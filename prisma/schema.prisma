@@ -95,6 +95,7 @@ model Employee {
   marketingUnitHead  MarketingUnit[]   @relation("MarketingUnitHead")
   projectsAsSalesRep Project[]         @relation("ProjectSalesRep")
   projectsAsTeamLead Project[]         @relation("ProjectTeamLead")
+  projectsAsUnitHead Project[]         @relation("ProjectUnitHead")
   projectLogs        ProjectLog[]      @relation("ProjectLogDeveloper")
   production         Production[]      @relation("ProductionEmployee")
   productionUnitHead ProductionUnit[]  @relation("ProductionUnitHead")
@@ -231,6 +232,7 @@ model Project {
   crackedLeadId   Int?             @map("cracked_lead_id")
   salesRepId      Int?             @map("sales_rep_id")
   teamLeadId      Int?             @map("team_lead_id")
+  unitHeadId      Int?             @map("unit_head_id")
   clientId        Int?             @map("client_id")
   status          ProjectStatus?
   difficultyLevel DifficultyLevel? @map("difficulty_level")
@@ -240,12 +242,12 @@ model Project {
   liveProgress    Decimal?         @map("live_progress") @db.Decimal(5, 2)
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
-
   // Foreign key relations
-  crackedLead CrackedLead? @relation(fields: [crackedLeadId], references: [id])
-  salesRep    Employee?    @relation("ProjectSalesRep", fields: [salesRepId], references: [id])
-  teamLead    Employee?    @relation("ProjectTeamLead", fields: [teamLeadId], references: [id])
-  client      Client?      @relation("ProjectClient", fields: [clientId], references: [id]) // New relation
+  crackedLead     CrackedLead?     @relation(fields: [crackedLeadId], references: [id])
+  salesRep        Employee?        @relation("ProjectSalesRep", fields: [salesRepId], references: [id])
+  teamLead        Employee?        @relation("ProjectTeamLead", fields: [teamLeadId], references: [id])
+  unitHead        Employee?        @relation("ProjectUnitHead", fields: [unitHeadId], references: [id])
+  client          Client?          @relation("ProjectClient", fields: [clientId], references: [id]) // New relation
 
   // Opposite relations
   projectLogs       ProjectLog[]
@@ -520,8 +522,9 @@ model LeadComment {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Foreign key relations
-  lead     Lead     @relation(fields: [leadId], references: [id])
-  employee Employee @relation("LeadCommentBy", fields: [commentBy], references: [id])
+  lead                 Lead                 @relation(fields: [leadId], references: [id])
+  employee             Employee             @relation("LeadCommentBy", fields: [commentBy], references: [id])
+  leadOutcomeHistories LeadOutcomeHistory[]
 
   @@map("lead_comments")
 }
@@ -662,12 +665,14 @@ model LeadOutcomeHistory {
   leadId    Int      @map("lead_id")
   outcome   String   @map("outcome") @db.VarChar(50)
   changedBy Int?     @map("changed_by")
-  changedAt DateTime @default(now()) @map("changed_at")
+  // changedAt DateTime @default(now()) @map("changed_at")
+  commentId Int?     @map("comment_id")
   createdAt DateTime @default(now()) @map("created_at")
 
   // Foreign key relations
-  lead          Lead      @relation(fields: [leadId], references: [id])
-  changedByUser Employee? @relation(fields: [changedBy], references: [id])
+  lead          Lead         @relation(fields: [leadId], references: [id])
+  changedByUser Employee?    @relation(fields: [changedBy], references: [id])
+  comment       LeadComment? @relation(fields: [commentId], references: [id])
 
   @@map("lead_outcome_history")
 }
@@ -1239,19 +1244,25 @@ model Meeting {
 }
 
 model Notification {
-  id        Int      @id @default(autoincrement())
-  sentTo    Int?     @map("sent_to")
-  sentBy    Int?     @map("sent_by")
-  heading   String?  @db.VarChar(255)
-  content   String?  @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id        Int                 @id @default(autoincrement())
+  status    NotificationStatus? @default(unread)
+  sentTo    Int?                @map("sent_to")
+  sentBy    Int?                @map("sent_by")
+  heading   String?             @db.VarChar(255)
+  content   String?             @db.Text
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee Employee? @relation("NotificationSentTo", fields: [sentTo], references: [id])
   sender   Employee? @relation("NotificationSentBy", fields: [sentBy], references: [id])
 
   @@map("notifications")
+}
+
+enum NotificationStatus {
+  read
+  unread
 }
 
 enum MeetingStatus {
