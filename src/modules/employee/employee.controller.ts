@@ -26,13 +26,6 @@ export class EmployeeController {
   @UseGuards(JwtAuthGuard)
   @Get('department-employees')
   getDepartmentEmployees(@Request() req: AuthenticatedRequest) {
-    // Only employees can access their department info
-    if (req.user.type === 'admin') {
-      throw new Error(
-        'Admins cannot access department-specific employee lists',
-      );
-    }
-
     return {
       message: 'Department employees accessed',
       departmentId: req.user.departmentId,
