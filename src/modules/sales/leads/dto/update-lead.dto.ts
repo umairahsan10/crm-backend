@@ -1,1 +1,1 @@
-export class UpdateLeadDto {} 
+export class UpdateLeadDto {}

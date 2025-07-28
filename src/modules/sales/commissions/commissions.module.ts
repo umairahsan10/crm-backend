@@ -6,4 +6,4 @@ import { CommissionsController } from './commissions.controller';
   controllers: [CommissionsController],
   providers: [CommissionsService],
 })
-export class CommissionsModule {} 
+export class CommissionsModule {}

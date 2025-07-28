@@ -6,4 +6,4 @@ import { HrController } from './hr.controller';
   controllers: [HrController],
   providers: [HrService],
 })
-export class HrModule {} 
+export class HrModule {}

@@ -6,4 +6,4 @@ import { MarketingController } from './marketing.controller';
   controllers: [MarketingController],
   providers: [MarketingService],
 })
-export class MarketingModule {} 
+export class MarketingModule {}
