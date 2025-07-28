@@ -961,7 +961,7 @@ model Admin {
 
 enum AdminRole {
   admin
-  super_admin
+  super_manager
 }
 
 model AdminRequest {
