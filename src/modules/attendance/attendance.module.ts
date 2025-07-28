@@ -6,4 +6,4 @@ import { AttendanceController } from './attendance.controller';
   controllers: [AttendanceController],
   providers: [AttendanceService],
 })
-export class AttendanceModule {} 
+export class AttendanceModule {}

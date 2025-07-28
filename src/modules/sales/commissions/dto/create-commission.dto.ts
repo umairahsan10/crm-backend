@@ -1,1 +1,1 @@
-export class CreateCommissionDto {} 
+export class CreateCommissionDto {}

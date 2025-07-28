@@ -6,4 +6,4 @@ import { FinanceController } from './finance.controller';
   controllers: [FinanceController],
   providers: [FinanceService],
 })
-export class FinanceModule {} 
+export class FinanceModule {}

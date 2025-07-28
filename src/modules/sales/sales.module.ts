@@ -6,4 +6,4 @@ import { CommissionsModule } from './commissions/commissions.module';
 @Module({
   imports: [LeadsModule, UnitsModule, CommissionsModule],
 })
-export class SalesModule {} 
+export class SalesModule {}

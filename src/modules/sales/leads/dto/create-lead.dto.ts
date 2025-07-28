@@ -1,1 +1,1 @@
-export class CreateLeadDto {} 
+export class CreateLeadDto {}

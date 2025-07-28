@@ -1,4 +1,4 @@
 import { Controller } from '@nestjs/common';
 
 @Controller('commissions')
-export class CommissionsController {} 
+export class CommissionsController {}
