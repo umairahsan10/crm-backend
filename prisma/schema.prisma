@@ -1003,6 +1003,7 @@ model Attendance {
   remoteDays      Int?     @map("remote_days")
   quarterlyLeaves Int?     @map("quarterly_leaves")
   monthlyLates    Int?     @map("monthly_lates")
+  halfDays        Int?     @map("half_days") @default(0)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -1153,6 +1154,7 @@ model MonthlyAttendanceSummary {
   totalAbsent     Int      @map("total_absent")
   totalLeaveDays  Int      @map("total_leave_days")
   totalLateDays   Int      @map("total_late_days")
+  totalHalfDays   Int      @map("total_half_days") @default(0)
   totalRemoteDays Int      @map("total_remote_days")
   generatedOn     DateTime @default(now()) @map("generated_on")
   createdAt       DateTime @default(now()) @map("created_at")

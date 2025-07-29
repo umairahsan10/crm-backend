@@ -93,7 +93,7 @@ export class AuthService {
         } else {
           // Default HR permissions for all HR employees
           permissionData = {
-            attendance_permission: false,
+            attendance_permission: true, // HR employees should have attendance permission by default
             salary_permission: false,
             commission_permission: false,
             employee_add_permission: false,
