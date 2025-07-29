@@ -13,10 +13,10 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 interface AuthenticatedRequest extends Request {
   user: {
     id: number;
-    email: string;
     role: string | number;
     type: string;
-    departmentId?: number;
+    department?: string;
+    permissions?: any;
   };
 }
 
