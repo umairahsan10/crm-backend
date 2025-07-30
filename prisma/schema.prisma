@@ -91,30 +91,32 @@ model Employee {
   managedDepartment Department? @relation("DepartmentManager")
 
   // Additional missing opposite relations
-  marketingRecords   Marketing[]       @relation("MarketingEmployee")
-  marketingUnitHead  MarketingUnit[]   @relation("MarketingUnitHead")
-  projectsAsSalesRep Project[]         @relation("ProjectSalesRep")
-  projectsAsTeamLead Project[]         @relation("ProjectTeamLead")
-  projectsAsUnitHead Project[]         @relation("ProjectUnitHead")
-  projectLogs        ProjectLog[]      @relation("ProjectLogDeveloper")
-  production         Production[]      @relation("ProductionEmployee")
-  productionUnitHead ProductionUnit[]  @relation("ProductionUnitHead")
-  teamsAsLead        Team[]            @relation("TeamLead")
-  clientsCreated     Client[]          @relation("ClientCreatedBy")
-  leadsCracked       Lead[]            @relation("LeadCrackedBy")
-  leadsAssigned      Lead[]            @relation("LeadAssignedTo")
-  leadsStarted       Lead[]            @relation("LeadStartedBy")
-  leadsClosed        Lead[]            @relation("LeadClosedBy")
-  salesUnitHead      SalesUnit[]       @relation("SalesUnitHead")
-  leadComments       LeadComment[]     @relation("LeadCommentBy")
-  salesDepartment    SalesDepartment[] @relation("SalesDepartmentEmployee")
-  crackedLeads       CrackedLead[]     @relation("CrackedLeadClosedBy")
-  refundsProcessed   Refund[]          @relation("RefundProcessedBy")
-  chargebacksHandled Chargeback[]      @relation("ChargebackHandledBy")
-  clientPayments     ClientPayment[]   @relation("PaymentProcessor")
-  archiveLeads       ArchiveLead[]     @relation("ArchiveLeadAssigned")
-  projectTasks       ProjectTask[]     @relation("TaskAssigner")
-  assignedTasks      ProjectTask[]     @relation("TaskAssignee")
+  marketingRecords    Marketing[]       @relation("MarketingEmployee")
+  marketingUnitHead   MarketingUnit[]   @relation("MarketingUnitHead")
+  projectsAsSalesRep  Project[]         @relation("ProjectSalesRep")
+  projectsAsTeamLead  Project[]         @relation("ProjectTeamLead")
+  projectsAsUnitHead  Project[]         @relation("ProjectUnitHead")
+  projectLogs         ProjectLog[]      @relation("ProjectLogDeveloper")
+  production          Production[]      @relation("ProductionEmployee")
+  productionUnitHead  ProductionUnit[]  @relation("ProductionUnitHead")
+  teamsAsLead         Team[]            @relation("TeamLead")
+  clientsCreated      Client[]          @relation("ClientCreatedBy")
+  leadsCracked        Lead[]            @relation("LeadCrackedBy")
+  leadsAssigned       Lead[]            @relation("LeadAssignedTo")
+  leadsStarted        Lead[]            @relation("LeadStartedBy")
+  leadsClosed         Lead[]            @relation("LeadClosedBy")
+  salesUnitHead       SalesUnit[]       @relation("SalesUnitHead")
+  leadComments        LeadComment[]     @relation("LeadCommentBy")
+  salesDepartment     SalesDepartment[] @relation("SalesDepartmentEmployee")
+  crackedLeads        CrackedLead[]     @relation("CrackedLeadClosedBy")
+  refundsProcessed    Refund[]          @relation("RefundProcessedBy")
+  chargebacksHandled  Chargeback[]      @relation("ChargebackHandledBy")
+  clientPayments      ClientPayment[]   @relation("PaymentProcessor")
+  archiveLeads        ArchiveLead[]     @relation("ArchiveLeadAssigned")
+  projectTasks        ProjectTask[]     @relation("TaskAssigner")
+  assignedTasks       ProjectTask[]     @relation("TaskAssignee")
+  halfDayLogsEmployee HalfDayLog[]      @relation("LateLogEmployee")
+  halfDayLogsReviewed HalfDayLog[]      @relation("LateLogReviewedBy")
 
   @@map("employees")
 }
@@ -1003,7 +1005,7 @@ model Attendance {
   remoteDays      Int?     @map("remote_days")
   quarterlyLeaves Int?     @map("quarterly_leaves")
   monthlyLates    Int?     @map("monthly_lates")
-  halfDays        Int?     @map("half_days") @default(0)
+  halfDays        Int?     @default(0) @map("half_days")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -1041,6 +1043,28 @@ enum AttendanceStatus {
   late
   half_day
   leave
+}
+
+model HalfDayLog {
+  id                 Int                 @id @default(autoincrement()) @map("half_day_log_id")
+  empId              Int                 @map("emp_id")
+  date               DateTime            @db.Date
+  scheduledTimeIn    String              @map("scheduled_time_in") @db.VarChar(10)
+  actualTimeIn       String              @map("actual_time_in") @db.VarChar(10)
+  minutesLate        Int                 @map("minutes_late")
+  reason             String?             @db.Text
+  justified          Boolean?            @default(false)
+  actionTaken        LateAction          @default(Pending) @map("action_taken")
+  confirmationReason ConfirmationAction? @map("confirmation_reason")
+  reviewedBy         Int?                @map("reviewed_by")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  // Foreign key relations
+  employee Employee  @relation("LateLogEmployee", fields: [empId], references: [id])
+  reviewer Employee? @relation("LateLogReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@map("half_day_logs")
 }
 
 model HR {
@@ -1154,7 +1178,7 @@ model MonthlyAttendanceSummary {
   totalAbsent     Int      @map("total_absent")
   totalLeaveDays  Int      @map("total_leave_days")
   totalLateDays   Int      @map("total_late_days")
-  totalHalfDays   Int      @map("total_half_days") @default(0)
+  totalHalfDays   Int      @default(0) @map("total_half_days")
   totalRemoteDays Int      @map("total_remote_days")
   generatedOn     DateTime @default(now()) @map("generated_on")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -1334,13 +1358,15 @@ model Company {
   website             String?  @db.VarChar(255)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
-  quarterlyLeavesDays Int      @map("quarterly_leaves_days")
-  monthlyLatesDays    Int      @map("monthly_lates_days") // Fixed mapping name
-  absentDeduction     Int      @map("absent_deduction")
-  lateDeduction       Int      @map("late_deduction")
+  quarterlyLeavesDays Int      @default(0) @map("quarterly_leaves_days")
+  monthlyLatesDays    Int      @default(0) @map("monthly_lates_days") // Fixed mapping name
+  absentDeduction     Int      @default(0) @map("absent_deduction")
+  lateDeduction       Int      @default(0) @map("late_deduction")
+  halfDeduction       Int      @default(0) @map("half_deduction")
   taxId               String?  @db.VarChar(100)
-  lateTime            Int      @map("late_time")
-  halfTime            Int      @map("half_time")
+  lateTime            Int      @default(0) @map("late_time")
+  halfTime            Int      @default(0) @map("half_time")
+  absentTime          Int      @default(0) @map("absent_time")
 
   @@map("companies")
 }

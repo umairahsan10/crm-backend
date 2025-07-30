@@ -11,6 +11,55 @@ import { CheckoutResponseDto } from './dto/checkout-response.dto';
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Helper function to create PKT timezone-aware date for storage
+  private createPKTDateForStorage(dateString: string, timeString: string): Date {
+    // Parse the time input to get the time components
+    const timeInput = new Date(timeString);
+    const timeISOString = timeInput.toISOString();
+    const timeMatch = timeISOString.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    
+    if (!timeMatch) {
+      throw new BadRequestException('Invalid time format');
+    }
+    
+    const hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const seconds = parseInt(timeMatch[3], 10);
+    
+    // Create the date
+    const date = new Date(dateString);
+    
+    // Set UTC time directly to ensure it stores as entered time
+    // Since PKT is UTC+5, if we want to store 9:00 as 9:00, 
+    // we set UTC time to 9:00 (which will display as 9:00)
+    const pktDate = new Date(date);
+    pktDate.setUTCHours(hours, minutes, seconds, 0);
+    
+    return pktDate;
+  }
+
+  // Helper function to create local time for calculations
+  private createLocalTimeForCalculation(dateString: string, timeString: string): Date {
+    const timeInput = new Date(timeString);
+    const timeISOString = timeInput.toISOString();
+    const timeMatch = timeISOString.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    
+    if (!timeMatch) {
+      throw new BadRequestException('Invalid time format');
+    }
+    
+    const hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const seconds = parseInt(timeMatch[3], 10);
+    
+    // For calculations, we need to treat this as PKT time
+    // So if input is 9:00, we want to compare it with shift times in PKT
+    const date = new Date(dateString);
+    date.setHours(hours, minutes, seconds, 0);
+    
+    return date;
+  }
+
   async getAttendanceLogs(query: GetAttendanceLogsDto): Promise<AttendanceLogResponseDto[]> {
     try {
       const { employee_id, start_date, end_date } = query;
@@ -128,21 +177,10 @@ export class AttendanceService {
         throw new BadRequestException('Employee already checked in for this date');
       }
 
-      // Parse check-in time and date (handle PKT timezone)
-      // Assume the input time is in PKT local time, not UTC
-      const checkinTimeInput = new Date(checkin);
-      const checkinDateInput = new Date(date);
-      
-      // Create the actual PKT time by setting the time components directly
-      const checkinTimePKT = new Date(checkinDateInput);
-      checkinTimePKT.setHours(
-        checkinTimeInput.getUTCHours(),
-        checkinTimeInput.getUTCMinutes(),
-        checkinTimeInput.getUTCSeconds(),
-        0
-      );
-      
-      const checkinDatePKT = new Date(checkinDateInput);
+      // Create dates - one for storage (PKT timezone-aware) and one for calculations (local)
+      const checkinTimeForStorage = this.createPKTDateForStorage(date, checkin);
+      const checkinTimeForCalculation = this.createLocalTimeForCalculation(date, checkin);
+      const checkinDatePKT = new Date(date);
       
       // Get employee's shift times (default to 9:00 AM - 5:00 PM if not set)
       const shiftStart = employee.shiftStart || '09:00';
@@ -150,42 +188,57 @@ export class AttendanceService {
       const [shiftStartHour, shiftStartMinute] = shiftStart.split(':').map(Number);
       const [shiftEndHour, shiftEndMinute] = shiftEnd.split(':').map(Number);
       
-      // Create expected shift times for this date in PKT
+      // Create expected shift times for this date (for calculation purposes)
       const expectedShiftStart = new Date(checkinDatePKT);
       expectedShiftStart.setHours(shiftStartHour, shiftStartMinute, 0, 0);
       
       const expectedShiftEnd = new Date(checkinDatePKT);
       expectedShiftEnd.setHours(shiftEndHour, shiftEndMinute, 0, 0);
 
-      // Calculate minutes late from shift start
-      const minutesLate = Math.floor((checkinTimePKT.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+      // Calculate minutes late from shift start using local calculation time
+      const minutesLate = Math.floor((checkinTimeForCalculation.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+      
+      // Fetch company policy values from companies table
+      const company = await this.prisma.company.findFirst();
+      if (!company) {
+        throw new BadRequestException('Company policy not found');
+      }
 
-      // Determine status based on late policy rules
+      // Use dynamic values from companies table
+      const lateTime = company.lateTime || 30; // Default to 30 minutes if not set
+      const halfTime = company.halfTime || 90; // Default to 90 minutes if not set
+      const absentTime = company.absentTime || 180; // Default to 180 minutes if not set
+
+      // Determine status based on dynamic late policy rules
       let status: 'present' | 'late' | 'half_day' | 'absent' = 'present';
       let lateDetails: { minutes_late: number; requires_reason: boolean } | null = null;
 
       if (minutesLate > 0) {
-        // Convert hours to minutes for comparison
-        const halfHourMinutes = 30;
-        const twoHoursMinutes = 120;
-        const fourHoursMinutes = 240;
+        // Dynamic policy rules based on companies table:
+        // 0 to lateTime: present
+        // lateTime+1 to halfTime: late
+        // halfTime+1 to absentTime: half-day
+        // absentTime+1 onwards: absent
 
-        if (minutesLate >= halfHourMinutes && minutesLate < twoHoursMinutes) {
-          // 30 minutes to 2 hours late: present + late
+        if (minutesLate <= lateTime) {
+          // Within late time limit: present
+          status = 'present';
+        } else if (minutesLate > lateTime && minutesLate <= halfTime) {
+          // Exceeds late time but within half time: late
           status = 'late';
           lateDetails = {
             minutes_late: minutesLate,
             requires_reason: true
           };
-        } else if (minutesLate >= twoHoursMinutes && minutesLate < fourHoursMinutes) {
-          // 2 hours to 4 hours late: present + half_day
+        } else if (minutesLate > halfTime && minutesLate <= absentTime) {
+          // Exceeds half time but within absent time: half-day
           status = 'half_day';
           lateDetails = {
             minutes_late: minutesLate,
             requires_reason: true
           };
-        } else if (minutesLate >= fourHoursMinutes || checkinTimePKT > expectedShiftEnd) {
-          // 4+ hours late or after shift end: absent
+        } else {
+          // Exceeds absent time: absent
           status = 'absent';
           lateDetails = {
             minutes_late: minutesLate,
@@ -194,13 +247,13 @@ export class AttendanceService {
         }
       }
 
-      // Create or update attendance log
+      // Create or update attendance log using the PKT timezone-aware time for storage
       const attendanceLog = await this.prisma.attendanceLog.upsert({
         where: {
           id: existingCheckin?.id || 0
         },
         update: {
-          checkin: checkinTimePKT,
+          checkin: checkinTimeForStorage, // This will store as 9:00 if entered as 9:00
           mode: mode || null,
           status,
           updatedAt: new Date()
@@ -208,7 +261,7 @@ export class AttendanceService {
         create: {
           employeeId,
           date: checkinDatePKT,
-          checkin: checkinTimePKT,
+          checkin: checkinTimeForStorage, // This will store as 9:00 if entered as 9:00
           mode: mode || null,
           status
         }
@@ -216,6 +269,9 @@ export class AttendanceService {
 
       // Update monthly attendance summary
       await this.updateMonthlyAttendanceSummary(employeeId, checkinDatePKT, status);
+
+      // Update base attendance table (lifetime records)
+      await this.updateBaseAttendance(employeeId, status);
 
       return {
         id: attendanceLog.id,
@@ -269,29 +325,19 @@ export class AttendanceService {
         throw new BadRequestException('Employee already checked out for this date');
       }
 
-      // Parse checkout time (handle PKT timezone)
-      const checkoutTimeInput = new Date(checkout);
-      const checkoutDateInput = new Date(date);
-      
-      // Create the actual PKT time by setting the time components directly
-      const checkoutTimePKT = new Date(checkoutDateInput);
-      checkoutTimePKT.setHours(
-        checkoutTimeInput.getUTCHours(),
-        checkoutTimeInput.getUTCMinutes(),
-        checkoutTimeInput.getUTCSeconds(),
-        0
-      );
+      // Create checkout time for storage (PKT timezone-aware)
+      const checkoutTimeForStorage = this.createPKTDateForStorage(date, checkout);
 
-      // Calculate total hours worked
+      // Calculate total hours worked using the stored times
       const checkinTime = existingAttendance.checkin;
-      const totalMilliseconds = checkoutTimePKT.getTime() - checkinTime.getTime();
+      const totalMilliseconds = checkoutTimeForStorage.getTime() - checkinTime.getTime();
       const totalHoursWorked = Math.round((totalMilliseconds / (1000 * 60 * 60)) * 100) / 100; // Round to 2 decimal places
 
       // Update attendance log with checkout time
       const updatedAttendance = await this.prisma.attendanceLog.update({
         where: { id: existingAttendance.id },
         data: {
-          checkout: checkoutTimePKT,
+          checkout: checkoutTimeForStorage,
           updatedAt: new Date()
         }
       });
@@ -378,6 +424,92 @@ export class AttendanceService {
 
     } catch (error) {
       console.error('Error updating monthly attendance summary:', error);
+      // Don't throw error here to avoid failing the check-in
+    }
+  }
+
+  private async updateBaseAttendance(
+    employeeId: number, 
+    status: 'present' | 'late' | 'half_day' | 'absent'
+  ): Promise<void> {
+    try {
+      // Find existing attendance record or create new one
+      let attendance = await this.prisma.attendance.findFirst({
+        where: {
+          employeeId: employeeId
+        }
+      });
+
+      if (!attendance) {
+        // Create new attendance record for the employee
+        attendance = await this.prisma.attendance.create({
+          data: {
+            employeeId: employeeId,
+            presentDays: 0,
+            absentDays: 0,
+            lateDays: 0,
+            leaveDays: 0,
+            remoteDays: 0,
+            quarterlyLeaves: 0,
+            monthlyLates: 0,
+            halfDays: 0
+          }
+        });
+      } else {
+        // Fix NULL values by setting them to 0 if they're null
+        const needsUpdate = attendance.presentDays === null || 
+                            attendance.absentDays === null ||
+                            attendance.lateDays === null ||
+                            attendance.halfDays === null;
+
+        if (needsUpdate) {
+          attendance = await this.prisma.attendance.update({
+            where: { id: attendance.id },
+            data: {
+              presentDays: attendance.presentDays ?? 0,
+              absentDays: attendance.absentDays ?? 0,
+              lateDays: attendance.lateDays ?? 0,
+              leaveDays: attendance.leaveDays ?? 0,
+              remoteDays: attendance.remoteDays ?? 0,
+              quarterlyLeaves: attendance.quarterlyLeaves ?? 0,
+              monthlyLates: attendance.monthlyLates ?? 0,
+              halfDays: attendance.halfDays ?? 0  
+            }
+          });
+        }
+      }
+
+      // Update counters based on status
+      const updateData: any = {};
+
+      switch (status) {
+        case 'present':
+          updateData.presentDays = { increment: 1 };
+          break;
+        case 'late':
+          updateData.presentDays = { increment: 1 };
+          updateData.lateDays = { increment: 1 };
+          if ((attendance.monthlyLates ?? 0) > 0) {
+            updateData.monthlyLates = { decrement: 1 }; // Decrement monthly lates when employee is late
+          }
+          break;
+        case 'half_day':
+          updateData.presentDays = { increment: 1 };
+          updateData.halfDays = { increment: 1 };
+          break;
+        case 'absent':
+          updateData.absentDays = { increment: 1 };
+          break;
+      }
+
+      // Update the attendance record
+      await this.prisma.attendance.update({
+        where: { id: attendance.id },
+        data: updateData
+      });
+
+    } catch (error) {
+      console.error('Error updating base attendance:', error);
       // Don't throw error here to avoid failing the check-in
     }
   }
