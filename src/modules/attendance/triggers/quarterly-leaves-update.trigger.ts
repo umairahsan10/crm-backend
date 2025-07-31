@@ -16,7 +16,7 @@ export class QuarterlyLeavesUpdateTrigger {
     name: 'quarterly-leaves-add',
     timeZone: 'Asia/Karachi' // PKT timezone
   })
-  async addQuarterlyLeaves() {
+  async addQuarterlyLeaves(): Promise<number> {
     try {
       this.logger.log('Starting quarterly leaves add trigger...');
 
@@ -43,6 +43,7 @@ export class QuarterlyLeavesUpdateTrigger {
       // Log the action for audit purposes
       await this.logQuarterlyLeavesUpdate('ADD', 5, result.count);
 
+      return result.count;
     } catch (error) {
       this.logger.error('Error in quarterly leaves add trigger:', error);
       throw error;
@@ -57,7 +58,7 @@ export class QuarterlyLeavesUpdateTrigger {
     name: 'quarterly-leaves-reset',
     timeZone: 'Asia/Karachi' // PKT timezone
   })
-  async resetQuarterlyLeaves() {
+  async resetQuarterlyLeaves(): Promise<number> {
     try {
       this.logger.log('Starting quarterly leaves reset trigger...');
 
@@ -82,6 +83,7 @@ export class QuarterlyLeavesUpdateTrigger {
       // Log the action for audit purposes
       await this.logQuarterlyLeavesUpdate('RESET', 5, result.count);
 
+      return result.count;
     } catch (error) {
       this.logger.error('Error in quarterly leaves reset trigger:', error);
       throw error;
@@ -107,14 +109,14 @@ export class QuarterlyLeavesUpdateTrigger {
   /**
    * Manual trigger method for testing or manual execution
    */
-  async manualAddQuarterlyLeaves() {
+  async manualAddQuarterlyLeaves(): Promise<number> {
     this.logger.log('Manual quarterly leaves add triggered');
-    await this.addQuarterlyLeaves();
+    return await this.addQuarterlyLeaves();
   }
 
-  async manualResetQuarterlyLeaves() {
+  async manualResetQuarterlyLeaves(): Promise<number> {
     this.logger.log('Manual quarterly leaves reset triggered');
-    await this.resetQuarterlyLeaves();
+    return await this.resetQuarterlyLeaves();
   }
 
   /**

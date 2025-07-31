@@ -114,10 +114,10 @@ export class AttendanceController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async triggerMonthlyLatesReset(): Promise<{ message: string; updated_count: number }> {
-    await this.monthlyLatesResetTrigger.manualReset();
+    const updatedCount = await this.monthlyLatesResetTrigger.manualReset();
     return {
       message: 'Monthly lates reset triggered successfully',
-      updated_count: 0 // Will be logged in the trigger
+      updated_count: updatedCount
     };
   }
 
@@ -126,10 +126,10 @@ export class AttendanceController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async triggerQuarterlyLeavesAdd(): Promise<{ message: string; updated_count: number }> {
-    await this.quarterlyLeavesUpdateTrigger.manualAddQuarterlyLeaves();
+    const updatedCount = await this.quarterlyLeavesUpdateTrigger.manualAddQuarterlyLeaves();
     return {
       message: 'Quarterly leaves add triggered successfully',
-      updated_count: 0 // Will be logged in the trigger
+      updated_count: updatedCount
     };
   }
 
@@ -138,10 +138,10 @@ export class AttendanceController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async triggerQuarterlyLeavesReset(): Promise<{ message: string; updated_count: number }> {
-    await this.quarterlyLeavesUpdateTrigger.manualResetQuarterlyLeaves();
+    const updatedCount = await this.quarterlyLeavesUpdateTrigger.manualResetQuarterlyLeaves();
     return {
       message: 'Quarterly leaves reset triggered successfully',
-      updated_count: 0 // Will be logged in the trigger
+      updated_count: updatedCount
     };
   }
 

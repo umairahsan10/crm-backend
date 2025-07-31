@@ -16,7 +16,7 @@ export class MonthlyLatesResetTrigger {
     name: 'monthly-lates-reset',
     timeZone: 'Asia/Karachi' // PKT timezone
   })
-  async resetMonthlyLates() {
+  async resetMonthlyLates(): Promise<number> {
     try {
       this.logger.log('Starting monthly lates reset trigger...');
 
@@ -41,6 +41,7 @@ export class MonthlyLatesResetTrigger {
       // Log the action for audit purposes
       await this.logMonthlyLatesReset(result.count);
 
+      return result.count;
     } catch (error) {
       this.logger.error('Error in monthly lates reset trigger:', error);
       throw error;
@@ -66,9 +67,9 @@ export class MonthlyLatesResetTrigger {
   /**
    * Manual trigger method for testing or manual execution
    */
-  async manualReset() {
+  async manualReset(): Promise<number> {
     this.logger.log('Manual monthly lates reset triggered');
-    await this.resetMonthlyLates();
+    return await this.resetMonthlyLates();
   }
 
   /**
