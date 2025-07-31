@@ -10,6 +10,8 @@ import { AttendanceListResponseDto } from './dto/attendance-list-response.dto';
 import { MonthlyAttendanceResponseDto } from './dto/monthly-attendance-response.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { UpdateMonthlyAttendanceDto } from './dto/update-monthly-attendance.dto';
+import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
+import { LateLogResponseDto } from './dto/late-log-response.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -157,6 +159,11 @@ export class AttendanceService {
       // Ensure employee_id is a number
       const employeeId = Number(employee_id);
 
+      // Validate employee_id
+      if (isNaN(employeeId) || employeeId <= 0) {
+        throw new BadRequestException('Invalid employee ID');
+      }
+
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
         where: { id: employeeId },
@@ -276,6 +283,31 @@ export class AttendanceService {
 
       // Update base attendance table (lifetime records)
       await this.updateBaseAttendance(employeeId, status);
+
+      // Automatically create late log ONLY if employee is late (not half-day or absent)
+      if (status === 'late') {
+        // Parse checkin time to get actual time in format "HH:MM"
+        const checkinTimeString = checkin.split('T')[1]; // "HH:MM:SS.sssZ"
+        const timeParts = checkinTimeString.split(':');
+        const hours = parseInt(timeParts[0], 10);
+        const minutes = parseInt(timeParts[1], 10);
+        const actualTimeIn = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+                 // Always create a new late log entry (maintains log history)
+         await this.prisma.lateLog.create({
+           data: {
+             empId: employeeId,
+             date: new Date(date),
+             scheduledTimeIn: shiftStart,
+             actualTimeIn: actualTimeIn,
+             minutesLate: minutesLate,
+             reason: null, // Will be filled when employee submits reason
+             actionTaken: 'Created', // Initial status when check-in creates late log
+             lateType: null, // Will be set by HR
+             justified: null // Will be set by HR
+           }
+         });
+      }
 
       return {
         id: attendanceLog.id,
@@ -850,6 +882,166 @@ export class AttendanceService {
            throw error;
          }
          throw new InternalServerErrorException(`Failed to update monthly attendance record: ${error.message}`);
+       }
+     }
+
+     async submitLateReason(lateData: SubmitLateReasonDto): Promise<LateLogResponseDto> {
+       try {
+         const { emp_id, date, scheduled_time_in, actual_time_in, minutes_late, reason } = lateData;
+
+         // Check if employee exists
+         const employee = await this.prisma.employee.findUnique({
+           where: { id: emp_id }
+         });
+
+         if (!employee) {
+           throw new BadRequestException('Employee not found');
+         }
+
+         // Find existing late log created by check-in for this employee and date
+         const existingLateLog = await this.prisma.lateLog.findFirst({
+           where: {
+             empId: emp_id,
+             date: new Date(date),
+             actionTaken: 'Created' // Only update logs created by check-in
+           },
+           orderBy: {
+             createdAt: 'desc' // Get the most recent one
+           }
+         });
+
+         if (!existingLateLog) {
+           throw new BadRequestException('No late log found for this employee and date. Please check-in first.');
+         }
+
+         // Update the existing late log with reason and change status to Pending
+         const lateLog = await this.prisma.lateLog.update({
+           where: { id: existingLateLog.id },
+           data: {
+             reason: reason,
+             actionTaken: 'Pending', // Status when employee submits reason
+             lateType: null, // Keep null, will be set by HR
+             justified: null, // Keep null, will be set by HR
+             updatedAt: new Date()
+           }
+         });
+
+         return {
+           late_log_id: lateLog.id,
+           emp_id: lateLog.empId,
+           date: lateLog.date.toISOString().split('T')[0],
+           scheduled_time_in: lateLog.scheduledTimeIn,
+           actual_time_in: lateLog.actualTimeIn,
+           minutes_late: lateLog.minutesLate,
+           reason: lateLog.reason || '',
+           justified: lateLog.justified || false,
+           late_type: lateLog.lateType || 'unpaid',
+           action_taken: lateLog.actionTaken,
+           reviewed_by: lateLog.reviewedBy,
+           created_at: lateLog.createdAt.toISOString(),
+           updated_at: lateLog.updatedAt.toISOString()
+         };
+       } catch (error) {
+         console.error('Error in submitLateReason:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to submit late reason: ${error.message}`);
+       }
+     }
+
+     async processLateAction(lateLogId: number, action: 'Pending' | 'Completed', reviewerId: number, lateType?: 'paid' | 'unpaid'): Promise<LateLogResponseDto> {
+       try {
+         // Find the late log
+         const lateLog = await this.prisma.lateLog.findUnique({
+           where: { id: lateLogId }
+         });
+
+         if (!lateLog) {
+           throw new BadRequestException('Late log not found');
+         }
+
+         // Update the late log with the action
+         const updatedLateLog = await this.prisma.lateLog.update({
+           where: { id: lateLogId },
+           data: {
+             actionTaken: action,
+             lateType: lateType || null, // Let HR set this
+             justified: action === 'Completed' ? (lateType === 'paid') : null, // Let HR set this
+             reviewedBy: reviewerId,
+             updatedAt: new Date()
+           }
+         });
+
+         let attendanceUpdates: { late_days: number; monthly_lates: number; } | undefined = undefined;
+
+         // If completed and marked as paid, update attendance records
+         if (action === 'Completed' && lateType === 'paid') {
+           // Find the attendance record for this employee
+           const attendance = await this.prisma.attendance.findFirst({
+             where: { employeeId: lateLog.empId }
+           });
+
+           if (attendance) {
+             // Check if late_days is greater than 0 before decrementing
+             const currentLateDays = attendance.lateDays || 0;
+             const newLateDays = Math.max(0, currentLateDays - 1); // Prevent going below 0
+
+             // Update attendance with safe decrement
+             const updatedAttendance = await this.prisma.attendance.update({
+               where: { id: attendance.id },
+               data: {
+                 lateDays: newLateDays,
+                 monthlyLates: {
+                   increment: 1
+                 }
+               }
+             });
+
+             // Update monthly attendance summary to reflect the change
+             const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+             await this.prisma.monthlyAttendanceSummary.updateMany({
+               where: {
+                 empId: lateLog.empId,
+                 month: currentMonth
+               },
+               data: {
+                 totalLateDays: {
+                   decrement: 1
+                 }
+               }
+             });
+
+             // Include the updated attendance values in response
+             attendanceUpdates = {
+               late_days: updatedAttendance.lateDays || 0,
+               monthly_lates: updatedAttendance.monthlyLates || 0
+             };
+           }
+         }
+
+         return {
+           late_log_id: updatedLateLog.id,
+           emp_id: updatedLateLog.empId,
+           date: updatedLateLog.date.toISOString().split('T')[0],
+           scheduled_time_in: updatedLateLog.scheduledTimeIn,
+           actual_time_in: updatedLateLog.actualTimeIn,
+           minutes_late: updatedLateLog.minutesLate,
+           reason: updatedLateLog.reason || '',
+           justified: updatedLateLog.justified || false,
+           late_type: updatedLateLog.lateType || 'unpaid',
+           action_taken: updatedLateLog.actionTaken,
+           reviewed_by: updatedLateLog.reviewedBy,
+           created_at: updatedLateLog.createdAt.toISOString(),
+           updated_at: updatedLateLog.updatedAt.toISOString(),
+           attendance_updates: attendanceUpdates
+         };
+       } catch (error) {
+         console.error('Error in processLateAction:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to process late action: ${error.message}`);
        }
      }
    }

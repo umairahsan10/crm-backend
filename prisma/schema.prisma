@@ -1046,25 +1046,30 @@ enum AttendanceStatus {
 }
 
 model HalfDayLog {
-  id                 Int                 @id @default(autoincrement()) @map("half_day_log_id")
-  empId              Int                 @map("emp_id")
-  date               DateTime            @db.Date
-  scheduledTimeIn    String              @map("scheduled_time_in") @db.VarChar(10)
-  actualTimeIn       String              @map("actual_time_in") @db.VarChar(10)
-  minutesLate        Int                 @map("minutes_late")
-  reason             String?             @db.Text
-  justified          Boolean?            @default(false)
-  actionTaken        LateAction          @default(Pending) @map("action_taken")
-  confirmationReason ConfirmationAction? @map("confirmation_reason")
-  reviewedBy         Int?                @map("reviewed_by")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
+  id              Int          @id @default(autoincrement()) @map("half_day_log_id")
+  empId           Int          @map("emp_id")
+  date            DateTime     @db.Date
+  scheduledTimeIn String       @map("scheduled_time_in") @db.VarChar(10)
+  actualTimeIn    String       @map("actual_time_in") @db.VarChar(10)
+  minutesLate     Int          @map("minutes_late")
+  reason          String?      @db.Text
+  justified       Boolean?     @default(false)
+  actionTaken     LateAction   @default(Pending) @map("action_taken")
+  halfDayType     HalfDayType? @default(unpaid) @map("half_day_type")
+  reviewedBy      Int?         @map("reviewed_by")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee Employee  @relation("LateLogEmployee", fields: [empId], references: [id])
   reviewer Employee? @relation("LateLogReviewedBy", fields: [reviewedBy], references: [id])
 
   @@map("half_day_logs")
+}
+
+enum HalfDayType {
+  paid
+  unpaid
 }
 
 model HR {
@@ -1138,19 +1143,19 @@ enum LeaveStatus {
 }
 
 model LateLog {
-  id                 Int                @id @default(autoincrement()) @map("late_log_id")
-  empId              Int                @map("emp_id")
-  date               DateTime           @db.Date
-  scheduledTimeIn    String             @map("scheduled_time_in") @db.VarChar(10)
-  actualTimeIn       String             @map("actual_time_in") @db.VarChar(10)
-  minutesLate        Int                @map("minutes_late")
-  reason             String?            @db.Text
-  justified          Boolean?           @default(false)
-  actionTaken        LateAction         @default(Pending) @map("action_taken")
-  confirmationReason ConfirmationAction @map("confirmation_reason")
-  reviewedBy         Int?               @map("reviewed_by")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+  id              Int        @id @default(autoincrement()) @map("late_log_id")
+  empId           Int        @map("emp_id")
+  date            DateTime   @db.Date
+  scheduledTimeIn String     @map("scheduled_time_in") @db.VarChar(10)
+  actualTimeIn    String     @map("actual_time_in") @db.VarChar(10)
+  minutesLate     Int        @map("minutes_late")
+  reason          String?    @db.Text
+  justified       Boolean?   @default(false)
+  lateType        LateType?  @default(unpaid) @map("late_type")
+  actionTaken     LateAction @default(Created) @map("action_taken")
+  reviewedBy      Int?       @map("reviewed_by")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee Employee  @relation("LateLogEmployee", fields: [empId], references: [id])
@@ -1160,14 +1165,14 @@ model LateLog {
 }
 
 enum LateAction {
-  Approved
+  Created
   Pending
-  Rejected
+  Completed
 }
 
-enum ConfirmationAction {
-  rejected
-  approved
+enum LateType {
+  paid
+  unpaid
 }
 
 model MonthlyAttendanceSummary {

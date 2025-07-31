@@ -10,6 +10,8 @@ import { AttendanceListResponseDto } from './dto/attendance-list-response.dto';
 import { MonthlyAttendanceResponseDto } from './dto/monthly-attendance-response.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { UpdateMonthlyAttendanceDto } from './dto/update-monthly-attendance.dto';
+import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
+import { LateLogResponseDto } from './dto/late-log-response.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -52,6 +54,35 @@ export class AttendanceController {
     @Body() checkoutData: CheckoutDto
   ): Promise<CheckoutResponseDto> {
     return this.attendanceService.checkout(checkoutData);
+  }
+
+  @Put('late-logs')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async submitLateReason(
+    @Body() lateData: SubmitLateReasonDto
+  ): Promise<LateLogResponseDto> {
+    return this.attendanceService.submitLateReason(lateData);
+  }
+
+  @Put('late-logs/:id/action')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async processLateAction(
+    @Param('id') id: string,
+    @Body() actionData: { action: 'Pending' | 'Completed'; reviewer_id: number; late_type?: 'paid' | 'unpaid' }
+  ): Promise<LateLogResponseDto> {
+    const lateLogId = Number(id);
+    if (isNaN(lateLogId)) {
+      throw new BadRequestException('Invalid late log ID');
+    }
+    return this.attendanceService.processLateAction(
+      lateLogId,
+      actionData.action,
+      actionData.reviewer_id,
+      actionData.late_type
+    );
   }
 
   @Get('list')
