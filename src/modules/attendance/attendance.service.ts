@@ -6,6 +6,10 @@ import { CheckinDto } from './dto/checkin.dto';
 import { CheckinResponseDto } from './dto/checkin-response.dto';
 import { CheckoutDto } from './dto/checkout.dto';
 import { CheckoutResponseDto } from './dto/checkout-response.dto';
+import { AttendanceListResponseDto } from './dto/attendance-list-response.dto';
+import { MonthlyAttendanceResponseDto } from './dto/monthly-attendance-response.dto';
+import { UpdateAttendanceDto } from './dto/update-attendance.dto';
+import { UpdateMonthlyAttendanceDto } from './dto/update-monthly-attendance.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -508,9 +512,344 @@ export class AttendanceService {
         data: updateData
       });
 
-    } catch (error) {
-      console.error('Error updating base attendance:', error);
-      // Don't throw error here to avoid failing the check-in
+         } catch (error) {
+       console.error('Error updating base attendance:', error);
+       // Don't throw error here to avoid failing the check-in
+     }
+   }
+
+   async getAttendanceList(): Promise<AttendanceListResponseDto[]> {
+     try {
+       const attendanceRecords = await this.prisma.attendance.findMany({
+         include: {
+           employee: {
+             select: {
+               id: true,
+               firstName: true,
+               lastName: true
+             }
+           }
+         },
+         orderBy: {
+           createdAt: 'desc'
+         }
+       });
+
+       return attendanceRecords.map(record => ({
+         id: record.id,
+         employee_id: record.employeeId,
+         present_days: record.presentDays,
+         absent_days: record.absentDays,
+         late_days: record.lateDays,
+         leave_days: record.leaveDays,
+         remote_days: record.remoteDays,
+         quarterly_leaves: record.quarterlyLeaves,
+         monthly_lates: record.monthlyLates,
+         half_days: record.halfDays,
+         created_at: record.createdAt.toISOString(),
+         updated_at: record.updatedAt.toISOString()
+       }));
+     } catch (error) {
+       console.error('Error in getAttendanceList:', error);
+       throw new InternalServerErrorException(`Failed to fetch attendance records: ${error.message}`);
+     }
+   }
+
+   async getAttendanceById(employeeId: number): Promise<AttendanceListResponseDto | null> {
+     try {
+       const attendanceRecord = await this.prisma.attendance.findFirst({
+         where: {
+           employeeId: employeeId
+         },
+         include: {
+           employee: {
+             select: {
+               id: true,
+               firstName: true,
+               lastName: true
+             }
+           }
+         }
+       });
+
+       if (!attendanceRecord) {
+         return null;
+       }
+
+       return {
+         id: attendanceRecord.id,
+         employee_id: attendanceRecord.employeeId,
+         present_days: attendanceRecord.presentDays,
+         absent_days: attendanceRecord.absentDays,
+         late_days: attendanceRecord.lateDays,
+         leave_days: attendanceRecord.leaveDays,
+         remote_days: attendanceRecord.remoteDays,
+         quarterly_leaves: attendanceRecord.quarterlyLeaves,
+         monthly_lates: attendanceRecord.monthlyLates,
+         half_days: attendanceRecord.halfDays,
+         created_at: attendanceRecord.createdAt.toISOString(),
+         updated_at: attendanceRecord.updatedAt.toISOString()
+       };
+           } catch (error) {
+        console.error('Error in getAttendanceById:', error);
+        throw new InternalServerErrorException(`Failed to fetch attendance record: ${error.message}`);
+      }
     }
-  }
-}
+
+    async getMonthlyAttendanceList(month?: string): Promise<MonthlyAttendanceResponseDto[]> {
+      try {
+        // If no month provided, use current month
+        const targetMonth = month || new Date().toISOString().slice(0, 7);
+        
+        // Validate month format (YYYY-MM)
+        if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
+          throw new BadRequestException('Invalid month format. Use YYYY-MM format (e.g., 2025-01)');
+        }
+
+        const monthlyRecords = await this.prisma.monthlyAttendanceSummary.findMany({
+          where: {
+            month: targetMonth
+          },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+
+        return monthlyRecords.map(record => ({
+          id: record.id,
+          employee_id: record.empId,
+          employee_first_name: record.employee.firstName,
+          employee_last_name: record.employee.lastName,
+          month: record.month,
+          total_present: record.totalPresent,
+          total_absent: record.totalAbsent,
+          total_leave_days: record.totalLeaveDays,
+          total_late_days: record.totalLateDays,
+          total_half_days: record.totalHalfDays,
+          total_remote_days: record.totalRemoteDays,
+          generated_on: record.generatedOn.toISOString(),
+          created_at: record.createdAt.toISOString(),
+          updated_at: record.updatedAt.toISOString()
+        }));
+      } catch (error) {
+        console.error('Error in getMonthlyAttendanceList:', error);
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+        throw new InternalServerErrorException(`Failed to fetch monthly attendance records: ${error.message}`);
+      }
+    }
+
+    async getMonthlyAttendanceByEmployee(employeeId: number, month?: string): Promise<MonthlyAttendanceResponseDto | null> {
+      try {
+        // If no month provided, use current month
+        const targetMonth = month || new Date().toISOString().slice(0, 7);
+        
+        // Validate month format (YYYY-MM)
+        if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
+          throw new BadRequestException('Invalid month format. Use YYYY-MM format (e.g., 2025-01)');
+        }
+
+        const monthlyRecord = await this.prisma.monthlyAttendanceSummary.findFirst({
+          where: {
+            empId: employeeId,
+            month: targetMonth
+          },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        });
+
+        if (!monthlyRecord) {
+          return null;
+        }
+
+        return {
+          id: monthlyRecord.id,
+          employee_id: monthlyRecord.empId,
+          employee_first_name: monthlyRecord.employee.firstName,
+          employee_last_name: monthlyRecord.employee.lastName,
+          month: monthlyRecord.month,
+          total_present: monthlyRecord.totalPresent,
+          total_absent: monthlyRecord.totalAbsent,
+          total_leave_days: monthlyRecord.totalLeaveDays,
+          total_late_days: monthlyRecord.totalLateDays,
+          total_half_days: monthlyRecord.totalHalfDays,
+          total_remote_days: monthlyRecord.totalRemoteDays,
+          generated_on: monthlyRecord.generatedOn.toISOString(),
+          created_at: monthlyRecord.createdAt.toISOString(),
+          updated_at: monthlyRecord.updatedAt.toISOString()
+        };
+      } catch (error) {
+        console.error('Error in getMonthlyAttendanceByEmployee:', error);
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+                 throw new InternalServerErrorException(`Failed to fetch monthly attendance record: ${error.message}`);
+       }
+     }
+
+     async updateAttendance(updateData: UpdateAttendanceDto): Promise<AttendanceListResponseDto> {
+       try {
+         const { employee_id, ...updateFields } = updateData;
+
+         // Check if employee exists
+         const employee = await this.prisma.employee.findUnique({
+           where: { id: employee_id }
+         });
+
+         if (!employee) {
+           throw new BadRequestException('Employee not found');
+         }
+
+         // Find existing attendance record
+         const attendance = await this.prisma.attendance.findFirst({
+           where: {
+             employeeId: employee_id
+           }
+         });
+
+         if (!attendance) {
+           throw new BadRequestException('Attendance record not found for this employee');
+         }
+
+         // Prepare update data (only include fields that are provided)
+         const dataToUpdate: any = {};
+         
+         if (updateFields.present_days !== undefined) dataToUpdate.presentDays = updateFields.present_days;
+         if (updateFields.absent_days !== undefined) dataToUpdate.absentDays = updateFields.absent_days;
+         if (updateFields.late_days !== undefined) dataToUpdate.lateDays = updateFields.late_days;
+         if (updateFields.leave_days !== undefined) dataToUpdate.leaveDays = updateFields.leave_days;
+         if (updateFields.remote_days !== undefined) dataToUpdate.remoteDays = updateFields.remote_days;
+         if (updateFields.quarterly_leaves !== undefined) dataToUpdate.quarterlyLeaves = updateFields.quarterly_leaves;
+         if (updateFields.monthly_lates !== undefined) dataToUpdate.monthlyLates = updateFields.monthly_lates;
+         if (updateFields.half_days !== undefined) dataToUpdate.halfDays = updateFields.half_days;
+
+         // Update the attendance record
+         const updatedAttendance = await this.prisma.attendance.update({
+           where: { id: attendance.id },
+           data: dataToUpdate,
+           include: {
+             employee: {
+               select: {
+                 id: true,
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           }
+         });
+
+         return {
+           id: updatedAttendance.id,
+           employee_id: updatedAttendance.employeeId,
+           present_days: updatedAttendance.presentDays,
+           absent_days: updatedAttendance.absentDays,
+           late_days: updatedAttendance.lateDays,
+           leave_days: updatedAttendance.leaveDays,
+           remote_days: updatedAttendance.remoteDays,
+           quarterly_leaves: updatedAttendance.quarterlyLeaves,
+           monthly_lates: updatedAttendance.monthlyLates,
+           half_days: updatedAttendance.halfDays,
+           created_at: updatedAttendance.createdAt.toISOString(),
+           updated_at: updatedAttendance.updatedAt.toISOString()
+         };
+       } catch (error) {
+         console.error('Error in updateAttendance:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to update attendance record: ${error.message}`);
+       }
+     }
+
+     async updateMonthlyAttendance(updateData: UpdateMonthlyAttendanceDto): Promise<MonthlyAttendanceResponseDto> {
+       try {
+         const { employee_id, month, ...updateFields } = updateData;
+
+         // Check if employee exists
+         const employee = await this.prisma.employee.findUnique({
+           where: { id: employee_id }
+         });
+
+         if (!employee) {
+           throw new BadRequestException('Employee not found');
+         }
+
+         // Find existing monthly attendance record
+         const monthlyAttendance = await this.prisma.monthlyAttendanceSummary.findFirst({
+           where: {
+             empId: employee_id,
+             month: month
+           }
+         });
+
+         if (!monthlyAttendance) {
+           throw new BadRequestException(`Monthly attendance record not found for employee ${employee_id} in month ${month}`);
+         }
+
+         // Prepare update data (only include fields that are provided)
+         const dataToUpdate: any = {};
+         
+         if (updateFields.total_present !== undefined) dataToUpdate.totalPresent = updateFields.total_present;
+         if (updateFields.total_absent !== undefined) dataToUpdate.totalAbsent = updateFields.total_absent;
+         if (updateFields.total_leave_days !== undefined) dataToUpdate.totalLeaveDays = updateFields.total_leave_days;
+         if (updateFields.total_late_days !== undefined) dataToUpdate.totalLateDays = updateFields.total_late_days;
+         if (updateFields.total_half_days !== undefined) dataToUpdate.totalHalfDays = updateFields.total_half_days;
+         if (updateFields.total_remote_days !== undefined) dataToUpdate.totalRemoteDays = updateFields.total_remote_days;
+
+         // Update the monthly attendance record
+         const updatedMonthlyAttendance = await this.prisma.monthlyAttendanceSummary.update({
+           where: { id: monthlyAttendance.id },
+           data: dataToUpdate,
+           include: {
+             employee: {
+               select: {
+                 id: true,
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           }
+         });
+
+         return {
+           id: updatedMonthlyAttendance.id,
+           employee_id: updatedMonthlyAttendance.empId,
+           employee_first_name: updatedMonthlyAttendance.employee.firstName,
+           employee_last_name: updatedMonthlyAttendance.employee.lastName,
+           month: updatedMonthlyAttendance.month,
+           total_present: updatedMonthlyAttendance.totalPresent,
+           total_absent: updatedMonthlyAttendance.totalAbsent,
+           total_leave_days: updatedMonthlyAttendance.totalLeaveDays,
+           total_late_days: updatedMonthlyAttendance.totalLateDays,
+           total_half_days: updatedMonthlyAttendance.totalHalfDays,
+           total_remote_days: updatedMonthlyAttendance.totalRemoteDays,
+           generated_on: updatedMonthlyAttendance.generatedOn.toISOString(),
+           created_at: updatedMonthlyAttendance.createdAt.toISOString(),
+           updated_at: updatedMonthlyAttendance.updatedAt.toISOString()
+         };
+       } catch (error) {
+         console.error('Error in updateMonthlyAttendance:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to update monthly attendance record: ${error.message}`);
+       }
+     }
+   }
