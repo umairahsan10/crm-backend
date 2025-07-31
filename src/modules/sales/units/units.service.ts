@@ -70,4 +70,41 @@ export class UnitsService {
       message: 'New Unit Created Successfully'
     };
   }
+
+  async getAllUnits() {
+    const units = await this.prisma.salesUnit.findMany({
+      include: {
+        head: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+
+    return {
+      success: true,
+      data: units.map(unit => ({
+        id: unit.id,
+        name: unit.name,
+        email: unit.email,
+        phone: unit.phone,
+        address: unit.address,
+        headId: unit.headId,
+        logoUrl: unit.logoUrl,
+        website: unit.website,
+        createdAt: unit.createdAt,
+        updatedAt: unit.updatedAt,
+        headFirstName: unit.head?.firstName || null,
+        headLastName: unit.head?.lastName || null
+      })),
+      total: units.length,
+      message: units.length > 0 ? 'Units retrieved successfully' : 'No units found'
+    };
+  }
 }

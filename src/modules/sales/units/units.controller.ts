@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { UnitsService } from './units.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -17,5 +17,12 @@ export class UnitsController {
   @Departments('Sales')
   async createUnit(@Body() createUnitDto: CreateUnitDto) {
     return this.unitsService.createUnit(createUnitDto);
+  }
+
+  @Get()
+  @Roles('dep_manager')
+  @Departments('Sales')
+  async getAllUnits() {
+    return this.unitsService.getAllUnits();
   }
 }

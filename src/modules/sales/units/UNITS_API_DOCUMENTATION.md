@@ -189,4 +189,111 @@ This API creates a new sales unit in the system. The flow includes:
 
 ---
 
+## 2. Get All Sales Units
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units`
+
+### API Description and Flow
+This API retrieves all sales units from the system. The flow includes:
+1. Fetches all units from the database
+2. Includes unit head details (firstName, lastName) from employees table
+3. Orders units alphabetically by name
+4. Returns formatted response with unit data and head information
+
+### Request Body/Parameters
+- **Request Body**: None
+- **Query Parameters**: None
+- **Path Parameters**: None
+
+### Response Format
+
+**Success Response with Units (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Sales Unit A",
+      "email": "unit@example.com",
+      "phone": "+1 (555) 123-4567",
+      "address": "123 Business St, City, Country",
+      "headId": 123,
+      "logoUrl": "https://example.com/logo.png",
+      "website": "https://example.com",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "headFirstName": "John",
+      "headLastName": "Doe"
+    }
+  ],
+  "total": 1,
+  "message": "Units retrieved successfully"
+}
+```
+
+**Success Response - No Units (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No units found"
+}
+```
+
+**Error Responses:**
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager. User role: junior",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- No input validation required (no request body)
+- Business logic validation handled by access control guards
+
+### Database Operations
+
+**Tables Affected:**
+- `sales_units` table (read)
+- `employees` table (read - for head details)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `sales_units` table with JOIN to `employees` table for head details
+2. **ORDER BY** name ascending for alphabetical sorting
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
 *This documentation will be updated as new APIs are added to the units module.* 
