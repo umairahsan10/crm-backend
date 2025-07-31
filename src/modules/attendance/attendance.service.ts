@@ -12,6 +12,12 @@ import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { UpdateMonthlyAttendanceDto } from './dto/update-monthly-attendance.dto';
 import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
 import { LateLogResponseDto } from './dto/late-log-response.dto';
+import { GetLateLogsDto } from './dto/get-late-logs.dto';
+import { LateLogsListResponseDto } from './dto/late-logs-list-response.dto';
+import { GetHalfDayLogsDto } from './dto/get-half-day-logs.dto';
+import { HalfDayLogsListResponseDto } from './dto/half-day-logs-list-response.dto';
+import { SubmitHalfDayReasonDto } from './dto/submit-half-day-reason.dto';
+import { HalfDayLogResponseDto } from './dto/half-day-log-response.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -1042,6 +1048,477 @@ export class AttendanceService {
            throw error;
          }
          throw new InternalServerErrorException(`Failed to process late action: ${error.message}`);
+       }
+     }
+
+     async getLateLogs(query: GetLateLogsDto): Promise<LateLogsListResponseDto[]> {
+       try {
+         const { employee_id, start_date, end_date } = query;
+
+         // Ensure employee_id is a number if provided
+         const employeeId = employee_id ? Number(employee_id) : undefined;
+
+         // Validate date range (within last 6 months)
+         const sixMonthsAgo = new Date();
+         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+         if (start_date && new Date(start_date) < sixMonthsAgo) {
+           throw new BadRequestException('Start date cannot be more than 6 months ago');
+         }
+
+         if (end_date && new Date(end_date) < sixMonthsAgo) {
+           throw new BadRequestException('End date cannot be more than 6 months ago');
+         }
+
+         // Validate that start_date is not greater than end_date
+         if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
+           throw new BadRequestException('Start date cannot be greater than end date');
+         }
+
+         // Build where clause
+         const where: any = {};
+
+         if (employeeId) {
+           where.empId = employeeId;
+         }
+
+         if (start_date || end_date) {
+           where.date = {};
+           if (start_date) {
+             where.date.gte = new Date(start_date);
+           }
+           if (end_date) {
+             where.date.lte = new Date(end_date);
+           }
+         }
+
+         // Fetch late logs with employee and reviewer information
+         const lateLogs = await this.prisma.lateLog.findMany({
+           where,
+           include: {
+             employee: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             },
+             reviewer: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           },
+           orderBy: {
+             date: 'desc'
+           }
+         });
+
+         // Transform the data to match the response DTO
+         return lateLogs.map(log => ({
+           late_log_id: log.id,
+           emp_id: log.empId,
+           employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+           date: log.date.toISOString().split('T')[0],
+           scheduled_time_in: log.scheduledTimeIn,
+           actual_time_in: log.actualTimeIn,
+           minutes_late: log.minutesLate,
+           reason: log.reason,
+           justified: log.justified,
+           late_type: log.lateType,
+           action_taken: log.actionTaken,
+           reviewed_by: log.reviewedBy,
+           reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+           created_at: log.createdAt.toISOString(),
+           updated_at: log.updatedAt.toISOString()
+         }));
+       } catch (error) {
+         console.error('Error in getLateLogs:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to fetch late logs: ${error.message}`);
+       }
+     }
+
+     async getLateLogsByEmployee(employeeId: number): Promise<LateLogsListResponseDto[]> {
+       try {
+         // Validate employee_id
+         if (isNaN(employeeId) || employeeId <= 0) {
+           throw new BadRequestException('Invalid employee ID');
+         }
+
+         // Check if employee exists
+         const employee = await this.prisma.employee.findUnique({
+           where: { id: employeeId }
+         });
+
+         if (!employee) {
+           throw new BadRequestException('Employee not found');
+         }
+
+         // Fetch late logs for the specific employee
+         const lateLogs = await this.prisma.lateLog.findMany({
+           where: {
+             empId: employeeId
+           },
+           include: {
+             employee: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             },
+             reviewer: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           },
+           orderBy: {
+             date: 'desc'
+           }
+         });
+
+         // Transform the data to match the response DTO
+         return lateLogs.map(log => ({
+           late_log_id: log.id,
+           emp_id: log.empId,
+           employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+           date: log.date.toISOString().split('T')[0],
+           scheduled_time_in: log.scheduledTimeIn,
+           actual_time_in: log.actualTimeIn,
+           minutes_late: log.minutesLate,
+           reason: log.reason,
+           justified: log.justified,
+           late_type: log.lateType,
+           action_taken: log.actionTaken,
+           reviewed_by: log.reviewedBy,
+           reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+           created_at: log.createdAt.toISOString(),
+           updated_at: log.updatedAt.toISOString()
+         }));
+       } catch (error) {
+         console.error('Error in getLateLogsByEmployee:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to fetch late logs for employee: ${error.message}`);
+       }
+     }
+
+     async getHalfDayLogs(query: GetHalfDayLogsDto): Promise<HalfDayLogsListResponseDto[]> {
+       try {
+         const { employee_id, start_date, end_date } = query;
+
+         // Ensure employee_id is a number if provided
+         const employeeId = employee_id ? Number(employee_id) : undefined;
+
+         // Validate date range (within last 6 months)
+         const sixMonthsAgo = new Date();
+         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+         if (start_date && new Date(start_date) < sixMonthsAgo) {
+           throw new BadRequestException('Start date cannot be more than 6 months ago');
+         }
+
+         if (end_date && new Date(end_date) < sixMonthsAgo) {
+           throw new BadRequestException('End date cannot be more than 6 months ago');
+         }
+
+         // Validate that start_date is not greater than end_date
+         if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
+           throw new BadRequestException('Start date cannot be greater than end date');
+         }
+
+         // Build where clause
+         const where: any = {};
+
+         if (employeeId) {
+           where.empId = employeeId;
+         }
+
+         if (start_date || end_date) {
+           where.date = {};
+           if (start_date) {
+             where.date.gte = new Date(start_date);
+           }
+           if (end_date) {
+             where.date.lte = new Date(end_date);
+           }
+         }
+
+         // Fetch half-day logs with employee and reviewer information
+         const halfDayLogs = await this.prisma.halfDayLog.findMany({
+           where,
+           include: {
+             employee: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             },
+             reviewer: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           },
+           orderBy: {
+             date: 'desc'
+           }
+         });
+
+         // Transform the data to match the response DTO
+         return halfDayLogs.map(log => ({
+           half_day_log_id: log.id,
+           emp_id: log.empId,
+           employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+           date: log.date.toISOString().split('T')[0],
+           scheduled_time_in: log.scheduledTimeIn,
+           actual_time_in: log.actualTimeIn,
+           minutes_late: log.minutesLate,
+           reason: log.reason,
+           justified: log.justified,
+           half_day_type: log.halfDayType,
+           action_taken: log.actionTaken,
+           reviewed_by: log.reviewedBy,
+           reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+           created_at: log.createdAt.toISOString(),
+           updated_at: log.updatedAt.toISOString()
+         }));
+       } catch (error) {
+         console.error('Error in getHalfDayLogs:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to fetch half-day logs: ${error.message}`);
+       }
+     }
+
+     async getHalfDayLogsByEmployee(employeeId: number): Promise<HalfDayLogsListResponseDto[]> {
+       try {
+         // Validate employee_id
+         if (isNaN(employeeId) || employeeId <= 0) {
+           throw new BadRequestException('Invalid employee ID');
+         }
+
+         // Check if employee exists
+         const employee = await this.prisma.employee.findUnique({
+           where: { id: employeeId }
+         });
+
+         if (!employee) {
+           throw new BadRequestException('Employee not found');
+         }
+
+         // Fetch half-day logs for the specific employee
+         const halfDayLogs = await this.prisma.halfDayLog.findMany({
+           where: {
+             empId: employeeId
+           },
+           include: {
+             employee: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             },
+             reviewer: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           },
+           orderBy: {
+             date: 'desc'
+           }
+         });
+
+         // Transform the data to match the response DTO
+         return halfDayLogs.map(log => ({
+           half_day_log_id: log.id,
+           emp_id: log.empId,
+           employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+           date: log.date.toISOString().split('T')[0],
+           scheduled_time_in: log.scheduledTimeIn,
+           actual_time_in: log.actualTimeIn,
+           minutes_late: log.minutesLate,
+           reason: log.reason,
+           justified: log.justified,
+           half_day_type: log.halfDayType,
+           action_taken: log.actionTaken,
+           reviewed_by: log.reviewedBy,
+           reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+           created_at: log.createdAt.toISOString(),
+           updated_at: log.updatedAt.toISOString()
+         }));
+       } catch (error) {
+         console.error('Error in getHalfDayLogsByEmployee:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to fetch half-day logs for employee: ${error.message}`);
+       }
+     }
+
+     async submitHalfDayReason(halfDayData: SubmitHalfDayReasonDto): Promise<HalfDayLogResponseDto> {
+       try {
+         const { emp_id, date, scheduled_time_in, actual_time_in, minutes_late, reason } = halfDayData;
+
+         // Check if employee exists
+         const employee = await this.prisma.employee.findUnique({
+           where: { id: emp_id }
+         });
+
+         if (!employee) {
+           throw new BadRequestException('Employee not found');
+         }
+
+         // Find existing half-day log created by check-in for this employee and date
+         const existingHalfDayLog = await this.prisma.halfDayLog.findFirst({
+           where: {
+             empId: emp_id,
+             date: new Date(date),
+             actionTaken: 'Created' // Only update logs created by check-in
+           },
+           orderBy: {
+             createdAt: 'desc' // Get the most recent one
+           }
+         });
+
+         if (!existingHalfDayLog) {
+           throw new BadRequestException('No half-day log found for this employee and date. Please check-in first.');
+         }
+
+         // Update the existing half-day log with reason and change status to Pending
+         const halfDayLog = await this.prisma.halfDayLog.update({
+           where: { id: existingHalfDayLog.id },
+           data: {
+             reason: reason,
+             actionTaken: 'Pending', // Status when employee submits reason
+             halfDayType: null, // Keep null, will be set by HR
+             justified: null, // Keep null, will be set by HR
+             updatedAt: new Date()
+           }
+         });
+
+         return {
+           half_day_log_id: halfDayLog.id,
+           emp_id: halfDayLog.empId,
+           date: halfDayLog.date.toISOString().split('T')[0],
+           scheduled_time_in: halfDayLog.scheduledTimeIn,
+           actual_time_in: halfDayLog.actualTimeIn,
+           minutes_late: halfDayLog.minutesLate,
+           reason: halfDayLog.reason || '',
+           justified: halfDayLog.justified || false,
+           half_day_type: halfDayLog.halfDayType || 'unpaid',
+           action_taken: halfDayLog.actionTaken,
+           reviewed_by: halfDayLog.reviewedBy,
+           created_at: halfDayLog.createdAt.toISOString(),
+           updated_at: halfDayLog.updatedAt.toISOString()
+         };
+       } catch (error) {
+         console.error('Error in submitHalfDayReason:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to submit half-day reason: ${error.message}`);
+       }
+     }
+
+     async processHalfDayAction(halfDayLogId: number, action: 'Pending' | 'Completed', reviewerId: number, halfDayType?: 'paid' | 'unpaid'): Promise<HalfDayLogResponseDto> {
+       try {
+         // Find the half-day log
+         const halfDayLog = await this.prisma.halfDayLog.findUnique({
+           where: { id: halfDayLogId }
+         });
+
+         if (!halfDayLog) {
+           throw new BadRequestException('Half-day log not found');
+         }
+
+         // Update the half-day log with the action
+         const updatedHalfDayLog = await this.prisma.halfDayLog.update({
+           where: { id: halfDayLogId },
+           data: {
+             actionTaken: action,
+             halfDayType: halfDayType || null, // Let HR set this
+             justified: action === 'Completed' ? (halfDayType === 'paid') : null, // Let HR set this
+             reviewedBy: reviewerId,
+             updatedAt: new Date()
+           }
+         });
+
+         let attendanceUpdates: { half_days: number; monthly_half_days: number; } | undefined = undefined;
+
+         // If completed and marked as paid, update attendance records
+         if (action === 'Completed' && halfDayType === 'paid') {
+           // Find the attendance record for this employee
+           const attendance = await this.prisma.attendance.findFirst({
+             where: { employeeId: halfDayLog.empId }
+           });
+
+           if (attendance) {
+             // Check if half_days is greater than 0 before decrementing
+             const currentHalfDays = attendance.halfDays || 0;
+             const newHalfDays = Math.max(0, currentHalfDays - 1); // Prevent going below 0
+
+             // Update attendance with safe decrement
+             const updatedAttendance = await this.prisma.attendance.update({
+               where: { id: attendance.id },
+               data: {
+                 halfDays: newHalfDays
+               }
+             });
+
+             // Update monthly attendance summary to reflect the change
+             const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+             await this.prisma.monthlyAttendanceSummary.updateMany({
+               where: {
+                 empId: halfDayLog.empId,
+                 month: currentMonth
+               },
+               data: {
+                 totalHalfDays: {
+                   decrement: 1
+                 }
+               }
+             });
+
+             // Include the updated attendance values in response
+             attendanceUpdates = {
+               half_days: updatedAttendance.halfDays || 0,
+               monthly_half_days: 0 // Not tracked in Attendance model, only in MonthlyAttendanceSummary
+             };
+           }
+         }
+
+         return {
+           half_day_log_id: updatedHalfDayLog.id,
+           emp_id: updatedHalfDayLog.empId,
+           date: updatedHalfDayLog.date.toISOString().split('T')[0],
+           scheduled_time_in: updatedHalfDayLog.scheduledTimeIn,
+           actual_time_in: updatedHalfDayLog.actualTimeIn,
+           minutes_late: updatedHalfDayLog.minutesLate,
+           reason: updatedHalfDayLog.reason || '',
+           justified: updatedHalfDayLog.justified || false,
+           half_day_type: updatedHalfDayLog.halfDayType || 'unpaid',
+           action_taken: updatedHalfDayLog.actionTaken,
+           reviewed_by: updatedHalfDayLog.reviewedBy,
+           created_at: updatedHalfDayLog.createdAt.toISOString(),
+           updated_at: updatedHalfDayLog.updatedAt.toISOString(),
+           attendance_updates: attendanceUpdates
+         };
+       } catch (error) {
+         console.error('Error in processHalfDayAction:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to process half-day action: ${error.message}`);
        }
      }
    }

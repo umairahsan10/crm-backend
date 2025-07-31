@@ -12,6 +12,12 @@ import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { UpdateMonthlyAttendanceDto } from './dto/update-monthly-attendance.dto';
 import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
 import { LateLogResponseDto } from './dto/late-log-response.dto';
+import { GetLateLogsDto } from './dto/get-late-logs.dto';
+import { LateLogsListResponseDto } from './dto/late-logs-list-response.dto';
+import { GetHalfDayLogsDto } from './dto/get-half-day-logs.dto';
+import { HalfDayLogsListResponseDto } from './dto/half-day-logs-list-response.dto';
+import { SubmitHalfDayReasonDto } from './dto/submit-half-day-reason.dto';
+import { HalfDayLogResponseDto } from './dto/half-day-log-response.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -56,6 +62,28 @@ export class AttendanceController {
     return this.attendanceService.checkout(checkoutData);
   }
 
+  @Get('late-logs')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getLateLogs(
+    @Query() query: GetLateLogsDto
+  ): Promise<LateLogsListResponseDto[]> {
+    return this.attendanceService.getLateLogs(query);
+  }
+
+  @Get('late-logs/employee/:emp_id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getLateLogsByEmployee(
+    @Param('emp_id') empId: string
+  ): Promise<LateLogsListResponseDto[]> {
+    const employeeId = Number(empId);
+    if (isNaN(employeeId)) {
+      throw new BadRequestException('Invalid employee ID');
+    }
+    return this.attendanceService.getLateLogsByEmployee(employeeId);
+  }
+
   @Put('late-logs')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -82,6 +110,57 @@ export class AttendanceController {
       actionData.action,
       actionData.reviewer_id,
       actionData.late_type
+    );
+  }
+
+  @Get('half-day-logs')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getHalfDayLogs(
+    @Query() query: GetHalfDayLogsDto
+  ): Promise<HalfDayLogsListResponseDto[]> {
+    return this.attendanceService.getHalfDayLogs(query);
+  }
+
+  @Get('half-day-logs/employee/:emp_id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getHalfDayLogsByEmployee(
+    @Param('emp_id') empId: string
+  ): Promise<HalfDayLogsListResponseDto[]> {
+    const employeeId = Number(empId);
+    if (isNaN(employeeId)) {
+      throw new BadRequestException('Invalid employee ID');
+    }
+    return this.attendanceService.getHalfDayLogsByEmployee(employeeId);
+  }
+
+  @Put('half-day-logs')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async submitHalfDayReason(
+    @Body() halfDayData: SubmitHalfDayReasonDto
+  ): Promise<HalfDayLogResponseDto> {
+    return this.attendanceService.submitHalfDayReason(halfDayData);
+  }
+
+  @Put('half-day-logs/:id/action')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async processHalfDayAction(
+    @Param('id') id: string,
+    @Body() actionData: { action: 'Pending' | 'Completed'; reviewer_id: number; half_day_type?: 'paid' | 'unpaid' }
+  ): Promise<HalfDayLogResponseDto> {
+    const halfDayLogId = Number(id);
+    if (isNaN(halfDayLogId)) {
+      throw new BadRequestException('Invalid half-day log ID');
+    }
+    return this.attendanceService.processHalfDayAction(
+      halfDayLogId,
+      actionData.action,
+      actionData.reviewer_id,
+      actionData.half_day_type
     );
   }
 
