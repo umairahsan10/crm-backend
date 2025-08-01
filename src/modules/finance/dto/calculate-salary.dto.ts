@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsDateString } from 'class-validator';
 
 export class CalculateSalaryDto {
   @IsInt()
@@ -6,9 +6,11 @@ export class CalculateSalaryDto {
 
   @IsOptional()
   @IsString()
+  @IsDateString()
   start_date?: string;
 
   @IsOptional()
   @IsString()
+  @IsDateString()
   end_date?: string;
 } 
