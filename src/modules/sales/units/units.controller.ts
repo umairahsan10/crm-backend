@@ -20,7 +20,7 @@ export class UnitsController {
     return this.unitsService.createUnit(createUnitDto);
   }
 
-  @Get()
+  @Get('get')
   @Roles('dep_manager')
   @Departments('Sales')
   async getAllUnits() {
@@ -35,6 +35,13 @@ export class UnitsController {
     @Body() updateUnitDto: UpdateUnitDto
   ) {
     return this.unitsService.updateUnit(id, updateUnitDto);
+  }
+
+  @Get('get/:id')
+  @Roles('dep_manager')
+  @Departments('Sales')
+  async getUnit(@Param('id', ParseIntPipe) id: number) {
+    return this.unitsService.getUnit(id);
   }
 
   @Delete('delete/:id')

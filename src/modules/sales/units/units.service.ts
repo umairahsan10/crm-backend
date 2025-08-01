@@ -109,6 +109,63 @@ export class UnitsService {
     };
   }
 
+  async getUnit(id: number) {
+    // Check if unit exists and get details with head information
+    const unit = await this.prisma.salesUnit.findUnique({
+      where: { id },
+      include: {
+        head: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    if (!unit) {
+      return {
+        success: false,
+        message: `Unit with ID ${id} does not exist`
+      };
+    }
+
+    // Get count of teams associated with this unit
+    const teamsCount = await this.prisma.team.count({
+      where: { salesUnitId: id }
+    });
+
+    // Get count of employees associated with this unit
+    const employeesCount = await this.prisma.salesDepartment.count({
+      where: { salesUnitId: id }
+    });
+
+    return {
+      success: true,
+      data: {
+        id: unit.id,
+        name: unit.name,
+        email: unit.email,
+        phone: unit.phone,
+        address: unit.address,
+        headId: unit.headId,
+        logoUrl: unit.logoUrl,
+        website: unit.website,
+        createdAt: unit.createdAt,
+        updatedAt: unit.updatedAt,
+        head: unit.head ? {
+          id: unit.head.id,
+          firstName: unit.head.firstName,
+          lastName: unit.head.lastName
+        } : null,
+        teamsCount,
+        employeesCount
+      },
+      message: 'Unit details retrieved successfully'
+    };
+  }
+
   async updateUnit(id: number, updateUnitDto: UpdateUnitDto) {
     // Check if unit exists
     const existingUnit = await this.prisma.salesUnit.findUnique({
