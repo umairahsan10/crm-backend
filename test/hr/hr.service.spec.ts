@@ -1,18 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HrService } from '../../src/modules/hr/hr.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { MarkSalaryPaidDto } from '../../src/modules/hr/dto/mark-salary-paid.dto';
+import { PaymentWays, SalaryStatus, TransactionType, TransactionStatus, PaymentMethod } from '@prisma/client';
 
 describe('HrService', () => {
   let service: HrService;
   let prismaService: PrismaService;
 
   const mockPrismaService = {
-    hr: {
-      create: jest.fn(),
-      findMany: jest.fn(),
+    $transaction: jest.fn(),
+    employee: {
       findUnique: jest.fn(),
+    },
+    netSalaryLog: {
+      findFirst: jest.fn(),
       update: jest.fn(),
-      delete: jest.fn(),
+    },
+    transaction: {
+      create: jest.fn(),
+    },
+    expense: {
+      create: jest.fn(),
     },
   };
 
@@ -35,141 +44,146 @@ describe('HrService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('create', () => {
-    it('should create a new hr record', async () => {
-      const createHrDto = {
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Looking for a skilled software engineer',
-        status: 'ACTIVE',
-        department: 'Engineering',
-        managerId: 1,
-      };
+  describe('markSalaryPaid', () => {
+    const mockDto: MarkSalaryPaidDto = {
+      employee_id: 1,
+      type: PaymentWays.bank,
+    };
 
-      const expectedResult = {
-        id: 1,
-        ...createHrDto,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+    const mockEmployee = {
+      id: 1,
+      firstName: 'John',
+      lastName: 'Doe',
+      status: 'active',
+    };
 
-      mockPrismaService.hr.create.mockResolvedValue(expectedResult);
+    const mockSalaryLog = {
+      id: 1,
+      employeeId: 1,
+      month: '2025-01',
+      netSalary: { toFixed: () => '5000.00' },
+      paidOn: null,
+    };
 
-      const result = await service.create(createHrDto);
+    const mockTransaction = {
+      id: 1,
+      employeeId: 1,
+      amount: mockSalaryLog.netSalary,
+      transactionType: TransactionType.salary,
+      paymentMethod: PaymentWays.bank,
+      status: TransactionStatus.completed,
+    };
 
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.create).toHaveBeenCalledWith({
-        data: createHrDto,
+    const mockExpense = {
+      id: 1,
+      title: 'John Doe Salary',
+      category: 'salary',
+      amount: mockSalaryLog.netSalary,
+      transactionId: 1,
+    };
+
+    it('should successfully mark salary as paid', async () => {
+      const currentUserId = 2;
+      const currentDate = new Date();
+
+      mockPrismaService.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrismaService);
       });
-    });
-  });
 
-  describe('findAll', () => {
-    it('should return all hr records', async () => {
-      const expectedResult = [
-        {
-          id: 1,
-          type: 'RECRUITMENT',
-          title: 'Software Engineer Position',
-          description: 'Looking for a skilled software engineer',
-          status: 'ACTIVE',
-          department: 'Engineering',
-          managerId: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-
-      mockPrismaService.hr.findMany.mockResolvedValue(expectedResult);
-
-      const result = await service.findAll();
-
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.findMany).toHaveBeenCalled();
-    });
-  });
-
-  describe('findOne', () => {
-    it('should return a single hr record', async () => {
-      const id = 1;
-      const expectedResult = {
-        id: 1,
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Looking for a skilled software engineer',
-        status: 'ACTIVE',
-        department: 'Engineering',
-        managerId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrismaService.hr.findUnique.mockResolvedValue(expectedResult);
-
-      const result = await service.findOne(id);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.findUnique).toHaveBeenCalledWith({
-        where: { id },
+      mockPrismaService.employee.findUnique.mockResolvedValue(mockEmployee);
+      mockPrismaService.netSalaryLog.findFirst.mockResolvedValue(mockSalaryLog);
+      mockPrismaService.netSalaryLog.update.mockResolvedValue({
+        ...mockSalaryLog,
+        paidOn: currentDate,
+        processedBy: currentUserId,
+        status: SalaryStatus.paid,
       });
+      mockPrismaService.transaction.create.mockResolvedValue(mockTransaction);
+      mockPrismaService.expense.create.mockResolvedValue(mockExpense);
+
+      const result = await service.markSalaryPaid(mockDto, currentUserId);
+
+      expect(result.status).toBe('success');
+      expect(result.message).toBe('Salary marked as paid successfully');
+      expect(result.data.employee_id).toBe(1);
+      expect(result.data.payment_method).toBe(PaymentWays.bank);
     });
-  });
 
-  describe('update', () => {
-    it('should update an hr record', async () => {
-      const id = 1;
-      const updateHrDto = {
-        status: 'CLOSED',
-        description: 'Position has been filled',
-      };
+    it('should return error when employee not found', async () => {
+      const currentUserId = 2;
 
-      const expectedResult = {
-        id: 1,
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Position has been filled',
-        status: 'CLOSED',
-        department: 'Engineering',
-        managerId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrismaService.hr.update.mockResolvedValue(expectedResult);
-
-      const result = await service.update(id, updateHrDto);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.update).toHaveBeenCalledWith({
-        where: { id },
-        data: updateHrDto,
+      mockPrismaService.$transaction.mockImplementation(async (callback) => {
+        mockPrismaService.employee.findUnique.mockResolvedValue(null);
+        return await callback(mockPrismaService);
       });
+
+      const result = await service.markSalaryPaid(mockDto, currentUserId);
+
+      expect(result.status).toBe('error');
+      expect(result.error_code).toBe('EMPLOYEE_NOT_FOUND');
+      expect(result.message).toBe('Employee not found');
     });
-  });
 
-  describe('remove', () => {
-    it('should remove an hr record', async () => {
-      const id = 1;
-      const expectedResult = {
-        id: 1,
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Looking for a skilled software engineer',
-        status: 'ACTIVE',
-        department: 'Engineering',
-        managerId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+    it('should return error when employee is inactive', async () => {
+      const currentUserId = 2;
 
-      mockPrismaService.hr.delete.mockResolvedValue(expectedResult);
-
-      const result = await service.remove(id);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.delete).toHaveBeenCalledWith({
-        where: { id },
+      mockPrismaService.$transaction.mockImplementation(async (callback) => {
+        mockPrismaService.employee.findUnique.mockResolvedValue({
+          ...mockEmployee,
+          status: 'inactive',
+        });
+        return await callback(mockPrismaService);
       });
+
+      const result = await service.markSalaryPaid(mockDto, currentUserId);
+
+      expect(result.status).toBe('error');
+      expect(result.error_code).toBe('EMPLOYEE_INACTIVE');
+      expect(result.message).toBe('Employee is not active');
+    });
+
+    it('should return error when no unpaid salary found', async () => {
+      const currentUserId = 2;
+
+      mockPrismaService.$transaction.mockImplementation(async (callback) => {
+        mockPrismaService.employee.findUnique.mockResolvedValue(mockEmployee);
+        mockPrismaService.netSalaryLog.findFirst.mockResolvedValue(null);
+        return await callback(mockPrismaService);
+      });
+
+      const result = await service.markSalaryPaid(mockDto, currentUserId);
+
+      expect(result.status).toBe('error');
+      expect(result.error_code).toBe('NO_UNPAID_SALARY_FOUND');
+      expect(result.message).toBe('No unpaid salary found for the current month');
+    });
+
+    it('should use cash as default payment method when type is not provided', async () => {
+      const currentUserId = 2;
+      const dtoWithoutType = { employee_id: 1 };
+
+      mockPrismaService.$transaction.mockImplementation(async (callback) => {
+        return await callback(mockPrismaService);
+      });
+
+      mockPrismaService.employee.findUnique.mockResolvedValue(mockEmployee);
+      mockPrismaService.netSalaryLog.findFirst.mockResolvedValue(mockSalaryLog);
+      mockPrismaService.netSalaryLog.update.mockResolvedValue({
+        ...mockSalaryLog,
+        paidOn: new Date(),
+        processedBy: currentUserId,
+        status: SalaryStatus.paid,
+      });
+      mockPrismaService.transaction.create.mockResolvedValue({
+        ...mockTransaction,
+        paymentMethod: PaymentWays.cash,
+      });
+      mockPrismaService.expense.create.mockResolvedValue(mockExpense);
+
+      const result = await service.markSalaryPaid(dtoWithoutType, currentUserId);
+
+      expect(result.status).toBe('success');
+      expect(result.data.payment_method).toBe(PaymentWays.cash);
     });
   });
 });
