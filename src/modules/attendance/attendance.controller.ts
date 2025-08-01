@@ -18,6 +18,10 @@ import { GetHalfDayLogsDto } from './dto/get-half-day-logs.dto';
 import { HalfDayLogsListResponseDto } from './dto/half-day-logs-list-response.dto';
 import { SubmitHalfDayReasonDto } from './dto/submit-half-day-reason.dto';
 import { HalfDayLogResponseDto } from './dto/half-day-log-response.dto';
+import { GetLeaveLogsDto } from './dto/get-leave-logs.dto';
+import { LeaveLogsListResponseDto } from './dto/leave-logs-list-response.dto';
+import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
+import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -163,6 +167,39 @@ export class AttendanceController {
       actionData.half_day_type
     );
   }
+
+  @Get('leave-logs')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getLeaveLogs(
+    @Query() query: GetLeaveLogsDto
+  ): Promise<LeaveLogsListResponseDto[]> {
+    return this.attendanceService.getLeaveLogs(query);
+  }
+
+  @Get('leave-logs/employee/:emp_id')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getLeaveLogsByEmployee(
+    @Param('emp_id') empId: string
+  ): Promise<LeaveLogsListResponseDto[]> {
+    const employeeId = Number(empId);
+    if (isNaN(employeeId)) {
+      throw new BadRequestException('Invalid employee ID');
+    }
+    return this.attendanceService.getLeaveLogsByEmployee(employeeId);
+  }
+
+  @Post('leave-logs')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard)
+  async createLeaveLog(
+    @Body() leaveData: CreateLeaveLogDto
+  ): Promise<LeaveLogResponseDto> {
+    return this.attendanceService.createLeaveLog(leaveData);
+  }
+
+
 
   @Get('list')
   @UseGuards(JwtAuthGuard, PermissionsGuard)

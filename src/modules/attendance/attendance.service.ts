@@ -18,6 +18,10 @@ import { GetHalfDayLogsDto } from './dto/get-half-day-logs.dto';
 import { HalfDayLogsListResponseDto } from './dto/half-day-logs-list-response.dto';
 import { SubmitHalfDayReasonDto } from './dto/submit-half-day-reason.dto';
 import { HalfDayLogResponseDto } from './dto/half-day-log-response.dto';
+import { GetLeaveLogsDto } from './dto/get-leave-logs.dto';
+import { LeaveLogsListResponseDto } from './dto/leave-logs-list-response.dto';
+import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
+import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -1521,4 +1525,237 @@ export class AttendanceService {
          throw new InternalServerErrorException(`Failed to process half-day action: ${error.message}`);
        }
      }
+
+     async getLeaveLogs(query: GetLeaveLogsDto): Promise<LeaveLogsListResponseDto[]> {
+       try {
+         const { employee_id, start_date, end_date } = query;
+
+         // Ensure employee_id is a number
+         const employeeId = employee_id ? Number(employee_id) : undefined;
+
+         // Validate date range (within last 3 months)
+         const threeMonthsAgo = new Date();
+         threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+         if (start_date && new Date(start_date) < threeMonthsAgo) {
+           throw new BadRequestException('Start date cannot be more than 3 months ago');
+         }
+
+         if (end_date && new Date(end_date) < threeMonthsAgo) {
+           throw new BadRequestException('End date cannot be more than 3 months ago');
+         }
+
+         // Validate that start_date is not less than end_date
+         if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
+           throw new BadRequestException('Start date cannot be greater than end date');
+         }
+
+         // Build where clause
+         const where: any = {};
+
+         if (employeeId) {
+           where.empId = employeeId;
+         }
+
+         if (start_date || end_date) {
+           where.OR = [];
+           
+           if (start_date && end_date) {
+             // Check if leave period overlaps with the date range
+             where.OR.push({
+               AND: [
+                 { startDate: { lte: new Date(end_date) } },
+                 { endDate: { gte: new Date(start_date) } }
+               ]
+             });
+           } else if (start_date) {
+             where.OR.push({
+               endDate: { gte: new Date(start_date) }
+             });
+           } else if (end_date) {
+             where.OR.push({
+               startDate: { lte: new Date(end_date) }
+             });
+           }
+         }
+
+         const leaveLogs = await this.prisma.leaveLog.findMany({
+           where,
+           include: {
+             employee: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             },
+             reviewer: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           },
+           orderBy: {
+             appliedOn: 'desc'
+           }
+         });
+
+         return leaveLogs.map(log => ({
+           leave_log_id: log.id,
+           emp_id: log.empId,
+           employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+           leave_type: log.leaveType,
+           start_date: log.startDate.toISOString().split('T')[0],
+           end_date: log.endDate.toISOString().split('T')[0],
+           reason: log.reason,
+           status: log.status,
+           applied_on: log.appliedOn.toISOString(),
+           reviewed_by: log.reviewedBy,
+           reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+           reviewed_on: log.reviewedOn ? log.reviewedOn.toISOString() : null,
+           confirmation_reason: log.confirmationReason,
+           is_half_day: log.isHalfDay,
+           created_at: log.createdAt.toISOString(),
+           updated_at: log.updatedAt.toISOString()
+         }));
+       } catch (error) {
+         console.error('Error in getLeaveLogs:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to get leave logs: ${error.message}`);
+       }
+     }
+
+     async getLeaveLogsByEmployee(employeeId: number): Promise<LeaveLogsListResponseDto[]> {
+       try {
+         if (!employeeId || isNaN(employeeId)) {
+           throw new BadRequestException('Invalid employee ID');
+         }
+
+         const leaveLogs = await this.prisma.leaveLog.findMany({
+           where: {
+             empId: employeeId
+           },
+           include: {
+             employee: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             },
+             reviewer: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           },
+           orderBy: {
+             appliedOn: 'desc'
+           }
+         });
+
+         return leaveLogs.map(log => ({
+           leave_log_id: log.id,
+           emp_id: log.empId,
+           employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+           leave_type: log.leaveType,
+           start_date: log.startDate.toISOString().split('T')[0],
+           end_date: log.endDate.toISOString().split('T')[0],
+           reason: log.reason,
+           status: log.status,
+           applied_on: log.appliedOn.toISOString(),
+           reviewed_by: log.reviewedBy,
+           reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+           reviewed_on: log.reviewedOn ? log.reviewedOn.toISOString() : null,
+           confirmation_reason: log.confirmationReason,
+           is_half_day: log.isHalfDay,
+           created_at: log.createdAt.toISOString(),
+           updated_at: log.updatedAt.toISOString()
+         }));
+       } catch (error) {
+         console.error('Error in getLeaveLogsByEmployee:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to get leave logs by employee: ${error.message}`);
+       }
+     }
+
+     async createLeaveLog(leaveData: CreateLeaveLogDto): Promise<LeaveLogResponseDto> {
+       try {
+         // Validate employee exists
+         const employee = await this.prisma.employee.findUnique({
+           where: { id: leaveData.emp_id },
+           select: { id: true, firstName: true, lastName: true }
+         });
+
+         if (!employee) {
+           throw new BadRequestException('Employee not found');
+         }
+
+         // Validate date range
+         const startDate = new Date(leaveData.start_date);
+         const endDate = new Date(leaveData.end_date);
+
+         if (startDate > endDate) {
+           throw new BadRequestException('Start date cannot be greater than end date');
+         }
+
+         // Create the leave log with status automatically set to 'Pending'
+         const leaveLog = await this.prisma.leaveLog.create({
+           data: {
+             empId: leaveData.emp_id,
+             leaveType: leaveData.leave_type,
+             startDate: startDate,
+             endDate: endDate,
+             reason: leaveData.reason,
+             status: 'Pending', // Automatically set to pending
+             isHalfDay: leaveData.is_half_day,
+             appliedOn: new Date()
+           },
+           include: {
+             employee: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             },
+             reviewer: {
+               select: {
+                 firstName: true,
+                 lastName: true
+               }
+             }
+           }
+         });
+
+         return {
+           leave_log_id: leaveLog.id,
+           emp_id: leaveLog.empId,
+           employee_name: `${leaveLog.employee.firstName} ${leaveLog.employee.lastName}`,
+           leave_type: leaveLog.leaveType,
+           start_date: leaveLog.startDate.toISOString().split('T')[0],
+           end_date: leaveLog.endDate.toISOString().split('T')[0],
+           reason: leaveLog.reason,
+           status: leaveLog.status,
+           applied_on: leaveLog.appliedOn.toISOString(),
+           reviewed_by: leaveLog.reviewedBy,
+           reviewer_name: leaveLog.reviewer ? `${leaveLog.reviewer.firstName} ${leaveLog.reviewer.lastName}` : null,
+           reviewed_on: leaveLog.reviewedOn ? leaveLog.reviewedOn.toISOString() : null,
+           confirmation_reason: leaveLog.confirmationReason,
+           is_half_day: leaveLog.isHalfDay,
+           created_at: leaveLog.createdAt.toISOString(),
+           updated_at: leaveLog.updatedAt.toISOString()
+         };
+       } catch (error) {
+         console.error('Error in createLeaveLog:', error);
+         if (error instanceof BadRequestException) {
+           throw error;
+         }
+         throw new InternalServerErrorException(`Failed to create leave log: ${error.message}`);
+       }
+     }
+
    }
