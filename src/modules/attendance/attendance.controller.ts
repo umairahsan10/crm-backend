@@ -22,6 +22,7 @@ import { GetLeaveLogsDto } from './dto/get-leave-logs.dto';
 import { LeaveLogsListResponseDto } from './dto/leave-logs-list-response.dto';
 import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
 import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
+import { ProcessLeaveActionDto } from './dto/process-leave-action.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -199,7 +200,27 @@ export class AttendanceController {
     return this.attendanceService.createLeaveLog(leaveData);
   }
 
+  @Put('leave-logs/:id/action')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async processLeaveAction(
+    @Param('id') id: string,
+    @Body() actionData: ProcessLeaveActionDto
+  ): Promise<LeaveLogResponseDto> {
+    const leaveLogId = Number(id);
+    if (isNaN(leaveLogId)) {
+      throw new BadRequestException('Invalid leave log ID');
+    }
+    return this.attendanceService.processLeaveAction(
+      leaveLogId,
+      actionData.action,
+      actionData.reviewer_id,
+      actionData.confirmation_reason
+    );
+  }
 
+  
 
   @Get('list')
   @UseGuards(JwtAuthGuard, PermissionsGuard)

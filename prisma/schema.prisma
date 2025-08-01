@@ -532,19 +532,21 @@ model LeadComment {
 }
 
 model SalesDepartment {
-  id                 Int      @id @default(autoincrement()) @map("sales_department_id")
-  employeeId         Int      @map("employee_id")
-  leadsClosed        Int?     @map("leads_closed")
-  salesAmount        Decimal? @map("sales_amount") @db.Decimal(12, 2)
-  salesUnitId        Int?     @map("sales_unit_id")
-  commissionRate     Decimal? @map("commission_rate") @db.Decimal(5, 2)
-  commissionAmount   Decimal? @map("commission_amount") @db.Decimal(12, 2)
-  bonus              Decimal? @map("bonus") @db.Decimal(12, 2)
-  withholdCommission Decimal  @map("withhold_commission") @db.Decimal(12, 2)
-  withholdFlag       Boolean  @map("withhold_flag")
-  targetAmount       Decimal? @map("target_amount") @db.Decimal(12, 2)
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  id                  Int      @id @default(autoincrement()) @map("sales_department_id")
+  employeeId          Int      @map("employee_id")
+  leadsClosed         Int?     @map("leads_closed")
+  salesAmount         Decimal? @map("sales_amount") @db.Decimal(12, 2)
+  salesUnitId         Int?     @map("sales_unit_id")
+  commissionRate      Decimal? @map("commission_rate") @db.Decimal(5, 2)
+  commissionAmount    Decimal? @map("commission_amount") @db.Decimal(12, 2)
+  bonus               Decimal? @map("bonus") @db.Decimal(12, 2)
+  withholdCommission  Decimal  @map("withhold_commission") @db.Decimal(12, 2)
+  withholdFlag        Boolean  @map("withhold_flag")
+  targetAmount        Decimal? @map("target_amount") @db.Decimal(12, 2)
+  chargebackDeductions Decimal? @default(0) @db.Decimal(12, 2) @map("chargeback_deductions")
+  refundDeductions    Decimal? @default(0) @db.Decimal(12, 2) @map("refund_deductions")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee  Employee   @relation("SalesDepartmentEmployee", fields: [employeeId], references: [id])
@@ -735,17 +737,18 @@ model Asset {
 }
 
 model Expense {
-  id            Int            @id @default(autoincrement()) @map("expense_id")
-  title         String?        @db.VarChar(255)
-  category      String?        @db.VarChar(100)
-  amount        Decimal?       @db.Decimal(12, 2)
-  createdBy     Int?           @map("created_by")
-  paidOn        DateTime?      @map("paid_on") @db.Date
-  notes         String?        @db.Text
-  transactionId Int?           @map("transaction_id")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  paymentMethod PaymentMethod? @map("payment_method")
+  id             Int            @id @default(autoincrement()) @map("expense_id")
+  title          String?        @db.VarChar(255)
+  category       String?        @db.VarChar(100)
+  amount         Decimal?       @db.Decimal(12, 2)
+  createdBy      Int?           @map("created_by")
+  paidOn         DateTime?      @map("paid_on") @db.Date
+  notes          String?        @db.Text
+  transactionId  Int?           @map("transaction_id")
+  processedByRole ProcessedByRole? @map("processed_by_role")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  paymentMethod  PaymentMethod? @map("payment_method")
 
   // Foreign key relation to employees table
   employee    Employee?    @relation("ExpenseCreatedBy", fields: [createdBy], references: [id])
@@ -864,16 +867,17 @@ enum PaymentWays {
 }
 
 model NetSalaryLog {
-  id          Int           @id @default(autoincrement()) @map("net_salary_log_id")
-  employeeId  Int           @map("employee_id")
-  month       String?       @db.VarChar(7)
-  netSalary   Decimal?      @map("net_salary") @db.Decimal(12, 2)
-  paidOn      DateTime?     @map("paid_on") @db.Date
-  processedBy Int?          @map("processed_by")
-  deductions  Int?
-  status      SalaryStatus?
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  id             Int              @id @default(autoincrement()) @map("net_salary_log_id")
+  employeeId     Int              @map("employee_id")
+  month          String?          @db.VarChar(7)
+  netSalary      Decimal?         @map("net_salary") @db.Decimal(12, 2)
+  paidOn         DateTime?        @map("paid_on") @db.Date
+  processedBy    Int?             @map("processed_by")
+  processedByRole ProcessedByRole? @map("processed_by_role")
+  deductions     Int?
+  status         SalaryStatus?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee  Employee  @relation(fields: [employeeId], references: [id])
@@ -944,6 +948,11 @@ enum TransactionStatus {
 enum SalaryStatus {
   paid
   unpaid
+}
+
+enum ProcessedByRole {
+  Employee
+  Admin
 }
 
 // ADMIN 
@@ -1125,7 +1134,6 @@ model LeaveLog {
   reviewedBy         Int?         @map("reviewed_by")
   reviewedOn         DateTime?    @map("reviewed_on")
   confirmationReason String?      @map("confirmation_reason") @db.Text
-  isHalfDay          Boolean?     @map("is_half_day")
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
@@ -1554,7 +1562,7 @@ model ArchiveLead {
   phone         String                   @db.VarChar(20)
   source        ArchiveLeadSource        @map("source")
   assignedTo    Int                      @map("assigned_to")
-  unitId        Int                      @map("unit_id")
+  unitId        Int?                     @map("unit_id")
   outcome       ArchiveLeadOutcome       @map("outcome")
   qualityRating ArchiveLeadQualityRating @map("quality_rating")
   createdAt     DateTime                 @map("created_at")
@@ -1563,7 +1571,7 @@ model ArchiveLead {
   // Foreign key relations
   lead     Lead      @relation("LeadArchive", fields: [leadId], references: [id])
   employee Employee  @relation("ArchiveLeadAssigned", fields: [assignedTo], references: [id])
-  unit     SalesUnit @relation("ArchiveLeadUnit", fields: [unitId], references: [id])
+  unit     SalesUnit? @relation("ArchiveLeadUnit", fields: [unitId], references: [id])
 
   @@map("archive_leads")
 }

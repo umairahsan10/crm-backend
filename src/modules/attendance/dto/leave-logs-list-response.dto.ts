@@ -12,7 +12,6 @@ export interface LeaveLogsListResponseDto {
   reviewer_name: string | null;
   reviewed_on: string | null;
   confirmation_reason: string | null;
-  is_half_day: boolean | null;
   created_at: string;
   updated_at: string;
 } 

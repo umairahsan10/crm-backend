@@ -1,4 +1,4 @@
-import { IsInt, IsDateString, IsOptional, IsString, IsBoolean } from 'class-validator';
+import { IsInt, IsDateString, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateLeaveLogDto {
@@ -19,9 +19,4 @@ export class CreateLeaveLogDto {
   @IsOptional()
   @IsString()
   reason?: string;
-
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  is_half_day?: boolean;
 } 

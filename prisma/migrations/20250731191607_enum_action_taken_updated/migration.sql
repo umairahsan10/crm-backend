@@ -19,4 +19,4 @@ ALTER TABLE "late_logs" ALTER COLUMN "action_taken" SET DEFAULT 'Created';
 COMMIT;
 
 -- AlterTable
-ALTER TABLE "late_logs" ALTER COLUMN "action_taken" SET DEFAULT 'Created'; 
+ALTER TABLE "late_logs" ALTER COLUMN "action_taken" SET DEFAULT 'Created';
