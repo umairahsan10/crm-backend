@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
@@ -197,6 +197,103 @@ export class UnitsService {
     return {
       success: true,
       message: 'Unit updated successfully'
+    };
+  }
+
+  async deleteUnit(id: number) {
+    // Check if unit exists
+    const existingUnit = await this.prisma.salesUnit.findUnique({
+      where: { id }
+    });
+
+    if (!existingUnit) {
+      throw new NotFoundException(`Unit with ID ${id} does not exist`);
+    }
+
+    // Check for teams associated with this unit
+    const teams = await this.prisma.team.findMany({
+      where: { salesUnitId: id },
+      select: { id: true, name: true }
+    });
+
+    // Check for leads associated with this unit
+    const leads = await this.prisma.lead.findMany({
+      where: { salesUnitId: id },
+      select: { id: true, name: true, email: true }
+    });
+
+    // Check for sales employees associated with this unit
+    const salesEmployees = await this.prisma.salesDepartment.findMany({
+      where: { salesUnitId: id },
+      include: {
+        employee: {
+          select: { id: true, firstName: true, lastName: true }
+        }
+      }
+    });
+
+    // Count archive leads associated with this unit
+    const archiveLeadsCount = await this.prisma.archiveLead.count({
+      where: { unitId: id }
+    });
+
+    // Check if there are any dependencies
+    const hasDependencies = teams.length > 0 || leads.length > 0 || salesEmployees.length > 0;
+
+    if (hasDependencies) {
+      // Return detailed dependency information
+      return {
+        success: false,
+        message: 'Cannot delete unit. Please reassign dependencies first.',
+        dependencies: {
+          teams: {
+            count: teams.length,
+            details: teams.map(team => ({
+              id: team.id,
+              name: team.name
+            }))
+          },
+          leads: {
+            count: leads.length,
+            details: leads.map(lead => ({
+              id: lead.id,
+              name: lead.name,
+              email: lead.email
+            }))
+          },
+          employees: {
+            count: salesEmployees.length,
+            details: salesEmployees.map(emp => ({
+              id: emp.employee.id,
+              firstName: emp.employee.firstName,
+              lastName: emp.employee.lastName
+            }))
+          }
+        },
+        archiveLeads: {
+          count: archiveLeadsCount,
+          message: `${archiveLeadsCount} archived leads will be assigned unit ID null`
+        }
+      };
+    }
+
+    // If no dependencies, proceed with deletion
+    // First, update archive leads to set unitId = null
+    if (archiveLeadsCount > 0) {
+      await this.prisma.archiveLead.updateMany({
+        where: { unitId: id },
+        data: { unitId: null }
+      });
+    }
+
+    // Delete the unit
+    await this.prisma.salesUnit.delete({
+      where: { id }
+    });
+
+    return {
+      success: true,
+      message: `Unit deleted successfully. ${archiveLeadsCount} archived leads have been assigned unit ID null.`
     };
   }
 }

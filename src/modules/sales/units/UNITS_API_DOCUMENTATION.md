@@ -502,4 +502,144 @@ This API updates a sales unit in the system. The flow includes:
 
 ---
 
+## 4. Delete Sales Unit
+
+### Method and Endpoint
+- **Method**: `DELETE`
+- **Endpoint**: `/sales/units/delete/:id`
+
+### API Description and Flow
+This API deletes a sales unit from the system. The flow includes:
+1. Validates that the unit exists (returns 404 if not found)
+2. Checks for dependencies: teams, leads, and sales employees associated with the unit
+3. Counts archive leads associated with the unit
+4. If dependencies exist, returns detailed information about what needs to be reassigned
+5. If no dependencies, updates archive leads (sets unitId = null) and deletes the unit
+6. Returns appropriate success or error response
+
+### Request Body/Parameters
+- **Path Parameter**: `id` (number) - Unit ID to delete
+- **Request Body**: None
+
+### Response Format
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Unit deleted successfully. 15 archived leads have been assigned unit ID null."
+}
+```
+
+**Error Response - Dependencies Exist (200):**
+```json
+{
+  "success": false,
+  "message": "Cannot delete unit. Please reassign dependencies first.",
+  "dependencies": {
+    "teams": {
+      "count": 2,
+      "details": [
+        { "id": 1, "name": "Sales Team A" },
+        { "id": 2, "name": "Enterprise Team" }
+      ]
+    },
+    "leads": {
+      "count": 5,
+      "details": [
+        { "id": 101, "name": "John Doe", "email": "john@example.com" },
+        { "id": 102, "name": "Jane Smith", "email": "jane@example.com" }
+      ]
+    },
+    "employees": {
+      "count": 3,
+      "details": [
+        { "id": 201, "firstName": "Mike", "lastName": "Johnson" },
+        { "id": 202, "firstName": "Sarah", "lastName": "Wilson" }
+      ]
+    }
+  },
+  "archiveLeads": {
+    "count": 15,
+    "message": "15 archived leads will be assigned unit ID null"
+  }
+}
+```
+
+**Error Responses:**
+
+**Not Found Error (404):**
+```json
+{
+  "statusCode": 404,
+  "message": "Unit with ID 123 does not exist",
+  "error": "Not Found"
+}
+```
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager. User role: junior",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- Unit with provided ID must exist
+- No input validation required (no request body)
+
+### Business Logic
+- **Dependency Check**: Ensures no active teams, leads, or employees are associated with the unit
+- **Archive Leads Handling**: Updates archive leads to set unitId = null before deletion
+- **Safe Deletion**: Only deletes unit when no active dependencies exist
+- **Detailed Feedback**: Provides specific information about what needs to be reassigned
+
+### Database Operations
+
+**Tables Affected:**
+- `sales_units` table (delete)
+- `teams` table (read - for dependency check)
+- `leads` table (read - for dependency check)
+- `sales_departments` table (read - for dependency check)
+- `archive_leads` table (update - set unitId = null)
+
+**Database Changes:**
+- **UPDATE** operation on `archive_leads` table (set unitId = null)
+- **DELETE** operation on `sales_units` table (only if no dependencies)
+
+**Database Queries:**
+1. **SELECT** from `sales_units` table to check if unit exists
+2. **SELECT** from `teams` table to check for associated teams
+3. **SELECT** from `leads` table to check for associated leads
+4. **SELECT** from `sales_departments` table with JOIN to `employees` for associated employees
+5. **COUNT** from `archive_leads` table for associated archive leads
+6. **UPDATE** `archive_leads` table to set unitId = null (if dependencies don't exist)
+7. **DELETE** from `sales_units` table (if dependencies don't exist)
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
 *This documentation will be updated as new APIs are added to the units module.* 
