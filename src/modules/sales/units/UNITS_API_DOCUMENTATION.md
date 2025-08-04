@@ -642,4 +642,132 @@ This API deletes a sales unit from the system. The flow includes:
 
 ---
 
+## 5. Get Single Unit Details
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units/get/:id`
+
+### API Description and Flow
+This API retrieves detailed information about a specific sales unit. The flow includes:
+1. Validates that the unit exists (returns 404 if not found)
+2. Fetches unit details with head information from employees table
+3. Counts associated teams and employees
+4. Returns comprehensive unit information with counts
+
+### Request Body/Parameters
+- **Path Parameter**: `id` (number) - Unit ID to retrieve
+- **Request Body**: None
+
+### Response Format
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Sales Unit A",
+    "email": "unit@example.com",
+    "phone": "+1 (555) 123-4567",
+    "address": "123 Business St, City, Country",
+    "headId": 123,
+    "logoUrl": "https://example.com/logo.png",
+    "website": "https://example.com",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z",
+    "head": {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe"
+    },
+    "teamsCount": 3,
+    "employeesCount": 8
+  },
+  "message": "Unit details retrieved successfully"
+}
+```
+
+**Error Responses:**
+
+**Not Found Error (404):**
+```json
+{
+  "success": false,
+  "message": "Unit with ID 123 does not exist"
+}
+```
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager. User role: junior",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- Unit with provided ID must exist
+- No input validation required (no request body)
+
+### Database Operations
+
+**Tables Affected:**
+- `sales_units` table (read)
+- `employees` table (read - for head details)
+- `teams` table (read - for count)
+- `sales_departments` table (read - for count)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `sales_units` table with JOIN to `employees` for head details
+2. **COUNT** from `teams` table for teams count
+3. **COUNT** from `sales_departments` table for employees count
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
+## Planned APIs
+
+### Unit Relationships
+- Get Teams in Unit
+- Get Employees in Unit
+- Get Leads in Unit
+- Get Archive Leads in Unit
+- Get Archive Leads from Deleted Units
+
+### Unit Head Management
+- Assign Head to Unit
+- Get Available Heads
+
+### Team Assignment
+- Assign Team to Unit
+- Unassign Team from Unit
+
+---
+
 *This documentation will be updated as new APIs are added to the units module.* 
