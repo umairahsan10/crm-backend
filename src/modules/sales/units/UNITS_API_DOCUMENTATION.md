@@ -1208,10 +1208,143 @@ This API retrieves all leads associated with a specific sales unit. The flow inc
 
 ---
 
+---
+
+## 9. Get Archive Leads in Unit
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units/:id/archive-leads`
+
+### API Description and Flow
+This API retrieves all archive leads associated with a specific sales unit. The flow includes:
+1. Validates that the unit exists (returns 404 if not found)
+2. Performs security check for unit_head access (can only access their own unit)
+3. Fetches all archive leads from archive_leads table filtered by unitId
+4. Includes employee details for assignedTo (id, firstName, lastName)
+5. Orders archive leads by archivedOn (newest first)
+6. Returns formatted response with complete archive lead data and employee information
+
+### Request Body/Parameters
+- **Path Parameter**: `id` (number) - Unit ID to get archive leads for
+- **Request Body**: None
+- **Query Parameters**: None
+
+### Response Format
+
+**Success Response with Archive Leads (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1001,
+      "leadId": 101,
+      "name": "John Doe",
+      "email": "john.doe@example.com",
+      "phone": "+1 (555) 123-4567",
+      "source": "PPC",
+      "outcome": "interested",
+      "qualityRating": "excellent",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "archivedOn": "2024-02-15T16:45:00Z",
+      "assignedTo": {
+        "id": 201,
+        "firstName": "Mike",
+        "lastName": "Johnson"
+      }
+    }
+  ],
+  "total": 1,
+  "message": "Archive leads retrieved successfully"
+}
+```
+
+**Success Response - No Archive Leads (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No archive leads found in this unit"
+}
+```
+
+**Error Responses:**
+
+**Not Found Error (404):**
+```json
+{
+  "success": false,
+  "message": "Unit with ID 123 does not exist"
+}
+```
+
+**Access Control Error (200):**
+```json
+{
+  "success": false,
+  "message": "You can only access your own unit"
+}
+```
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager, unit_head. User role: junior",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- Unit with provided ID must exist
+- Unit head can only access their own unit (security check)
+- No input validation required (no request body)
+
+### Database Operations
+
+**Tables Affected:**
+- `sales_units` table (read - for unit validation)
+- `archive_leads` table (read - for archive lead data)
+- `employees` table (read - for employee details)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `sales_units` table to check if unit exists
+2. **SELECT** from `archive_leads` table with JOIN to `employees` for employee details
+3. **ORDER BY** archivedOn descending for newest first ordering
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` OR `unit_head` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: Unit heads can only access archive leads in their own unit (security check implemented)
+
+---
+
 ## Planned APIs
 
 ### Unit Relationships
-- Get Archive Leads in Unit
 - Get Archive Leads from Deleted Units
 
 ### Unit Head Management

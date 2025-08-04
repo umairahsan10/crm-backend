@@ -434,6 +434,68 @@ export class UnitsService {
     };
   }
 
+  async getArchiveLeadsInUnit(id: number, currentUser: any) {
+    // Check if unit exists
+    const unit = await this.prisma.salesUnit.findUnique({
+      where: { id }
+    });
+
+    if (!unit) {
+      return {
+        success: false,
+        message: `Unit with ID ${id} does not exist`
+      };
+    }
+
+    // Security check: unit_head can only access their own unit
+    if (currentUser.role === 'unit_head' && unit.headId !== currentUser.id) {
+      return {
+        success: false,
+        message: 'You can only access your own unit'
+      };
+    }
+
+    // Get all archive leads associated with this unit
+    const archiveLeads = await this.prisma.archiveLead.findMany({
+      where: { unitId: id },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      },
+      orderBy: {
+        archivedOn: 'desc'
+      }
+    });
+
+    return {
+      success: true,
+      data: archiveLeads.map(archiveLead => ({
+        id: archiveLead.id,
+        leadId: archiveLead.leadId,
+        name: archiveLead.name,
+        email: archiveLead.email,
+        phone: archiveLead.phone,
+        source: archiveLead.source,
+        outcome: archiveLead.outcome,
+        qualityRating: archiveLead.qualityRating,
+        createdAt: archiveLead.createdAt,
+        archivedOn: archiveLead.archivedOn,
+        assignedTo: archiveLead.employee ? {
+          id: archiveLead.employee.id,
+          firstName: archiveLead.employee.firstName,
+          lastName: archiveLead.employee.lastName
+        } : null
+      })),
+      total: archiveLeads.length,
+      message: archiveLeads.length > 0 ? 'Archive leads retrieved successfully' : 'No archive leads found in this unit'
+    };
+  }
+
   async updateUnit(id: number, updateUnitDto: UpdateUnitDto) {
     // Check if unit exists
     const existingUnit = await this.prisma.salesUnit.findUnique({
