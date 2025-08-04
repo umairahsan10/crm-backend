@@ -58,6 +58,13 @@ export class UnitsController {
     return this.unitsService.getEmployeesInUnit(id, req.user);
   }
 
+  @Get(':id/leads')
+  @Roles('dep_manager', 'unit_head')
+  @Departments('Sales')
+  async getLeadsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.unitsService.getLeadsInUnit(id, req.user);
+  }
+
   @Delete('delete/:id')
   @Roles('dep_manager')
   @Departments('Sales')

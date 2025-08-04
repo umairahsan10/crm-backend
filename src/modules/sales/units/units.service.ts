@@ -349,6 +349,91 @@ export class UnitsService {
     };
   }
 
+  async getLeadsInUnit(id: number, currentUser: any) {
+    // Check if unit exists
+    const unit = await this.prisma.salesUnit.findUnique({
+      where: { id }
+    });
+
+    if (!unit) {
+      return {
+        success: false,
+        message: `Unit with ID ${id} does not exist`
+      };
+    }
+
+    // Security check: unit_head can only access their own unit
+    if (currentUser.role === 'unit_head' && unit.headId !== currentUser.id) {
+      return {
+        success: false,
+        message: 'You can only access your own unit'
+      };
+    }
+
+    // Get all leads associated with this unit
+    const leads = await this.prisma.lead.findMany({
+      where: { salesUnitId: id },
+      include: {
+        crackedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        startedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        closedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return {
+      success: true,
+      data: leads.map(lead => ({
+        id: lead.id,
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        source: lead.source,
+        type: lead.type,
+        status: lead.status,
+        failedCount: lead.failedCount,
+        outcome: lead.outcome,
+        qualityRating: lead.qualityRating,
+        createdAt: lead.createdAt,
+        updatedAt: lead.updatedAt,
+        closedAt: lead.closedAt,
+        crackedBy: lead.crackedBy,
+        assignedTo: lead.assignedTo,
+        startedBy: lead.startedBy,
+        closedBy: lead.closedBy
+      })),
+      total: leads.length,
+      message: leads.length > 0 ? 'Leads retrieved successfully' : 'No leads found in this unit'
+    };
+  }
+
   async updateUnit(id: number, updateUnitDto: UpdateUnitDto) {
     // Check if unit exists
     const existingUnit = await this.prisma.salesUnit.findUnique({

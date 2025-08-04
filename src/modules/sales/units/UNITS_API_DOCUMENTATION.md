@@ -1060,10 +1060,157 @@ This API retrieves all active employees associated with a specific sales unit. T
 
 ---
 
+---
+
+## 8. Get Leads in Unit
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units/:id/leads`
+
+### API Description and Flow
+This API retrieves all leads associated with a specific sales unit. The flow includes:
+1. Validates that the unit exists (returns 404 if not found)
+2. Performs security check for unit_head access (can only access their own unit)
+3. Fetches all leads from leads table filtered by salesUnitId
+4. Includes employee details for crackedBy, assignedTo, startedBy, and closedBy
+5. Orders leads by createdAt (newest first)
+6. Returns formatted response with complete lead data and employee information
+
+### Request Body/Parameters
+- **Path Parameter**: `id` (number) - Unit ID to get leads for
+- **Request Body**: None
+- **Query Parameters**: None
+
+### Response Format
+
+**Success Response with Leads (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 101,
+      "name": "John Doe",
+      "email": "john.doe@example.com",
+      "phone": "+1 (555) 123-4567",
+      "source": "PPC",
+      "type": "warm",
+      "status": "in_progress",
+      "failedCount": 0,
+      "outcome": "interested",
+      "qualityRating": "good",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "closedAt": null,
+      "crackedBy": {
+        "id": 201,
+        "firstName": "Mike",
+        "lastName": "Johnson"
+      },
+      "assignedTo": {
+        "id": 202,
+        "firstName": "Sarah",
+        "lastName": "Wilson"
+      },
+      "startedBy": {
+        "id": 202,
+        "firstName": "Sarah",
+        "lastName": "Wilson"
+      },
+      "closedBy": null
+    }
+  ],
+  "total": 1,
+  "message": "Leads retrieved successfully"
+}
+```
+
+**Success Response - No Leads (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No leads found in this unit"
+}
+```
+
+**Error Responses:**
+
+**Not Found Error (404):**
+```json
+{
+  "success": false,
+  "message": "Unit with ID 123 does not exist"
+}
+```
+
+**Access Control Error (200):**
+```json
+{
+  "success": false,
+  "message": "You can only access your own unit"
+}
+```
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager, unit_head. User role: junior",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- Unit with provided ID must exist
+- Unit head can only access their own unit (security check)
+- No input validation required (no request body)
+
+### Database Operations
+
+**Tables Affected:**
+- `sales_units` table (read - for unit validation)
+- `leads` table (read - for lead data)
+- `employees` table (read - for employee details)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `sales_units` table to check if unit exists
+2. **SELECT** from `leads` table with JOIN to `employees` for employee details
+3. **ORDER BY** createdAt descending for newest first ordering
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` OR `unit_head` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: Unit heads can only access leads in their own unit (security check implemented)
+
+---
+
 ## Planned APIs
 
 ### Unit Relationships
-- Get Leads in Unit
 - Get Archive Leads in Unit
 - Get Archive Leads from Deleted Units
 
