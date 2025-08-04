@@ -496,6 +496,48 @@ export class UnitsService {
     };
   }
 
+  async getArchiveLeadsFromDeletedUnits(currentUser: any) {
+    // Get all archive leads from deleted units (unitId = null)
+    const archiveLeads = await this.prisma.archiveLead.findMany({
+      where: { unitId: null },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      },
+      orderBy: {
+        archivedOn: 'desc'
+      }
+    });
+
+    return {
+      success: true,
+      data: archiveLeads.map(archiveLead => ({
+        id: archiveLead.id,
+        leadId: archiveLead.leadId,
+        name: archiveLead.name,
+        email: archiveLead.email,
+        phone: archiveLead.phone,
+        source: archiveLead.source,
+        outcome: archiveLead.outcome,
+        qualityRating: archiveLead.qualityRating,
+        createdAt: archiveLead.createdAt,
+        archivedOn: archiveLead.archivedOn,
+        assignedTo: archiveLead.employee ? {
+          id: archiveLead.employee.id,
+          firstName: archiveLead.employee.firstName,
+          lastName: archiveLead.employee.lastName
+        } : null
+      })),
+      total: archiveLeads.length,
+      message: archiveLeads.length > 0 ? 'Archive leads from deleted units retrieved successfully' : 'No archive leads found from deleted units'
+    };
+  }
+
   async updateUnit(id: number, updateUnitDto: UpdateUnitDto) {
     // Check if unit exists
     const existingUnit = await this.prisma.salesUnit.findUnique({

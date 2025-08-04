@@ -1342,10 +1342,121 @@ This API retrieves all archive leads associated with a specific sales unit. The 
 
 ---
 
-## Planned APIs
+---
 
-### Unit Relationships
-- Get Archive Leads from Deleted Units
+## 10. Get Archive Leads from Deleted Units
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units/deleted/archive-leads`
+
+### API Description and Flow
+This API retrieves all archive leads that belonged to units that have been deleted. The flow includes:
+1. Fetches all archive leads from archive_leads table where unitId = null
+2. Includes employee details for assignedTo (id, firstName, lastName)
+3. Orders archive leads by archivedOn (newest first)
+4. Returns formatted response with complete archive lead data and employee information
+
+### Request Body/Parameters
+- **Path Parameter**: None
+- **Request Body**: None
+- **Query Parameters**: None
+
+### Response Format
+
+**Success Response with Archive Leads (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1001,
+      "leadId": 101,
+      "name": "John Doe",
+      "email": "john.doe@example.com",
+      "phone": "+1 (555) 123-4567",
+      "source": "PPC",
+      "outcome": "interested",
+      "qualityRating": "excellent",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "archivedOn": "2024-02-15T16:45:00Z",
+      "assignedTo": {
+        "id": 201,
+        "firstName": "Mike",
+        "lastName": "Johnson"
+      }
+    }
+  ],
+  "total": 1,
+  "message": "Archive leads from deleted units retrieved successfully"
+}
+```
+
+**Success Response - No Archive Leads (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No archive leads found from deleted units"
+}
+```
+
+**Error Responses:**
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager. User role: unit_head",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- No input validation required (no request body)
+- No unit validation required (getting leads from deleted units)
+
+### Database Operations
+
+**Tables Affected:**
+- `archive_leads` table (read - for archive lead data)
+- `employees` table (read - for employee details)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `archive_leads` table with JOIN to `employees` for employee details
+2. **WHERE** unitId = null (deleted units)
+3. **ORDER BY** archivedOn descending for newest first ordering
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: ❌ **NOT ALLOWED** - Only admin and dep_manager can access
+
+---
+
+## Planned APIs
 
 ### Unit Head Management
 - Assign Head to Unit
