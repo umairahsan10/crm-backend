@@ -219,7 +219,7 @@ export class AttendanceController {
       actionData.confirmation_reason
     );
   }
-
+x
   
 
   @Get('list')
@@ -311,6 +311,14 @@ export class AttendanceController {
       message: 'Quarterly leaves reset triggered successfully',
       updated_count: updatedCount
     };
+  }
+
+  @Post('triggers/auto-mark-absent')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async triggerAutoMarkAbsent(): Promise<{ message: string; absent_marked: number; leave_applied: number }> {
+    return this.attendanceService.autoMarkAbsent();
   }
 
 

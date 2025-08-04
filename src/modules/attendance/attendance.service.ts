@@ -1878,17 +1878,16 @@ export class AttendanceService {
       if (action === 'Approved') {
         const currentDate = new Date();
         const startDate = leaveLog.startDate;
+        const endDate = leaveLog.endDate;
 
-        // Check if start date is in the past (emergency leave)
-        if (startDate < currentDate) {
-          // Calculate the TOTAL number of days for this leave using proper day counting
-          const totalLeaveDays = this.calculateLeaveDays(startDate, leaveLog.endDate);
+        // Calculate the TOTAL number of days for this leave using proper day counting
+        const totalLeaveDays = this.calculateLeaveDays(startDate, endDate);
 
-          // For emergency leave, we need to be consistent between attendance and monthly tables
-          // Let's use the full leave days for both to avoid double counting
-          const allowedDaysForMonthly = totalLeaveDays;
+        console.log(`Leave approved: Total days: ${totalLeaveDays}, Start: ${startDate.toISOString().split('T')[0]}, End: ${endDate.toISOString().split('T')[0]}`);
 
-          console.log(`Emergency leave: Total days: ${totalLeaveDays}, Using same for monthly updates`);
+        // Condition 1: If endDate is less than current date (past leave)
+        if (endDate < currentDate) {
+          console.log(`Processing past leave - endDate ${endDate.toISOString().split('T')[0]} is before current date ${currentDate.toISOString().split('T')[0]}`);
 
           // Find the attendance record for this employee
           const attendance = await this.prisma.attendance.findFirst({
@@ -1896,11 +1895,11 @@ export class AttendanceService {
           });
 
           if (attendance) {
-            // Update attendance: absent-totalLeaveDays, leave+totalLeaveDays, quarterlyLeaves-totalLeaveDays
             const currentAbsentDays = attendance.absentDays || 0;
             const currentLeaveDays = attendance.leaveDays || 0;
             const currentQuarterlyLeaves = attendance.quarterlyLeaves || 0;
 
+            // 1. Update attendance table
             await this.prisma.attendance.update({
               where: { id: attendance.id },
               data: {
@@ -1912,34 +1911,56 @@ export class AttendanceService {
 
             console.log(`Updated attendance: -${totalLeaveDays} absent, +${totalLeaveDays} leave, -${totalLeaveDays} quarterly`);
 
-            // Update monthly attendance summary with full leave days distributed across months
-            await this.updateMonthlyAttendanceForLeave(leaveLog.empId, startDate, leaveLog.endDate, totalLeaveDays, allowedDaysForMonthly);
-          }
-        } else {
-          // Future leave (normal leave request)
-          const totalLeaveDays = this.calculateLeaveDays(startDate, leaveLog.endDate);
+            // 2. Update monthly attendance summary table
+            await this.updateMonthlyAttendanceForLeave(leaveLog.empId, startDate, endDate, totalLeaveDays, totalLeaveDays);
 
-          // Find the attendance record for this employee
-          const attendance = await this.prisma.attendance.findFirst({
-            where: { employeeId: leaveLog.empId }
-          });
+            // 3. Update attendance logs table - change status from absent to leave
+            const currentDateForLogs = new Date(startDate);
+            while (currentDateForLogs <= endDate) {
+              const logDate = currentDateForLogs.toISOString().split('T')[0];
+              
+              // Check if attendance log exists for this date
+              const existingLog = await this.prisma.attendanceLog.findFirst({
+                where: {
+                  employeeId: leaveLog.empId,
+                  date: new Date(logDate)
+                }
+              });
 
-          if (attendance) {
-            // For future leaves, update attendance normally
-            const currentLeaveDays = attendance.leaveDays || 0;
-            const currentQuarterlyLeaves = attendance.quarterlyLeaves || 0;
-
-            await this.prisma.attendance.update({
-              where: { id: attendance.id },
-              data: {
-                leaveDays: currentLeaveDays + totalLeaveDays,
-                quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - totalLeaveDays)
+              if (existingLog) {
+                // Update existing log to leave status
+                await this.prisma.attendanceLog.update({
+                  where: { id: existingLog.id },
+                  data: {
+                    status: 'leave',
+                    checkin: null,
+                    checkout: null
+                  }
+                });
+                console.log(`Updated existing log for ${logDate} to leave status`);
+              } else {
+                // Create new attendance log with leave status
+                await this.prisma.attendanceLog.create({
+                  data: {
+                    employeeId: leaveLog.empId,
+                    date: new Date(logDate),
+                    checkin: null,
+                    checkout: null,
+                    mode: 'onsite',
+                    status: 'leave'
+                  }
+                });
+                console.log(`Created new leave log for ${logDate}`);
               }
-            });
 
-            // Update monthly attendance summary for all days (no limit for future leaves)
-            await this.updateMonthlyAttendanceForLeave(leaveLog.empId, startDate, leaveLog.endDate, totalLeaveDays, totalLeaveDays);
+              // Move to next day
+              currentDateForLogs.setDate(currentDateForLogs.getDate() + 1);
+            }
           }
+        }
+        // Condition 2: If startDate >= current date (future leave) - DO NOTHING
+        else {
+          console.log(`Future leave - startDate ${startDate.toISOString().split('T')[0]} is >= current date ${currentDate.toISOString().split('T')[0]}, doing nothing`);
         }
       }
       // If action is 'Rejected', no action needed as per your requirement
@@ -2017,6 +2038,187 @@ export class AttendanceService {
       });
       
       console.log(`Updated month ${month}: -${daysInMonth} absent, +${daysInMonth} leave days`);
+    }
+  }
+
+  async autoMarkAbsent(): Promise<{ message: string; absent_marked: number; leave_applied: number }> {
+    try {
+      const currentDate = new Date();
+      const today = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const currentTime = currentDate.toTimeString().split(' ')[0]; // HH:MM:SS format
+      
+      console.log(`Auto-marking absent for date: ${today}, current time: ${currentTime}`);
+
+      // Get all employees with their shift end times
+      const employees = await this.prisma.employee.findMany({
+        where: {
+          status: 'active'
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          shiftEnd: true
+        }
+      });
+
+      let absentMarked = 0;
+      let leaveApplied = 0;
+
+      for (const employee of employees) {
+        if (!employee.shiftEnd) {
+          console.log(`Employee ${employee.id} has no shift end time, skipping`);
+          continue;
+        }
+
+        // Calculate deadline (shift end + 30 minutes)
+        const shiftEndTime = employee.shiftEnd;
+        const [hours, minutes] = shiftEndTime.split(':').map(Number);
+        const deadlineMinutes = hours * 60 + minutes + 30;
+        const deadlineHours = Math.floor(deadlineMinutes / 60);
+        const deadlineMins = deadlineMinutes % 60;
+        const deadlineTime = `${deadlineHours.toString().padStart(2, '0')}:${deadlineMins.toString().padStart(2, '0')}:00`;
+
+        console.log(`Employee ${employee.id} (${employee.firstName} ${employee.lastName}) - Shift end: ${shiftEndTime}, Deadline: ${deadlineTime}`);
+
+        // Check if current time is past the deadline
+        if (currentTime > deadlineTime) {
+          // Check if employee already has attendance log for today
+          const existingLog = await this.prisma.attendanceLog.findFirst({
+            where: {
+              employeeId: employee.id,
+              date: new Date(today)
+            }
+          });
+
+          if (existingLog) {
+            console.log(`Employee ${employee.id} already has attendance log for today, skipping`);
+            continue;
+          }
+
+          // Check if employee has approved leave for today
+          const approvedLeave = await this.prisma.leaveLog.findFirst({
+            where: {
+              empId: employee.id,
+              status: 'Approved',
+              startDate: {
+                lte: currentDate
+              },
+              endDate: {
+                gte: currentDate
+              }
+            }
+          });
+
+          if (approvedLeave) {
+            console.log(`Employee ${employee.id} has approved leave for today, applying leave instead of absent`);
+            
+            // Apply leave logic
+            const attendance = await this.prisma.attendance.findFirst({
+              where: { employeeId: employee.id }
+            });
+
+            if (attendance) {
+              const currentLeaveDays = attendance.leaveDays || 0;
+              const currentQuarterlyLeaves = attendance.quarterlyLeaves || 0;
+
+              await this.prisma.attendance.update({
+                where: { id: attendance.id },
+                data: {
+                  leaveDays: currentLeaveDays + 1,
+                  quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - 1)
+                }
+              });
+
+              // Update monthly attendance summary
+              const monthKey = today.substring(0, 7); // YYYY-MM format
+              await this.prisma.monthlyAttendanceSummary.updateMany({
+                where: {
+                  empId: employee.id,
+                  month: monthKey
+                },
+                data: {
+                  totalLeaveDays: {
+                    increment: 1
+                  }
+                }
+              });
+
+              // Create/update attendance log with leave status
+              const existingLog = await this.prisma.attendanceLog.findFirst({
+                where: {
+                  employeeId: employee.id,
+                  date: new Date(today)
+                }
+              });
+
+              if (existingLog) {
+                // Update existing log to leave status
+                await this.prisma.attendanceLog.update({
+                  where: { id: existingLog.id },
+                  data: {
+                    status: 'leave',
+                    checkin: null,
+                    checkout: null
+                  }
+                });
+                console.log(`Updated existing log for employee ${employee.id} to leave status`);
+              } else {
+                // Create new attendance log with leave status
+                await this.prisma.attendanceLog.create({
+                  data: {
+                    employeeId: employee.id,
+                    date: new Date(today),
+                    checkin: null,
+                    checkout: null,
+                    mode: 'onsite',
+                    status: 'leave'
+                  }
+                });
+                console.log(`Created new leave log for employee ${employee.id}`);
+              }
+
+              leaveApplied++;
+              console.log(`Applied leave for employee ${employee.id}`);
+            }
+          } else {
+            console.log(`Employee ${employee.id} has no approved leave, marking as absent`);
+            
+            // Mark as absent
+            await this.prisma.attendanceLog.create({
+              data: {
+                employeeId: employee.id,
+                date: new Date(today),
+                checkin: null,
+                checkout: null,
+                mode: 'onsite',
+                status: 'absent'
+              }
+            });
+
+            // Update attendance table
+            await this.updateBaseAttendance(employee.id, 'absent');
+
+            // Update monthly attendance summary
+            await this.updateMonthlyAttendanceSummary(employee.id, currentDate, 'absent');
+
+            absentMarked++;
+            console.log(`Marked absent for employee ${employee.id}`);
+          }
+        } else {
+          console.log(`Employee ${employee.id} deadline not reached yet (${deadlineTime} > ${currentTime})`);
+        }
+      }
+
+      return {
+        message: 'Auto-mark absent process completed successfully',
+        absent_marked: absentMarked,
+        leave_applied: leaveApplied
+      };
+
+    } catch (error) {
+      console.error('Error in autoMarkAbsent:', error);
+      throw new InternalServerErrorException(`Failed to auto-mark absent: ${error.message}`);
     }
   }
 }
