@@ -751,10 +751,148 @@ This API retrieves detailed information about a specific sales unit. The flow in
 
 ---
 
+## 6. Get Teams in Unit
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units/:id/teams`
+
+### API Description and Flow
+This API retrieves all teams associated with a specific sales unit. The flow includes:
+1. Validates that the unit exists (returns 404 if not found)
+2. Fetches all teams associated with the unit
+3. Includes team lead details (id, firstName, lastName) from employees table
+4. Includes current project details (id, description, liveProgress, deadline) if assigned
+5. Orders teams alphabetically by name
+6. Returns formatted response with team data, lead information, and project details
+
+### Request Body/Parameters
+- **Path Parameter**: `id` (number) - Unit ID to get teams for
+- **Request Body**: None
+- **Query Parameters**: None
+
+### Response Format
+
+**Success Response with Teams (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Sales Team A",
+      "teamLead": {
+        "id": 5,
+        "firstName": "John",
+        "lastName": "Doe"
+      },
+      "currentProject": {
+        "id": 10,
+        "description": "E-commerce website development",
+        "liveProgress": 65.50,
+        "deadline": "2024-03-15T00:00:00.000Z"
+      },
+      "employeeCount": 8,
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": 2,
+      "name": "Sales Team B",
+      "teamLead": {
+        "id": 12,
+        "firstName": "Mike",
+        "lastName": "Wilson"
+      },
+      "currentProject": null,
+      "employeeCount": 5,
+      "createdAt": "2024-01-20T14:30:00Z",
+      "updatedAt": "2024-01-20T14:30:00Z"
+    }
+  ],
+  "total": 2,
+  "message": "Teams retrieved successfully"
+}
+```
+
+**Success Response - No Teams (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No teams found in this unit"
+}
+```
+
+**Error Responses:**
+
+**Not Found Error (404):**
+```json
+{
+  "success": false,
+  "message": "Unit with ID 123 does not exist"
+}
+```
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager, unit_head. User role: junior",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- Unit with provided ID must exist
+- No input validation required (no request body)
+
+### Database Operations
+
+**Tables Affected:**
+- `sales_units` table (read - for unit validation)
+- `teams` table (read - for team data)
+- `employees` table (read - for team lead details)
+- `projects` table (read - for current project details)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `sales_units` table to check if unit exists
+2. **SELECT** from `teams` table with JOIN to `employees` for team lead details
+3. **SELECT** from `teams` table with JOIN to `projects` for current project details
+4. **ORDER BY** team name ascending for alphabetical sorting
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` OR `unit_head` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: Unit heads can access teams in their own unit
+
+---
+
 ## Planned APIs
 
 ### Unit Relationships
-- Get Teams in Unit
 - Get Employees in Unit
 - Get Leads in Unit
 - Get Archive Leads in Unit
