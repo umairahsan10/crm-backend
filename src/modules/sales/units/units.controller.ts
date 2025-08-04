@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request } from '@nestjs/common';
 import { UnitsService } from './units.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
@@ -47,8 +47,15 @@ export class UnitsController {
   @Get(':id/teams')
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
-  async getTeamsInUnit(@Param('id', ParseIntPipe) id: number) {
-    return this.unitsService.getTeamsInUnit(id);
+  async getTeamsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.unitsService.getTeamsInUnit(id, req.user);
+  }
+
+  @Get(':id/employees')
+  @Roles('dep_manager', 'unit_head')
+  @Departments('Sales')
+  async getEmployeesInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.unitsService.getEmployeesInUnit(id, req.user);
   }
 
   @Delete('delete/:id')

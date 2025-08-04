@@ -186,7 +186,7 @@ export class UnitsService {
     };
   }
 
-  async getTeamsInUnit(id: number) {
+  async getTeamsInUnit(id: number, currentUser: any) {
     // Check if unit exists
     const unit = await this.prisma.salesUnit.findUnique({
       where: { id }
@@ -196,6 +196,14 @@ export class UnitsService {
       return {
         success: false,
         message: `Unit with ID ${id} does not exist`
+      };
+    }
+
+    // Security check: unit_head can only access their own unit
+    if (currentUser.role === 'unit_head' && unit.headId !== currentUser.id) {
+      return {
+        success: false,
+        message: 'You can only access your own unit'
       };
     }
 
@@ -246,6 +254,98 @@ export class UnitsService {
       })),
       total: teams.length,
       message: teams.length > 0 ? 'Teams retrieved successfully' : 'No teams found in this unit'
+    };
+  }
+
+  async getEmployeesInUnit(id: number, currentUser: any) {
+    // Check if unit exists
+    const unit = await this.prisma.salesUnit.findUnique({
+      where: { id }
+    });
+
+    if (!unit) {
+      return {
+        success: false,
+        message: `Unit with ID ${id} does not exist`
+      };
+    }
+
+    // Security check: unit_head can only access their own unit
+    if (currentUser.role === 'unit_head' && unit.headId !== currentUser.id) {
+      return {
+        success: false,
+        message: 'You can only access your own unit'
+      };
+    }
+
+    // Get all active employees in this unit
+    const salesEmployees = await this.prisma.salesDepartment.findMany({
+      where: { 
+        salesUnitId: id 
+      },
+      include: {
+        employee: {
+          include: {
+            role: true
+          }
+        }
+      }
+    });
+
+    // Filter only active employees and get their team information
+    const employeesWithTeams = await Promise.all(
+      salesEmployees
+        .filter(salesEmp => salesEmp.employee.status === 'active')
+        .map(async (salesEmp) => {
+          const employee = salesEmp.employee;
+          
+          // Find the team for this employee
+          let team: { id: number; name: string } | null = null;
+          if (employee.teamLeadId) {
+            const foundTeam = await this.prisma.team.findFirst({
+              where: { teamLeadId: employee.teamLeadId },
+              select: {
+                id: true,
+                name: true
+              }
+            });
+            if (foundTeam && foundTeam.name) {
+              team = {
+                id: foundTeam.id,
+                name: foundTeam.name
+              };
+            }
+          }
+
+          return {
+            id: employee.id,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            email: employee.email,
+            phone: employee.phone,
+            role: {
+              id: employee.role.id,
+              name: employee.role.name
+            },
+            team: team,
+            startDate: employee.startDate
+          };
+        })
+    );
+
+    // Sort alphabetically by firstName, then lastName
+    const sortedEmployees = employeesWithTeams.sort((a, b) => {
+      if (a.firstName !== b.firstName) {
+        return a.firstName.localeCompare(b.firstName);
+      }
+      return a.lastName.localeCompare(b.lastName);
+    });
+
+    return {
+      success: true,
+      data: sortedEmployees,
+      total: sortedEmployees.length,
+      message: sortedEmployees.length > 0 ? 'Employees retrieved successfully' : 'No employees found in this unit'
     };
   }
 
