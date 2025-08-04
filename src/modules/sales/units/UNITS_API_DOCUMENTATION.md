@@ -197,10 +197,11 @@ This API creates a new sales unit in the system. The flow includes:
 
 ### API Description and Flow
 This API retrieves all sales units from the system. The flow includes:
-1. Fetches all units from the database
-2. Includes unit head details (firstName, lastName) from employees table
-3. Orders units alphabetically by name
-4. Returns formatted response with unit data and head information
+1. Fetches all units from the database with head information
+2. For each unit, calculates the count of associated teams
+3. For each unit, calculates the count of associated employees
+4. Orders units alphabetically by name
+5. Returns formatted response with unit data, head information, and counts
 
 ### Request Body/Parameters
 - **Request Body**: None
@@ -225,8 +226,13 @@ This API retrieves all sales units from the system. The flow includes:
       "website": "https://example.com",
       "createdAt": "2024-01-15T10:30:00Z",
       "updatedAt": "2024-01-15T10:30:00Z",
-      "headFirstName": "John",
-      "headLastName": "Doe"
+      "head": {
+        "id": 123,
+        "firstName": "John",
+        "lastName": "Doe"
+      },
+      "teamsCount": 3,
+      "employeesCount": 8
     }
   ],
   "total": 1,
@@ -280,13 +286,17 @@ This API retrieves all sales units from the system. The flow includes:
 **Tables Affected:**
 - `sales_units` table (read)
 - `employees` table (read - for head details)
+- `teams` table (read - for count)
+- `sales_departments` table (read - for count)
 
 **Database Changes:**
 - **No changes** - read-only operation
 
 **Database Queries:**
 1. **SELECT** from `sales_units` table with JOIN to `employees` table for head details
-2. **ORDER BY** name ascending for alphabetical sorting
+2. **COUNT** from `teams` table for each unit's teams count
+3. **COUNT** from `sales_departments` table for each unit's employees count
+4. **ORDER BY** name ascending for alphabetical sorting
 
 ### Access Control
 - **Authentication**: JWT token required
