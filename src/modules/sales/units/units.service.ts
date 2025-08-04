@@ -88,24 +88,44 @@ export class UnitsService {
       }
     });
 
+    // Get counts for each unit
+    const unitsWithCounts = await Promise.all(
+      units.map(async (unit) => {
+        const teamsCount = await this.prisma.team.count({
+          where: { salesUnitId: unit.id }
+        });
+
+        const employeesCount = await this.prisma.salesDepartment.count({
+          where: { salesUnitId: unit.id }
+        });
+
+        return {
+          id: unit.id,
+          name: unit.name,
+          email: unit.email,
+          phone: unit.phone,
+          address: unit.address,
+          headId: unit.headId,
+          logoUrl: unit.logoUrl,
+          website: unit.website,
+          createdAt: unit.createdAt,
+          updatedAt: unit.updatedAt,
+          head: unit.head ? {
+            id: unit.head.id,
+            firstName: unit.head.firstName,
+            lastName: unit.head.lastName
+          } : null,
+          teamsCount,
+          employeesCount
+        };
+      })
+    );
+
     return {
       success: true,
-      data: units.map(unit => ({
-        id: unit.id,
-        name: unit.name,
-        email: unit.email,
-        phone: unit.phone,
-        address: unit.address,
-        headId: unit.headId,
-        logoUrl: unit.logoUrl,
-        website: unit.website,
-        createdAt: unit.createdAt,
-        updatedAt: unit.updatedAt,
-        headFirstName: unit.head?.firstName || null,
-        headLastName: unit.head?.lastName || null
-      })),
-      total: units.length,
-      message: units.length > 0 ? 'Units retrieved successfully' : 'No units found'
+      data: unitsWithCounts,
+      total: unitsWithCounts.length,
+      message: unitsWithCounts.length > 0 ? 'Units retrieved successfully' : 'No units found'
     };
   }
 
