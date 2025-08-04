@@ -845,6 +845,14 @@ This API retrieves all teams associated with a specific sales unit. The flow inc
 }
 ```
 
+**Access Control Error (200):**
+```json
+{
+  "success": false,
+  "message": "You can only access your own unit"
+}
+```
+
 **Authentication/Authorization Errors (401/403):**
 ```json
 {
@@ -896,14 +904,165 @@ This API retrieves all teams associated with a specific sales unit. The flow inc
 - **Roles**: `dep_manager` OR `unit_head` role required
 - **Departments**: `Sales` department required
 - **Admin Access**: Admins (admin, supermanager) have automatic access
-- **Unit Head Access**: Unit heads can access teams in their own unit
+- **Unit Head Access**: Unit heads can only access teams in their own unit (security check implemented)
+
+---
+
+## 7. Get Employees in Unit
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units/:id/employees`
+
+### API Description and Flow
+This API retrieves all active employees associated with a specific sales unit. The flow includes:
+1. Validates that the unit exists (returns 404 if not found)
+2. Performs security check for unit_head access (can only access their own unit)
+3. Fetches all active employees from sales_departments table filtered by salesUnitId
+4. For each employee, resolves their team assignment using teamLeadId relationship
+5. Includes employee details, role information, and team assignment
+6. Orders employees alphabetically by firstName, then lastName
+7. Returns formatted response with employee data, role information, and team details
+
+### Request Body/Parameters
+- **Path Parameter**: `id` (number) - Unit ID to get employees for
+- **Request Body**: None
+- **Query Parameters**: None
+
+### Response Format
+
+**Success Response with Employees (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 201,
+      "firstName": "Mike",
+      "lastName": "Johnson",
+      "email": "mike.johnson@company.com",
+      "phone": "+1 (555) 123-4567",
+      "role": {
+        "id": 3,
+        "name": "senior"
+      },
+      "team": {
+        "id": 5,
+        "name": "Sales Team A"
+      },
+      "startDate": "2023-06-15T00:00:00.000Z"
+    },
+    {
+      "id": 202,
+      "firstName": "Sarah",
+      "lastName": "Wilson",
+      "email": "sarah.wilson@company.com",
+      "phone": "+1 (555) 987-6543",
+      "role": {
+        "id": 4,
+        "name": "junior"
+      },
+      "team": {
+        "id": 5,
+        "name": "Sales Team A"
+      },
+      "startDate": "2023-08-20T00:00:00.000Z"
+    }
+  ],
+  "total": 2,
+  "message": "Employees retrieved successfully"
+}
+```
+
+**Success Response - No Employees (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No employees found in this unit"
+}
+```
+
+**Error Responses:**
+
+**Not Found Error (404):**
+```json
+{
+  "success": false,
+  "message": "Unit with ID 123 does not exist"
+}
+```
+
+**Access Control Error (200):**
+```json
+{
+  "success": false,
+  "message": "You can only access your own unit"
+}
+```
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager, unit_head. User role: junior",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- Unit with provided ID must exist
+- Unit head can only access their own unit (security check)
+- No input validation required (no request body)
+
+### Database Operations
+
+**Tables Affected:**
+- `sales_units` table (read - for unit validation)
+- `sales_departments` table (read - for employee-unit relationship)
+- `employees` table (read - for employee details)
+- `roles` table (read - for role information)
+- `teams` table (read - for team assignment)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `sales_units` table to check if unit exists
+2. **SELECT** from `sales_departments` table with JOIN to `employees` and `roles` for employee details
+3. **SELECT** from `teams` table to resolve team assignment for each employee
+4. **FILTER** by employee status = 'active'
+5. **ORDER BY** firstName, lastName for alphabetical sorting
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` OR `unit_head` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: Unit heads can only access employees in their own unit (security check implemented)
 
 ---
 
 ## Planned APIs
 
 ### Unit Relationships
-- Get Employees in Unit
 - Get Leads in Unit
 - Get Archive Leads in Unit
 - Get Archive Leads from Deleted Units
