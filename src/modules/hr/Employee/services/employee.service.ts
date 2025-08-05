@@ -1,13 +1,13 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { FinanceService } from '../finance/finance.service';
-import { CreateEmployeeDto } from './dto/create-employee.dto';
-import { UpdateEmployeeDto } from './dto/update-employee.dto';
-import { GetEmployeesDto } from './dto/get-employees.dto';
+import { PrismaService } from '../../../../../prisma/prisma.service';
+import { FinanceService } from '../../../finance/finance.service';
+import { CreateEmployeeDto } from '../dto/create-employee.dto';
+import { UpdateEmployeeDto } from '../dto/update-employee.dto';
+import { GetEmployeesDto } from '../dto/get-employees.dto';
 
 @Injectable()
-export class HrService {
-  private readonly logger = new Logger(HrService.name);
+export class EmployeeService {
+  private readonly logger = new Logger(EmployeeService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -518,7 +518,7 @@ export class HrService {
       throw new NotFoundException(`Employee with ID ${id} not found`);
     }
 
-    // Check if employee is already deleted (to prevent duplicate logs)
+    // Check if employee is already deleted (to prevent duplicate operations)
     const existingDeletionLog = await this.prisma.hRLog.findFirst({
       where: {
         affectedEmployeeId: id,
@@ -565,12 +565,13 @@ export class HrService {
           where: { empId: id },
         });
 
-        // Delete HR logs where this employee is affected (but keep creation and deletion logs for audit trail)
+        // Delete HR logs where this employee is affected (but keep creation and update logs for audit trail)
+        // We'll create the deletion log before deleting other HR logs
         await tx.hRLog.deleteMany({
           where: { 
             affectedEmployeeId: id,
             actionType: { 
-              notIn: ['employee_created', 'employee_deleted'] // Keep both creation and deletion logs
+              notIn: ['employee_created', 'employee_updated'] // Keep creation and update logs, deletion log will be created separately
             }
           },
         });
@@ -818,6 +819,27 @@ export class HrService {
           data: { teamLeadId: null },
         });
 
+        // Create HR log entry BEFORE deleting the employee record
+        // This ensures the log is created within the transaction and won't be lost
+        const hrRecord = await tx.hR.findUnique({
+          where: { employeeId: hrEmployeeId },
+        });
+
+        if (hrRecord) {
+          await tx.hRLog.create({
+            data: {
+              hrId: hrRecord.id,
+              actionType: 'employee_deleted',
+              affectedEmployeeId: id,
+              description: `Employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) permanently deleted from all systems`,
+            },
+          });
+          this.logger.log(`HR deletion log created for employee ${id}`);
+        } else {
+          this.logger.warn(`No HR record found for HR employee ${hrEmployeeId}, skipping deletion log creation`);
+          // Still proceed with deletion even if log creation fails
+        }
+
         // Finally, delete the employee record
         await tx.employee.delete({
           where: { id },
@@ -825,9 +847,6 @@ export class HrService {
       }, {
         timeout: 30000 // 30 second timeout
       });
-
-      // Create HR log entry AFTER successful deletion
-      await this.createHrLog(hrEmployeeId, 'employee_deleted', employee.id, `Employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) permanently deleted from all systems`);
 
       this.logger.log(`Employee ${id} and all related records deleted successfully`);
       return { message: 'Employee and all related records deleted successfully' };
