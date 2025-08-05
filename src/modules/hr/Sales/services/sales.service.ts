@@ -57,7 +57,7 @@ export class SalesService {
       return salesDepartments;
     } catch (error) {
       this.logger.error(`Failed to retrieve sales departments: ${error.message}`);
-      throw error;
+      throw new BadRequestException(`Failed to retrieve sales departments: ${error.message}`);
     }
   }
 
@@ -113,11 +113,29 @@ export class SalesService {
         throw error;
       }
       this.logger.error(`Failed to retrieve sales department ${id}: ${error.message}`);
-      throw error;
+      throw new BadRequestException(`Failed to retrieve sales department: ${error.message}`);
     }
   }
 
-  async createSalesDepartment(dto: CreateSalesDepartmentDto) {
+  async createSalesDepartment(dto: CreateSalesDepartmentDto, hrEmployeeId: number) {
+    // Validate HR employee exists
+    const hrEmployee = await this.prisma.employee.findUnique({
+      where: { id: hrEmployeeId },
+    });
+
+    if (!hrEmployee) {
+      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+    }
+
+    // Get HR record
+    const hrRecord = await this.prisma.hR.findUnique({
+      where: { employeeId: hrEmployeeId },
+    });
+
+    if (!hrRecord) {
+      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+    }
+
     try {
       const employee = await this.prisma.employee.findUnique({
         where: { id: dto.employeeId },
@@ -134,6 +152,18 @@ export class SalesService {
 
       if (existingSalesDept) {
         throw new BadRequestException(`Sales department record already exists for employee ${dto.employeeId}. Use update endpoint instead.`);
+      }
+
+      // Get sales unit details if provided
+      let salesUnitName = 'N/A';
+      if (dto.salesUnitId) {
+        const salesUnit = await this.prisma.salesUnit.findUnique({
+          where: { id: dto.salesUnitId },
+          select: { name: true },
+        });
+        if (salesUnit) {
+          salesUnitName = salesUnit.name;
+        }
       }
 
       const salesDepartment = await this.prisma.salesDepartment.create({
@@ -188,10 +218,14 @@ export class SalesService {
         },
       });
 
+      // Create HR log entry with detailed information
+      const logDescription = `Sales department record created for employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) - Sales Unit: ${salesUnitName}, Leads Closed: ${dto.leadsClosed || 0}, Sales Amount: ${dto.salesAmount || 0}, Commission Rate: ${dto.commissionRate || 0}%, Target Amount: ${dto.targetAmount || 0}`;
+      await this.createHrLog(hrEmployeeId, 'sales_department_created', employee.id, logDescription);
+
       this.logger.log(`Created sales department record for employee ${dto.employeeId}`);
       return salesDepartment;
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
       }
       this.logger.error(`Failed to create sales department: ${error.message}`);
@@ -199,11 +233,32 @@ export class SalesService {
     }
   }
 
-  async updateSalesDepartment(id: number, dto: UpdateSalesDepartmentDto) {
+  async updateSalesDepartment(id: number, dto: UpdateSalesDepartmentDto, hrEmployeeId: number) {
+    // Validate HR employee exists
+    const hrEmployee = await this.prisma.employee.findUnique({
+      where: { id: hrEmployeeId },
+    });
+
+    if (!hrEmployee) {
+      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+    }
+
+    // Get HR record
+    const hrRecord = await this.prisma.hR.findUnique({
+      where: { employeeId: hrEmployeeId },
+    });
+
+    if (!hrRecord) {
+      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+    }
+
     try {
       const existingSalesDept = await this.prisma.salesDepartment.findUnique({
         where: { id },
-        include: { employee: { select: { id: true, firstName: true, lastName: true, email: true } } },
+        include: { 
+          employee: { select: { id: true, firstName: true, lastName: true, email: true } },
+          salesUnit: { select: { name: true } }
+        },
       });
 
       if (!existingSalesDept) {
@@ -217,6 +272,53 @@ export class SalesService {
 
       if (!employee) {
         throw new BadRequestException(`Employee with ID ${existingSalesDept.employeeId} no longer exists. Cannot update sales department record.`);
+      }
+
+      // Track changes for logging
+      const changes: string[] = [];
+      if (dto.leadsClosed !== undefined && dto.leadsClosed !== existingSalesDept.leadsClosed) {
+        changes.push(`Leads Closed: ${existingSalesDept.leadsClosed || 0} → ${dto.leadsClosed}`);
+      }
+      if (dto.salesAmount !== undefined && dto.salesAmount !== Number(existingSalesDept.salesAmount)) {
+        changes.push(`Sales Amount: ${existingSalesDept.salesAmount || 0} → ${dto.salesAmount}`);
+      }
+      if (dto.salesUnitId !== undefined && dto.salesUnitId !== existingSalesDept.salesUnitId) {
+        const oldUnitName = existingSalesDept.salesUnit?.name || 'N/A';
+        let newUnitName = 'N/A';
+        if (dto.salesUnitId) {
+          const newUnit = await this.prisma.salesUnit.findUnique({
+            where: { id: dto.salesUnitId },
+            select: { name: true },
+          });
+          if (newUnit) {
+            newUnitName = newUnit.name;
+          }
+        }
+        changes.push(`Sales Unit: ${oldUnitName} → ${newUnitName}`);
+      }
+      if (dto.commissionRate !== undefined && dto.commissionRate !== Number(existingSalesDept.commissionRate)) {
+        changes.push(`Commission Rate: ${existingSalesDept.commissionRate || 0}% → ${dto.commissionRate}%`);
+      }
+      if (dto.commissionAmount !== undefined && dto.commissionAmount !== Number(existingSalesDept.commissionAmount)) {
+        changes.push(`Commission Amount: ${existingSalesDept.commissionAmount || 0} → ${dto.commissionAmount}`);
+      }
+      if (dto.salesBonus !== undefined && dto.salesBonus !== Number(existingSalesDept.salesBonus)) {
+        changes.push(`Sales Bonus: ${existingSalesDept.salesBonus || 0} → ${dto.salesBonus}`);
+      }
+      if (dto.withholdCommission !== undefined && dto.withholdCommission !== Number(existingSalesDept.withholdCommission)) {
+        changes.push(`Withhold Commission: ${existingSalesDept.withholdCommission || 0} → ${dto.withholdCommission}`);
+      }
+      if (dto.withholdFlag !== undefined && dto.withholdFlag !== existingSalesDept.withholdFlag) {
+        changes.push(`Withhold Flag: ${existingSalesDept.withholdFlag ? 'Yes' : 'No'} → ${dto.withholdFlag ? 'Yes' : 'No'}`);
+      }
+      if (dto.targetAmount !== undefined && dto.targetAmount !== Number(existingSalesDept.targetAmount)) {
+        changes.push(`Target Amount: ${existingSalesDept.targetAmount || 0} → ${dto.targetAmount}`);
+      }
+      if (dto.chargebackDeductions !== undefined && dto.chargebackDeductions !== Number(existingSalesDept.chargebackDeductions)) {
+        changes.push(`Chargeback Deductions: ${existingSalesDept.chargebackDeductions || 0} → ${dto.chargebackDeductions}`);
+      }
+      if (dto.refundDeductions !== undefined && dto.refundDeductions !== Number(existingSalesDept.refundDeductions)) {
+        changes.push(`Refund Deductions: ${existingSalesDept.refundDeductions || 0} → ${dto.refundDeductions}`);
       }
 
       const updatedSalesDepartment = await this.prisma.salesDepartment.update({
@@ -271,6 +373,13 @@ export class SalesService {
         },
       });
 
+      // Create HR log entry with detailed changes
+      const logDescription = changes.length > 0 
+        ? `Sales department record updated for employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}) - Changes: ${changes.join(', ')}`
+        : `Sales department record updated for employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}) - No changes detected`;
+      
+      await this.createHrLog(hrEmployeeId, 'sales_department_updated', employee.id, logDescription);
+
       this.logger.log(`Updated sales department with ID ${id}`);
       return updatedSalesDepartment;
     } catch (error) {
@@ -282,11 +391,32 @@ export class SalesService {
     }
   }
 
-  async deleteSalesDepartment(id: number) {
+  async deleteSalesDepartment(id: number, hrEmployeeId: number) {
+    // Validate HR employee exists
+    const hrEmployee = await this.prisma.employee.findUnique({
+      where: { id: hrEmployeeId },
+    });
+
+    if (!hrEmployee) {
+      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+    }
+
+    // Get HR record
+    const hrRecord = await this.prisma.hR.findUnique({
+      where: { employeeId: hrEmployeeId },
+    });
+
+    if (!hrRecord) {
+      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+    }
+
     try {
       const existingSalesDept = await this.prisma.salesDepartment.findUnique({
         where: { id },
-        include: { employee: { select: { id: true, firstName: true, lastName: true, email: true } } },
+        include: { 
+          employee: { select: { id: true, firstName: true, lastName: true, email: true } },
+          salesUnit: { select: { name: true } }
+        },
       });
 
       if (!existingSalesDept) {
@@ -301,6 +431,17 @@ export class SalesService {
       if (!employee) {
         throw new BadRequestException(`Employee with ID ${existingSalesDept.employeeId} no longer exists. Cannot delete sales department record.`);
       }
+
+      // Store sales department details before deletion for logging
+      const salesDetails = {
+        salesUnitName: existingSalesDept.salesUnit?.name || 'N/A',
+        leadsClosed: existingSalesDept.leadsClosed,
+        salesAmount: existingSalesDept.salesAmount,
+        commissionRate: existingSalesDept.commissionRate,
+        commissionAmount: existingSalesDept.commissionAmount,
+        salesBonus: existingSalesDept.salesBonus,
+        targetAmount: existingSalesDept.targetAmount,
+      };
 
       const result = await this.prisma.$transaction(async (tx) => {
         await tx.salesDepartment.delete({
@@ -328,6 +469,10 @@ export class SalesService {
         };
       });
 
+      // Create HR log entry with detailed sales department information
+      const logDescription = `Sales department record deleted for employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) - Sales Unit: ${salesDetails.salesUnitName}, Leads Closed: ${salesDetails.leadsClosed || 0}, Sales Amount: ${salesDetails.salesAmount || 0}, Commission Rate: ${salesDetails.commissionRate || 0}%, Commission Amount: ${salesDetails.commissionAmount || 0}, Sales Bonus: ${salesDetails.salesBonus || 0}, Target Amount: ${salesDetails.targetAmount || 0}`;
+      await this.createHrLog(hrEmployeeId, 'sales_department_deleted', employee.id, logDescription);
+
       this.logger.log(`Deleted sales department with ID ${id} for employee ${existingSalesDept.employeeId} and updated related records`);
       return result;
     } catch (error) {
@@ -336,6 +481,34 @@ export class SalesService {
       }
       this.logger.error(`Failed to delete sales department ${id}: ${error.message}`);
       throw new BadRequestException(`Failed to delete sales department: ${error.message}`);
+    }
+  }
+
+  /**
+   * Helper method to create HR log entries
+   */
+  private async createHrLog(hrEmployeeId: number, actionType: string, affectedEmployeeId: number, description: string) {
+    try {
+      const hrRecord = await this.prisma.hR.findUnique({
+        where: { employeeId: hrEmployeeId },
+      });
+
+      if (hrRecord) {
+        await this.prisma.hRLog.create({
+          data: {
+            hrId: hrRecord.id,
+            actionType,
+            affectedEmployeeId,
+            description,
+          },
+        });
+        this.logger.log(`HR log created for action: ${actionType}, affected employee: ${affectedEmployeeId}`);
+      } else {
+        this.logger.warn(`No HR record found for HR employee ${hrEmployeeId}, skipping log creation`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to create HR log: ${error.message}`);
+      // Don't fail the main operation if log creation fails
     }
   }
 } 

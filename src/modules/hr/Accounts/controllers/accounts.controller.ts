@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { AccountsService } from '../services/accounts.service';
 import { CreateAccountDto, UpdateAccountDto } from '../dto/accounts.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
@@ -24,7 +24,7 @@ export class AccountsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async getAllAccountRecords(@Request() req: AuthenticatedRequest) {
+  async getAllAccountRecords() {
     return await this.accountsService.getAllAccountRecords();
   }
 
@@ -32,44 +32,31 @@ export class AccountsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async getAccountRecordById(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
-  ) {
-    return await this.accountsService.getAccountRecordById(id);
+  async getAccountRecordById(@Param('id') id: string) {
+    return await this.accountsService.getAccountRecordById(+id);
   }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async createAccountRecord(
-    @Body() dto: CreateAccountDto,
-    @Request() req: AuthenticatedRequest
-  ) {
-    return await this.accountsService.createAccountRecord(dto);
+  async createAccountRecord(@Body() dto: CreateAccountDto, @Request() req: AuthenticatedRequest) {
+    return await this.accountsService.createAccountRecord(dto, req.user.id);
   }
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async updateAccountRecord(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateAccountDto,
-    @Request() req: AuthenticatedRequest
-  ) {
-    return await this.accountsService.updateAccountRecord(id, dto);
+  async updateAccountRecord(@Param('id') id: string, @Body() dto: UpdateAccountDto, @Request() req: AuthenticatedRequest) {
+    return await this.accountsService.updateAccountRecord(+id, dto, req.user.id);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async deleteAccountRecord(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
-  ) {
-    return await this.accountsService.deleteAccountRecord(id);
+  async deleteAccountRecord(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return await this.accountsService.deleteAccountRecord(+id, req.user.id);
   }
 } 

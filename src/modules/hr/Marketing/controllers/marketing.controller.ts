@@ -47,7 +47,7 @@ export class MarketingController {
     @Body() dto: CreateMarketingDto,
     @Request() req: AuthenticatedRequest
   ) {
-    return await this.marketingService.createMarketingRecord(dto);
+    return await this.marketingService.createMarketingRecord(dto, req.user.id);
   }
 
   @Put(':id')
@@ -59,7 +59,7 @@ export class MarketingController {
     @Body() dto: UpdateMarketingDto,
     @Request() req: AuthenticatedRequest
   ) {
-    return await this.marketingService.updateMarketingRecord(id, dto);
+    return await this.marketingService.updateMarketingRecord(id, dto, req.user.id);
   }
 
   @Delete(':id')
@@ -70,6 +70,6 @@ export class MarketingController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
   ) {
-    return await this.marketingService.deleteMarketingRecord(id);
+    return await this.marketingService.deleteMarketingRecord(id, req.user.id);
   }
 } 

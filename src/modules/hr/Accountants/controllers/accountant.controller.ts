@@ -28,7 +28,7 @@ export class AccountantController {
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
   async createAccountant(@Body() dto: CreateAccountantDto, @Request() req: AuthenticatedRequest): Promise<AccountantResponseDto> {
-    return await this.accountantService.createAccountant(dto);
+    return await this.accountantService.createAccountant(dto, req.user.id);
   }
 
   /**
@@ -72,7 +72,7 @@ export class AccountantController {
     @Body() dto: UpdateAccountantDto,
     @Request() req: AuthenticatedRequest
   ): Promise<AccountantResponseDto> {
-    return await this.accountantService.updateAccountant(id, dto);
+    return await this.accountantService.updateAccountant(id, dto, req.user.id);
   }
 
   /**
@@ -86,6 +86,6 @@ export class AccountantController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
   ): Promise<{ message: string }> {
-    return await this.accountantService.deleteAccountant(id);
+    return await this.accountantService.deleteAccountant(id, req.user.id);
   }
 } 
