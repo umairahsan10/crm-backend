@@ -47,7 +47,7 @@ export class SalesController {
     @Body() dto: CreateSalesDepartmentDto,
     @Request() req: AuthenticatedRequest
   ) {
-    return await this.salesService.createSalesDepartment(dto);
+    return await this.salesService.createSalesDepartment(dto, req.user.id);
   }
 
   @Put(':id')
@@ -59,7 +59,7 @@ export class SalesController {
     @Body() dto: UpdateSalesDepartmentDto,
     @Request() req: AuthenticatedRequest
   ) {
-    return await this.salesService.updateSalesDepartment(id, dto);
+    return await this.salesService.updateSalesDepartment(id, dto, req.user.id);
   }
 
   @Delete(':id')
@@ -70,6 +70,6 @@ export class SalesController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
   ) {
-    return await this.salesService.deleteSalesDepartment(id);
+    return await this.salesService.deleteSalesDepartment(id, req.user.id);
   }
 } 

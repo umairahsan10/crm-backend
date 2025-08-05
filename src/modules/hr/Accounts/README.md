@@ -249,6 +249,30 @@ Deletes an account record.
 - `404 Not Found`: Account record not found
 - `400 Bad Request`: Associated employee no longer exists
 
+## HR Logging
+
+All account management operations are logged in the HR logs table for audit purposes:
+
+### Action Types:
+- `account_created` - When a new account record is created
+- `account_updated` - When account information is updated (includes list of changed fields)
+- `account_deleted` - When an account record is deleted
+
+### Log Details:
+Each log entry includes:
+- **HR Employee ID** - Who performed the action
+- **Action Type** - What operation was performed
+- **Affected Employee ID** - Which employee was affected
+- **Description** - Detailed description of the action
+- **Timestamp** - When the action was performed
+
+### Example Log Entries:
+```
+account_created: "Account record created for employee John Doe (ID: 101, Email: john.doe@company.com)"
+account_updated: "Account record updated for employee John Doe (ID: 101) - Fields changed: accountTitle, bankName, baseSalary"
+account_deleted: "Account record deleted for employee John Doe (ID: 101, Email: john.doe@company.com)"
+```
+
 ## Data Models
 
 ### Account Model
@@ -306,6 +330,7 @@ interface UpdateAccountDto {
 ### Audit Trail
 - All operations are logged for audit purposes
 - Timestamps are automatically managed for creation and updates
+- HR logging tracks who performed what action on which employee
 
 ## Security Features
 

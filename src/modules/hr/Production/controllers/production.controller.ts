@@ -28,7 +28,7 @@ export class ProductionController {
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
   async createProduction(@Body() dto: CreateProductionDto, @Request() req: AuthenticatedRequest): Promise<ProductionResponseDto> {
-    return await this.productionService.createProduction(dto);
+    return await this.productionService.createProduction(dto, req.user.id);
   }
 
   /**
@@ -72,7 +72,7 @@ export class ProductionController {
     @Body() dto: UpdateProductionDto,
     @Request() req: AuthenticatedRequest
   ): Promise<ProductionResponseDto> {
-    return await this.productionService.updateProduction(id, dto);
+    return await this.productionService.updateProduction(id, dto, req.user.id);
   }
 
   /**
@@ -86,6 +86,6 @@ export class ProductionController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
   ): Promise<{ message: string }> {
-    return await this.productionService.deleteProduction(id);
+    return await this.productionService.deleteProduction(id, req.user.id);
   }
 } 

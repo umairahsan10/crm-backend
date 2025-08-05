@@ -28,7 +28,7 @@ export class HrManagementController {
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
   async createHr(@Body() dto: CreateHrDto, @Request() req: AuthenticatedRequest): Promise<HrResponseDto> {
-    return await this.hrManagementService.createHr(dto);
+    return await this.hrManagementService.createHr(dto, req.user.id);
   }
 
   /**
@@ -72,7 +72,7 @@ export class HrManagementController {
     @Body() dto: UpdateHrDto,
     @Request() req: AuthenticatedRequest
   ): Promise<HrResponseDto> {
-    return await this.hrManagementService.updateHr(id, dto);
+    return await this.hrManagementService.updateHr(id, dto, req.user.id);
   }
 
   /**
@@ -86,6 +86,6 @@ export class HrManagementController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
   ): Promise<{ message: string }> {
-    return await this.hrManagementService.deleteHr(id);
+    return await this.hrManagementService.deleteHr(id, req.user.id);
   }
 } 
