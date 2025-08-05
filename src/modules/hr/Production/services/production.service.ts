@@ -238,33 +238,7 @@ export class ProductionService {
     try {
       // Use transaction to ensure all operations succeed or fail together
       await this.prisma.$transaction(async (prisma) => {
-        // 1. Check if employee is head of any production unit and update
-        const productionUnitsAsHead = await prisma.productionUnit.findMany({
-          where: { headId: employeeId },
-        });
-
-        if (productionUnitsAsHead.length > 0) {
-          await prisma.productionUnit.updateMany({
-            where: { headId: employeeId },
-            data: { headId: null },
-          });
-          this.logger.log(`Updated ${productionUnitsAsHead.length} production units: removed employee ${employeeId} as head`);
-        }
-
-        // 2. Check if employee is team lead of any team and update
-        const teamsAsLead = await prisma.team.findMany({
-          where: { teamLeadId: employeeId },
-        });
-
-        if (teamsAsLead.length > 0) {
-          await prisma.team.updateMany({
-            where: { teamLeadId: employeeId },
-            data: { teamLeadId: null },
-          });
-          this.logger.log(`Updated ${teamsAsLead.length} teams: removed employee ${employeeId} as team lead`);
-        }
-
-        // 3. Delete the production record
+        // Delete the production record
         await prisma.production.delete({
           where: { id },
         });

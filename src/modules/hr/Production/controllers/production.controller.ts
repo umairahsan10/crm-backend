@@ -77,18 +77,6 @@ export class ProductionController {
 
   /**
    * Delete production record
-   * 
-   * This endpoint removes an employee from the production department.
-   * It also handles cleanup of related data:
-   * - If employee is head of any production unit, sets head_id to null
-   * - If employee is team lead of any team, sets team_lead_id to null
-   * 
-   * @param id - Production record ID
-   * @param req - Authenticated request containing HR employee details
-   * @returns Success message confirming deletion
-   * 
-   * Required Permissions: employee_add_permission
-   * Required Department: HR
    */
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
