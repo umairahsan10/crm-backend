@@ -120,7 +120,7 @@ export class FinanceSalaryService {
       this.prisma.salesDepartment.findFirst({
         where: { employeeId },
         select: { 
-          bonus: true,
+          salesBonus: true,
           commissionAmount: true
         }
       })
@@ -150,7 +150,7 @@ export class FinanceSalaryService {
         fullBaseSalary: parseFloat(salaryResult.fullBaseSalary.toFixed(2)),
         proratedBaseSalary: parseFloat(salaryResult.baseSalary.toFixed(2)),
         employeeBonus: parseFloat((employee.bonus || 0).toFixed(2)),
-        salesBonus: parseFloat((salesDept?.bonus || 0).toFixed(2)),
+        salesBonus: parseFloat((salesDept?.salesBonus || 0).toFixed(2)),
         totalBonus: parseFloat(salaryResult.bonus.toFixed(2)),
         commission: parseFloat(salaryResult.commission.toFixed(2)),
         netSalary: parseFloat(salaryResult.netSalary.toFixed(2)),
@@ -266,7 +266,7 @@ export class FinanceSalaryService {
         salesDepartment: {
           select: { 
             commissionAmount: true,
-            bonus: true,
+            salesBonus: true,
             chargebackDeductions: true,
             refundDeductions: true,
           },
@@ -294,7 +294,7 @@ export class FinanceSalaryService {
 
         const baseSalary = Number(employee.accounts?.[0]?.baseSalary || 0);
         const commission = Number(employee.salesDepartment?.[0]?.commissionAmount || 0);
-        const bonus = Number(employee.salesDepartment?.[0]?.bonus || 0);
+        const bonus = Number(employee.salesDepartment?.[0]?.salesBonus || 0);
         const attendanceDeductions = Number(salaryLog.deductions || 0);
         const chargebackDeduction = Number(employee.salesDepartment?.[0]?.chargebackDeductions || 0);
         const refundDeduction = Number(employee.salesDepartment?.[0]?.refundDeductions || 0);
@@ -379,7 +379,7 @@ export class FinanceSalaryService {
         salesDepartment: {
           select: { 
             commissionAmount: true,
-            bonus: true,
+            salesBonus: true,
             chargebackDeductions: true,
             refundDeductions: true,
           },
@@ -412,7 +412,7 @@ export class FinanceSalaryService {
 
     const baseSalary = Number(employee.accounts?.[0]?.baseSalary || 0);
     const commission = Number(employee.salesDepartment?.[0]?.commissionAmount || 0);
-    const bonus = Number(employee.salesDepartment?.[0]?.bonus || 0);
+    const bonus = Number(employee.salesDepartment?.[0]?.salesBonus || 0);
     const attendanceDeductions = Number(salaryLog.deductions || 0);
     const chargebackDeduction = Number(employee.salesDepartment?.[0]?.chargebackDeductions || 0);
     const refundDeduction = Number(employee.salesDepartment?.[0]?.refundDeductions || 0);

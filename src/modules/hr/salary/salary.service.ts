@@ -344,7 +344,7 @@ export class SalaryService {
           await prisma.salesDepartment.update({
             where: { id: salesDepartment.id },
             data: {
-              bonus: 0,
+              salesBonus: 0,
               updatedAt: currentDate,
             },
           });

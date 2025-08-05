@@ -121,7 +121,7 @@ export class FinanceService {
       this.prisma.salesDepartment.findFirst({
         where: { employeeId },
         select: { 
-          bonus: true,
+          salesBonus: true,
           commissionAmount: true
         }
       })
@@ -151,7 +151,7 @@ export class FinanceService {
         fullBaseSalary: parseFloat(salaryResult.fullBaseSalary.toFixed(2)),
         proratedBaseSalary: parseFloat(salaryResult.baseSalary.toFixed(2)),
         employeeBonus: parseFloat((employee.bonus || 0).toFixed(2)),
-        salesBonus: parseFloat((salesDept?.bonus || 0).toFixed(2)),
+        salesBonus: parseFloat((salesDept?.salesBonus || 0).toFixed(2)),
         totalBonus: parseFloat(salaryResult.bonus.toFixed(2)),
         commission: parseFloat(salaryResult.commission.toFixed(2)),
         netSalary: parseFloat(salaryResult.netSalary.toFixed(2)),
@@ -203,7 +203,7 @@ export class FinanceService {
       }),
       this.prisma.salesDepartment.findFirst({
         where: { employeeId },
-        select: { commissionAmount: true, bonus: true },
+        select: { commissionAmount: true, salesBonus: true },
       }),
     ]);
 
@@ -221,7 +221,7 @@ export class FinanceService {
     const commission: Prisma.Decimal = (salesDept?.commissionAmount ?? new Prisma.Decimal(0)) as Prisma.Decimal;
 
     // Combine possible bonus sources (SalesDepartment + Employee table)
-    const bonusSales: Prisma.Decimal = (salesDept?.bonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
+    const bonusSales: Prisma.Decimal = (salesDept?.salesBonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
     const bonusEmp: Prisma.Decimal = (employee.bonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
     const totalBonus = bonusSales.plus(bonusEmp);
 
@@ -1098,7 +1098,7 @@ export class FinanceService {
         salesDepartment: {
           select: { 
             commissionAmount: true,
-            bonus: true,
+            salesBonus: true,
             chargebackDeductions: true,
             refundDeductions: true,
           },
@@ -1132,7 +1132,7 @@ export class FinanceService {
       const baseSalary = Number(employee.accounts[0]?.baseSalary || 0);
       const commission = Number(employee.salesDepartment[0]?.commissionAmount || 0);
       const employeeBonus = Number(employee.bonus || 0);
-      const salesBonus = Number(employee.salesDepartment[0]?.bonus || 0);
+      const salesBonus = Number(employee.salesDepartment[0]?.salesBonus || 0);
       const totalBonus = employeeBonus + salesBonus;
       const attendanceDeductions = salaryLog?.deductions || 0;
       
@@ -1237,7 +1237,7 @@ export class FinanceService {
         salesDepartment: {
           select: { 
             commissionAmount: true,
-            bonus: true,
+            salesBonus: true,
             chargebackDeductions: true,
             refundDeductions: true,
           },
@@ -1272,7 +1272,7 @@ export class FinanceService {
     const baseSalary = Number(employee.accounts[0]?.baseSalary || 0);
     const commission = Number(employee.salesDepartment[0]?.commissionAmount || 0);
     const employeeBonus = Number(employee.bonus || 0);
-    const salesBonus = Number(employee.salesDepartment[0]?.bonus || 0);
+    const salesBonus = Number(employee.salesDepartment[0]?.salesBonus || 0);
     const totalBonus = employeeBonus + salesBonus;
     const attendanceDeductions = salaryLog?.deductions || 0;
     
