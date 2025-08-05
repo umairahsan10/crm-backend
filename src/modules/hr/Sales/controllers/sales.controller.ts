@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
 import { SalesService } from '../services/sales.service';
-import { CreateSalesDepartmentDto, UpdateSalesDepartmentDto } from '../dto/sales.dto';
+import { CreateSalesDepartmentDto, UpdateSalesDepartmentDto, UpdateCommissionRateDto, UpdateTargetAmountDto } from '../dto/sales.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -71,5 +71,37 @@ export class SalesController {
     @Request() req: AuthenticatedRequest
   ) {
     return await this.salesService.deleteSalesDepartment(id, req.user.id);
+  }
+
+  /**
+   * Update commission rate for a sales department record
+   * Requires commission permission
+   */
+  @Patch(':id/commission-rate')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @Permissions(PermissionName.commission_permission)
+  async updateCommissionRate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCommissionRateDto,
+    @Request() req: AuthenticatedRequest
+  ) {
+    return await this.salesService.updateCommissionRate(id, dto, req.user.id);
+  }
+
+  /**
+   * Update target amount for a sales department record
+   * Requires targets set permission
+   */
+  @Patch(':id/target-amount')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @Permissions(PermissionName.targets_set)
+  async updateTargetAmount(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateTargetAmountDto,
+    @Request() req: AuthenticatedRequest
+  ) {
+    return await this.salesService.updateTargetAmount(id, dto, req.user.id);
   }
 } 

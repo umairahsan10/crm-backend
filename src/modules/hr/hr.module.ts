@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { SalaryModule } from './salary/salary.module';
 import { EmployeeModule } from './Employee/employee.module';
 import { SalesModule } from './Sales/sales.module';
-import { TeamsModule } from './Teams/teams.module';
 import { ProductionModule } from './Production/production.module';
 import { MarketingModule } from './Marketing/marketing.module';
 import { HrManagementModule } from './HR/hr.module';
@@ -16,7 +15,6 @@ import { FinanceModule } from '../finance/finance.module';
     SalaryModule, 
     EmployeeModule, 
     SalesModule, 
-    TeamsModule, 
     ProductionModule, 
     MarketingModule, 
     HrManagementModule, 

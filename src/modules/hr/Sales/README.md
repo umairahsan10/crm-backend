@@ -396,6 +396,178 @@ Authorization: Bearer <jwt-token>
 
 ---
 
+### 6. Update Commission Rate
+**Endpoint**: `PATCH /hr/sales/:id/commission-rate`  
+**Method**: PATCH  
+**Access**: HR (requires `commission_permission`)
+
+#### Description
+Update the commission rate for a specific sales department record. This endpoint requires commission permission and logs the change for audit purposes.
+
+#### Path Parameters
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | integer | Yes | Sales department ID |
+
+#### Request Body
+```json
+{
+  "commissionRate": 7.5
+}
+```
+
+#### Required Fields
+- `commissionRate` (number): New commission rate (0-100%)
+
+#### Validation Rules
+- `commissionRate`: Must be between 0 and 100 percent
+
+#### Sample Response
+```json
+{
+  "id": 1,
+  "employeeId": 123,
+  "leadsClosed": 15,
+  "salesAmount": 75000.00,
+  "salesUnitId": 1,
+  "commissionRate": 7.5,
+  "commissionAmount": 5625.00,
+  "salesBonus": 1000.00,
+  "withholdCommission": 500.00,
+  "withholdFlag": false,
+  "targetAmount": 100000.00,
+  "chargebackDeductions": 0.00,
+  "refundDeductions": 0.00,
+  "createdAt": "2025-01-15T10:30:00.000Z",
+  "updatedAt": "2025-01-15T12:00:00.000Z",
+  "employee": {
+    "id": 123,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1234567890",
+    "status": "active",
+    "department": {
+      "id": 1,
+      "name": "Sales"
+    },
+    "role": {
+      "id": 2,
+      "name": "Sales Representative"
+    }
+  },
+  "salesUnit": {
+    "id": 1,
+    "name": "North Region",
+    "email": "north@company.com",
+    "phone": "+1234567891",
+    "address": "123 North St, City",
+    "logoUrl": "https://example.com/logo.png",
+    "website": "https://north.company.com"
+  }
+}
+```
+
+#### Tables Affected
+- **Update**: `sales_departments`
+- **Create**: `hr_logs` (audit trail)
+- **Read**: `employees`, `sales_units`
+
+#### Error Responses
+- `404`: Sales department not found
+- `400`: Validation errors (invalid commission rate)
+- `401`: Unauthorized access
+- `403`: Insufficient permissions (commission_permission required)
+- `500`: Internal server error
+
+---
+
+### 7. Update Target Amount
+**Endpoint**: `PATCH /hr/sales/:id/target-amount`  
+**Method**: PATCH  
+**Access**: HR (requires `targets_set` permission)
+
+#### Description
+Update the target amount for a specific sales department record. This endpoint requires targets set permission and logs the change for audit purposes.
+
+#### Path Parameters
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | integer | Yes | Sales department ID |
+
+#### Request Body
+```json
+{
+  "targetAmount": 125000.00
+}
+```
+
+#### Required Fields
+- `targetAmount` (number): New target amount
+
+#### Validation Rules
+- `targetAmount`: Must be non-negative
+
+#### Sample Response
+```json
+{
+  "id": 1,
+  "employeeId": 123,
+  "leadsClosed": 15,
+  "salesAmount": 75000.00,
+  "salesUnitId": 1,
+  "commissionRate": 5.5,
+  "commissionAmount": 4125.00,
+  "salesBonus": 1000.00,
+  "withholdCommission": 500.00,
+  "withholdFlag": false,
+  "targetAmount": 125000.00,
+  "chargebackDeductions": 0.00,
+  "refundDeductions": 0.00,
+  "createdAt": "2025-01-15T10:30:00.000Z",
+  "updatedAt": "2025-01-15T12:15:00.000Z",
+  "employee": {
+    "id": 123,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1234567890",
+    "status": "active",
+    "department": {
+      "id": 1,
+      "name": "Sales"
+    },
+    "role": {
+      "id": 2,
+      "name": "Sales Representative"
+    }
+  },
+  "salesUnit": {
+    "id": 1,
+    "name": "North Region",
+    "email": "north@company.com",
+    "phone": "+1234567891",
+    "address": "123 North St, City",
+    "logoUrl": "https://example.com/logo.png",
+    "website": "https://north.company.com"
+  }
+}
+```
+
+#### Tables Affected
+- **Update**: `sales_departments`
+- **Create**: `hr_logs` (audit trail)
+- **Read**: `employees`, `sales_units`
+
+#### Error Responses
+- `404`: Sales department not found
+- `400`: Validation errors (invalid target amount)
+- `401`: Unauthorized access
+- `403`: Insufficient permissions (targets_set permission required)
+- `500`: Internal server error
+
+---
+
 ## Data Models
 
 ### Sales Department

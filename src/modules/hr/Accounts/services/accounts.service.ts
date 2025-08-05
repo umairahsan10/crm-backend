@@ -361,6 +361,87 @@ export class AccountsService {
     }
   }
 
+  async updateBaseSalary(id: number, baseSalary: number, hrEmployeeId: number) {
+    // Validate HR employee exists
+    const hrEmployee = await this.prisma.employee.findUnique({
+      where: { id: hrEmployeeId },
+    });
+
+    if (!hrEmployee) {
+      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+    }
+
+    // Get HR record
+    const hrRecord = await this.prisma.hR.findUnique({
+      where: { employeeId: hrEmployeeId },
+    });
+
+    if (!hrRecord) {
+      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+    }
+
+    try {
+      const existingAccountRecord = await this.prisma.account.findUnique({
+        where: { id },
+        include: { employee: { select: { id: true, firstName: true, lastName: true, email: true } } },
+      });
+
+      if (!existingAccountRecord) {
+        throw new NotFoundException(`Account record with ID ${id} not found`);
+      }
+
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: existingAccountRecord.employeeId },
+        select: { id: true, firstName: true, lastName: true, email: true },
+      });
+
+      if (!employee) {
+        throw new BadRequestException(`Employee with ID ${existingAccountRecord.employeeId} no longer exists. Cannot update account record.`);
+      }
+
+      const updatedAccountRecord = await this.prisma.account.update({
+        where: { id },
+        data: { baseSalary },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              status: true,
+              department: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const logDescription = `Base salary updated for employee ${employee.firstName} ${employee.lastName} from ${existingAccountRecord.baseSalary || 0} to ${baseSalary}`;
+      await this.createHrLog(hrEmployeeId, 'base_salary_updated', employee.id, logDescription);
+
+      this.logger.log(`Base salary updated for account record ${id} from ${existingAccountRecord.baseSalary || 0} to ${baseSalary}`);
+      return updatedAccountRecord;
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Failed to update base salary for account record ${id}: ${error.message}`);
+      throw new BadRequestException(`Failed to update base salary: ${error.message}`);
+    }
+  }
+
   /**
    * Helper method to create HR log entries
    */
