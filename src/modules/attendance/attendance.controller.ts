@@ -320,7 +320,5 @@ x
   async triggerAutoMarkAbsent(): Promise<{ message: string; absent_marked: number; leave_applied: number }> {
     return this.attendanceService.autoMarkAbsent();
   }
-
-
 }
 
