@@ -13,8 +13,8 @@ This document contains all the APIs for the Sales Units module.
 ### API Description and Flow
 This API creates a new sales unit in the system. The flow includes:
 1. Validates all required fields using DTO validation
-2. Checks if the employee (headId) exists in the database
-3. Verifies that the employee has the `unit_head` role
+2. If headId is provided, checks if the employee exists in the database
+3. If headId is provided, verifies that the employee has the `unit_head` role
 4. Validates that email, phone, and name are unique (not already exists)
 5. Creates the sales unit in the database
 6. Returns success response
@@ -26,7 +26,7 @@ This API creates a new sales unit in the system. The flow includes:
   "email": "string (required)",
   "phone": "string (required)",
   "address": "string (required)",
-  "headId": "number (required)",
+  "headId": "number (optional)",
   "logoUrl": "string (optional)",
   "website": "string (optional)"
 }
@@ -37,9 +37,10 @@ This API creates a new sales unit in the system. The flow includes:
 - `email`: Unit email address (must be unique and valid format)
 - `phone`: Unit phone number (must be unique)
 - `address`: Unit physical address
-- `headId`: Employee ID who will be the unit head
 
 **Optional Fields:**
+- `headId`: Employee ID who will be the unit head (must have unit_head role if provided)
+
 - `logoUrl`: URL to unit's logo image
 - `website`: Unit's website URL
 
@@ -316,10 +317,12 @@ This API retrieves all sales units from the system. The flow includes:
 This API updates a sales unit in the system. The flow includes:
 1. Validates that the unit exists (returns 404 if not found)
 2. Validates only the fields provided in the request (partial update)
-3. Checks if the employee (headId) exists and has unit_head role (if headId provided)
+3. Enhanced headId validation (if headId provided):
+   - If headId is a positive number: validates employee exists, has unit_head role, and isn't already head of another unit
+   - If headId is null: allows unassigning head from unit
 4. Validates that email, phone, and name are unique (excluding current unit)
 5. Updates only the provided fields in the database
-6. Returns success response
+6. Returns success response with updated unit data including head information
 
 ### Request Body/Parameters
 - **Path Parameter**: `id` (number) - Unit ID to update
@@ -331,7 +334,7 @@ This API updates a sales unit in the system. The flow includes:
   "email": "string (optional)",
   "phone": "string (optional)",
   "address": "string (optional)",
-  "headId": "number (optional)",
+  "headId": "number | null (optional)",
   "logoUrl": "string (optional)",
   "website": "string (optional)"
 }
@@ -346,18 +349,28 @@ This API updates a sales unit in the system. The flow includes:
   "name": "Updated Unit Name"
 }
 
+// Assign head to unit
+{
+  "headId": 123
+}
+
+// Unassign head from unit
+{
+  "headId": null
+}
+
 // Update email and phone
 {
   "email": "new@example.com",
   "phone": "+1 (555) 999-9999"
 }
 
-// Update multiple fields
+// Update multiple fields including head assignment
 {
   "name": "Updated Unit",
   "email": "new@example.com",
   "address": "New Address",
-  "website": "https://new-website.com"
+  "headId": 456
 }
 ```
 
@@ -367,7 +380,29 @@ This API updates a sales unit in the system. The flow includes:
 ```json
 {
   "success": true,
-  "message": "Unit updated successfully"
+  "message": "Unit updated successfully",
+  "data": {
+    "id": 1,
+    "name": "Sales Unit A",
+    "head": {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe"
+    }
+  }
+}
+```
+
+**Success Response - Head Unassigned (200):**
+```json
+{
+  "success": true,
+  "message": "Unit updated successfully",
+  "data": {
+    "id": 1,
+    "name": "Sales Unit A",
+    "head": null
+  }
 }
 ```
 
@@ -474,14 +509,17 @@ This API updates a sales unit in the system. The flow includes:
 - `email`: Valid email format (if provided)
 - `phone`: String format (if provided)
 - `address`: String format (if provided)
-- `headId`: Positive number (if provided)
+- `headId`: Positive number or null (if provided)
 - `logoUrl`: Valid URL format (if provided)
 - `website`: Valid URL format (if provided)
 
 **Business Logic Validations:**
 - Unit with provided ID must exist
-- Employee with `headId` must exist in `employees` table (if headId provided)
-- Employee must have `unit_head` role in `roles` table (if headId provided)
+- If `headId` is a positive number:
+  - Employee with `headId` must exist in `employees` table
+  - Employee must have `unit_head` role in `roles` table
+  - Employee must not already be head of another unit
+- If `headId` is null: allows unassigning head from unit
 - Email must be unique across all other sales units (if email provided)
 - Phone must be unique across all other sales units (if phone provided)
 - Unit name must be unique across all other sales units (if name provided)
@@ -498,11 +536,12 @@ This API updates a sales unit in the system. The flow includes:
 
 **Database Queries:**
 1. **SELECT** from `sales_units` table to check if unit exists
-2. **SELECT** from `employees` table to check if employee exists and get role (if headId provided)
-3. **SELECT** from `sales_units` table to check email uniqueness (exclude current unit, if email provided)
-4. **SELECT** from `sales_units` table to check phone uniqueness (exclude current unit, if phone provided)
-5. **SELECT** from `sales_units` table to check name uniqueness (exclude current unit, if name provided)
-6. **UPDATE** `sales_units` table with only provided fields
+2. **SELECT** from `employees` table with JOIN to `roles` for employee validation (if headId provided)
+3. **SELECT** from `sales_units` table to check if employee is already head elsewhere (if headId provided)
+4. **SELECT** from `sales_units` table to check email uniqueness (exclude current unit, if email provided)
+5. **SELECT** from `sales_units` table to check phone uniqueness (exclude current unit, if phone provided)
+6. **SELECT** from `sales_units` table to check name uniqueness (exclude current unit, if name provided)
+7. **UPDATE** `sales_units` table with only provided fields
 
 ### Access Control
 - **Authentication**: JWT token required
@@ -1456,174 +1495,11 @@ This API retrieves all archive leads that belonged to units that have been delet
 
 ---
 
-## 11. Assign Head to Unit
-
-### Method and Endpoint
-- **Method**: `PATCH`
-- **Endpoint**: `/sales/units/:id/assign-head`
-
-### API Description and Flow
-This API assigns a head to a sales unit. The flow includes:
-1. Validates that the unit exists (returns 404 if not found)
-2. Checks if the unit already has a head assigned (prevents overwriting)
-3. Validates that the employee (headId) exists in the database
-4. Verifies that the employee has the `unit_head` role
-5. Checks if the employee is already assigned as head of another unit
-6. Assigns the head to the unit and returns success response
-
-### Request Body/Parameters
-- **Path Parameter**: `id` (number) - Unit ID to assign head to
-- **Request Body**: Employee ID to assign as head
-
-```json
-{
-  "headId": 123 // Integer ID of the employee to assign as unit head
-}
-```
-
-**Required Fields:**
-- `headId`: Employee ID who will be the unit head (must be positive integer)
-
-### Response Format
-
-**Success Response (200):**
-```json
-{
-  "success": true,
-  "message": "Head assigned to unit successfully",
-  "data": {
-    "id": 1,
-    "name": "Sales Unit A",
-    "head": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    }
-  }
-}
-```
-
-**Error Responses:**
-
-**Not Found Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Unit with ID 123 does not exist",
-  "error": "Not Found"
-}
-```
-
-```json
-{
-  "statusCode": 404,
-  "message": "Employee with ID 456 does not exist",
-  "error": "Not Found"
-}
-```
-
-**Conflict Error (409):**
-```json
-{
-  "statusCode": 409,
-  "message": "Unit already has a head assigned. Please unassign the current head first.",
-  "error": "Conflict"
-}
-```
-
-```json
-{
-  "statusCode": 409,
-  "message": "Employee is already assigned as head of unit: Sales Unit B",
-  "error": "Conflict"
-}
-```
-
-**Bad Request Error (400):**
-```json
-{
-  "statusCode": 400,
-  "message": "Employee must have unit_head role to be assigned as unit head",
-  "error": "Bad Request"
-}
-```
-
-**Validation Errors (400):**
-```json
-{
-  "statusCode": 400,
-  "message": [
-    "headId must be a positive number"
-  ],
-  "error": "Bad Request"
-}
-```
-
-**Authentication/Authorization Errors (401/403):**
-```json
-{
-  "statusCode": 401,
-  "message": "Unauthorized",
-  "error": "Unauthorized"
-}
-```
-
-```json
-{
-  "statusCode": 403,
-  "message": "User does not have the required roles. Required: dep_manager. User role: unit_head",
-  "error": "Forbidden"
-}
-```
-
-```json
-{
-  "statusCode": 403,
-  "message": "User does not belong to required departments. Required: Sales. User department: HR",
-  "error": "Forbidden"
-}
-```
-
-### Validations
-- **Unit ID**: Must be a valid positive integer
-- **Head ID**: Must be a valid positive integer
-- **Unit Existence**: Unit must exist in the database
-- **Employee Existence**: Employee must exist and be active
-- **Role Validation**: Employee must have `unit_head` role
-- **Head Assignment**: Unit must not already have a head assigned
-- **Duplicate Assignment**: Employee must not already be head of another unit
-
-### Database Operations
-
-**Tables Affected:**
-- `sales_units` table (read and write)
-- `employees` table (read - for employee validation)
-- `roles` table (read - for role validation)
-
-**Database Changes:**
-- **UPDATE** `sales_units` table - set `headId` field
-
-**Database Queries:**
-1. **SELECT** from `sales_units` table to check if unit exists and has head
-2. **SELECT** from `employees` table with JOIN to `roles` for employee validation
-3. **SELECT** from `sales_units` table to check if employee is already head elsewhere
-4. **UPDATE** `sales_units` table to assign head
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-- **Unit Head Access**: ❌ **NOT ALLOWED** - Only admin and dep_manager can assign heads
-
----
-
 ## Planned APIs
 
 ### Unit Head Management
-- ✅ Assign Head to Unit
+- ✅ Assign/Unassign Head to Unit (via Update API)
 - Get Available Heads
-- Unassign Head from Unit
 
 ### Team Assignment
 - Assign Team to Unit
