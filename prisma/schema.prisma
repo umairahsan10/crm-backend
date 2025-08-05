@@ -539,7 +539,7 @@ model SalesDepartment {
   salesUnitId         Int?     @map("sales_unit_id")
   commissionRate      Decimal? @map("commission_rate") @db.Decimal(5, 2)
   commissionAmount    Decimal? @map("commission_amount") @db.Decimal(12, 2)
-  bonus               Decimal? @map("bonus") @db.Decimal(12, 2)
+  salesBonus          Decimal? @map("sales_bonus") @db.Decimal(12, 2)
   withholdCommission  Decimal  @map("withhold_commission") @db.Decimal(12, 2)
   withholdFlag        Boolean  @map("withhold_flag")
   targetAmount        Decimal? @map("target_amount") @db.Decimal(12, 2)
@@ -726,12 +726,14 @@ model Asset {
   purchaseValue    Decimal?  @map("purchase_value") @db.Decimal(12, 2)
   depreciationRate Decimal?  @map("depreciation_rate") @db.Decimal(5, 2)
   currentValue     Decimal?  @map("current_value") @db.Decimal(12, 2)
+  transactionId    Int       @map("transaction_id")
   createdBy        Int?      @map("created_by")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  // Foreign key relation to employees table
-  employee Employee? @relation("AssetCreatedBy", fields: [createdBy], references: [id])
+  // Foreign key relations
+  employee    Employee?    @relation("AssetCreatedBy", fields: [createdBy], references: [id])
+  transaction Transaction  @relation(fields: [transactionId], references: [id])
 
   @@map("assets")
 }
@@ -772,14 +774,16 @@ model Liability {
   dueDate         DateTime? @map("due_date") @db.Date
   isPaid          Boolean?  @map("is_paid")
   paidOn          DateTime? @map("paid_on") @db.Date
+  transactionId   Int       @map("transaction_id")
   relatedVendorId Int?      @map("related_vendor_id")
   createdBy       Int?      @map("created_by")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Foreign key relations
-  vendor   Vendor?   @relation(fields: [relatedVendorId], references: [id])
-  employee Employee? @relation("LiabilityCreatedBy", fields: [createdBy], references: [id])
+  vendor      Vendor?      @relation(fields: [relatedVendorId], references: [id])
+  employee    Employee?    @relation("LiabilityCreatedBy", fields: [createdBy], references: [id])
+  transaction Transaction  @relation(fields: [transactionId], references: [id])
 
   @@map("liabilities")
 }
@@ -854,6 +858,8 @@ model Transaction {
   chargeback Chargeback? @relation(fields: [relatedChargebackId], references: [id])
   Expense    Expense[]
   Revenue    Revenue[]
+  Asset      Asset[]
+  Liability  Liability[]
 
   @@map("transactions")
 }
