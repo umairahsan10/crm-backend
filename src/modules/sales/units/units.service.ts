@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ConflictException, NotFoundException, 
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
+import { AssignHeadDto } from './dto/assign-head.dto';
 
 @Injectable()
 export class UnitsService {
@@ -723,6 +724,73 @@ export class UnitsService {
     return {
       success: true,
       message: `Unit deleted successfully. ${archiveLeadsCount} archived leads have been assigned unit ID null.`
+    };
+  }
+
+  async assignHeadToUnit(id: number, assignHeadDto: AssignHeadDto) {
+    const { headId } = assignHeadDto;
+
+    // Check if unit exists
+    const unit = await this.prisma.salesUnit.findUnique({
+      where: { id }
+    });
+
+    if (!unit) {
+      throw new NotFoundException(`Unit with ID ${id} does not exist`);
+    }
+
+    // Check if unit already has a head assigned
+    if (unit.headId) {
+      throw new ConflictException('Unit already has a head assigned. Please unassign the current head first.');
+    }
+
+    // Check if employee exists and get their role
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: headId },
+      include: { role: true }
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${headId} does not exist`);
+    }
+
+    // Check if employee has unit_head role
+    if (employee.role.name !== 'unit_head') {
+      throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
+    }
+
+    // Check if employee is already head of another unit
+    const existingHeadAssignment = await this.prisma.salesUnit.findFirst({
+      where: { headId: headId }
+    });
+
+    if (existingHeadAssignment) {
+      throw new ConflictException(`Employee is already assigned as head of unit: ${existingHeadAssignment.name}`);
+    }
+
+    // Assign head to unit
+    const updatedUnit = await this.prisma.salesUnit.update({
+      where: { id },
+      data: { headId },
+      include: {
+        head: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Head assigned to unit successfully',
+      data: {
+        id: updatedUnit.id,
+        name: updatedUnit.name,
+        head: updatedUnit.head
+      }
     };
   }
 }

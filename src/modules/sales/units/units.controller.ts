@@ -2,6 +2,7 @@ import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntP
 import { UnitsService } from './units.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
+import { AssignHeadDto } from './dto/assign-head.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
@@ -84,5 +85,15 @@ export class UnitsController {
   @Departments('Sales')
   async deleteUnit(@Param('id', ParseIntPipe) id: number) {
     return this.unitsService.deleteUnit(id);
+  }
+
+  @Patch(':id/assign-head')
+  @Roles('dep_manager')
+  @Departments('Sales')
+  async assignHeadToUnit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() assignHeadDto: AssignHeadDto
+  ) {
+    return this.unitsService.assignHeadToUnit(id, assignHeadDto);
   }
 }
