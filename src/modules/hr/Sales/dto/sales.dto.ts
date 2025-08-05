@@ -65,6 +65,21 @@ export class CreateSalesDepartmentDto {
   refundDeductions?: number;
 }
 
+export class UpdateCommissionRateDto {
+  @Transform(({ value }) => parseFloat(value))
+  @IsDecimal()
+  @Min(0)
+  @Max(100)
+  commissionRate: number;
+}
+
+export class UpdateTargetAmountDto {
+  @Transform(({ value }) => parseFloat(value))
+  @IsDecimal()
+  @Min(0)
+  targetAmount: number;
+}
+
 export class UpdateSalesDepartmentDto {
   @IsOptional()
   @IsNumber()

@@ -219,7 +219,72 @@ Updates an existing account record.
 - `400 Bad Request`: Associated employee no longer exists
 - `400 Bad Request`: Validation errors
 
-### 5. Delete Account Record
+### 5. Update Account Base Salary
+**PATCH** `/hr/accounts/:id/base-salary`
+
+Updates the base salary for a specific account record.
+
+#### Parameters
+- `id` (number, required): The unique identifier of the account record
+
+#### Request Body
+```json
+{
+  "baseSalary": 55000.00
+}
+```
+
+#### Required Fields
+- `baseSalary` (number, required): New base salary amount (must be >= 0)
+
+#### Validation Rules
+- `baseSalary` must be a valid number
+- `baseSalary` must be greater than or equal to 0
+
+#### Business Rules
+- Account record must exist
+- Associated employee must still exist in the system
+- HR employee performing the update must have valid HR record
+- Creates an HR log entry for audit purposes
+
+#### Response
+```json
+{
+  "id": 1,
+  "employeeId": 101,
+  "accountTitle": "John Doe Account",
+  "bankName": "Chase Bank",
+  "ibanNumber": "US12345678901234567890",
+  "baseSalary": 55000.00,
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T11:45:00.000Z",
+  "employee": {
+    "id": 101,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1234567890",
+    "status": "ACTIVE",
+    "department": {
+      "id": 1,
+      "name": "Accounts"
+    },
+    "role": {
+      "id": 1,
+      "name": "Accountant"
+    }
+  }
+}
+```
+
+#### Error Responses
+- `404 Not Found`: Account record not found
+- `404 Not Found`: HR employee not found
+- `404 Not Found`: HR record not found for employee
+- `400 Bad Request`: Associated employee no longer exists
+- `400 Bad Request`: Validation errors
+
+### 6. Delete Account Record
 **DELETE** `/hr/accounts/:id`
 
 Deletes an account record.
@@ -256,6 +321,7 @@ All account management operations are logged in the HR logs table for audit purp
 ### Action Types:
 - `account_created` - When a new account record is created
 - `account_updated` - When account information is updated (includes list of changed fields)
+- `base_salary_updated` - When base salary is updated specifically
 - `account_deleted` - When an account record is deleted
 
 ### Log Details:
@@ -270,6 +336,7 @@ Each log entry includes:
 ```
 account_created: "Account record created for employee John Doe (ID: 101, Email: john.doe@company.com)"
 account_updated: "Account record updated for employee John Doe (ID: 101) - Fields changed: accountTitle, bankName, baseSalary"
+base_salary_updated: "Base salary updated for employee John Doe from 50000 to 55000"
 account_deleted: "Account record deleted for employee John Doe (ID: 101, Email: john.doe@company.com)"
 ```
 

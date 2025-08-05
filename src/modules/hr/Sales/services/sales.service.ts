@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
-import { CreateSalesDepartmentDto, UpdateSalesDepartmentDto } from '../dto/sales.dto';
+import { CreateSalesDepartmentDto, UpdateSalesDepartmentDto, UpdateCommissionRateDto, UpdateTargetAmountDto } from '../dto/sales.dto';
 
 @Injectable()
 export class SalesService {
@@ -509,6 +509,180 @@ export class SalesService {
     } catch (error) {
       this.logger.error(`Failed to create HR log: ${error.message}`);
       // Don't fail the main operation if log creation fails
+    }
+  }
+
+  /**
+   * Update commission rate for a sales department record
+   * Requires commission permission
+   */
+  async updateCommissionRate(id: number, dto: UpdateCommissionRateDto, hrEmployeeId: number) {
+    try {
+      // Check if sales department record exists
+      const existingSalesDepartment = await this.prisma.salesDepartment.findUnique({
+        where: { id },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (!existingSalesDepartment) {
+        throw new NotFoundException(`Sales department record with ID ${id} not found`);
+      }
+
+      // Update commission rate
+      const updatedSalesDepartment = await this.prisma.salesDepartment.update({
+        where: { id },
+        data: {
+          commissionRate: dto.commissionRate,
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              status: true,
+              department: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          salesUnit: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              address: true,
+              logoUrl: true,
+              website: true,
+            },
+          },
+        },
+      });
+
+      // Create HR log
+      await this.createHrLog(
+        hrEmployeeId,
+        'UPDATE_COMMISSION_RATE',
+        existingSalesDepartment.employeeId,
+        `Commission rate updated to ${dto.commissionRate}% for employee ${existingSalesDepartment.employee.firstName} ${existingSalesDepartment.employee.lastName}`
+      );
+
+      this.logger.log(`Commission rate updated for sales department ${id} to ${dto.commissionRate}%`);
+      return updatedSalesDepartment;
+    } catch (error) {
+      this.logger.error(`Failed to update commission rate for sales department ${id}: ${error.message}`);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(`Failed to update commission rate: ${error.message}`);
+    }
+  }
+
+  /**
+   * Update target amount for a sales department record
+   * Requires targets set permission
+   */
+  async updateTargetAmount(id: number, dto: UpdateTargetAmountDto, hrEmployeeId: number) {
+    try {
+      // Check if sales department record exists
+      const existingSalesDepartment = await this.prisma.salesDepartment.findUnique({
+        where: { id },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (!existingSalesDepartment) {
+        throw new NotFoundException(`Sales department record with ID ${id} not found`);
+      }
+
+      // Update target amount
+      const updatedSalesDepartment = await this.prisma.salesDepartment.update({
+        where: { id },
+        data: {
+          targetAmount: dto.targetAmount,
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              status: true,
+              department: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          salesUnit: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              address: true,
+              logoUrl: true,
+              website: true,
+            },
+          },
+        },
+      });
+
+      // Create HR log
+      await this.createHrLog(
+        hrEmployeeId,
+        'UPDATE_TARGET_AMOUNT',
+        existingSalesDepartment.employeeId,
+        `Target amount updated to $${dto.targetAmount} for employee ${existingSalesDepartment.employee.firstName} ${existingSalesDepartment.employee.lastName}`
+      );
+
+      this.logger.log(`Target amount updated for sales department ${id} to $${dto.targetAmount}`);
+      return updatedSalesDepartment;
+    } catch (error) {
+      this.logger.error(`Failed to update target amount for sales department ${id}: ${error.message}`);
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(`Failed to update target amount: ${error.message}`);
     }
   }
 } 

@@ -857,6 +857,178 @@ export class EmployeeService {
   }
 
   /**
+   * Update employee bonus
+   * 
+   * This method updates the bonus amount for a specific employee.
+   * It validates that the employee exists and creates an HR log entry.
+   * 
+   * @param id - Employee ID
+   * @param bonus - New bonus amount
+   * @param hrEmployeeId - ID of the HR employee making the change
+   * @returns Updated employee data
+   */
+  async updateBonus(id: number, bonus: number, hrEmployeeId: number) {
+    // Check if employee exists
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${id} not found`);
+    }
+
+    // Get HR employee details for logging
+    const hrEmployee = await this.prisma.employee.findUnique({
+      where: { id: hrEmployeeId },
+    });
+
+    if (!hrEmployee) {
+      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+    }
+
+    // Get HR record
+    const hrRecord = await this.prisma.hR.findUnique({
+      where: { employeeId: hrEmployeeId },
+    });
+
+    if (!hrRecord) {
+      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+    }
+
+    try {
+      // Update the employee's bonus
+      const updatedEmployee = await this.prisma.employee.update({
+        where: { id },
+        data: { bonus },
+        include: {
+          department: true,
+          role: true,
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          teamLead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      // Create HR log entry
+      const logDescription = `Bonus updated for employee ${employee.firstName} ${employee.lastName} from ${employee.bonus || 0} to ${bonus}`;
+      await this.createHrLog(hrEmployeeId, 'bonus_updated', id, logDescription);
+
+      this.logger.log(`Bonus updated for employee ${id} from ${employee.bonus || 0} to ${bonus}`);
+
+      return updatedEmployee;
+    } catch (error) {
+      this.logger.error(`Failed to update bonus for employee ${id}: ${error.message}`);
+      throw new BadRequestException(`Failed to update bonus: ${error.message}`);
+    }
+  }
+
+  /**
+   * Update employee shift times
+   */
+  async updateShift(id: number, shiftData: { shift_start?: string; shift_end?: string }, hrEmployeeId: number) {
+    // Check if employee exists
+    const employee = await this.prisma.employee.findUnique({
+      where: { id },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${id} not found`);
+    }
+
+    // Get HR employee details for logging
+    const hrEmployee = await this.prisma.employee.findUnique({
+      where: { id: hrEmployeeId },
+    });
+
+    if (!hrEmployee) {
+      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+    }
+
+    // Get HR record
+    const hrRecord = await this.prisma.hR.findUnique({
+      where: { employeeId: hrEmployeeId },
+    });
+
+    if (!hrRecord) {
+      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+    }
+
+    // Validate that at least one shift time is provided
+    if (!shiftData.shift_start && !shiftData.shift_end) {
+      throw new BadRequestException('At least one shift time (shift_start or shift_end) must be provided');
+    }
+
+    try {
+      // Prepare update data
+      const updateData: { shiftStart?: string; shiftEnd?: string } = {};
+      if (shiftData.shift_start !== undefined) {
+        updateData.shiftStart = shiftData.shift_start;
+      }
+      if (shiftData.shift_end !== undefined) {
+        updateData.shiftEnd = shiftData.shift_end;
+      }
+
+      // Update the employee's shift times
+      const updatedEmployee = await this.prisma.employee.update({
+        where: { id },
+        data: updateData,
+        include: {
+          department: true,
+          role: true,
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          teamLead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      // Create HR log entry
+      const changes: string[] = [];
+      if (shiftData.shift_start !== undefined) {
+        changes.push(`shift_start: ${employee.shiftStart || 'N/A'} → ${shiftData.shift_start}`);
+      }
+      if (shiftData.shift_end !== undefined) {
+        changes.push(`shift_end: ${employee.shiftEnd || 'N/A'} → ${shiftData.shift_end}`);
+      }
+
+      const logDescription = `Shift times updated for employee ${employee.firstName} ${employee.lastName} - Changes: ${changes.join(', ')}`;
+      await this.createHrLog(hrEmployeeId, 'shift_updated', id, logDescription);
+
+      this.logger.log(`Shift times updated for employee ${id}: ${changes.join(', ')}`);
+
+      return updatedEmployee;
+    } catch (error) {
+      this.logger.error(`Failed to update shift times for employee ${id}: ${error.message}`);
+      throw new BadRequestException(`Failed to update shift times: ${error.message}`);
+    }
+  }
+
+  /**
    * Helper method to create HR log entries
    */
   private async createHrLog(hrEmployeeId: number, actionType: string, affectedEmployeeId: number, description: string) {

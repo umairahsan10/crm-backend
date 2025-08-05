@@ -4,10 +4,13 @@ This document describes the employee management endpoints available in the HR mo
 
 ## Authentication & Authorization
 
-All endpoints require:
+Most endpoints require:
 - JWT authentication
 - HR department access
 - `employee_add_permission` permission
+
+**Special Permissions:**
+- **Bonus Update**: Requires `bonuses_set` permission
 
 ## Endpoints
 
@@ -324,7 +327,146 @@ Updates employee information. Only provided fields are updated.
 }
 ```
 
-### 5. Delete Employee
+### 5. Update Employee Bonus
+**PATCH** `/hr/employees/:id/bonus`
+
+Updates the bonus amount for a specific employee. This endpoint requires the `bonuses_set` permission.
+
+**Request Body:**
+```json
+{
+  "bonus": 2000
+}
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@company.com",
+  "phone": "+1234567890",
+  "gender": "male",
+  "cnic": "12345-1234567-1",
+  "departmentId": 1,
+  "roleId": 1,
+  "managerId": 2,
+  "teamLeadId": 3,
+  "address": "123 Main St, City",
+  "maritalStatus": true,
+  "status": "active",
+  "startDate": "2025-01-01T00:00:00.000Z",
+  "endDate": null,
+  "modeOfWork": "hybrid",
+  "remoteDaysAllowed": 2,
+  "dob": "1990-01-01T00:00:00.000Z",
+  "emergencyContact": "+1234567890",
+  "shiftStart": "09:00",
+  "shiftEnd": "17:00",
+  "employmentType": "full_time",
+  "dateOfConfirmation": "2025-04-01T00:00:00.000Z",
+  "periodType": "probation",
+  "bonus": 2000,
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "department": {
+    "id": 1,
+    "name": "Engineering",
+    "description": "Software Engineering Department"
+  },
+  "role": {
+    "id": 1,
+    "name": "senior",
+    "description": "Senior Developer"
+  },
+  "manager": {
+    "id": 2,
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@company.com"
+  },
+  "teamLead": {
+    "id": 3,
+    "firstName": "Bob",
+    "lastName": "Johnson",
+    "email": "bob.johnson@company.com"
+  }
+}
+```
+
+### 6. Update Employee Shift Times
+**PATCH** `/hr/employees/:id/shift`
+
+Updates the shift start and/or end times for a specific employee. This endpoint requires the `employee_add_permission`.
+
+**Request Body:**
+```json
+{
+  "shift_start": "08:00",
+  "shift_end": "16:00"
+}
+```
+
+**Note:** Both `shift_start` and `shift_end` are optional. You can update one or both fields. Times must be in HH:MM format (24-hour).
+
+**Response:**
+```json
+{
+  "id": 1,
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@company.com",
+  "phone": "+1234567890",
+  "gender": "male",
+  "cnic": "12345-1234567-1",
+  "departmentId": 1,
+  "roleId": 1,
+  "managerId": 2,
+  "teamLeadId": 3,
+  "address": "123 Main St, City",
+  "maritalStatus": true,
+  "status": "active",
+  "startDate": "2025-01-01T00:00:00.000Z",
+  "endDate": null,
+  "modeOfWork": "hybrid",
+  "remoteDaysAllowed": 2,
+  "dob": "1990-01-01T00:00:00.000Z",
+  "emergencyContact": "+1234567890",
+  "shiftStart": "08:00",
+  "shiftEnd": "16:00",
+  "employmentType": "full_time",
+  "dateOfConfirmation": "2025-04-01T00:00:00.000Z",
+  "periodType": "probation",
+  "bonus": 1000,
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "department": {
+    "id": 1,
+    "name": "Engineering",
+    "description": "Software Engineering Department"
+  },
+  "role": {
+    "id": 1,
+    "name": "senior",
+    "description": "Senior Developer"
+  },
+  "manager": {
+    "id": 2,
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@company.com"
+  },
+  "teamLead": {
+    "id": 3,
+    "firstName": "Bob",
+    "lastName": "Johnson",
+    "email": "bob.johnson@company.com"
+  }
+}
+```
+
+### 7. Delete Employee
 **DELETE** `/hr/employees/:id`
 
 Permanently deletes an employee and all related records from the database. This includes:
@@ -407,6 +549,8 @@ All employee management operations are logged in the HR logs table for audit pur
 ### Action Types:
 - `employee_created` - When a new employee is created
 - `employee_updated` - When employee information is updated (includes list of changed fields)
+- `bonus_updated` - When an employee's bonus is updated
+- `shift_updated` - When an employee's shift times are updated
 - `employee_terminated` - When an employee is terminated (soft delete)
 - `employee_deleted` - When an employee is permanently deleted (hard delete)
 
@@ -422,6 +566,8 @@ Each log entry includes:
 ```
 employee_created: "New employee John Doe created with email john.doe@company.com in department Engineering"
 employee_updated: "Employee John Doe updated - Fields changed: firstName, phone, bonus"
+bonus_updated: "Bonus updated for employee John Doe from 1000 to 2000"
+shift_updated: "Shift times updated for employee John Doe - Changes: shift_start: 09:00 → 08:00, shift_end: 17:00 → 16:00"
 employee_terminated: "Employee John Doe terminated on 2025-12-31"
 employee_deleted: "Employee John Doe (ID: 123, Email: john.doe@company.com) permanently deleted from all systems"
 ``` 

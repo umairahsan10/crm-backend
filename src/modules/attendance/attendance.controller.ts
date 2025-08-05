@@ -101,7 +101,7 @@ export class AttendanceController {
   @Put('late-logs/:id/action')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @Permissions(PermissionName.monthly_leave_request)
   async processLateAction(
     @Param('id') id: string,
     @Body() actionData: { action: 'Pending' | 'Completed'; reviewer_id: number; late_type?: 'paid' | 'unpaid' }
@@ -152,7 +152,7 @@ export class AttendanceController {
   @Put('half-day-logs/:id/action')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @Permissions(PermissionName.monthly_leave_request)
   async processHalfDayAction(
     @Param('id') id: string,
     @Body() actionData: { action: 'Pending' | 'Completed'; reviewer_id: number; half_day_type?: 'paid' | 'unpaid' }
@@ -203,7 +203,7 @@ export class AttendanceController {
   @Put('leave-logs/:id/action')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @Permissions(PermissionName.monthly_leave_request)
   async processLeaveAction(
     @Param('id') id: string,
     @Body() actionData: ProcessLeaveActionDto
