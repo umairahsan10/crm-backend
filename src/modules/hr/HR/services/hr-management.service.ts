@@ -60,7 +60,7 @@ export class HrManagementService {
           commissionPermission: dto.commissionPermission,
           employeeAddPermission: dto.employeeAddPermission,
           terminationsHandle: dto.terminationsHandle,
-          monthlyLeaveRequest: dto.monthlyLeaveRequest,
+          monthlyRequestApprovals: dto.monthlyRequestApprovals,
           targetsSet: dto.targetsSet,
           bonusesSet: dto.bonusesSet,
           shiftTimingSet: dto.shiftTimingSet,
@@ -84,7 +84,7 @@ export class HrManagementService {
       if (dto.commissionPermission) permissions.push('Commission');
       if (dto.employeeAddPermission) permissions.push('Employee Add');
       if (dto.terminationsHandle) permissions.push('Terminations');
-      if (dto.monthlyLeaveRequest) permissions.push('Monthly Leave Request');
+      if (dto.monthlyRequestApprovals) permissions.push('Monthly Leave Request');
       if (dto.targetsSet) permissions.push('Targets Set');
       if (dto.bonusesSet) permissions.push('Bonuses Set');
       if (dto.shiftTimingSet) permissions.push('Shift Timing Set');
@@ -232,8 +232,8 @@ export class HrManagementService {
       if (dto.terminationsHandle !== undefined && dto.terminationsHandle !== existingHr.terminationsHandle) {
         changes.push(`Terminations Handle: ${existingHr.terminationsHandle ? 'Yes' : 'No'} → ${dto.terminationsHandle ? 'Yes' : 'No'}`);
       }
-      if (dto.monthlyLeaveRequest !== undefined && dto.monthlyLeaveRequest !== existingHr.monthlyLeaveRequest) {
-        changes.push(`Monthly Leave Request: ${existingHr.monthlyLeaveRequest ? 'Yes' : 'No'} → ${dto.monthlyLeaveRequest ? 'Yes' : 'No'}`);
+      if (dto.monthlyRequestApprovals !== undefined && dto.monthlyRequestApprovals !== existingHr.monthlyRequestApprovals) {
+        changes.push(`Monthly Request Approvals: ${existingHr.monthlyRequestApprovals ? 'Yes' : 'No'} → ${dto.monthlyRequestApprovals ? 'Yes' : 'No'}`);
       }
       if (dto.targetsSet !== undefined && dto.targetsSet !== existingHr.targetsSet) {
         changes.push(`Targets Set: ${existingHr.targetsSet ? 'Yes' : 'No'} → ${dto.targetsSet ? 'Yes' : 'No'}`);
@@ -253,7 +253,7 @@ export class HrManagementService {
           commissionPermission: dto.commissionPermission,
           employeeAddPermission: dto.employeeAddPermission,
           terminationsHandle: dto.terminationsHandle,
-          monthlyLeaveRequest: dto.monthlyLeaveRequest,
+          monthlyRequestApprovals: dto.monthlyRequestApprovals,
           targetsSet: dto.targetsSet,
           bonusesSet: dto.bonusesSet,
           shiftTimingSet: dto.shiftTimingSet,
@@ -339,7 +339,7 @@ export class HrManagementService {
       commissionPermission: existingHr.commissionPermission,
       employeeAddPermission: existingHr.employeeAddPermission,
       terminationsHandle: existingHr.terminationsHandle,
-      monthlyLeaveRequest: existingHr.monthlyLeaveRequest,
+      monthlyRequestApprovals: existingHr.monthlyRequestApprovals,
       targetsSet: existingHr.targetsSet,
       bonusesSet: existingHr.bonusesSet,
       shiftTimingSet: existingHr.shiftTimingSet,
@@ -363,7 +363,7 @@ export class HrManagementService {
       if (hrDetails.commissionPermission) permissions.push('Commission');
       if (hrDetails.employeeAddPermission) permissions.push('Employee Add');
       if (hrDetails.terminationsHandle) permissions.push('Terminations');
-      if (hrDetails.monthlyLeaveRequest) permissions.push('Monthly Leave Request');
+      if (hrDetails.monthlyRequestApprovals) permissions.push('Monthly Request Approvals');
       if (hrDetails.targetsSet) permissions.push('Targets Set');
       if (hrDetails.bonusesSet) permissions.push('Bonuses Set');
       if (hrDetails.shiftTimingSet) permissions.push('Shift Timing Set');

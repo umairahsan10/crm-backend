@@ -85,7 +85,7 @@ export class AuthService {
             commission_permission: hr.commissionPermission ?? false,
             employee_add_permission: hr.employeeAddPermission ?? false,
             terminations_handle: hr.terminationsHandle ?? false,
-            monthly_leave_request: hr.monthlyLeaveRequest ?? false,
+            monthly_request_approvals: hr.monthlyRequestApprovals ?? false,
             targets_set: hr.targetsSet ?? false,
             bonuses_set: hr.bonusesSet ?? false,
             shift_timing_set: hr.shiftTimingSet ?? false,
@@ -112,7 +112,7 @@ export class AuthService {
         // If accountant record exists, use its permissions, otherwise use default accountant permissions
         if (accountant) {
           permissionData = {
-            tax_permission: accountant.taxPermission ?? false,
+            liabilities_permission: accountant.liabilitiesPermission ?? false,
             salary_permission: accountant.salaryPermission ?? false,
             sales_permission: accountant.salesPermission ?? false,
             invoices_permission: accountant.invoicesPermission ?? false,

@@ -6,7 +6,7 @@ export class CreateAccountantDto {
 
   @IsOptional()
   @IsBoolean()
-  taxPermission?: boolean;
+  liabilitiesPermission?: boolean;
 
   @IsOptional()
   @IsBoolean()
@@ -36,7 +36,7 @@ export class CreateAccountantDto {
 export class UpdateAccountantDto {
   @IsOptional()
   @IsBoolean()
-  taxPermission?: boolean;
+  liabilitiesPermission?: boolean;
 
   @IsOptional()
   @IsBoolean()
@@ -66,7 +66,7 @@ export class UpdateAccountantDto {
 export class AccountantResponseDto {
   id: number;
   employeeId: number;
-  taxPermission?: boolean | null;
+  liabilitiesPermission?: boolean | null;
   salaryPermission?: boolean | null;
   salesPermission?: boolean | null;
   invoicesPermission?: boolean | null;
