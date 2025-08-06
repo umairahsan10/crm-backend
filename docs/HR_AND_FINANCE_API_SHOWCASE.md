@@ -496,6 +496,81 @@ The Finance module handles salary calculations, commissions, and displays. Base 
 **Tables Affected:**
 - `sales_departments`: Update commission amounts.
 
+### 9. Update Accountant Permissions
+
+**Title:** Update Permissions for Accountant
+
+**Methods and Endpoints:** PATCH /accountant/permissions
+
+**Description and Flow:** 
+- Allows admins or account managers to update permissions for accountants.
+- Flow:
+  1. Validate target employee exists and is active.
+  2. Ensure employee is in Accounts department.
+  3. Verify accountant record exists.
+  4. Apply permission restrictions.
+  5. Update permission flags.
+  6. Create audit log entry.
+
+**JSON Body:**
+```json
+{
+  \"employee_id\": 123,
+  \"permissions\": {
+    \"liabilities_permission\": true,
+    \"salary_permission\": false,
+    \"sales_permission\": true,
+    \"invoices_permission\": false,
+    \"expenses_permission\": true,
+    \"assets_permission\": false,
+    \"revenues_permission\": true
+  }
+}
+```
+
+**Required and Optional Fields:**
+- `employee_id` (number, required): ID of the accountant employee.
+- `permissions` (object, required): Object containing permission flags.
+
+**Sample Responses:**
+- Success (200):
+```json
+{
+  \"status\": \"success\",
+  \"message\": \"Permissions updated successfully for John Doe (ID: 123)\",
+  \"employee_id\": 123,
+  \"updated_permissions\": {
+    \"liabilities_permission\": true,
+    \"salary_permission\": false,
+    \"sales_permission\": true,
+    \"invoices_permission\": false,
+    \"expenses_permission\": true,
+    \"assets_permission\": false,
+    \"revenues_permission\": true
+  },
+  \"previous_permissions\": {
+    \"liabilities_permission\": false,
+    \"salary_permission\": true,
+    \"sales_permission\": false,
+    \"invoices_permission\": true,
+    \"expenses_permission\": false,
+    \"assets_permission\": true,
+    \"revenues_permission\": false
+  }
+}
+```
+
+**Errors:**
+- 400 Bad Request: Employee not found or invalid input.
+- 403 Forbidden: Insufficient permissions.
+
+**DB Access Controls:** JWT, Accounts department, salary_permission, admin bypass available.
+
+**Tables Affected:**
+- `employees`: Read employee data for validation.
+- `accountants`: Update permission flags.
+- `hr_logs`: Create audit log entry.
+
 ## Additional Notes
 - Overlapping endpoints between /salary and /finance/salary may indicate migration; use the appropriate base path based on current implementation.
 - All endpoints require JWT authentication unless noted.

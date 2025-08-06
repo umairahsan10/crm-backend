@@ -1232,6 +1232,25 @@ curl -X GET http://localhost:3000/salary/display/1/detailed \
   -H "Authorization: Bearer <jwt_token>"
 ```
 
+### Update Accountant Permissions
+```bash
+curl -X PATCH http://localhost:3000/accountant/permissions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{
+    "employee_id": 123,
+    "permissions": {
+      "liabilities_permission": true,
+      "salary_permission": false,
+      "sales_permission": true,
+      "invoices_permission": false,
+      "expenses_permission": true,
+      "assets_permission": false,
+      "revenues_permission": true
+    }
+  }'
+```
+
 ---
 
 ## Notes

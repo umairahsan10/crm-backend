@@ -7,6 +7,7 @@ This document provides a complete overview of all APIs in the HR and Finance mod
 2. [Finance Module APIs](#finance-module-apis)
    - [Salary Management](#salary-management)
    - [Commission Management](#commission-management)
+   - [Accountant Management](#accountant-management)
    - [Vendor Management](#vendor-management)
    - [Profit & Loss (P&L) Management](#profit--loss-pl-management)
 3. [Database Schema Overview](#database-schema-overview)
@@ -980,11 +981,126 @@ Error (400):
 
 ---
 
+### Accountant Management
+
+The accountant management APIs handle accountant permissions and access control.
+
+### 9. Update Accountant Permissions
+
+**Title:** Update Permissions for Accountant
+
+**Methods and Endpoints:** 
+- `PATCH /accountant/permissions`
+
+**Description and Flow:** 
+This endpoint allows admins or account managers to update permissions for accountants:
+1. Validates that the target employee exists and is active
+2. Ensures the employee is in the Accounts department
+3. Verifies the accountant record exists
+4. Applies permission restrictions (admin bypass, account manager restrictions)
+5. Updates all specified permission flags
+6. Creates audit log entry for tracking
+
+**JSON Body:**
+```json
+{
+  "employee_id": 123,
+  "permissions": {
+    "liabilities_permission": true,
+    "salary_permission": false,
+    "sales_permission": true,
+    "invoices_permission": false,
+    "expenses_permission": true,
+    "assets_permission": false,
+    "revenues_permission": true
+  }
+}
+```
+
+**Required and Optional Fields:**
+- `employee_id` (number, required): ID of the accountant employee
+- `permissions` (object, required): Object containing permission flags
+  - `liabilities_permission` (boolean, optional): Liabilities management permission
+  - `salary_permission` (boolean, optional): Salary management permission
+  - `sales_permission` (boolean, optional): Sales management permission
+  - `invoices_permission` (boolean, optional): Invoice management permission
+  - `expenses_permission` (boolean, optional): Expense management permission
+  - `assets_permission` (boolean, optional): Asset management permission
+  - `revenues_permission` (boolean, optional): Revenue management permission
+
+**Validations:**
+- employee_id must be a positive integer
+- Employee must exist and be active
+- Employee must be in the Accounts department
+- Accountant record must exist
+- Admin users can update any accountant permissions
+- Account managers have restricted update capabilities
+
+**Sample Responses:**
+
+Success (200):
+```json
+{
+  "status": "success",
+  "message": "Permissions updated successfully for John Doe (ID: 123)",
+  "employee_id": 123,
+  "updated_permissions": {
+    "liabilities_permission": true,
+    "salary_permission": false,
+    "sales_permission": true,
+    "invoices_permission": false,
+    "expenses_permission": true,
+    "assets_permission": false,
+    "revenues_permission": true
+  },
+  "previous_permissions": {
+    "liabilities_permission": false,
+    "salary_permission": true,
+    "sales_permission": false,
+    "invoices_permission": true,
+    "expenses_permission": false,
+    "assets_permission": true,
+    "revenues_permission": false
+  }
+}
+```
+
+Error (400):
+```json
+{
+  "status": "error",
+  "message": "Employee with ID 999 does not exist or is not active",
+  "error_code": "EMPLOYEE_NOT_FOUND"
+}
+```
+
+Error (403):
+```json
+{
+  "status": "error",
+  "message": "Access denied: You (Jane Smith) are not authorized to update permissions for this accountant. Only admins can update permissions for senior accountants.",
+  "error_code": "INSUFFICIENT_PERMISSIONS"
+}
+```
+
+**DB Access Controls:** 
+- JWT Authentication required
+- Accounts department access required
+- `salary_permission` required (for validation)
+- Admin bypass available for all permissions
+
+**Tables Affected:**
+- `employees`: Read employee data for validation
+- `accountants`: Update permission flags
+- `hr_logs`: Create audit log entry
+
+---
+
 ### Vendor Management
 
 The vendor management APIs handle vendor record creation and retrieval for financial transactions.
 
-### 9. Create Vendor
+### 11. Create Vendor
 
 **Title:** Add New Vendor Record
 
@@ -1092,7 +1208,7 @@ Error (403) - Permission Denied:
 
 ---
 
-### 10. Get All Vendors
+### 12. Get All Vendors
 
 **Title:** Retrieve All Vendor Records
 
@@ -1199,7 +1315,7 @@ Error (500) - Database Connection Error:
 
 The P&L management APIs handle automatic calculation and storage of monthly profit and loss statements, including revenue, expenses, and net profit calculations.
 
-### 10. Auto Calculate P&L
+### 13. Auto Calculate P&L
 
 **Title:** Trigger Automatic P&L Calculation and Storage
 
@@ -1289,7 +1405,7 @@ Error (400) - Invalid Format:
 
 ---
 
-### 11. P&L Preview Calculation
+### 14. P&L Preview Calculation
 
 **Title:** Read-Only P&L Calculation Preview
 
@@ -1371,7 +1487,7 @@ Error (400) - Invalid Format:
 
 ---
 
-### 12. P&L Category Breakdown
+### 15. P&L Category Breakdown
 
 **Title:** P&L Calculation with Category Breakdown
 
