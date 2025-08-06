@@ -55,7 +55,7 @@ export class AccountantService {
       const accountant = await this.prisma.accountant.create({
         data: {
           employeeId: dto.employeeId,
-          taxPermission: dto.taxPermission,
+          liabilitiesPermission: dto.liabilitiesPermission,
           salaryPermission: dto.salaryPermission,
           salesPermission: dto.salesPermission,
           invoicesPermission: dto.invoicesPermission,
@@ -77,7 +77,7 @@ export class AccountantService {
 
       // Create HR log entry with detailed permissions
       const permissions: string[] = [];
-      if (dto.taxPermission) permissions.push('Tax');
+      if (dto.liabilitiesPermission) permissions.push('Liabilities');
       if (dto.salaryPermission) permissions.push('Salary');
       if (dto.salesPermission) permissions.push('Sales');
       if (dto.invoicesPermission) permissions.push('Invoices');
@@ -213,8 +213,9 @@ export class AccountantService {
     try {
       // Track changes for logging
       const changes: string[] = [];
-      if (dto.taxPermission !== undefined && dto.taxPermission !== existingAccountant.taxPermission) {
-        changes.push(`Tax Permission: ${existingAccountant.taxPermission ? 'Yes' : 'No'} → ${dto.taxPermission ? 'Yes' : 'No'}`);
+
+      if (dto.liabilitiesPermission !== undefined && dto.liabilitiesPermission !== existingAccountant.liabilitiesPermission) {
+        changes.push(`Liabilities Permission: ${existingAccountant.liabilitiesPermission ? 'Yes' : 'No'} → ${dto.liabilitiesPermission ? 'Yes' : 'No'}`);
       }
       if (dto.salaryPermission !== undefined && dto.salaryPermission !== existingAccountant.salaryPermission) {
         changes.push(`Salary Permission: ${existingAccountant.salaryPermission ? 'Yes' : 'No'} → ${dto.salaryPermission ? 'Yes' : 'No'}`);
@@ -238,7 +239,7 @@ export class AccountantService {
       const accountant = await this.prisma.accountant.update({
         where: { id },
         data: {
-          taxPermission: dto.taxPermission,
+          liabilitiesPermission: dto.liabilitiesPermission,
           salaryPermission: dto.salaryPermission,
           salesPermission: dto.salesPermission,
           invoicesPermission: dto.invoicesPermission,
@@ -322,7 +323,7 @@ export class AccountantService {
 
     // Store accountant details before deletion for logging
     const accountantDetails = {
-      taxPermission: existingAccountant.taxPermission,
+      liabilitiesPermission: existingAccountant.liabilitiesPermission,
       salaryPermission: existingAccountant.salaryPermission,
       salesPermission: existingAccountant.salesPermission,
       invoicesPermission: existingAccountant.invoicesPermission,
@@ -344,7 +345,7 @@ export class AccountantService {
 
       // Create HR log entry with detailed accountant information
       const permissions: string[] = [];
-      if (accountantDetails.taxPermission) permissions.push('Tax');
+      if (accountantDetails.liabilitiesPermission) permissions.push('Liabilities');
       if (accountantDetails.salaryPermission) permissions.push('Salary');
       if (accountantDetails.salesPermission) permissions.push('Sales');
       if (accountantDetails.invoicesPermission) permissions.push('Invoices');

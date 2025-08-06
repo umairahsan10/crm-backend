@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 export class PermissionsDto {
   @IsOptional()
   @IsBoolean()
-  tax_permission?: boolean;
+  liabilities_permission?: boolean;
 
   @IsOptional()
   @IsBoolean()

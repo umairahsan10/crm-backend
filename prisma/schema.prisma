@@ -94,8 +94,6 @@ model Employee {
   marketingRecords    Marketing[]       @relation("MarketingEmployee")
   marketingUnitHead   MarketingUnit[]   @relation("MarketingUnitHead")
   projectsAsSalesRep  Project[]         @relation("ProjectSalesRep")
-  projectsAsTeamLead  Project[]         @relation("ProjectTeamLead")
-  projectsAsUnitHead  Project[]         @relation("ProjectUnitHead")
   projectLogs         ProjectLog[]      @relation("ProjectLogDeveloper")
   production          Production[]      @relation("ProductionEmployee")
   productionUnitHead  ProductionUnit[]  @relation("ProductionUnitHead")
@@ -233,8 +231,7 @@ model Project {
   id              Int              @id @default(autoincrement()) @map("project_id")
   crackedLeadId   Int?             @map("cracked_lead_id")
   salesRepId      Int?             @map("sales_rep_id")
-  teamLeadId      Int?             @map("team_lead_id")
-  unitHeadId      Int?             @map("unit_head_id")
+  teamId          Int?             @map("team_id")
   clientId        Int?             @map("client_id")
   status          ProjectStatus?
   difficultyLevel DifficultyLevel? @map("difficulty_level")
@@ -247,8 +244,7 @@ model Project {
   // Foreign key relations
   crackedLead     CrackedLead?     @relation(fields: [crackedLeadId], references: [id])
   salesRep        Employee?        @relation("ProjectSalesRep", fields: [salesRepId], references: [id])
-  teamLead        Employee?        @relation("ProjectTeamLead", fields: [teamLeadId], references: [id])
-  unitHead        Employee?        @relation("ProjectUnitHead", fields: [unitHeadId], references: [id])
+  team            Team?            @relation("ProjectTeam", fields: [teamId], references: [id])
   client          Client?          @relation("ProjectClient", fields: [clientId], references: [id]) // New relation
 
   // Opposite relations
@@ -352,6 +348,9 @@ model Team {
   salesUnit      SalesUnit?      @relation(fields: [salesUnitId], references: [id])
   productionUnit ProductionUnit? @relation(fields: [productionUnitId], references: [id])
   marketingUnit  MarketingUnit?  @relation(fields: [marketingUnitId], references: [id])
+
+  // Opposite relations
+  projects Project[] @relation("ProjectTeam")
 
   @@map("teams")
 }
@@ -532,21 +531,21 @@ model LeadComment {
 }
 
 model SalesDepartment {
-  id                   Int      @id @default(autoincrement()) @map("sales_department_id")
-  employeeId           Int      @map("employee_id")
-  leadsClosed          Int?     @map("leads_closed")
-  salesAmount          Decimal? @map("sales_amount") @db.Decimal(12, 2)
-  salesUnitId          Int?     @map("sales_unit_id")
-  commissionRate       Decimal? @map("commission_rate") @db.Decimal(5, 2)
-  commissionAmount     Decimal? @map("commission_amount") @db.Decimal(12, 2)
-  salesBonus           Decimal? @map("sales_bonus") @db.Decimal(12, 2)
-  withholdCommission   Decimal  @map("withhold_commission") @db.Decimal(12, 2)
-  withholdFlag         Boolean  @map("withhold_flag")
-  targetAmount         Decimal? @map("target_amount") @db.Decimal(12, 2)
-  chargebackDeductions Decimal? @default(0) @map("chargeback_deductions") @db.Decimal(12, 2)
-  refundDeductions     Decimal? @default(0) @map("refund_deductions") @db.Decimal(12, 2)
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                  Int      @id @default(autoincrement()) @map("sales_department_id")
+  employeeId          Int      @map("employee_id")
+  leadsClosed         Int?     @map("leads_closed")
+  salesAmount         Decimal? @map("sales_amount") @db.Decimal(12, 2)
+  salesUnitId         Int?     @map("sales_unit_id")
+  commissionRate      Decimal? @map("commission_rate") @db.Decimal(5, 2)
+  commissionAmount    Decimal? @map("commission_amount") @db.Decimal(12, 2)
+  salesBonus          Decimal? @map("sales_bonus") @db.Decimal(12, 2)
+  withholdCommission  Decimal  @map("withhold_commission") @db.Decimal(12, 2)
+  withholdFlag        Boolean  @map("withhold_flag")
+  targetAmount        Decimal? @map("target_amount") @db.Decimal(12, 2)
+  chargebackDeductions Decimal? @default(0) @db.Decimal(12, 2) @map("chargeback_deductions")
+  refundDeductions    Decimal? @default(0) @db.Decimal(12, 2) @map("refund_deductions")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee  Employee   @relation("SalesDepartmentEmployee", fields: [employeeId], references: [id])
@@ -700,17 +699,17 @@ model Account {
 }
 
 model Accountant {
-  id                 Int      @id @default(autoincrement()) @map("accountant_id")
-  employeeId         Int      @unique @map("employee_id")
-  taxPermission      Boolean? @map("tax_permission")
-  salaryPermission   Boolean? @map("salary_permission")
-  salesPermission    Boolean? @map("sales_permission")
-  invoicesPermission Boolean? @map("invoices_permission")
-  expensesPermission Boolean? @map("expenses_permission")
-  assetsPermission   Boolean? @map("assets_permission")
-  revenuesPermission Boolean? @map("revenues_permission")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  id                    Int      @id @default(autoincrement()) @map("accountant_id")
+  employeeId            Int      @unique @map("employee_id")
+  liabilitiesPermission Boolean? @map("liabilities_permission")
+  salaryPermission      Boolean? @map("salary_permission")
+  salesPermission       Boolean? @map("sales_permission")
+  invoicesPermission    Boolean? @map("invoices_permission")
+  expensesPermission    Boolean? @map("expenses_permission")
+  assetsPermission      Boolean? @map("assets_permission")
+  revenuesPermission    Boolean? @map("revenues_permission")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   // Foreign key relation to employees table
   employee Employee @relation("EmployeeAccountant", fields: [employeeId], references: [id])
@@ -724,7 +723,6 @@ model Asset {
   category         String?   @db.VarChar(100)
   purchaseDate     DateTime? @map("purchase_date") @db.Date
   purchaseValue    Decimal?  @map("purchase_value") @db.Decimal(12, 2)
-  depreciationRate Decimal?  @map("depreciation_rate") @db.Decimal(5, 2)
   currentValue     Decimal?  @map("current_value") @db.Decimal(12, 2)
   transactionId    Int       @map("transaction_id")
   createdBy        Int?      @map("created_by")
@@ -732,25 +730,25 @@ model Asset {
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   // Foreign key relations
-  employee    Employee?   @relation("AssetCreatedBy", fields: [createdBy], references: [id])
-  transaction Transaction @relation(fields: [transactionId], references: [id])
+  employee    Employee?    @relation("AssetCreatedBy", fields: [createdBy], references: [id])
+  transaction Transaction  @relation(fields: [transactionId], references: [id])
 
   @@map("assets")
 }
 
 model Expense {
-  id              Int              @id @default(autoincrement()) @map("expense_id")
-  title           String?          @db.VarChar(255)
-  category        String?          @db.VarChar(100)
-  amount          Decimal?         @db.Decimal(12, 2)
-  createdBy       Int?             @map("created_by")
-  paidOn          DateTime?        @map("paid_on") @db.Date
-  notes           String?          @db.Text
-  transactionId   Int?             @map("transaction_id")
+  id             Int            @id @default(autoincrement()) @map("expense_id")
+  title          String?        @db.VarChar(255)
+  category       String?        @db.VarChar(100)
+  amount         Decimal?       @db.Decimal(12, 2)
+  createdBy      Int?           @map("created_by")
+  paidOn         DateTime?      @map("paid_on") @db.Date
+  notes          String?        @db.Text
+  transactionId  Int?           @map("transaction_id")
   processedByRole ProcessedByRole? @map("processed_by_role")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  paymentMethod   PaymentMethod?   @map("payment_method")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  paymentMethod  PaymentMethod? @map("payment_method")
 
   // Foreign key relation to employees table
   employee    Employee?    @relation("ExpenseCreatedBy", fields: [createdBy], references: [id])
@@ -781,9 +779,9 @@ model Liability {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Foreign key relations
-  vendor      Vendor?     @relation(fields: [relatedVendorId], references: [id])
-  employee    Employee?   @relation("LiabilityCreatedBy", fields: [createdBy], references: [id])
-  transaction Transaction @relation(fields: [transactionId], references: [id])
+  vendor      Vendor?      @relation(fields: [relatedVendorId], references: [id])
+  employee    Employee?    @relation("LiabilityCreatedBy", fields: [createdBy], references: [id])
+  transaction Transaction  @relation(fields: [transactionId], references: [id])
 
   @@map("liabilities")
 }
@@ -873,17 +871,17 @@ enum PaymentWays {
 }
 
 model NetSalaryLog {
-  id              Int              @id @default(autoincrement()) @map("net_salary_log_id")
-  employeeId      Int              @map("employee_id")
-  month           String?          @db.VarChar(7)
-  netSalary       Decimal?         @map("net_salary") @db.Decimal(12, 2)
-  paidOn          DateTime?        @map("paid_on") @db.Date
-  processedBy     Int?             @map("processed_by")
+  id             Int              @id @default(autoincrement()) @map("net_salary_log_id")
+  employeeId     Int              @map("employee_id")
+  month          String?          @db.VarChar(7)
+  netSalary      Decimal?         @map("net_salary") @db.Decimal(12, 2)
+  paidOn         DateTime?        @map("paid_on") @db.Date
+  processedBy    Int?             @map("processed_by")
   processedByRole ProcessedByRole? @map("processed_by_role")
-  deductions      Int?
-  status          SalaryStatus?
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  deductions     Int?
+  status         SalaryStatus?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee  Employee  @relation(fields: [employeeId], references: [id])
@@ -923,7 +921,6 @@ model ProfitLoss {
   year          String?  @db.VarChar(4)
   totalIncome   Decimal? @map("total_income") @db.Decimal(12, 2)
   totalExpenses Decimal? @map("total_expenses") @db.Decimal(12, 2)
-  salariesPaid  Decimal? @map("salaries_paid") @db.Decimal(12, 2)
   netProfit     Decimal? @map("net_profit") @db.Decimal(12, 2)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -1088,19 +1085,19 @@ enum HalfDayType {
 }
 
 model HR {
-  id                    Int      @id @default(autoincrement()) @map("hr_id")
-  employeeId            Int      @unique @map("employee_id")
-  attendancePermission  Boolean? @map("attendance_permission")
-  salaryPermission      Boolean? @map("salary_permission")
-  commissionPermission  Boolean? @map("commission_permission")
-  employeeAddPermission Boolean? @map("employee_add_permission")
-  terminationsHandle    Boolean? @map("terminations_handle")
-  monthlyLeaveRequest   Boolean? @map("monthly_leave_request")
-  targetsSet            Boolean? @map("targets_set")
-  bonusesSet            Boolean? @map("bonuses_set")
-  shiftTimingSet        Boolean? @map("shift_timing_set")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                       Int      @id @default(autoincrement()) @map("hr_id")
+  employeeId               Int      @unique @map("employee_id")
+  attendancePermission     Boolean? @map("attendance_permission")
+  salaryPermission         Boolean? @map("salary_permission")
+  commissionPermission     Boolean? @map("commission_permission")
+  employeeAddPermission    Boolean? @map("employee_add_permission")
+  terminationsHandle       Boolean? @map("terminations_handle")
+  monthlyRequestApprovals  Boolean? @map("monthly_request_approvals")
+  targetsSet               Boolean? @map("targets_set")
+  bonusesSet               Boolean? @map("bonuses_set")
+  shiftTimingSet           Boolean? @map("shift_timing_set")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
 
   // Foreign key relation to employees table
   employee Employee @relation("HrEmployee", fields: [employeeId], references: [id])
@@ -1293,6 +1290,7 @@ model Notification {
   status    NotificationStatus? @default(unread)
   sentTo    Int?                @map("sent_to")
   sentBy    Int?                @map("sent_by")
+  userType  UserType            @map("user_type")
   heading   String?             @db.VarChar(255)
   content   String?             @db.Text
   createdAt DateTime            @default(now()) @map("created_at")
@@ -1308,6 +1306,11 @@ model Notification {
 enum NotificationStatus {
   read
   unread
+}
+
+enum UserType {
+  admin
+  employee
 }
 
 enum MeetingStatus {
@@ -1575,8 +1578,8 @@ model ArchiveLead {
   archivedOn    DateTime                 @default(now()) @map("archived_on")
 
   // Foreign key relations
-  lead     Lead       @relation("LeadArchive", fields: [leadId], references: [id])
-  employee Employee   @relation("ArchiveLeadAssigned", fields: [assignedTo], references: [id])
+  lead     Lead      @relation("LeadArchive", fields: [leadId], references: [id])
+  employee Employee  @relation("ArchiveLeadAssigned", fields: [assignedTo], references: [id])
   unit     SalesUnit? @relation("ArchiveLeadUnit", fields: [unitId], references: [id])
 
   @@map("archive_leads")

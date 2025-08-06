@@ -768,16 +768,6 @@ export class EmployeeService {
           data: { salesRepId: null },
         });
 
-        await tx.project.updateMany({
-          where: { teamLeadId: id },
-          data: { teamLeadId: null },
-        });
-
-        await tx.project.updateMany({
-          where: { unitHeadId: id },
-          data: { unitHeadId: null },
-        });
-
         // Update teams to remove employee references
         await tx.team.updateMany({
           where: { teamLeadId: id },

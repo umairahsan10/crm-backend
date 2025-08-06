@@ -26,7 +26,7 @@ export class CreateHrDto {
 
   @IsOptional()
   @IsBoolean()
-  monthlyLeaveRequest?: boolean;
+  monthlyRequestApprovals?: boolean;
 
   @IsOptional()
   @IsBoolean()
@@ -64,7 +64,7 @@ export class UpdateHrDto {
 
   @IsOptional()
   @IsBoolean()
-  monthlyLeaveRequest?: boolean;
+  monthlyRequestApprovals?: boolean;
 
   @IsOptional()
   @IsBoolean()
@@ -87,7 +87,7 @@ export class HrResponseDto {
   commissionPermission?: boolean | null;
   employeeAddPermission?: boolean | null;
   terminationsHandle?: boolean | null;
-  monthlyLeaveRequest?: boolean | null;
+  monthlyRequestApprovals?: boolean | null;
   targetsSet?: boolean | null;
   bonusesSet?: boolean | null;
   shiftTimingSet?: boolean | null;

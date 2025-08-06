@@ -3,7 +3,7 @@ export class PermissionsResponseDto {
     message: string;
     employee_id?: number;
     updated_permissions?: {
-      tax_permission: boolean;
+      liabilities_permission: boolean;
       salary_permission: boolean;
       sales_permission: boolean;
       invoices_permission: boolean;
@@ -12,7 +12,7 @@ export class PermissionsResponseDto {
       revenues_permission: boolean;
     };
     previous_permissions?: {
-      tax_permission: boolean;
+      liabilities_permission: boolean;
       salary_permission: boolean;
       sales_permission: boolean;
       invoices_permission: boolean;
@@ -21,7 +21,7 @@ export class PermissionsResponseDto {
       revenues_permission: boolean;
     };
     already_set_permissions?: {
-      tax_permission: boolean;
+      liabilities_permission: boolean;
       salary_permission: boolean;
       sales_permission: boolean;
       invoices_permission: boolean;

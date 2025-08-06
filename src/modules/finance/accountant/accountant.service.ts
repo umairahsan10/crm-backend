@@ -80,7 +80,7 @@ export class AccountantService {
         where: { employeeId: dto.employee_id },
         select: {
           id: true,
-          taxPermission: true,
+          liabilitiesPermission: true,
           salaryPermission: true,
           salesPermission: true,
           invoicesPermission: true,
@@ -152,7 +152,7 @@ export class AccountantService {
 
       // 5. Store current permissions for comparison
       const currentPermissions = {
-        tax_permission: accountant.taxPermission ?? false,
+        liabilities_permission: accountant.liabilitiesPermission ?? false,
         salary_permission: accountant.salaryPermission ?? false,
         sales_permission: accountant.salesPermission ?? false,
         invoices_permission: accountant.invoicesPermission ?? false,
@@ -167,14 +167,14 @@ export class AccountantService {
       const changedPermissions: any = {};
 
       // Check each permission that was provided in the request
-      if (dto.permissions.tax_permission !== undefined) {
-        if (dto.permissions.tax_permission === currentPermissions.tax_permission) {
-          alreadySetPermissions.tax_permission = dto.permissions.tax_permission;
-        } else {
-          permissionsToUpdate.taxPermission = dto.permissions.tax_permission;
-          changedPermissions.tax_permission = currentPermissions.tax_permission;
+              if (dto.permissions.liabilities_permission !== undefined) {
+          if (dto.permissions.liabilities_permission === currentPermissions.liabilities_permission) {
+            alreadySetPermissions.liabilities_permission = dto.permissions.liabilities_permission;
+          } else {
+            permissionsToUpdate.liabilitiesPermission = dto.permissions.liabilities_permission;
+            changedPermissions.liabilities_permission = currentPermissions.liabilities_permission;
+          }
         }
-      }
 
       if (dto.permissions.salary_permission !== undefined) {
         if (dto.permissions.salary_permission === currentPermissions.salary_permission) {
