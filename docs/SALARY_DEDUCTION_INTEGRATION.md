@@ -236,7 +236,7 @@ GET /salary/calculate/1?endDate=2025-01-15
 - This endpoint is **read-only** and does NOT update the database
 - It calculates salary and deductions for the current period up to the specified end date
 - **Base Salary**: Only base salary is prorated for partial months; bonuses and commission are added as full amounts
-- **Bonus Structure**: Shows both employee bonus and sales department bonus separately
+- **Bonus Structure**: Shows both employee bonus and sales bonus separately
 - **Detailed Deduction Breakdown**: Includes complete deduction details with day-by-day breakdown
 - Smart calculation automatically determines the period based on employee type:
   - **Old employees**: 1st of current month to current date
@@ -1017,7 +1017,7 @@ The API now provides clear, user-friendly error messages for common issues:
 - **Enhanced validation**: Better error handling and parameter validation
 
 ### Bonus Structure Updates (Latest)
-- **Dual Bonus System**: Now shows both employee bonus and sales department bonus separately
+- **Dual Bonus System**: Now shows both employee bonus and sales bonus separately
 - **Full Amount Bonuses**: Both bonuses are added as full amounts (not prorated)
 - **Full Amount Commission**: Commission is also added as full amount (not prorated)
 - **Base Salary Transparency**: Shows both full base salary and prorated amount used in calculations

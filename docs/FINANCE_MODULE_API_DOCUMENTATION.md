@@ -1117,7 +1117,7 @@ Authorization: Bearer <jwt_token>
 - `withholdCommission` - Withheld commission amount
 - `withholdFlag` - Boolean flag for commission withholding
 - `commissionRate` - Commission rate percentage
-- `bonus` - Sales department bonus
+- `salesBonus` - Sales bonus
 - `salesAmount` - Total sales amount
 - `leadsClosed` - Number of leads closed
 

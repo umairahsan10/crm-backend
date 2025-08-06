@@ -1,4 +1,3 @@
-
 import { IsNumber, IsEnum, IsOptional } from 'class-validator';
 import { PaymentWays } from '@prisma/client';
 
@@ -9,4 +8,4 @@ export class MarkSalaryPaidDto {
   @IsOptional()
   @IsEnum(PaymentWays)
   type?: PaymentWays;
-}
+} 

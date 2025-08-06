@@ -1,13 +1,30 @@
 # HR Module API Documentation
 
 ## Overview
-The HR module handles employee termination and related HR operations. It includes proper validation, error handling, integration with the finance module for salary processing, and automatic HR logging for audit trails.
+The HR module is organized into a modular structure with separate submodules for different concerns. The main HR module handles employee termination and HR logs, while the salary submodule manages all salary-related operations including deductions, updates, and payments.
+
+---
+
+## Module Structure
+
+```
+HR Module
+├── Main HR Module (/hr/*)
+│   ├── Employee Termination
+│   └── HR Activity Logs
+└── Salary Submodule (/hr/salary/*)
+    ├── Salary Deductions
+    ├── Salary Updates
+    └── Salary Payments
+```
 
 ---
 
 ## API Endpoints
 
-### 1. Terminate Employee
+### Main HR Module Endpoints
+
+#### 1. Terminate Employee
 
 **Title:** Terminate Employee and Process Final Salary  
 **Endpoint:** `/hr/terminate`  
@@ -94,7 +111,7 @@ The HR module handles employee termination and related HR operations. It include
    - If description is provided, uses it; otherwise generates automatic description
    - Automatic description format: "Employee [Name] (ID: [ID]) was terminated on [Date] by HR [HR Name]"
 
-### 2. Get HR Logs
+#### 2. Get HR Logs
 
 **Title:** Retrieve HR Activity Logs  
 **Endpoint:** `/hr/logs`  
@@ -171,10 +188,14 @@ Authorization: Bearer <jwt_token>
    - Includes HR employee details
    - Orders by creation date (newest first)
 
-### 3. Calculate Salary Deductions
+---
+
+### Salary Submodule Endpoints
+
+#### 3. Calculate Salary Deductions
 
 **Title:** Calculate Salary Deductions for Employees  
-**Endpoint:** `/hr/salary-deductions`  
+**Endpoint:** `/hr/salary/deductions`  
 **Method:** `GET`  
 **Description:** Calculates comprehensive salary deductions including attendance-based deductions (absent, late, half-day) and sales department deductions (chargeback, refund) for employees.
 
@@ -192,16 +213,16 @@ Authorization: Bearer <jwt_token>
 #### Query Examples
 ```bash
 # Calculate for specific employee and month
-GET /hr/salary-deductions?employeeId=1&month=2025-01
+GET /hr/salary/deductions?employeeId=1&month=2025-01
 
 # Calculate for specific employee, current month
-GET /hr/salary-deductions?employeeId=1
+GET /hr/salary/deductions?employeeId=1
 
 # Calculate for all employees, specific month
-GET /hr/salary-deductions?month=2025-01
+GET /hr/salary/deductions?month=2025-01
 
 # Calculate for all employees, current month
-GET /hr/salary-deductions
+GET /hr/salary/deductions
 ```
 
 #### Response
@@ -264,7 +285,113 @@ GET /hr/salary-deductions
   }
   ```
 
-#### Backend Logic & Database Operations
+#### 4. Update Employee Salary
+
+**Title:** Update Employee Base Salary  
+**Endpoint:** `/hr/salary/update`  
+**Method:** `PATCH`  
+**Description:** Updates an employee's base salary with proper permission checks. Admins can update any salary, while HR users have restrictions.
+
+#### Request Body
+```json
+{
+  "employee_id": 15,
+  "amount": 35000,
+  "description": "Annual salary review and performance bonus"
+}
+```
+
+#### Parameters
+| Parameter | Type | Required | Description | Validation |
+|-----------|------|----------|-------------|------------|
+| `employee_id` | `number` | ✅ Yes | ID of the employee | Must be a valid integer |
+| `amount` | `number` | ✅ Yes | New salary amount | Must be >= 0 |
+| `description` | `string` | ❌ No | Reason for salary update | Optional string |
+
+#### Response
+**Success (200):**
+```json
+{
+  "status": "success",
+  "message": "Salary updated successfully",
+  "employee_id": 15,
+  "previous_salary": 30000,
+  "new_salary": 35000,
+  "updated_by": 2
+}
+```
+
+**Error Responses:**
+- **400 Bad Request:**
+  ```json
+  {
+    "status": "error",
+    "message": "Employee does not exist",
+    "error_code": "EMPLOYEE_NOT_FOUND"
+  }
+  ```
+  ```json
+  {
+    "status": "error",
+    "message": "HR cannot set their own salary",
+    "error_code": "SELF_SALARY_RESTRICTION"
+  }
+  ```
+
+#### 5. Mark Salary as Paid
+
+**Title:** Mark Salary as Paid  
+**Endpoint:** `/hr/salary/mark-paid`  
+**Method:** `PATCH`  
+**Description:** Marks a salary as paid, creates transaction and expense records, and resets employee bonuses to zero.
+
+#### Request Body
+```json
+{
+  "employee_id": 15,
+  "type": "bank"
+}
+```
+
+#### Parameters
+| Parameter | Type | Required | Description | Validation |
+|-----------|------|----------|-------------|------------|
+| `employee_id` | `number` | ✅ Yes | ID of the employee | Must be a valid integer |
+| `type` | `string` | ❌ No | Payment method | Must be valid PaymentWays enum |
+
+#### Response
+**Success (200):**
+```json
+{
+  "status": "success",
+  "message": "Salary marked as paid successfully",
+  "data": {
+    "employee_id": 15,
+    "salary_log_id": 123,
+    "transaction_id": 456,
+    "expense_id": 789,
+    "amount": 35000,
+    "payment_method": "bank",
+    "paid_on": "2025-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Error Responses:**
+- **400 Bad Request:**
+  ```json
+  {
+    "status": "error",
+    "message": "No unpaid salary found for the current month",
+    "error_code": "NO_UNPAID_SALARY_FOUND"
+  }
+  ```
+
+---
+
+## Backend Logic & Database Operations
+
+### Salary Deduction Calculation
 
 1. **Input Validation:**
    - Validates employeeId format if provided
@@ -305,6 +432,56 @@ GET /hr/salary-deductions
    - Calculates summary totals for all employees
    - Provides detailed breakdown of each deduction type
 
+### Salary Update Process
+
+1. **Employee Validation:**
+   - Checks if employee exists and is active
+   - Validates account record exists
+
+2. **Permission Checks:**
+   - HR cannot update their own salary
+   - HR cannot update salary of another HR with salary permission
+   - Admins have no restrictions
+
+3. **Database Updates:**
+   ```sql
+   UPDATE account 
+   SET base_salary = [NEW_AMOUNT], updated_at = NOW() 
+   WHERE employee_id = [EMPLOYEE_ID];
+   ```
+
+4. **Logging:**
+   - Creates HR log entry for non-admin users
+   - Records previous and new salary amounts
+
+### Salary Payment Process
+
+1. **Validation:**
+   - Checks if employee exists and is active
+   - Finds unpaid salary log for current month
+
+2. **Database Transaction:**
+   ```sql
+   -- Update salary log
+   UPDATE net_salary_logs 
+   SET paid_on = NOW(), status = 'paid', processed_by = [USER_ID] 
+   WHERE id = [SALARY_LOG_ID];
+   
+   -- Reset bonuses
+   UPDATE employee SET bonus = 0 WHERE id = [EMPLOYEE_ID];
+   UPDATE sales_departments SET bonus = 0 WHERE employee_id = [EMPLOYEE_ID];
+   
+   -- Create transaction record
+   INSERT INTO transactions (employee_id, amount, transaction_type, ...);
+   
+   -- Create expense record
+   INSERT INTO expenses (title, category, amount, ...);
+   ```
+
+3. **HR Logging:**
+   - Creates HR log entry for non-admin users
+   - Records payment details and bonus resets
+
 ---
 
 ## Database Schema
@@ -314,22 +491,26 @@ GET /hr/salary-deductions
 |-------|------|-------------|
 | `hr_log_id` | `SERIAL` | Primary key |
 | `hr_id` | `INTEGER` | Foreign key to HR table |
-| `action_type` | `VARCHAR(255)` | Type of HR action (e.g., 'employee_termination') |
+| `action_type` | `VARCHAR(255)` | Type of HR action (e.g., 'employee_termination', 'salary_update', 'salary_payment') |
 | `affected_employee_id` | `INTEGER` | ID of employee affected by the action |
 | `description` | `TEXT` | Detailed description of the action |
 | `created_at` | `TIMESTAMP` | When the log was created |
 | `updated_at` | `TIMESTAMP` | When the log was last updated |
 
-### Sales Department Deductions
-| Field | Type | Description |
-|-------|------|-------------|
-| `chargebackDeductions` | `DECIMAL(12,2)` | Chargeback deduction amount for sales employees |
-| `refundDeductions` | `DECIMAL(12,2)` | Refund deduction amount for sales employees |
+### Salary-Related Tables
+| Table | Purpose |
+|-------|---------|
+| `net_salary_logs` | Tracks salary calculations and payments |
+| `transactions` | Records salary payment transactions |
+| `expenses` | Tracks salary expenses |
+| `sales_departments` | Contains sales-specific deductions |
 
 ### Relationships
 - `hr_logs.hr_id` → `hr.id`
 - `hr_logs.affected_employee_id` → `employees.id`
 - `sales_departments.employeeId` → `employees.id`
+- `net_salary_logs.employee_id` → `employees.id`
+- `transactions.employee_id` → `employees.id`
 
 ---
 
@@ -349,6 +530,15 @@ GET /hr/salary-deductions
 3. Permission check (salary permission)
 4. HR record validation
 
+### Permission Restrictions
+- **HR Users:**
+  - Cannot update their own salary
+  - Cannot update salary of another HR with salary permission
+  - Can update regular employee salaries
+- **Admin Users:**
+  - No restrictions on salary updates
+  - Can update any employee salary
+
 ---
 
 ## Error Handling
@@ -361,9 +551,14 @@ GET /hr/salary-deductions
 5. **Database Errors:** Returns 400 with error details
 6. **Invalid Month Format:** Returns 400 with format guidance
 7. **Missing Attendance Data:** Returns 404 with employee details
+8. **Permission Violations:** Returns 400 with specific restriction message
+9. **No Unpaid Salary:** Returns 400 when no salary to pay
+10. **Transaction Failures:** Returns 400 with transaction error details
 
 ### Logging
 - All termination actions are logged with timestamps
+- All salary updates are logged with before/after amounts
+- All salary payments are logged with transaction details
 - Automatic descriptions generated when none provided
 - Full audit trail maintained in `hr_logs` table
 - Deduction calculation errors are logged for debugging
@@ -382,6 +577,9 @@ GET /hr/salary-deductions
 - Salary deduction calculation for single employee
 - Salary deduction calculation for all employees
 - Invalid query parameter handling
+- Salary update permission checks
+- Salary payment validation
+- Bonus reset functionality
 
 ### Integration Tests
 - End-to-end termination flow
@@ -390,6 +588,9 @@ GET /hr/salary-deductions
 - Logging accuracy
 - Deduction calculation integration
 - Sales department deduction integration
+- Salary update workflow
+- Salary payment workflow
+- Transaction and expense creation
 
 ---
 
@@ -404,3 +605,7 @@ GET /hr/salary-deductions
 6. **Deduction Reports:** Generate detailed deduction reports
 7. **Deduction History:** Track deduction changes over time
 8. **Deduction Approvals:** Workflow for deduction approvals
+9. **Salary History:** Track salary changes over time
+10. **Payment Scheduling:** Automated salary payment scheduling
+11. **Tax Calculations:** Integrate tax deduction calculations
+12. **Benefits Management:** Handle benefits and allowances

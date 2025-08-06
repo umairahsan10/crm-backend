@@ -11,4 +11,4 @@ export class UpdateSalaryDto {
   @IsOptional()
   @IsString()
   description?: string;
-}
+} 
