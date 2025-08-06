@@ -53,13 +53,6 @@ export class UnitsController {
     return this.unitsService.getAvailableUnitHeads(assignedBoolean);
   }
 
-  @Get(':id/teams')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Sales')
-  async getTeamsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.unitsService.getTeamsInUnit(id, req.user);
-  }
-
   @Get(':id/employees')
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
