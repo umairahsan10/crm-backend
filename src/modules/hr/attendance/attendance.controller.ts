@@ -25,12 +25,12 @@ import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { ProcessLeaveActionDto } from './dto/process-leave-action.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
-import { PermissionName } from '../../common/constants/permission.enum';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { PermissionName } from '../../../common/constants/permission.enum';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
-@Controller('attendance')
+@Controller('hr/attendance')
 export class AttendanceController {
   private readonly logger = new Logger(AttendanceController.name);
 

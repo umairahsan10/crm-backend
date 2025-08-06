@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { GetAttendanceLogsDto } from './dto/get-attendance-logs.dto';
 import { AttendanceLogResponseDto } from './dto/attendance-log-response.dto';
 import { CheckinDto } from './dto/checkin.dto';
