@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request, Query, BadRequestException } from '@nestjs/common';
 import { UnitsService } from './units.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
@@ -32,6 +32,25 @@ export class UnitsController {
   @Departments('Sales')
   async getUnit(@Param('id', ParseIntPipe) id: number) {
     return this.unitsService.getUnit(id);
+  }
+
+  @Get('available-heads')
+  @Roles('dep_manager')
+  @Departments('Sales')
+  async getAvailableUnitHeads(@Query('assigned') assigned?: string) {
+    // Convert string query parameter to boolean
+    let assignedBoolean: boolean | undefined;
+    if (assigned !== undefined) {
+      if (assigned === 'true') {
+        assignedBoolean = true;
+      } else if (assigned === 'false') {
+        assignedBoolean = false;
+      } else {
+        throw new BadRequestException('assigned parameter must be true or false');
+      }
+    }
+    
+    return this.unitsService.getAvailableUnitHeads(assignedBoolean);
   }
 
   @Get(':id/teams')

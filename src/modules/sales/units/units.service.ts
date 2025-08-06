@@ -12,19 +12,19 @@ export class UnitsService {
 
     // Validate headId only if provided
     if (headId) {
-      // Check if employee exists
-      const employee = await this.prisma.employee.findUnique({
-        where: { id: headId },
-        include: { role: true }
-      });
+    // Check if employee exists
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: headId },
+      include: { role: true }
+    });
 
-      if (!employee) {
-        throw new BadRequestException(`Employee with ID ${headId} does not exist`);
-      }
+    if (!employee) {
+      throw new BadRequestException(`Employee with ID ${headId} does not exist`);
+    }
 
-      // Check if employee has unit_head role
-      if (employee.role.name !== 'unit_head') {
-        throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
+    // Check if employee has unit_head role
+    if (employee.role.name !== 'unit_head') {
+      throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
       }
     }
 
@@ -754,6 +754,102 @@ export class UnitsService {
     return {
       success: true,
       message: `Unit deleted successfully. ${archiveLeadsCount} archived leads have been assigned unit ID null.`
+    };
+  }
+
+  async getAvailableUnitHeads(assigned?: boolean) {
+    let employees;
+
+    if (assigned === true) {
+      // Get only assigned heads
+      employees = await this.prisma.employee.findMany({
+        where: {
+          role: {
+            name: 'unit_head'
+          },
+          department: {
+            name: 'Sales'
+          },
+          status: 'active',
+          salesUnitHead: {
+            some: {}
+          }
+        },
+        include: {
+          salesUnitHead: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: {
+          firstName: 'asc'
+        }
+      });
+    } else if (assigned === false) {
+      // Get only unassigned heads
+      employees = await this.prisma.employee.findMany({
+        where: {
+          role: {
+            name: 'unit_head'
+          },
+          department: {
+            name: 'Sales'
+          },
+          status: 'active',
+          salesUnitHead: {
+            none: {}
+          }
+        },
+        orderBy: {
+          firstName: 'asc'
+        }
+      });
+    } else {
+      // Get all heads (default behavior)
+      employees = await this.prisma.employee.findMany({
+        where: {
+          role: {
+            name: 'unit_head'
+          },
+          department: {
+            name: 'Sales'
+          },
+          status: 'active'
+        },
+        include: {
+          salesUnitHead: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: {
+          firstName: 'asc'
+        }
+      });
+    }
+
+    // Format the response
+    const heads = employees.map(employee => ({
+      id: employee.id,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      email: employee.email,
+      currentUnit: employee.salesUnitHead && employee.salesUnitHead.length > 0 ? {
+        id: employee.salesUnitHead[0].id,
+        name: employee.salesUnitHead[0].name
+      } : null
+    }));
+
+    return {
+      success: true,
+      message: 'Unit heads retrieved successfully',
+      data: {
+        heads
+      }
     };
   }
 }
