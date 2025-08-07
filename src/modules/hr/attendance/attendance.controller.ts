@@ -77,8 +77,7 @@ export class AttendanceController {
   }
 
   @Get('late-logs/employee/:emp_id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @UseGuards(JwtAuthGuard)
   async getLateLogsByEmployee(
     @Param('emp_id') empId: string
   ): Promise<LateLogsListResponseDto[]> {
@@ -128,8 +127,7 @@ export class AttendanceController {
   }
 
   @Get('half-day-logs/employee/:emp_id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @UseGuards(JwtAuthGuard)
   async getHalfDayLogsByEmployee(
     @Param('emp_id') empId: string
   ): Promise<HalfDayLogsListResponseDto[]> {
@@ -179,8 +177,7 @@ export class AttendanceController {
   }
 
   @Get('leave-logs/employee/:emp_id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @UseGuards(JwtAuthGuard)
   async getLeaveLogsByEmployee(
     @Param('emp_id') empId: string
   ): Promise<LeaveLogsListResponseDto[]> {
@@ -230,8 +227,7 @@ x
   }
 
   @Get('list/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @UseGuards(JwtAuthGuard)
   async getAttendanceById(@Param('id') id: string): Promise<AttendanceListResponseDto | null> {
     const employeeId = Number(id);
     if (isNaN(employeeId)) {
@@ -248,8 +244,7 @@ x
   }
 
   @Get('month/:emp_id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
+  @UseGuards(JwtAuthGuard)
   async getMonthlyAttendanceByEmployee(
     @Param('emp_id') empId: string,
     @Query('month') month?: string

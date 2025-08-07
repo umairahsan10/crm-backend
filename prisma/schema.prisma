@@ -1211,7 +1211,7 @@ model MonthlyAttendanceSummary {
 model ProjectChat {
   id              Int      @id @default(autoincrement()) @map("project_chat_id")
   projectId       Int?     @map("project_id")
-  participants    Json?    @db.JsonB
+  participants    Int?
   transferredFrom Int?     @map("transferred_from")
   transferredTo   Int?     @map("transferred_to")
   createdAt       DateTime @default(now()) @map("created_at")
