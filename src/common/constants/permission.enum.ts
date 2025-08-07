@@ -7,7 +7,7 @@ export enum PermissionName {
   targets_set = 'targets_set',
   bonuses_set = 'bonuses_set',
   shift_timing_set = 'shift_timing_set',
-  monthly_request_approval = 'monthly_request_approval',
+  monthly_request_approvals = 'monthly_request_approvals',
   // Accountant permissions
   liabilities_permission = 'liabilities_permission',
   sales_permission = 'sales_permission',
