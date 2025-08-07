@@ -4,13 +4,12 @@ export enum PermissionName {
   commission_permission = 'commission_permission',
   employee_add_permission = 'employee_add_permission',
   terminations_handle = 'terminations_handle',
-  monthly_leave_request = 'monthly_leave_request',
   targets_set = 'targets_set',
   bonuses_set = 'bonuses_set',
   shift_timing_set = 'shift_timing_set',
-  
+  monthly_request_approvals = 'monthly_request_approvals',
   // Accountant permissions
-  tax_permission = 'tax_permission',
+  liabilities_permission = 'liabilities_permission',
   sales_permission = 'sales_permission',
   invoices_permission = 'invoices_permission',
   expenses_permission = 'expenses_permission',

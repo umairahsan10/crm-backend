@@ -1,9 +1,9 @@
 import { Module, Global } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { EmployeeModule } from './modules/employee/employee.module';
-import { AttendanceModule } from './modules/attendance/attendance.module';
 import { CommunicationModule } from './modules/communication/communication.module';
 import { CompanyModule } from './modules/company/company.module';
 import { FinanceModule } from './modules/finance/finance.module';
@@ -15,9 +15,9 @@ import { SalesModule } from './modules/sales/sales.module';
 @Global() // Make this module global so PrismaService is available everywhere
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     AuthModule,
     EmployeeModule,
-    AttendanceModule,
     CommunicationModule,
     CompanyModule,
     FinanceModule,
