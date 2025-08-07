@@ -4,9 +4,9 @@ import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
-import { DepartmentsGuard } from '../../../common/guards/departments.guard';
-import { Roles } from '../../../common/decorators/roles.decorator';
 import { Departments } from '../../../common/decorators/departments.decorator';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 
 @Controller('sales/units')
 @UseGuards(JwtAuthGuard, RolesWithServiceGuard, DepartmentsGuard)
@@ -25,16 +25,6 @@ export class UnitsController {
   @Departments('Sales')
   async getAllUnits() {
     return this.unitsService.getAllUnits();
-  }
-
-  @Patch('update/:id')
-  @Roles('dep_manager')
-  @Departments('Sales')
-  async updateUnit(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateUnitDto: UpdateUnitDto
-  ) {
-    return this.unitsService.updateUnit(id, updateUnitDto);
   }
 
   @Get('get/:id')
@@ -65,6 +55,13 @@ export class UnitsController {
     return this.unitsService.getLeadsInUnit(id, req.user);
   }
 
+  @Get(':id/archive-leads')
+  @Roles('dep_manager', 'unit_head')
+  @Departments('Sales')
+  async getArchiveLeadsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.unitsService.getArchiveLeadsInUnit(id, req.user);
+  }
+
   @Get('deleted/archive-leads')
   @Roles('dep_manager')
   @Departments('Sales')
@@ -72,11 +69,14 @@ export class UnitsController {
     return this.unitsService.getArchiveLeadsFromDeletedUnits(req.user);
   }
 
-  @Get(':id/archive-leads')
-  @Roles('dep_manager', 'unit_head')
+  @Patch('update/:id')
+  @Roles('dep_manager')
   @Departments('Sales')
-  async getArchiveLeadsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.unitsService.getArchiveLeadsInUnit(id, req.user);
+  async updateUnit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateUnitDto: UpdateUnitDto
+  ) {
+    return this.unitsService.updateUnit(id, updateUnitDto);
   }
 
   @Delete('delete/:id')

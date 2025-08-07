@@ -147,70 +147,6 @@ export class UnitsService {
     };
   }
 
-  async getTeamsInUnit(id: number, currentUser: any) {
-    // Check if unit exists
-    const unit = await this.prisma.productionUnit.findUnique({
-      where: { id }
-    });
-
-    if (!unit) {
-      throw new NotFoundException(`Unit with ID ${id} does not exist`);
-    }
-
-    // Security check for unit_head - can only access their own unit
-    if (currentUser.role === 'unit_head' && currentUser.id !== unit.headId) {
-      return {
-        success: false,
-        message: 'You can only access your own unit'
-      };
-    }
-
-    const teams = await this.prisma.team.findMany({
-      where: { productionUnitId: id },
-      include: {
-        teamLead: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true
-          }
-        },
-        currentProject: {
-          select: {
-            id: true,
-            description: true,
-            liveProgress: true,
-            deadline: true
-          }
-        }
-      },
-      orderBy: {
-        name: 'asc'
-      }
-    });
-
-    // Add employee count for each team
-    const teamsWithCounts = await Promise.all(
-      teams.map(async (team) => {
-        const employeeCount = await this.prisma.production.count({
-          where: { productionUnitId: id }
-        });
-
-        return {
-          ...team,
-          employeeCount
-        };
-      })
-    );
-
-    return {
-      success: true,
-      data: teamsWithCounts,
-      total: teamsWithCounts.length,
-      message: teamsWithCounts.length > 0 ? 'Teams retrieved successfully' : 'No teams found in this unit'
-    };
-  }
-
   async getEmployeesInUnit(id: number, currentUser: any) {
     // Check if unit exists
     const unit = await this.prisma.productionUnit.findUnique({
@@ -296,24 +232,23 @@ export class UnitsService {
 
     const projects = await this.prisma.project.findMany({
       where: {
-        OR: [
-          { teamLeadId: { in: teamIds } },
-          { unitHeadId: unit.headId }
-        ]
+        teams: {
+          some: {
+            id: { in: teamIds }
+          }
+        }
       },
       include: {
-        teamLead: {
+        teams: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true
-          }
-        },
-        unitHead: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true
+            teamLead: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
           }
         },
         client: {
@@ -362,20 +297,20 @@ export class UnitsService {
     // Validate headId if provided
     if (headId !== undefined) {
       if (headId === null) {
-        // Setting headId to NULL - check if all projects have team leads
-        const projectsWithoutTeamLead = await this.prisma.project.findMany({
+        // Setting headId to NULL - check if all teams have team leads
+        const teamsWithoutTeamLead = await this.prisma.team.findMany({
           where: {
-            unitHeadId: existingUnit.headId,
+            productionUnitId: id,
             teamLeadId: null
           },
-          select: { id: true, description: true }
+          select: { id: true, name: true }
         });
 
-        if (projectsWithoutTeamLead.length > 0) {
+        if (teamsWithoutTeamLead.length > 0) {
           throw new BadRequestException(
-            `Cannot remove unit head. ${projectsWithoutTeamLead.length} project(s) do not have team leads assigned. ` +
-            `Please assign team leads to all projects before removing the unit head to avoid workflow disruption. ` +
-            `Affected projects: ${projectsWithoutTeamLead.map(p => `ID ${p.id}`).join(', ')}`
+            `Cannot remove unit head. ${teamsWithoutTeamLead.length} team(s) do not have team leads assigned. ` +
+            `Please assign team leads to all teams before removing the unit head to avoid workflow disruption. ` +
+            `Affected teams: ${teamsWithoutTeamLead.map(t => `ID ${t.id}`).join(', ')}`
           );
         }
       } else {
@@ -439,21 +374,51 @@ export class UnitsService {
 
   async deleteUnit(id: number) {
     // Check if unit exists
-    const unit = await this.prisma.productionUnit.findUnique({
+    const existingUnit = await this.prisma.productionUnit.findUnique({
       where: { id }
     });
 
-    if (!unit) {
+    if (!existingUnit) {
       throw new NotFoundException(`Unit with ID ${id} does not exist`);
     }
 
-    // Check for teams and employees (these always block deletion)
+    // Check for teams associated with this unit
     const teams = await this.prisma.team.findMany({
       where: { productionUnitId: id },
       select: { id: true, name: true }
     });
 
-    const employees = await this.prisma.production.findMany({
+    // Check for active projects associated with this unit through teams
+    const teamIds = teams.map(team => team.id);
+    const activeProjects = await this.prisma.project.findMany({
+      where: {
+        teams: {
+          some: {
+            id: { in: teamIds }
+          }
+        },
+        status: {
+          in: ['in_progress', 'onhold']  // Only active projects block deletion
+        }
+      },
+      select: { id: true, description: true, status: true }
+    });
+
+    // Also get completed projects for informational purposes
+    const completedProjects = await this.prisma.project.findMany({
+      where: {
+        teams: {
+          some: {
+            id: { in: teamIds }
+          }
+        },
+        status: 'completed'
+      },
+      select: { id: true, description: true, status: true }
+    });
+
+    // Check for production employees associated with this unit
+    const productionEmployees = await this.prisma.production.findMany({
       where: { productionUnitId: id },
       include: {
         employee: {
@@ -462,64 +427,43 @@ export class UnitsService {
       }
     });
 
-    // Check for projects based on unit head status
-    let projects: any[] = [];
-    let projectMessage = '';
+    // Check if there are any dependencies
+    const hasDependencies = teams.length > 0 || activeProjects.length > 0 || productionEmployees.length > 0;
 
-    if (unit.headId === null) {
-      // Unit has no head - check if any projects are assigned to this unit through teams
-      const teamIds = teams.map(team => team.id);
-      
-      if (teamIds.length > 0) {
-        projects = await this.prisma.project.findMany({
-          where: { teamLeadId: { in: teamIds } },
-          select: { id: true, description: true, teamLeadId: true }
-        });
-      }
-      
-      if (projects.length > 0) {
-        projectMessage = 'Unit has no head but contains projects assigned to teams. Please reassign projects to another unit first.';
-      }
-    } else {
-      // Unit has a head - check projects assigned to this head
-      projects = await this.prisma.project.findMany({
-        where: { unitHeadId: unit.headId },
-        select: { id: true, description: true, teamLeadId: true }
-      });
-      
-      if (projects.length > 0) {
-        projectMessage = 'Unit has a head with assigned projects. Please reassign projects to another unit first.';
-      }
-    }
-
-    // If dependencies exist, return them without deleting
-    if (teams.length > 0 || employees.length > 0 || projects.length > 0) {
+    if (hasDependencies) {
+      // Return detailed dependency information
       return {
         success: false,
         message: 'Cannot delete unit. Please reassign dependencies first.',
         dependencies: {
           teams: {
             count: teams.length,
-            details: teams
+            details: teams.map(team => ({
+              id: team.id,
+              name: team.name
+            }))
+          },
+          projects: {
+            count: activeProjects.length,
+            details: activeProjects.map(project => ({
+              id: project.id,
+              description: project.description,
+              status: project.status
+            }))
           },
           employees: {
-            count: employees.length,
-            details: employees.map(emp => ({
+            count: productionEmployees.length,
+            details: productionEmployees.map(emp => ({
               id: emp.employee.id,
               firstName: emp.employee.firstName,
               lastName: emp.employee.lastName
             }))
-          },
-          projects: {
-            count: projects.length,
-            details: projects,
-            message: projectMessage
           }
         }
       };
     }
 
-    // Delete the unit
+    // If no dependencies, proceed with deletion
     await this.prisma.productionUnit.delete({
       where: { id }
     });
@@ -529,4 +473,101 @@ export class UnitsService {
       message: 'Unit deleted successfully'
     };
   }
-} 
+
+  async getCompletedProjectsFromDeletedUnits() {
+    // Get all completed projects that are not associated with any existing unit
+    const completedProjects = await this.prisma.project.findMany({
+      where: {
+        status: 'completed',
+        teams: {
+          some: {
+            productionUnitId: null  // Teams not assigned to any unit
+          }
+        }
+      },
+      include: {
+        teams: {
+          select: {
+            id: true,
+            name: true,
+            teamLead: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
+        client: {
+          select: {
+            id: true,
+            companyName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return {
+      success: true,
+      data: completedProjects,
+      total: completedProjects.length,
+      message: completedProjects.length > 0 
+        ? 'Completed projects from deleted units retrieved successfully' 
+        : 'No completed projects found from deleted units'
+    };
+  }
+
+  async getAvailableHeads(assigned?: boolean) {
+    let whereClause: any = {
+      role: { name: 'unit_head' },
+      department: { name: 'Production' },
+      status: 'active'
+    };
+
+    if (assigned === true) {
+      // Only heads assigned to Production units
+      whereClause.productionUnitHead = { some: {} };
+    } else if (assigned === false) {
+      // Only heads NOT assigned to any Production unit
+      whereClause.productionUnitHead = { none: {} };
+    }
+    // If assigned is undefined, show all (no additional filter)
+
+    const heads = await this.prisma.employee.findMany({
+      where: whereClause,
+      include: {
+        productionUnitHead: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: [
+        { firstName: 'asc' },
+        { lastName: 'asc' }
+      ]
+    });
+
+    return {
+      success: true,
+      data: heads.map(head => ({
+        id: head.id,
+        firstName: head.firstName,
+        lastName: head.lastName,
+        email: head.email,
+        isAssigned: head.productionUnitHead.length > 0,
+        currentUnit: head.productionUnitHead.length > 0 ? head.productionUnitHead[0] : null
+      })),
+      total: heads.length,
+      message: heads.length > 0 
+        ? 'Available heads retrieved successfully' 
+        : 'No available heads found'
+    };
+  }
+}

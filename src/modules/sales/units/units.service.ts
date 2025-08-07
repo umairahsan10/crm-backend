@@ -10,19 +10,22 @@ export class UnitsService {
   async createUnit(createUnitDto: CreateUnitDto) {
     const { name, email, phone, address, headId, logoUrl, website } = createUnitDto;
 
-    // Check if employee exists
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: headId },
-      include: { role: true }
-    });
+    // Validate headId only if provided
+    if (headId) {
+      // Check if employee exists
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: headId },
+        include: { role: true }
+      });
 
-    if (!employee) {
-      throw new BadRequestException(`Employee with ID ${headId} does not exist`);
-    }
+      if (!employee) {
+        throw new BadRequestException(`Employee with ID ${headId} does not exist`);
+      }
 
-    // Check if employee has unit_head role
-    if (employee.role.name !== 'unit_head') {
-      throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
+      // Check if employee has unit_head role
+      if (employee.role.name !== 'unit_head') {
+        throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
+      }
     }
 
     // Check if email already exists
@@ -550,8 +553,9 @@ export class UnitsService {
 
     const { name, email, phone, address, headId, logoUrl, website } = updateUnitDto;
 
-    // Check if employee exists and has unit_head role (if headId is provided)
-    if (headId) {
+    // Enhanced headId validation logic
+    if (headId !== undefined && headId !== null) {
+      // Check if employee exists and has unit_head role
       const employee = await this.prisma.employee.findUnique({
         where: { id: headId },
         include: { role: true }
@@ -563,6 +567,18 @@ export class UnitsService {
 
       if (employee.role.name !== 'unit_head') {
         throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
+      }
+
+      // Check if employee is already head of another unit
+      const existingHeadAssignment = await this.prisma.salesUnit.findFirst({
+        where: { 
+          headId: headId,
+          id: { not: id } // Exclude current unit
+        }
+      });
+
+      if (existingHeadAssignment) {
+        throw new ConflictException(`Employee is already assigned as head of unit: ${existingHeadAssignment.name}`);
       }
     }
 
@@ -609,23 +625,38 @@ export class UnitsService {
     }
 
     // Update the sales unit (only provided fields)
-    await this.prisma.salesUnit.update({
+    const updateData: any = {};
+    
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (address !== undefined) updateData.address = address;
+    if (headId !== undefined) updateData.headId = headId; // Allow null, 0, or any valid ID
+    if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
+    if (website !== undefined) updateData.website = website;
+
+    const updatedUnit = await this.prisma.salesUnit.update({
       where: { id },
-      data: {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone && { phone }),
-        ...(address && { address }),
-        ...(headId && { headId }),
-        ...(logoUrl && { logoUrl }),
-        ...(website && { website })
-        // updatedAt is automatically handled by Prisma @updatedAt
+      data: updateData,
+      include: {
+        head: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
       }
     });
 
     return {
       success: true,
-      message: 'Unit updated successfully'
+      message: 'Unit updated successfully',
+      data: {
+        id: updatedUnit.id,
+        name: updatedUnit.name,
+        head: updatedUnit.head
+      }
     };
   }
 

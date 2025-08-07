@@ -16,9 +16,10 @@ export class CreateUnitDto {
   @IsNotEmpty({ message: 'Address is required' })
   address: string;
 
+  @IsOptional()
   @IsNumber()
   @IsPositive({ message: 'Head ID must be a positive number' })
-  headId: number;
+  headId?: number;
 
   @IsOptional()
   @IsUrl({}, { message: 'Please provide a valid URL for logo' })

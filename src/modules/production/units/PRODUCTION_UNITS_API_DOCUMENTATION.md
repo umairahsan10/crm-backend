@@ -521,8 +521,9 @@ This API deletes a production unit from the system. The flow includes:
 - No input validation required (no request body)
 
 ### Business Logic
-- **Dependency Check**: Ensures no active teams, employees, or projects are associated with the unit
+- **Dependency Check**: Ensures no active teams, employees, or active projects (in_progress, onhold) are associated with the unit
 - **Safe Deletion**: Only deletes unit when no active dependencies exist
+- **Completed Projects**: Completed projects do not block deletion but are tracked for reference
 - **Detailed Feedback**: Provides specific information about what needs to be reassigned
 
 ### Database Operations
@@ -657,154 +658,15 @@ This API retrieves detailed information about a specific production unit. The fl
 
 ## 6. Get Teams in Unit
 
-### Method and Endpoint
+**Note**: This functionality has been moved to the Production Teams module. Please use the Teams endpoint instead:
+
+- **Endpoint**: `/production/teams/unit/:productionUnitId`
 - **Method**: `GET`
-- **Endpoint**: `/production/units/:id/teams`
-
-### API Description and Flow
-This API retrieves all teams associated with a specific production unit. The flow includes:
-1. Validates that the unit exists (returns 404 if not found)
-2. Performs security check for unit_head access (can only access their own unit)
-3. Fetches all teams associated with the unit
-4. Includes team lead details (id, firstName, lastName) from employees table
-5. Includes current project details (id, description, liveProgress, deadline) if assigned
-6. Orders teams alphabetically by name
-7. Returns formatted response with team data, lead information, and project details
-
-### Request Body/Parameters
-- **Path Parameter**: `id` (number) - Unit ID to get teams for
-- **Request Body**: None
-- **Query Parameters**: None
-
-### Response Format
-
-**Success Response with Teams (200):**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Development Team A",
-      "teamLead": {
-        "id": 5,
-        "firstName": "John",
-        "lastName": "Doe"
-      },
-      "currentProject": {
-        "id": 10,
-        "description": "E-commerce website development",
-        "liveProgress": 65.50,
-        "deadline": "2024-03-15T00:00:00.000Z"
-      },
-      "employeeCount": 8,
-      "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z"
-    },
-    {
-      "id": 2,
-      "name": "QA Team",
-      "teamLead": {
-        "id": 12,
-        "firstName": "Mike",
-        "lastName": "Wilson"
-      },
-      "currentProject": null,
-      "employeeCount": 5,
-      "createdAt": "2024-01-20T14:30:00Z",
-      "updatedAt": "2024-01-20T14:30:00Z"
-    }
-  ],
-  "total": 2,
-  "message": "Teams retrieved successfully"
-}
-```
-
-**Success Response - No Teams (200):**
-```json
-{
-  "success": true,
-  "data": [],
-  "total": 0,
-  "message": "No teams found in this unit"
-}
-```
-
-**Error Responses:**
-
-**Not Found Error (404):**
-```json
-{
-  "success": false,
-  "message": "Unit with ID 123 does not exist"
-}
-```
-
-**Access Control Error (200):**
-```json
-{
-  "success": false,
-  "message": "You can only access your own unit"
-}
-```
-
-**Authentication/Authorization Errors (401/403):**
-```json
-{
-  "statusCode": 401,
-  "message": "Unauthorized",
-  "error": "Unauthorized"
-}
-```
-
-```json
-{
-  "statusCode": 403,
-  "message": "User does not have the required roles. Required: dep_manager, unit_head. User role: junior",
-  "error": "Forbidden"
-}
-```
-
-```json
-{
-  "statusCode": 403,
-  "message": "User does not belong to required departments. Required: Production. User department: HR",
-  "error": "Forbidden"
-}
-```
-
-### Validations
-- Unit with provided ID must exist
-- Unit head can only access their own unit (security check)
-- No input validation required (no request body)
-
-### Database Operations
-
-**Tables Affected:**
-- `production_units` table (read - for unit validation)
-- `teams` table (read - for team data)
-- `employees` table (read - for team lead details)
-- `projects` table (read - for current project details)
-
-**Database Changes:**
-- **No changes** - read-only operation
-
-**Database Queries:**
-1. **SELECT** from `production_units` table to check if unit exists
-2. **SELECT** from `teams` table with JOIN to `employees` for team lead details
-3. **SELECT** from `teams` table with JOIN to `projects` for current project details
-4. **ORDER BY** team name ascending for alphabetical sorting
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` OR `unit_head` role required
-- **Departments**: `Production` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-- **Unit Head Access**: Unit heads can only access teams in their own unit (security check implemented)
+- **Documentation**: See Production Teams API Documentation, Section 3
 
 ---
 
-## 7. Get Employees in Unit
+## 6. Get Employees in Unit
 
 ### Method and Endpoint
 - **Method**: `GET`
@@ -948,7 +810,7 @@ This API retrieves all employees associated with a specific production unit. The
 
 ---
 
-## 8. Get Projects in Unit
+## 7. Get Projects in Unit
 
 ### Method and Endpoint
 - **Method**: `GET`
@@ -1098,20 +960,306 @@ This API retrieves all projects associated with a specific production unit. The 
 
 ---
 
-## Planned APIs
+## 8. Get Completed Projects from Deleted Units
 
-### Unit Head Management
-- Assign Head to Unit
-- Get Available Heads
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/production/units/deleted/completed-projects`
+
+### API Description and Flow
+This API retrieves all completed projects that belonged to units that have been deleted. The flow includes:
+1. Fetches all completed projects from projects table where associated teams have no unit assignment
+2. Includes team details and team lead information
+3. Includes client details for each project
+4. Orders projects by createdAt (newest first)
+5. Returns formatted response with complete project data and related information
+
+### Request Body/Parameters
+- **Path Parameter**: None
+- **Request Body**: None
+- **Query Parameters**: None
+
+### Response Format
+
+**Success Response with Completed Projects (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 101,
+      "crackedLeadId": 201,
+      "salesRepId": 301,
+      "teamId": 401,
+      "clientId": 501,
+      "status": "completed",
+      "difficultyLevel": "medium",
+      "paymentStage": "final",
+      "description": "E-commerce website development",
+      "deadline": "2024-03-15T00:00:00.000Z",
+      "liveProgress": 100.00,
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "teams": [
+        {
+          "id": 401,
+          "name": "Development Team A",
+          "teamLead": {
+            "id": 123,
+            "firstName": "John",
+            "lastName": "Doe"
+          }
+        }
+      ],
+      "client": {
+        "id": 501,
+        "companyName": "ABC Corp",
+        "email": "contact@abccorp.com"
+      }
+    }
+  ],
+  "total": 1,
+  "message": "Completed projects from deleted units retrieved successfully"
+}
+```
+
+**Success Response - No Completed Projects (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No completed projects found from deleted units"
+}
+```
+
+**Error Responses:**
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager. User role: unit_head",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Production. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- No input validation required (no request body)
+- No unit validation required (getting projects from deleted units)
+
+### Database Operations
+
+**Tables Affected:**
+- `projects` table (read - for completed project data)
+- `teams` table (read - for team details)
+- `employees` table (read - for team lead details)
+- `clients` table (read - for client details)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `projects` table with JOIN to `teams`, `employees`, and `clients`
+2. **WHERE** status = 'completed' AND teams.productionUnitId = null
+3. **ORDER BY** createdAt descending for newest first ordering
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Production` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: ❌ **NOT ALLOWED** - Only admin and dep_manager can access
+
+---
+## 9. Assign/Unassign Head to Unit (via Update API) Done in Patch API
+
+## 10. Get Available Heads
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/production/units/available-heads` Also has Flag of ?assigned=true|false  
+              If no flag used fetches both assigned and unassigned heads of production dept
+### API Description and Flow
+This API retrieves available heads for Production units with flexible filtering. The flow includes:
+1. Fetches employees with `unit_head` role from Production department
+2. Filters based on assignment status using query parameter
+3. Includes current unit assignment information
+4. Orders results alphabetically by firstName, then lastName
+5. Returns formatted response with head details and assignment status
+
+### Request Body/Parameters
+- **Path Parameter**: None
+- **Request Body**: None
+- **Query Parameters**: 
+  - `assigned` (optional): 
+    - `assigned=true` → Show heads assigned to Production units
+    - `assigned=false` → Show heads NOT assigned to any Production unit
+    - No parameter → Show ALL Production heads (both assigned and unassigned)
+
+### Response Format
+
+**Success Response - Unassigned Heads (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john.doe@company.com",
+      "isAssigned": false,
+      "currentUnit": null
+    }
+  ],
+  "total": 1,
+  "message": "Available heads retrieved successfully"
+}
+```
+
+**Success Response - Assigned Heads (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 456,
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "email": "jane.smith@company.com",
+      "isAssigned": true,
+      "currentUnit": {
+        "id": 1,
+        "name": "Production Unit A"
+      }
+    }
+  ],
+  "total": 1,
+  "message": "Available heads retrieved successfully"
+}
+```
+
+**Success Response - All Heads (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john.doe@company.com",
+      "isAssigned": false,
+      "currentUnit": null
+    },
+    {
+      "id": 456,
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "email": "jane.smith@company.com",
+      "isAssigned": true,
+      "currentUnit": {
+        "id": 1,
+        "name": "Production Unit A"
+      }
+    }
+  ],
+  "total": 2,
+  "message": "Available heads retrieved successfully"
+}
+```
+
+**Success Response - No Heads (200):**
+```json
+{
+  "success": true,
+  "data": [],
+  "total": 0,
+  "message": "No available heads found"
+}
+```
+
+**Error Responses:**
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager. User role: unit_head",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Production. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- No input validation required (no request body)
+- Query parameter validation handled automatically
+- Department-specific filtering (Production only)
+
+### Database Operations
+
+**Tables Affected:**
+- `employees` table (read - for head details)
+- `roles` table (read - for role validation)
+- `departments` table (read - for department filtering)
+- `production_units` table (read - for unit assignment info)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `employees` table with JOIN to `roles`, `departments`, and `production_units`
+2. **WHERE** role = 'unit_head' AND department = 'Production' AND status = 'active'
+3. **FILTER** by assignment status based on query parameter
+4. **ORDER BY** firstName, lastName for alphabetical sorting
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Production` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: ❌ **NOT ALLOWED** - Only admin and dep_manager can access
+
+---
+
+## Planned APIs
 
 ### Team Assignment
 - Assign Team to Unit
 - Unassign Team from Unit
 
-### Employee Management
-- Assign Employee to Unit
-- Remove Employee from Unit
-- Update Employee Specialization
 
 ---
 

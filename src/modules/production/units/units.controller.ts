@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request, Query } from '@nestjs/common';
 import { UnitsService } from './units.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
@@ -44,13 +44,6 @@ export class UnitsController {
     return this.unitsService.getUnit(id);
   }
 
-  @Get(':id/teams')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Production')
-  async getTeamsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.unitsService.getTeamsInUnit(id, req.user);
-  }
-
   @Get(':id/employees')
   @Roles('dep_manager', 'unit_head')
   @Departments('Production')
@@ -70,5 +63,24 @@ export class UnitsController {
   @Departments('Production')
   async deleteUnit(@Param('id', ParseIntPipe) id: number) {
     return this.unitsService.deleteUnit(id);
+  }
+
+  @Get('deleted/completed-projects')
+  @Roles('dep_manager')
+  @Departments('Production')
+  async getCompletedProjectsFromDeletedUnits() {
+    return this.unitsService.getCompletedProjectsFromDeletedUnits();
+  }
+
+  @Get('available-heads')
+  @Roles('dep_manager')
+  @Departments('Production')
+  async getAvailableHeads(@Query('assigned') assigned?: string) {
+    // Convert string query parameter to boolean
+    let assignedBoolean: boolean | undefined;
+    if (assigned === 'true') assignedBoolean = true;
+    else if (assigned === 'false') assignedBoolean = false;
+    
+    return this.unitsService.getAvailableHeads(assignedBoolean);
   }
 } 

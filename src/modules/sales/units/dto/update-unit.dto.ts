@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsNumber, IsPositive, IsOptional, IsUrl } from 'class-validator';
+import { IsString, IsEmail, IsNumber, IsPositive, IsOptional, IsUrl, ValidateIf } from 'class-validator';
 
 export class UpdateUnitDto {
   @IsOptional()
@@ -19,8 +19,9 @@ export class UpdateUnitDto {
 
   @IsOptional()
   @IsNumber({}, { message: 'Head ID must be a number' })
-  @IsPositive({ message: 'Head ID must be a positive number' })
-  headId?: number;
+  @ValidateIf((o) => o.headId !== null)
+  @IsPositive({ message: 'Head ID must be a positive number or null' })
+  headId?: number | null;
 
   @IsOptional()
   @IsUrl({}, { message: 'Please provide a valid URL for logo' })
