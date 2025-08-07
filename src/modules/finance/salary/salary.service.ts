@@ -412,7 +412,7 @@ export class FinanceSalaryService {
 
     const baseSalary = Number(employee.accounts?.[0]?.baseSalary || 0);
     const commission = Number(employee.salesDepartment?.[0]?.commissionAmount || 0);
-    const bonus = Number(employee.salesDepartment?.[0]?.salesBonus || 0);
+          const bonus = Number(employee.salesDepartment?.[0]?.salesBonus || 0);
     const attendanceDeductions = Number(salaryLog.deductions || 0);
     const chargebackDeduction = Number(employee.salesDepartment?.[0]?.chargebackDeductions || 0);
     const refundDeduction = Number(employee.salesDepartment?.[0]?.refundDeductions || 0);
@@ -730,5 +730,168 @@ export class FinanceSalaryService {
 
   private calculateHalfDayDeduction(halfDays: number, perDaySalary: number): number {
     return halfDays * perDaySalary * 0.5; // 0.5x per day salary for half days
+  }
+
+  /**
+   * Get sales employees with sales amount greater than 3000, ordered alphabetically
+   * 
+   * This endpoint retrieves sales employees from the sales department who have
+   * sales amount greater than 3000, ordered alphabetically by name.
+   * 
+   * @returns Array of sales employees with id, name, and sales amount
+   */
+  public async getSalesEmployeesBonusDisplay() {
+    this.logger.log('⏳ Fetching sales employees with sales amount > 3000');
+
+    // First, let's debug by getting all sales employees to see what data exists
+    const allSalesEmployees = await this.prisma.salesDepartment.findMany({
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    this.logger.log(`🔍 Found ${allSalesEmployees.length} total sales employees`);
+    allSalesEmployees.forEach(emp => {
+      this.logger.log(`Employee: ${emp.employee.firstName} ${emp.employee.lastName}, Sales Amount: ${emp.salesAmount}`);
+    });
+
+              const salesEmployees = await this.prisma.salesDepartment.findMany({
+       where: {
+         AND: [
+           {
+             salesAmount: {
+               not: null
+             }
+           },
+           {
+             salesAmount: {
+               gte: new Prisma.Decimal(3000)
+             }
+           }
+         ]
+       },
+       select: {
+         salesAmount: true,
+         salesBonus: true,
+         employee: {
+           select: {
+             id: true,
+             firstName: true,
+             lastName: true
+           }
+         }
+       },
+      orderBy: {
+        employee: {
+          firstName: 'asc'
+        }
+      }
+    });
+
+         const result = salesEmployees.map(record => ({
+       id: record.employee.id,
+       name: `${record.employee.firstName} ${record.employee.lastName}`,
+       salesAmount: Number(record.salesAmount),
+       bonusAmount: Number(record.salesBonus || 0)
+     }));
+
+    this.logger.log(`✅ Found ${result.length} sales employees with sales amount > 3000`);
+    return result;
+  }
+
+  /**
+   * Update bonus amount for sales employees with sales amount >= 3000
+   * 
+   * This endpoint allows admins to update the bonus amount for sales employees
+   * who have sales amount greater than or equal to 3000.
+   * 
+   * @param employeeId - Employee ID to update bonus for
+   * @param bonusAmount - New bonus amount to set
+   * @returns Updated employee data with success message
+   */
+  public async updateSalesEmployeeBonus(employeeId: number, bonusAmount: number) {
+    this.logger.log(`⏳ Updating bonus for employee ${employeeId} to ${bonusAmount}`);
+
+    // Validate employeeId
+    if (!employeeId || employeeId <= 0) {
+      throw new BadRequestException('Invalid employeeId. Must be a positive number.');
+    }
+
+    // Validate bonusAmount
+    if (bonusAmount < 0) {
+      throw new BadRequestException('Bonus amount cannot be negative.');
+    }
+
+    // First check if employee exists
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { id: true, firstName: true, lastName: true }
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${employeeId} not found.`);
+    }
+
+    // Check if employee belongs to sales department
+    const salesEmployee = await this.prisma.salesDepartment.findFirst({
+      where: {
+        employeeId: employeeId
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    if (!salesEmployee) {
+      throw new NotFoundException(`Employee ${employee.firstName} ${employee.lastName} (ID: ${employeeId}) is not a sales department employee. Only sales employees can have their bonus updated.`);
+    }
+
+    // Check if employee has sales amount >= 3000
+    if (!salesEmployee.salesAmount || Number(salesEmployee.salesAmount) < 3000) {
+      const currentSalesAmount = salesEmployee.salesAmount ? Number(salesEmployee.salesAmount) : 0;
+      throw new NotFoundException(`Employee ${employee.firstName} ${employee.lastName} (ID: ${employeeId}) does not meet the minimum sales criteria. Current sales amount: ${currentSalesAmount}, Required: >= 3000.`);
+    }
+
+    // Update the bonus amount
+    const updatedSalesEmployee = await this.prisma.salesDepartment.update({
+      where: {
+        id: salesEmployee.id
+      },
+      data: {
+        salesBonus: new Prisma.Decimal(bonusAmount)
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    const result = {
+      id: updatedSalesEmployee.employee.id,
+      name: `${updatedSalesEmployee.employee.firstName} ${updatedSalesEmployee.employee.lastName}`,
+      salesAmount: Number(updatedSalesEmployee.salesAmount),
+      bonusAmount: Number(updatedSalesEmployee.salesBonus),
+      message: `Bonus updated successfully for ${updatedSalesEmployee.employee.firstName} ${updatedSalesEmployee.employee.lastName}`
+    };
+
+    this.logger.log(`✅ Bonus updated for employee ${employeeId} to ${bonusAmount}`);
+    return result;
   }
 } 

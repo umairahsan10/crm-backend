@@ -1,10 +1,11 @@
-import { Controller, Post, Get, Param, Query, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Param, Query, UseGuards, BadRequestException, Patch, Body } from '@nestjs/common';
 import { FinanceSalaryService } from './salary.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../common/constants/permission.enum';
+import { Departments } from '../../../common/decorators/departments.decorator';
 
 @Controller('finance/salary')
 export class FinanceSalaryController {
@@ -144,6 +145,45 @@ export class FinanceSalaryController {
     @Query('month') month?: string
   ) {
     const result = await this.financeSalaryService.getDetailedSalaryBreakdown(parseInt(employeeId), month);
+    return result;
+  }
+
+  /**
+   * Get sales employees with sales amount greater than 3000, ordered alphabetically
+   * 
+   * This endpoint retrieves sales employees from the sales department who have
+   * sales amount greater than 3000, ordered alphabetically by name.
+   * 
+   * @returns Array of sales employees with id, name, and sales amount
+   * 
+   * Required Permissions: salary_permission
+   */
+  @Get('bonus-display')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Permissions(PermissionName.salary_permission)
+  async getSalesEmployeesBonusDisplay() {
+    const result = await this.financeSalaryService.getSalesEmployeesBonusDisplay();
+    return result;
+  }
+
+  /**
+   * Update bonus amount for sales employees with sales amount >= 3000
+   * 
+   * This endpoint allows admins to update the bonus amount for sales employees
+   * who have sales amount greater than or equal to 3000.
+   * 
+   * @param employeeId - Employee ID to update bonus for
+   * @param bonusAmount - New bonus amount to set
+   * @returns Updated employee data with success message
+   * 
+   * Required Permissions: Admin access (bypass using non-existent department)
+   */
+  @Patch('update-sales-bonus')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Departments('Admin', 'NonExistentDepartment')
+  @Permissions(PermissionName.salary_permission)
+  async updateSalesEmployeeBonus(@Body() body: { employee_id: number; bonusAmount: number }) {
+    const result = await this.financeSalaryService.updateSalesEmployeeBonus(body.employee_id, body.bonusAmount);
     return result;
   }
 } 

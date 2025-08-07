@@ -221,9 +221,9 @@ export class FinanceService {
     const commission: Prisma.Decimal = (salesDept?.commissionAmount ?? new Prisma.Decimal(0)) as Prisma.Decimal;
 
     // Combine possible bonus sources (SalesDepartment + Employee table)
-    const bonusSales: Prisma.Decimal = (salesDept?.salesBonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
-    const bonusEmp: Prisma.Decimal = (employee.bonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
-    const totalBonus = bonusSales.plus(bonusEmp);
+    const salesBonus: Prisma.Decimal = (salesDept?.salesBonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
+    const employeeBonus: Prisma.Decimal = (employee.bonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
+    const totalBonus = salesBonus.plus(employeeBonus);
 
     // Determine calculation month (year-month string) using reference date in PKT
     const referenceDate = startDate
