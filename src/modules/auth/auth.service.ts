@@ -98,7 +98,7 @@ export class AuthService {
             commission_permission: false,
             employee_add_permission: false,
             terminations_handle: false,
-            monthly_leave_request: false,
+            monthly_request_approvals: false,
             targets_set: false,
             bonuses_set: false,
             shift_timing_set: false,
@@ -123,7 +123,7 @@ export class AuthService {
         } else {
           // Default accountant permissions for all accountant employees
           permissionData = {
-            tax_permission: false,
+            liabilities_permission: false,
             salary_permission: false,
             sales_permission: false,
             invoices_permission: false,
