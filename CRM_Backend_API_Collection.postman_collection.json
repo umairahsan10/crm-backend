@@ -1,0 +1,1191 @@
+{
+  "info": {
+    "name": "CRM Backend API Collection",
+    "description": "Complete API collection for CRM Backend including ALL Communication modules (chat-messages, chat-participants, complaints, employee, meeting, notifications, project-chats, reminder) and Company module",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "jwtToken",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwtToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Communication",
+      "description": "Communication module APIs organized by individual files/modules",
+      "item": [
+        {
+          "name": "Chat Messages",
+          "description": "Chat message management APIs from chat-messages module",
+          "item": [
+            {
+              "name": "Get All Chat Messages",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-messages",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-messages"]
+                }
+              }
+            },
+            {
+              "name": "Get Chat Message by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-messages/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-messages", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get Chat Messages by Chat ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-messages/chat/1?limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-messages", "chat", "1"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "50",
+                      "description": "Number of messages to return"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0",
+                      "description": "Number of messages to skip"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Latest Message by Chat ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-messages/chat/1/latest",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-messages", "chat", "1", "latest"]
+                }
+              }
+            },
+            {
+              "name": "Create Chat Message",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"chatId\": 1,\n  \"senderId\": 1,\n  \"message\": \"Hello team! How is the project going?\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-messages",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-messages"]
+                }
+              }
+            },
+            {
+              "name": "Update Chat Message",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"Updated message content\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-messages/1?senderId=1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-messages", "1"],
+                  "query": [
+                    {
+                      "key": "senderId",
+                      "value": "1",
+                      "description": "ID of the message sender (required for update)"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Delete Chat Message",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-messages/1?senderId=1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-messages", "1"],
+                  "query": [
+                    {
+                      "key": "senderId",
+                      "value": "1",
+                      "description": "ID of the message sender (required for deletion)"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Chat Participants",
+          "description": "Chat participant management APIs from chat-participants module",
+          "item": [
+            {
+              "name": "Get All Chat Participants",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-participants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-participants"]
+                }
+              }
+            },
+            {
+              "name": "Get Chat Participant by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-participants/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-participants", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get Chat Participants by Chat ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-participants/chat/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-participants", "chat", "1"]
+                }
+              }
+            },
+            {
+              "name": "Create Chat Participant",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"chatId\": 1,\n  \"employeeId\": 2,\n  \"memberType\": \"member\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-participants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-participants"]
+                }
+              }
+            },
+            {
+              "name": "Update Chat Participant",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"memberType\": \"admin\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-participants/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-participants", "1"]
+                }
+              }
+            },
+            {
+              "name": "Delete Chat Participant",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/chat-participants/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "chat-participants", "1"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complaints",
+          "description": "Complaint management APIs from complaints module",
+          "item": [
+            {
+              "name": "Get All Complaints (HR/Admin Only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/complaints",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "complaints"]
+                }
+              }
+            },
+            {
+              "name": "Get Complaint by ID (HR/Admin Only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/complaints/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "complaints", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get Complaints by Priority (HR/Admin Only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/complaints/priority/High",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "complaints", "priority", "High"]
+                }
+              }
+            },
+            {
+              "name": "Get Complaints by Status (HR/Admin Only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/complaints/status/Open",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "complaints", "status", "Open"]
+                }
+              }
+            },
+            {
+              "name": "Create Complaint",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"raisedBy\": 1,\n  \"againstEmployeeId\": 2,\n  \"departmentId\": 3,\n  \"complaintType\": \"HR\",\n  \"subject\": \"Unprofessional Behavior\",\n  \"description\": \"Employee has been displaying unprofessional behavior during team meetings.\",\n  \"status\": \"Open\",\n  \"priority\": \"Medium\",\n  \"assignedTo\": 5\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/complaints",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "complaints"]
+                }
+              }
+            },
+            {
+              "name": "Update Complaint Action (HR Only)",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"In_Progress\",\n  \"resolutionNotes\": \"Complaint received and under investigation.\",\n  \"priority\": \"High\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/complaints/1/action?hrEmployeeId=5",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "complaints", "1", "action"],
+                  "query": [
+                    {
+                      "key": "hrEmployeeId",
+                      "value": "5",
+                      "description": "HR employee ID taking the action"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Delete Complaint (HR/Admin Only)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/complaints/1?hrEmployeeId=5",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "complaints", "1"],
+                  "query": [
+                    {
+                      "key": "hrEmployeeId",
+                      "value": "5",
+                      "description": "HR employee ID performing the deletion"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+                 {
+           "name": "Employee",
+           "description": "Employee HR request management APIs from employee module",
+           "item": [
+             {
+               "name": "Get All HR Requests (HR/Admin Only)",
+               "request": {
+                 "method": "GET",
+                 "header": [],
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests"]
+                 }
+               }
+             },
+             {
+               "name": "Get My HR Requests",
+               "request": {
+                 "method": "GET",
+                 "header": [],
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests/my-requests?employeeId=1",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests", "my-requests"],
+                   "query": [
+                     {
+                       "key": "employeeId",
+                       "value": "1",
+                       "description": "ID of the employee"
+                     }
+                   ]
+                 }
+               }
+             },
+             {
+               "name": "Get HR Request by ID (HR/Admin Only)",
+               "request": {
+                 "method": "GET",
+                 "header": [],
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests/1",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests", "1"]
+                 }
+               }
+             },
+             {
+               "name": "Get HR Requests by Priority (HR/Admin Only)",
+               "request": {
+                 "method": "GET",
+                 "header": [],
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests/priority/Medium",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests", "priority", "Medium"]
+                 }
+               }
+             },
+             {
+               "name": "Get HR Requests by Status (HR Only)",
+               "request": {
+                 "method": "GET",
+                 "header": [],
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests/status/Pending",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests", "status", "Pending"]
+                 }
+               }
+             },
+             {
+               "name": "Create HR Request",
+               "request": {
+                 "method": "POST",
+                 "header": [
+                   {
+                     "key": "Content-Type",
+                     "value": "application/json"
+                   }
+                 ],
+                 "body": {
+                   "mode": "raw",
+                   "raw": "{\n  \"empId\": 1,\n  \"departmentId\": 2,\n  \"requestType\": \"Leave Request\",\n  \"subject\": \"Annual Leave Application\",\n  \"description\": \"I would like to request annual leave for personal reasons.\",\n  \"priority\": \"Medium\",\n  \"assignedTo\": 5\n}"
+                 },
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests"]
+                 }
+               }
+             },
+             {
+               "name": "Take HR Action (HR Only)",
+               "request": {
+                 "method": "POST",
+                 "header": [
+                   {
+                     "key": "Content-Type",
+                     "value": "application/json"
+                   }
+                 ],
+                 "body": {
+                   "mode": "raw",
+                   "raw": "{\n  \"status\": \"In_Progress\",\n  \"resolutionNotes\": \"Request received and under review.\",\n  \"assignedTo\": 5,\n  \"priority\": \"High\"\n}"
+                 },
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests/1/action?hrEmployeeId=5",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests", "1", "action"],
+                   "query": [
+                     {
+                       "key": "hrEmployeeId",
+                       "value": "5",
+                       "description": "HR employee ID taking the action"
+                     }
+                   ]
+                 }
+               }
+             },
+             {
+               "name": "Update HR Request Action (HR Only)",
+               "request": {
+                 "method": "PUT",
+                 "header": [
+                   {
+                     "key": "Content-Type",
+                     "value": "application/json"
+                   }
+                 ],
+                 "body": {
+                   "mode": "raw",
+                   "raw": "{\n  \"status\": \"Approved\",\n  \"resolutionNotes\": \"Request approved after review.\",\n  \"resolvedOn\": \"2024-12-08T15:00:00.000Z\"\n}"
+                 },
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests/1/action?hrEmployeeId=5",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests", "1", "action"],
+                   "query": [
+                     {
+                       "key": "hrEmployeeId",
+                       "value": "5",
+                       "description": "HR employee ID updating the action"
+                     }
+                   ]
+                 }
+               }
+             },
+             {
+               "name": "Delete HR Request (HR Only)",
+               "request": {
+                 "method": "DELETE",
+                 "header": [],
+                 "url": {
+                   "raw": "{{baseUrl}}/communication/employee/hr-requests/1?hrEmployeeId=5",
+                   "host": ["{{baseUrl}}"],
+                   "path": ["communication", "employee", "hr-requests", "1"],
+                   "query": [
+                     {
+                       "key": "hrEmployeeId",
+                       "value": "5",
+                       "description": "HR employee ID performing the deletion"
+                     }
+                   ]
+                 }
+               }
+             }
+           ]
+         },
+        {
+          "name": "Meetings",
+          "description": "Meeting management APIs from meeting module",
+          "item": [
+            {
+              "name": "Create Meeting",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"topic\": \"Project Discussion\",\n  \"dateTime\": \"2025-01-15T10:00:00Z\",\n  \"meetingLink\": \"https://meet.google.com/abc-defg-hij\",\n  \"clientId\": null,\n  \"projectId\": null,\n  \"status\": \"scheduled\",\n  \"autoReminder\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings"]
+                }
+              }
+            },
+            {
+              "name": "Get All Meetings (Admin/HR Only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings?status=scheduled&startDate=2025-01-01&page=1&limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings"],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "scheduled",
+                      "description": "Filter by meeting status"
+                    },
+                    {
+                      "key": "startDate",
+                      "value": "2025-01-01",
+                      "description": "Filter by start date"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": "Page number"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10",
+                      "description": "Items per page"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Meeting by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "1"]
+                }
+              }
+            },
+            {
+              "name": "Update Meeting",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"topic\": \"Updated Project Discussion\",\n  \"dateTime\": \"2025-01-16T11:00:00Z\",\n  \"status\": \"completed\",\n  \"meetingLink\": \"https://meet.google.com/xyz-uvw-rst\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "1"]
+                }
+              }
+            },
+            {
+              "name": "Delete Meeting",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get My Meetings",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/my/meetings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "my", "meetings"]
+                }
+              }
+            },
+            {
+              "name": "Get Upcoming Meetings (Default 7 days)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/upcoming",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "upcoming"]
+                }
+              }
+            },
+            {
+              "name": "Get Upcoming Meetings (Custom days)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/upcoming/14",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "upcoming", "14"]
+                }
+              }
+            },
+            {
+              "name": "Get Meetings by Status",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/status/scheduled",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "status", "scheduled"]
+                }
+              }
+            },
+            {
+              "name": "Get Meetings by Employee",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/employee/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "employee", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get Meetings by Client",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/client/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "client", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get Meetings by Project",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/meetings/project/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "meetings", "project", "1"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Notifications",
+          "description": "Notification management APIs from notifications module",
+          "item": [
+            {
+              "name": "Create Notification",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"heading\": \"Meeting Reminder\",\n  \"content\": \"Your team meeting starts in 15 minutes. Please join the Zoom call.\",\n  \"sentTo\": 1,\n  \"userType\": \"employee\",\n  \"status\": \"unread\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications"]
+                }
+              }
+            },
+            {
+              "name": "Get All Notifications",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications"]
+                }
+              }
+            },
+            {
+              "name": "Get Notification by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications", "1"]
+                }
+              }
+            },
+            {
+              "name": "Update Notification",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"heading\": \"Meeting Rescheduled\",\n  \"content\": \"Your meeting has been moved to 3:00 PM today.\",\n  \"status\": \"read\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications", "1"]
+                }
+              }
+            },
+            {
+              "name": "Delete Notification",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications", "1"]
+                }
+              }
+            },
+            {
+              "name": "Get My Notifications",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications/my/notifications",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications", "my", "notifications"]
+                }
+              }
+            },
+            {
+              "name": "Mark Notification as Read",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications/1/read",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications", "1", "read"]
+                }
+              }
+            },
+            {
+              "name": "Get Unread Count",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications/unread/count",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications", "unread", "count"]
+                }
+              }
+            },
+            {
+              "name": "Get Notifications by Status",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/notifications/status/unread",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "notifications", "status", "unread"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Project Chats",
+          "description": "Project chat management APIs from project-chats module",
+          "item": [
+            {
+              "name": "Get All Project Chats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/project-chats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "project-chats"]
+                }
+              }
+            },
+            {
+              "name": "Get Project Chat by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/project-chats/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "project-chats", "1"]
+                }
+              }
+            },
+            {
+              "name": "Create Project Chat",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": 1,\n  \"transferredFromEmployeeId\": null,\n  \"transferredToEmployeeId\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/project-chats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "project-chats"]
+                }
+              }
+            },
+            {
+              "name": "Update Project Chat",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"transferredToEmployeeId\": 2\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/project-chats/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "project-chats", "1"]
+                }
+              }
+            },
+            {
+              "name": "Delete Project Chat",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/project-chats/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "project-chats", "1"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reminders",
+          "description": "Personal reminder management APIs from reminder module",
+          "item": [
+            {
+              "name": "Create Reminder",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Team Meeting\",\n  \"description\": \"Weekly team standup meeting to discuss project progress\",\n  \"reminderDate\": \"2024-01-15\",\n  \"reminderTime\": \"10:30\",\n  \"isRecurring\": true,\n  \"recurrencePattern\": \"Weekly\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/reminders",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "reminders"]
+                }
+              }
+            },
+            {
+              "name": "Get All Reminders (with filters)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/reminders?status=active&startDate=2024-01-01&endDate=2024-01-31",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "reminders"],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "active",
+                      "description": "Filter by reminder status"
+                    },
+                    {
+                      "key": "startDate",
+                      "value": "2024-01-01",
+                      "description": "Filter by start date"
+                    },
+                    {
+                      "key": "endDate",
+                      "value": "2024-01-31",
+                      "description": "Filter by end date"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Reminder by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/reminders/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "reminders", "1"]
+                }
+              }
+            },
+            {
+              "name": "Update Reminder",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Updated Team Meeting\",\n  \"description\": \"Updated description\",\n  \"reminderDate\": \"2024-01-16\",\n  \"reminderTime\": \"11:00\",\n  \"isRecurring\": false,\n  \"recurrencePattern\": null\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/communication/reminders/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "reminders", "1"]
+                }
+              }
+            },
+            {
+              "name": "Delete Reminder",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/communication/reminders/1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["communication", "reminders", "1"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Company",
+      "description": "Company management APIs (Admin/HR Manager/Unit Head + HR Department only)",
+      "item": [
+        {
+          "name": "Create Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tech Solutions Inc.\",\n  \"address\": \"123 Business Street\",\n  \"city\": \"New York\",\n  \"state\": \"NY\",\n  \"zip\": \"10001\",\n  \"country\": \"USA\",\n  \"phone\": \"+1-555-0123\",\n  \"email\": \"info@techsolutions.com\",\n  \"website\": \"https://techsolutions.com\",\n  \"quarterlyLeavesDays\": 20,\n  \"monthlyLatesDays\": 3,\n  \"absentDeduction\": 1000,\n  \"lateDeduction\": 500,\n  \"halfDeduction\": 750,\n  \"taxId\": \"TAX123456789\",\n  \"lateTime\": 30,\n  \"halfTime\": 90,\n  \"absentTime\": 180\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/company",
+              "host": ["{{baseUrl}}"],
+              "path": ["company"]
+            }
+          }
+        },
+        {
+          "name": "Get All Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/company",
+              "host": ["{{baseUrl}}"],
+              "path": ["company"]
+            }
+          }
+        },
+        {
+          "name": "Get Main Company",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/company/main",
+              "host": ["{{baseUrl}}"],
+              "path": ["company", "main"]
+            }
+          }
+        },
+        {
+          "name": "Get Company by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/company/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["company", "1"]
+            }
+          }
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tech Solutions International Inc.\",\n  \"city\": \"Los Angeles\",\n  \"state\": \"CA\",\n  \"lateTime\": 45,\n  \"halfTime\": 120,\n  \"absentTime\": 240\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/company/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["company", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Company",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/company/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["company", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Company Attendance Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/company/settings/attendance",
+              "host": ["{{baseUrl}}"],
+              "path": ["company", "settings", "attendance"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set JWT token in headers for all requests",
+          "if (pm.collectionVariables.get('jwtToken') && pm.collectionVariables.get('jwtToken') !== 'YOUR_JWT_TOKEN_HERE') {",
+          "    pm.request.headers.add({",
+          "        key: 'Authorization',",
+          "        value: 'Bearer ' + pm.collectionVariables.get('jwtToken')",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ]
+}
