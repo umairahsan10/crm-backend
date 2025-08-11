@@ -7,9 +7,10 @@ import { ChatMessagesModule } from './chat-messages/chat-messages.module';
 import { EmployeeModule } from './employee/employee.module';
 import { ComplaintsModule } from './complaints/complaints.module';
 import { ReminderModule } from './reminder/reminder.module';
+import { MeetingModule } from './meeting/meeting.module';
 
 @Module({
-  imports: [ProjectChatsModule, ChatParticipantsModule, ChatMessagesModule, EmployeeModule, ComplaintsModule, ReminderModule],
+  imports: [ProjectChatsModule, ChatParticipantsModule, ChatMessagesModule, EmployeeModule, ComplaintsModule, ReminderModule, MeetingModule],
   controllers: [CommunicationController],
   providers: [CommunicationService],
 })
