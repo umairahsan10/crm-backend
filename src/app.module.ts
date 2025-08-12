@@ -9,6 +9,7 @@ import { CompanyModule } from './modules/company/company.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { HrModule } from './modules/hr/hr.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
+import { ProductionModule } from './modules/production/production.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SalesModule } from './modules/sales/sales.module';
 
@@ -23,6 +24,7 @@ import { SalesModule } from './modules/sales/sales.module';
     FinanceModule,
     HrModule,
     MarketingModule,
+    ProductionModule,
     ProjectsModule,
     SalesModule,
   ],
