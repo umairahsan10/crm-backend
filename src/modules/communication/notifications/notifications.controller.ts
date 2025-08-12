@@ -9,9 +9,11 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
+import { CreateBulkNotificationDto } from './dto/create-bulk-notification.dto';
 import { UpdateNotificationDto } from './dto/update-notification.dto';
 import { NotificationResponseDto } from './dto/notification-response.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -41,6 +43,35 @@ export class NotificationsController {
     @Request() req: AuthenticatedRequest,
   ): Promise<NotificationResponseDto[]> {
     return this.notificationsService.createNotification(createNotificationDto, req.user.id);
+  }
+
+  /**
+   * Create bulk notification to all employees or specific department
+   * Only HR and Department Managers can create bulk notifications
+   */
+  @Post('bulk')
+  async createBulkNotification(
+    @Body() createBulkNotificationDto: CreateBulkNotificationDto,
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{ message: string; recipientCount: number }> {
+    return this.notificationsService.createBulkNotification(createBulkNotificationDto, req.user.id);
+  }
+
+  /**
+   * Get summary of all bulk notifications sent
+   * Only HR and Department Managers can access this
+   */
+  @Get('bulk')
+  async getBulkNotificationSummary(
+    @Request() req: AuthenticatedRequest,
+    @Query('departmentId') departmentId?: string,
+    @Query('notificationType') notificationType?: 'bulk_all' | 'bulk_department',
+  ): Promise<any[]> {
+    const filters = {
+      departmentId: departmentId ? parseInt(departmentId) : undefined,
+      notificationType
+    };
+    return this.notificationsService.getBulkNotificationSummary(req.user.id, filters);
   }
 
   /**

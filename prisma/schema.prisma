@@ -134,6 +134,7 @@ model Department {
   employees  Employee[]  @relation("EmployeeDepartment")
   hrRequests HrRequest[]
   complaints Complaint[]
+  notifications Notification[] @relation("NotificationTargetDepartment")
 
   @@map("departments")
 }
@@ -1286,19 +1287,22 @@ model Meeting {
 }
 
 model Notification {
-  id        Int                 @id @default(autoincrement()) @map("notification_id")
-  status    NotificationStatus? @default(unread)
-  sentTo    Int?                @map("sent_to")
-  sentBy    Int?                @map("sent_by")
-  userType  UserType            @map("user_type")
-  heading   String?             @db.VarChar(255)
-  content   String?             @db.Text
-  createdAt DateTime            @default(now()) @map("created_at")
-  updatedAt DateTime            @updatedAt @map("updated_at")
+  id                Int                 @id @default(autoincrement()) @map("notification_id")
+  status            NotificationStatus? @default(unread)
+  sentTo            Int?                @map("sent_to")
+  sentBy            Int?                @map("sent_by")
+  userType          UserType            @map("user_type")
+  heading           String?             @db.VarChar(255)
+  content           String?             @db.Text
+  targetDepartmentId Int?               @map("target_department_id")
+  notificationType  NotificationType    @default(individual)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
 
   // Foreign key relations
   employee Employee? @relation("NotificationSentTo", fields: [sentTo], references: [id])
   sender   Employee? @relation("NotificationSentBy", fields: [sentBy], references: [id])
+  targetDepartment Department? @relation("NotificationTargetDepartment", fields: [targetDepartmentId], references: [id])
 
   @@map("notifications")
 }
@@ -1306,6 +1310,12 @@ model Notification {
 enum NotificationStatus {
   read
   unread
+}
+
+enum NotificationType {
+  individual
+  bulk_department
+  bulk_all
 }
 
 enum UserType {
@@ -1630,4 +1640,16 @@ model ProjectTask {
   assignee Employee @relation("TaskAssignee", fields: [assignedTo], references: [id])
 
   @@map("project_tasks")
+}
+
+model Holiday {
+  holidayId   Int      @id @default(autoincrement()) @map("holiday_id")
+  holidayName String   @map("holiday_name") @db.VarChar(100)
+  holidayDate DateTime @map("holiday_date") @db.Date
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([holidayDate])
+  @@map("holidays")
 }
