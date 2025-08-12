@@ -112,7 +112,7 @@ export class AuthService {
         // If accountant record exists, use its permissions, otherwise use default accountant permissions
         if (accountant) {
           permissionData = {
-            liabilities_permission: accountant.liabilitiesPermission ?? false, // Using existing field
+            liabilities_permission: accountant.liabilitiesPermission ?? false,
             salary_permission: accountant.salaryPermission ?? false,
             sales_permission: accountant.salesPermission ?? false,
             invoices_permission: accountant.invoicesPermission ?? false,

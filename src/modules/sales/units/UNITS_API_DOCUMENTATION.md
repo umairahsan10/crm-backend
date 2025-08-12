@@ -1495,11 +1495,195 @@ This API retrieves all archive leads that belonged to units that have been delet
 
 ---
 
+## 15. Get Available Unit Heads
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/units/available-heads`
+
+### API Description and Flow
+This API retrieves available unit heads for assignment purposes. The flow includes:
+1. Validates the `assigned` query parameter if provided
+2. Queries employees with `unit_head` role in Sales department
+3. Filters based on the `assigned` parameter (all, assigned only, or unassigned only)
+4. Returns formatted list of heads with their current unit assignments
+
+### Query Parameters
+- `assigned` (optional, string): Controls which heads to return
+  - **No parameter provided**: Return all heads (default)
+  - **`assigned=true`**: Return only assigned heads
+  - **`assigned=false`**: Return only unassigned heads
+
+### Request Examples
+```bash
+# Get all heads (default)
+GET /sales/units/available-heads
+
+# Get only assigned heads
+GET /sales/units/available-heads?assigned=true
+
+# Get only unassigned heads
+GET /sales/units/available-heads?assigned=false
+```
+
+### Response Format
+
+**Success Response - All Heads (200):**
+```json
+{
+  "success": true,
+  "message": "Unit heads retrieved successfully",
+  "data": {
+    "heads": [
+      {
+        "id": 123,
+        "firstName": "John",
+        "lastName": "Doe",
+        "email": "john.doe@example.com",
+        "currentUnit": {
+          "id": 1,
+          "name": "Unit A"
+        }
+      },
+      {
+        "id": 456,
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "email": "jane.smith@example.com",
+        "currentUnit": null
+      }
+    ]
+  }
+}
+```
+
+**Success Response - Assigned Heads Only (200):**
+```json
+{
+  "success": true,
+  "message": "Unit heads retrieved successfully",
+  "data": {
+    "heads": [
+      {
+        "id": 123,
+        "firstName": "John",
+        "lastName": "Doe",
+        "email": "john.doe@example.com",
+        "currentUnit": {
+          "id": 1,
+          "name": "Unit A"
+        }
+      }
+    ]
+  }
+}
+```
+
+**Success Response - Unassigned Heads Only (200):**
+```json
+{
+  "success": true,
+  "message": "Unit heads retrieved successfully",
+  "data": {
+    "heads": [
+      {
+        "id": 456,
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "email": "jane.smith@example.com",
+        "currentUnit": null
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+
+**Invalid Query Parameter (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "assigned parameter must be true or false",
+  "error": "Bad Request"
+}
+```
+
+**Authentication/Authorization Errors (401/403):**
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not have the required roles. Required: dep_manager. User role: unit_head",
+  "error": "Forbidden"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "message": "User does not belong to required departments. Required: Sales. User department: HR",
+  "error": "Forbidden"
+}
+```
+
+### Validations
+- **Query Parameter Validation**: `assigned` must be 'true' or 'false' if provided
+- **No request body validation required**
+
+### Business Logic
+1. **Employee Filtering**:
+   - Role must be `unit_head`
+   - Department must be `Sales`
+   - Status must be `active`
+
+2. **Assignment Filtering**:
+   - **All heads**: No additional filtering
+   - **Assigned heads**: Must be `headId` in any `SalesUnit`
+   - **Unassigned heads**: Must NOT be `headId` in any `SalesUnit`
+
+3. **Data Processing**:
+   - Include `currentUnit` object for assigned heads
+   - Set `currentUnit: null` for unassigned heads
+   - Sort by `firstName` ascending
+
+### Database Operations
+
+**Tables Accessed:**
+- `employees` table (read - for employee data)
+- `roles` table (read - for role validation)
+- `departments` table (read - for department validation)
+- `sales_units` table (read - for current unit assignments)
+
+**Database Changes:**
+- **No changes** - read-only operation
+
+**Database Queries:**
+1. **SELECT** from `employees` with JOINs to `roles`, `departments`, and `sales_units`
+2. **WHERE** conditions based on role, department, status, and assignment status
+3. **ORDER BY** firstName ascending
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+- **Unit Head Access**: ❌ **NOT ALLOWED** - Only admin and dep_manager can access
+
+---
+
 ## Planned APIs
 
 ### Unit Head Management
 - ✅ Assign/Unassign Head to Unit (via Update API)
-- Get Available Heads
+- ✅ Get Available Heads
 
 ### Team Assignment
 - Assign Team to Unit
