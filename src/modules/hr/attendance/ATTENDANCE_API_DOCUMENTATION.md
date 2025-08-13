@@ -1180,6 +1180,74 @@ The system updates **all three tables** when marking employees present on weeken
 
 ---
 
+### 26. Bulk Mark All Employees Present
+**Endpoint**: `POST /hr/attendance/bulk-mark-present`  
+**Method**: POST  
+**Access**: HR, Admin (requires `attendance_permission`)
+
+**Description:** Allows HR to mark all active employees as present for a specific date at once. This is useful for situations like:
+- System outages that prevented normal attendance recording
+- Power failures or technical issues
+- Company-wide events where all employees were present
+- Corrections for accidental absent markings
+- Historical corrections for past dates
+
+**Important:** This endpoint works for the current day and past dates, but not for future dates.
+
+**Request Body:**
+```json
+{
+  "date": "2024-01-15",
+  "reason": "System outage prevented normal attendance recording"
+}
+```
+
+**Parameters:**
+- `date` (required): Date in YYYY-MM-DD format. **Can be current day or past dates, but not future dates.**
+- `reason` (optional): Reason for bulk marking all employees present
+
+**Business Logic:**
+1. Validates that the date is the current day
+2. Fetches all active employees
+3. For each employee:
+   - Creates or updates attendance log with 'present' status
+   - Sets checkin/checkout times based on employee's shift schedule
+   - Updates attendance summary (increments present days, decrements absent days if applicable)
+   - Updates monthly attendance summary
+   - Creates HR log entry for audit trail
+
+**Tables Updated:**
+- `attendance_logs`: New records or status updates
+- `attendance`: Present days incremented, absent days decremented
+- `monthly_attendance_summary`: Monthly totals updated
+- `hr_logs`: Audit trail entry created
+
+**Sample Response:**
+```json
+{
+  "message": "Bulk mark present completed for 2024-01-15 - Reason: System outage prevented normal attendance recording",
+  "marked_present": 45,
+  "errors": 0,
+  "skipped": 2
+}
+```
+
+**Response Fields:**
+- `message`: Success message with date and reason
+- `marked_present`: Number of employees successfully marked present
+- `errors`: Number of employees that encountered errors
+- `skipped`: Number of employees already marked present (skipped)
+
+**Use Cases:**
+- Daily system maintenance where attendance couldn't be recorded
+- Technical issues preventing normal check-in/check-out
+- Company events where all employees were present
+- Immediate corrections for accidental absent markings on the same day
+
+**Note:** For past date corrections or individual employee updates, use the appropriate individual attendance endpoints to maintain data integrity and proper audit trails.
+
+---
+
 ## Future Holiday Trigger System
 
 ### **Overview**

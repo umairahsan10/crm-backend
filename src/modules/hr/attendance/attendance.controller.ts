@@ -23,6 +23,7 @@ import { LeaveLogsListResponseDto } from './dto/leave-logs-list-response.dto';
 import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
 import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { ProcessLeaveActionDto } from './dto/process-leave-action.dto';
+import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
@@ -392,5 +393,13 @@ export class AttendanceController {
       this.logger.error(`Error in manual future holiday trigger: ${error.message}`);
       throw error;
     }
+  }
+
+  @Post('bulk-mark-present')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async bulkMarkPresent(@Body() bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
+    return this.attendanceService.bulkMarkAllEmployeesPresent(bulkMarkData);
   }
 }

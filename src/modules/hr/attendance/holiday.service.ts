@@ -232,6 +232,11 @@ export class HolidayService {
   /**
    * Delete a holiday
    * Only HR and Admin can delete holidays
+   * Restrictions:
+   * - Only future holidays can be deleted
+   * - Deletion is not allowed on the same day as the holiday (due to trigger activation)
+   * - Past holidays cannot be deleted as tables have already been updated
+   * - Emergency holidays cannot be deleted after creation
    */
   async deleteHoliday(holidayId: number, userId: number, userType: string): Promise<{ message: string }> {
     try {
@@ -242,6 +247,49 @@ export class HolidayService {
 
       if (!existingHoliday) {
         throw new NotFoundException(`Holiday with ID ${holidayId} not found`);
+      }
+
+      // Get current date (start of day)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Get holiday date (start of day)
+      const holidayDate = new Date(existingHoliday.holidayDate);
+      holidayDate.setHours(0, 0, 0, 0);
+
+      // Check if holiday is in the past
+      if (holidayDate < today) {
+        throw new BadRequestException(
+          `Cannot delete past holiday "${existingHoliday.holidayName}" (${existingHoliday.holidayDate.toDateString()}). Past holidays cannot be deleted as attendance tables have already been updated.`
+        );
+      }
+
+      // Check if holiday is today (same day)
+      if (holidayDate.getTime() === today.getTime()) {
+        throw new BadRequestException(
+          `Cannot delete holiday "${existingHoliday.holidayName}" on the same day (${existingHoliday.holidayDate.toDateString()}). Deletion is not allowed on the same day as the holiday due to trigger activation.`
+        );
+      }
+
+      // Check if holiday is tomorrow (one day before)
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+
+      if (holidayDate.getTime() === tomorrow.getTime()) {
+        throw new BadRequestException(
+          `Cannot delete holiday "${existingHoliday.holidayName}" one day before (${existingHoliday.holidayDate.toDateString()}). Deletion is only allowed for holidays that are at least 2 days in the future.`
+        );
+      }
+
+      // Check if this is an emergency holiday (created on or after the holiday date)
+      const holidayCreatedDate = new Date(existingHoliday.createdAt);
+      holidayCreatedDate.setHours(0, 0, 0, 0);
+
+      if (holidayCreatedDate >= holidayDate) {
+        throw new BadRequestException(
+          `Cannot delete emergency holiday "${existingHoliday.holidayName}" (${existingHoliday.holidayDate.toDateString()}). Emergency holidays created on or after the holiday date cannot be deleted.`
+        );
       }
 
       // Delete the holiday
@@ -259,7 +307,7 @@ export class HolidayService {
         message: `Holiday "${existingHoliday.holidayName}" deleted successfully`
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       throw new BadRequestException('Failed to delete holiday');

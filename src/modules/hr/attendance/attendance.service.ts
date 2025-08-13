@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { GetAttendanceLogsDto } from './dto/get-attendance-logs.dto';
 import { AttendanceLogResponseDto } from './dto/attendance-log-response.dto';
@@ -22,6 +22,7 @@ import { GetLeaveLogsDto } from './dto/get-leave-logs.dto';
 import { LeaveLogsListResponseDto } from './dto/leave-logs-list-response.dto';
 import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
 import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
+import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -1918,7 +1919,7 @@ export class AttendanceService {
             const currentDateForLogs = new Date(startDate);
             while (currentDateForLogs <= endDate) {
               const logDate = currentDateForLogs.toISOString().split('T')[0];
-              
+
               // Check if attendance log exists for this date
               const existingLog = await this.prisma.attendanceLog.findFirst({
                 where: {
@@ -1995,18 +1996,18 @@ export class AttendanceService {
   private calculateLeaveDays(startDate: Date, endDate: Date): number {
     let count = 0;
     const currentDate = new Date(startDate);
-    
+
     // Loop through each day from start to end (inclusive)
     while (currentDate <= endDate) {
       count++;
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return count;
   }
 
   // Helper function to update monthly attendance for cross-month leaves
-  private async updateMonthlyAttendanceForLeave(empId: number, startDate: Date, endDate: Date, totalLeaveDays: number, allowedDaysForMonthly: number): Promise<void> {    
+  private async updateMonthlyAttendanceForLeave(empId: number, startDate: Date, endDate: Date, totalLeaveDays: number, allowedDaysForMonthly: number): Promise<void> {
     const monthlyDays = new Map<string, number>();
 
     // Count the actual days per month
@@ -2036,7 +2037,7 @@ export class AttendanceService {
           }
         }
       });
-      
+
       console.log(`Updated month ${month}: -${daysInMonth} absent, +${daysInMonth} leave days`);
     }
   }
@@ -2046,7 +2047,7 @@ export class AttendanceService {
       const currentDate = new Date();
       const today = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
       const currentTime = currentDate.toTimeString().split(' ')[0]; // HH:MM:SS format
-      
+
       console.log(`Auto-marking absent for date: ${today}, current time: ${currentTime}`);
 
       // Get all employees with their shift end times
@@ -2112,7 +2113,7 @@ export class AttendanceService {
 
           if (approvedLeave) {
             console.log(`Employee ${employee.id} has approved leave for today, applying leave instead of absent`);
-            
+
             // Apply leave logic
             const attendance = await this.prisma.attendance.findFirst({
               where: { employeeId: employee.id }
@@ -2183,7 +2184,7 @@ export class AttendanceService {
             }
           } else {
             console.log(`Employee ${employee.id} has no approved leave, marking as absent`);
-            
+
             // Mark as absent
             await this.prisma.attendanceLog.create({
               data: {
@@ -2220,5 +2221,267 @@ export class AttendanceService {
       console.error('Error in autoMarkAbsent:', error);
       throw new InternalServerErrorException(`Failed to auto-mark absent: ${error.message}`);
     }
+  }
+
+  /**
+   * Bulk mark all active employees as present for a specific date
+   * Updates attendance_logs, attendance, monthly_attendance_summary, and hr_logs tables
+   */
+  async bulkMarkAllEmployeesPresent(bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
+    const { date, reason } = bulkMarkData;
+    const targetDate = new Date(date);
+
+    // Allow present and past dates, but not future dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    if (targetDate.getTime() > today.getTime()) {
+      throw new BadRequestException('Bulk mark present is not allowed for future dates.');
+    }
+
+    // Get all active employees
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        status: 'active'
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        shiftStart: true,
+        shiftEnd: true
+      }
+    });
+
+    if (employees.length === 0) {
+      throw new NotFoundException('No active employees found.');
+    }
+
+    let markedPresent = 0;
+    let errors = 0;
+    let skipped = 0;
+    
+    console.log(`Starting bulk mark present operation for ${employees.length} employees on ${date}`);
+    
+    const batchSize = 20; // Reduced from 50 to 20 for better performance
+    console.log(`Processing ${employees.length} employees in batches of ${batchSize}`);
+    
+    for (let i = 0; i < employees.length; i += batchSize) {
+      const batch = employees.slice(i, i + batchSize);
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(employees.length / batchSize);
+      console.log(`Processing batch ${batchNumber}/${totalBatches} with ${batch.length} employees`);
+    
+      await this.prisma.$transaction(async (tx) => {
+        for (const employee of batch) {
+          try {
+            const existingLog = await tx.attendanceLog.findFirst({
+              where: {
+                employeeId: employee.id,
+                date: targetDate
+              }
+            });
+
+            let wasAbsent = false; // Default to false for new records
+
+            if (existingLog) {
+              if (existingLog.status === 'present') {
+                skipped++;
+                continue;
+              }
+              wasAbsent = existingLog.status === 'absent';
+              
+              await tx.attendanceLog.update({
+                where: { id: existingLog.id },
+                data: {
+                  status: 'present',
+                  checkin: employee.shiftStart ? this.createShiftDateTime(targetDate, employee.shiftStart) : null,
+                  checkout: employee.shiftEnd ? this.createShiftDateTime(targetDate, employee.shiftEnd) : null,
+                  updatedAt: new Date()
+                }
+              });
+                        } else {
+              // For new records, check if this specific date was already counted as absent in the monthly summary
+              // This handles cases where HR manually marked someone absent without creating an attendance log
+              const monthYear = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+              const monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
+                where: {
+                  empId: employee.id,
+                  month: monthYear
+                }
+              });
+              
+              if (monthlySummary && monthlySummary.totalAbsent > 0) {
+                // Count actual absent records for this month
+                const actualAbsentRecords = await tx.attendanceLog.count({
+                  where: {
+                    employeeId: employee.id,
+                    status: 'absent',
+                    date: {
+                      gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), 1),
+                      lt: new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1)
+                    }
+                  }
+                });
+                
+                // If monthly summary shows more absents than actual records, this date was manually counted
+                if (monthlySummary.totalAbsent > actualAbsentRecords) {
+                  wasAbsent = true;
+                }
+              }
+              
+              await tx.attendanceLog.create({
+                data: {
+                  employeeId: employee.id,
+                  date: targetDate,
+                  status: 'present',
+                  checkin: employee.shiftStart ? this.createShiftDateTime(targetDate, employee.shiftStart) : null,
+                  checkout: employee.shiftEnd ? this.createShiftDateTime(targetDate, employee.shiftEnd) : null,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                }
+              });
+            }
+
+            await this.updateAttendanceForBulkMarkPresent(tx, employee.id, targetDate, wasAbsent);
+            await this.updateMonthlyAttendanceForBulkMarkPresent(tx, employee.id, targetDate, wasAbsent);
+            
+            markedPresent++;
+          } catch (error) {
+            console.error(`Error processing employee ${employee.id}:`, error);
+            errors++;
+          }
+        }
+      }, {
+        timeout: 30000, // Increase timeout to 30 seconds
+        maxWait: 10000  // Maximum wait time for transaction to start
+      });
+      
+      // Add small delay between batches to prevent overwhelming the database
+      if (i + batchSize < employees.length) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+      }
+    }
+    
+    console.log(`Bulk mark present operation completed. Marked: ${markedPresent}, Errors: ${errors}, Skipped: ${skipped}`);
+    
+    // Create a single HR log entry for the entire bulk operation
+    await this.prisma.hRLog.create({
+      data: {
+        hrId: 1, // TODO: Get from authenticated user
+        actionType: 'bulk_mark_present',
+        affectedEmployeeId: null, // Set to null for bulk operations
+        description: `Bulk marked ${markedPresent} employees present for ${date}${reason ? ` - Reason: ${reason}` : ''}`
+      }
+    });
+
+    const message = `Bulk mark present completed for ${date}${reason ? ` - Reason: ${reason}` : ''}`;
+    return { message, marked_present: markedPresent, errors, skipped };
+  }
+
+  /**
+   * Helper method to update attendance table for bulk mark present
+   */
+  private async updateAttendanceForBulkMarkPresent(tx: any, employeeId: number, date: Date, wasAbsent: boolean = false): Promise<void> {
+    // Find existing attendance record or create new one
+    let attendance = await tx.attendance.findFirst({
+      where: { employeeId }
+    });
+
+    if (!attendance) {
+      // Create new attendance record
+      attendance = await tx.attendance.create({
+        data: {
+          employeeId,
+          presentDays: 0,
+          absentDays: 0,
+          lateDays: 0,
+          leaveDays: 0,
+          remoteDays: 0,
+          quarterlyLeaves: 0,
+          monthlyLates: 0,
+          halfDays: 0
+        }
+      });
+    }
+
+    // Update present days and decrement absent days if any
+    const updateData: any = {
+      presentDays: (attendance.presentDays || 0) + 1
+    };
+
+    // Only decrement absent days if the employee was actually marked absent for this date
+    if (wasAbsent && attendance.absentDays && attendance.absentDays > 0) {
+      updateData.absentDays = Math.max(0, attendance.absentDays - 1);
+    }
+
+    await tx.attendance.update({
+      where: { id: attendance.id },
+      data: updateData
+    });
+  }
+
+  /**
+   * Helper method to update monthly attendance summary for bulk mark present
+   */
+  private async updateMonthlyAttendanceForBulkMarkPresent(tx: any, employeeId: number, date: Date, wasAbsent: boolean = false): Promise<void> {
+    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    // Find existing monthly summary or create new one
+    let monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
+      where: {
+        empId: employeeId,
+        month: monthYear
+      }
+    });
+
+    if (!monthlySummary) {
+      // Create new monthly summary
+      monthlySummary = await tx.monthlyAttendanceSummary.create({
+        data: {
+          empId: employeeId,
+          month: monthYear,
+          totalPresent: 0,
+          totalAbsent: 0,
+          totalLeaveDays: 0,
+          totalLateDays: 0,
+          totalHalfDays: 0,
+          totalRemoteDays: 0
+        }
+      });
+    }
+
+    // Update monthly summary (increment present, decrement absent if any)
+    const updateData: any = {
+      totalPresent: (monthlySummary.totalPresent || 0) + 1
+    };
+
+    // Only decrement absent count if the employee was actually marked absent for this date
+    if (wasAbsent && monthlySummary.totalAbsent && monthlySummary.totalAbsent > 0) {
+      updateData.totalAbsent = Math.max(0, monthlySummary.totalAbsent - 1);
+    }
+
+    await tx.monthlyAttendanceSummary.update({
+      where: { id: monthlySummary.id },
+      data: updateData
+    });
+  }
+
+  /**
+   * Helper method to create shift date time for a specific date
+   */
+  private createShiftDateTime(date: Date, timeString: string): Date {
+    // Parse time string directly (e.g., "09:00" -> hours=9, minutes=0)
+    const [hours, minutes] = timeString.split(':').map(Number);
+    
+    if (isNaN(hours) || isNaN(minutes)) {
+      throw new Error(`Invalid time format: ${timeString}. Expected format: HH:MM`);
+    }
+
+    const shiftDateTime = new Date(date);
+    shiftDateTime.setHours(hours, minutes, 0, 0);
+
+    return shiftDateTime;
   }
 }

@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HolidayService } from '../../../src/modules/hr/attendance/holiday.service';
-import { PrismaService } from '../../../../prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateHolidayDto } from '../../../src/modules/hr/attendance/dto/create-holiday.dto';
-import { UpdateHolidayDto } from '../../../src/modules/hr/attendance/dto/update-holiday.dto';
 import { BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 
 describe('HolidayService', () => {
@@ -65,7 +64,7 @@ describe('HolidayService', () => {
       mockPrismaService.holiday.findFirst.mockResolvedValue(null);
       mockPrismaService.holiday.create.mockResolvedValue(mockHoliday);
 
-      const result = await service.createHoliday(createDto);
+      const result = await service.createHoliday(createDto, 1, 'hr');
 
       expect(prisma.holiday.findFirst).toHaveBeenCalledWith({
         where: { holidayDate: new Date('2025-01-01') },
@@ -83,7 +82,7 @@ describe('HolidayService', () => {
     it('should throw ConflictException if holiday already exists on the same date', async () => {
       mockPrismaService.holiday.findFirst.mockResolvedValue(mockHoliday);
 
-      await expect(service.createHoliday(createDto)).rejects.toThrow(
+      await expect(service.createHoliday(createDto, 1, 'hr')).rejects.toThrow(
         ConflictException,
       );
     });
@@ -91,7 +90,7 @@ describe('HolidayService', () => {
     it('should throw BadRequestException on other errors', async () => {
       mockPrismaService.holiday.findFirst.mockRejectedValue(new Error('Database error'));
 
-      await expect(service.createHoliday(createDto)).rejects.toThrow(
+      await expect(service.createHoliday(createDto, 1, 'hr')).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -260,132 +259,126 @@ describe('HolidayService', () => {
     });
   });
 
-  describe('updateHoliday', () => {
-    const updateDto: UpdateHolidayDto = {
-      holidayName: 'Updated Holiday',
-    };
 
-    it('should update a holiday successfully', async () => {
-      mockPrismaService.holiday.findUnique.mockResolvedValue(mockHoliday);
-      mockPrismaService.holiday.findFirst.mockResolvedValue(null);
-      mockPrismaService.holiday.update.mockResolvedValue(mockHoliday);
-
-      const result = await service.updateHoliday(1, updateDto);
-
-      expect(prisma.holiday.update).toHaveBeenCalledWith({
-        where: { holidayId: 1 },
-        data: { holidayName: 'Updated Holiday' },
-      });
-      expect(result).toEqual(mockHoliday);
-    });
-
-    it('should throw NotFoundException if holiday not found', async () => {
-      mockPrismaService.holiday.findUnique.mockResolvedValue(null);
-
-      await expect(service.updateHoliday(999, updateDto)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it('should throw ConflictException if updating to conflicting date', async () => {
-      mockPrismaService.holiday.findUnique.mockResolvedValue(mockHoliday);
-      mockPrismaService.holiday.findFirst.mockResolvedValue({ holidayId: 2 });
-
-      const updateWithDate: UpdateHolidayDto = {
-        holidayDate: '2025-01-02',
-      };
-
-      await expect(service.updateHoliday(1, updateWithDate)).rejects.toThrow(
-        ConflictException,
-      );
-    });
-
-    it('should throw BadRequestException on other errors', async () => {
-      mockPrismaService.holiday.findUnique.mockRejectedValue(new Error('Database error'));
-
-      await expect(service.updateHoliday(1, updateDto)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-  });
 
   describe('deleteHoliday', () => {
-    it('should delete a holiday successfully', async () => {
-      mockPrismaService.holiday.findUnique.mockResolvedValue(mockHoliday);
-      mockPrismaService.holiday.delete.mockResolvedValue(mockHoliday);
+    const mockPrismaServiceWithHR = {
+      ...mockPrismaService,
+      hR: {
+        findUnique: jest.fn(),
+      },
+      hRLog: {
+        create: jest.fn(),
+      },
+    };
 
-      const result = await service.deleteHoliday(1);
+    beforeEach(() => {
+      // Update the mock to include HR-related methods
+      Object.assign(prisma, mockPrismaServiceWithHR);
+      mockPrismaServiceWithHR.hR.findUnique.mockResolvedValue({ id: 1 });
+      mockPrismaServiceWithHR.hRLog.create.mockResolvedValue({});
+    });
+
+    it('should delete a future holiday successfully', async () => {
+      const futureHoliday = {
+        ...mockHoliday,
+        holidayDate: new Date('2025-12-25'), // Future date
+        createdAt: new Date('2025-01-01'), // Created in past
+      };
+      mockPrismaService.holiday.findUnique.mockResolvedValue(futureHoliday);
+      mockPrismaService.holiday.delete.mockResolvedValue(futureHoliday);
+
+      const result = await service.deleteHoliday(1, 1, 'hr');
 
       expect(prisma.holiday.delete).toHaveBeenCalledWith({
         where: { holidayId: 1 },
       });
       expect(result).toEqual({
-        message: `Holiday "${mockHoliday.holidayName}" deleted successfully`,
+        message: `Holiday "${futureHoliday.holidayName}" deleted successfully`,
       });
     });
 
     it('should throw NotFoundException if holiday not found', async () => {
       mockPrismaService.holiday.findUnique.mockResolvedValue(null);
 
-      await expect(service.deleteHoliday(999)).rejects.toThrow(
+      await expect(service.deleteHoliday(999, 1, 'hr')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should throw BadRequestException when trying to delete past holiday', async () => {
+      const pastHoliday = {
+        ...mockHoliday,
+        holidayDate: new Date('2024-12-25'), // Past date
+      };
+      mockPrismaService.holiday.findUnique.mockResolvedValue(pastHoliday);
+
+      await expect(service.deleteHoliday(1, 1, 'hr')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.holiday.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when trying to delete holiday on same day', async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const sameDayHoliday = {
+        ...mockHoliday,
+        holidayDate: today, // Same as today
+      };
+      mockPrismaService.holiday.findUnique.mockResolvedValue(sameDayHoliday);
+
+      await expect(service.deleteHoliday(1, 1, 'hr')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.holiday.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when trying to delete holiday one day before', async () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const oneDayBeforeHoliday = {
+        ...mockHoliday,
+        holidayDate: tomorrow, // One day before
+      };
+      mockPrismaService.holiday.findUnique.mockResolvedValue(oneDayBeforeHoliday);
+
+      await expect(service.deleteHoliday(1, 1, 'hr')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.holiday.delete).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when trying to delete emergency holiday', async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const emergencyHoliday = {
+        ...mockHoliday,
+        holidayDate: today, // Same as today
+        createdAt: today, // Created today (emergency)
+      };
+      mockPrismaService.holiday.findUnique.mockResolvedValue(emergencyHoliday);
+
+      await expect(service.deleteHoliday(1, 1, 'hr')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.holiday.delete).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException on other errors', async () => {
       mockPrismaService.holiday.findUnique.mockRejectedValue(new Error('Database error'));
 
-      await expect(service.deleteHoliday(1)).rejects.toThrow(
+      await expect(service.deleteHoliday(1, 1, 'hr')).rejects.toThrow(
         BadRequestException,
       );
     });
   });
 
-  describe('bulkCreateHolidays', () => {
-    const holidays: CreateHolidayDto[] = [
-      {
-        holidayName: 'Holiday 1',
-        holidayDate: '2025-01-01',
-        description: 'Description 1',
-      },
-      {
-        holidayName: 'Holiday 2',
-        holidayDate: '2025-01-02',
-        description: 'Description 2',
-      },
-    ];
 
-    it('should bulk create holidays successfully', async () => {
-      // Mock the createHoliday method to avoid complex setup
-      jest.spyOn(service, 'createHoliday').mockResolvedValue(mockHoliday);
-
-      const result = await service.bulkCreateHolidays(holidays);
-
-      expect(result.created).toBe(2);
-      expect(result.errors).toBe(0);
-      expect(result.details).toHaveLength(2);
-    });
-
-    it('should handle errors in bulk creation', async () => {
-      jest.spyOn(service, 'createHoliday')
-        .mockResolvedValueOnce(mockHoliday)
-        .mockRejectedValueOnce(new Error('Creation failed'));
-
-      const result = await service.bulkCreateHolidays(holidays);
-
-      expect(result.created).toBe(1);
-      expect(result.errors).toBe(1);
-      expect(result.details).toHaveLength(2);
-    });
-
-    it('should throw BadRequestException on error', async () => {
-      jest.spyOn(service, 'createHoliday').mockRejectedValue(new Error('Database error'));
-
-      await expect(service.bulkCreateHolidays(holidays)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-  });
 
   describe('getHolidayStats', () => {
     it('should return holiday statistics for current year', async () => {

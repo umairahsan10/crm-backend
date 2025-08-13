@@ -243,10 +243,50 @@ GET /hr/attendance/holidays/stats?year=2025
 |-----------|------|----------|-------------|
 | `id` | number | Yes | Holiday ID |
 
+**Deletion Restrictions**:
+- **Future Holidays Only**: Only holidays with dates in the future can be deleted
+- **Same Day Restriction**: Holidays cannot be deleted on the same day (due to trigger activation)
+- **One Day Before Restriction**: Holidays cannot be deleted one day before the holiday date
+- **Emergency Holiday Restriction**: Holidays created on or after the holiday date cannot be deleted
+- **Past Holidays**: Past holidays cannot be deleted as attendance tables have already been updated
+
 **Sample Response**:
 ```json
 {
   "message": "Holiday \"Independence Day\" deleted successfully"
+}
+```
+
+**Error Responses**:
+```json
+{
+  "statusCode": 400,
+  "message": "Cannot delete past holiday \"Independence Day\" (2025-01-01). Past holidays cannot be deleted as attendance tables have already been updated.",
+  "error": "Bad Request"
+}
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "Cannot delete holiday \"Independence Day\" on the same day (2025-01-01). Deletion is not allowed on the same day as the holiday due to trigger activation.",
+  "error": "Bad Request"
+}
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "Cannot delete holiday \"Independence Day\" one day before (2025-01-01). Deletion is only allowed for holidays that are at least 2 days in the future.",
+  "error": "Bad Request"
+}
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "Cannot delete emergency holiday \"Independence Day\" (2025-01-01). Emergency holidays created on or after the holiday date cannot be deleted.",
+  "error": "Bad Request"
 }
 ```
 
@@ -329,8 +369,13 @@ GET /hr/attendance/holidays/stats?year=2025
 3. **Validation**: Same rules as creation
 
 ### **Deletion Rules**
-1. **Soft Delete**: Currently hard delete (can be modified)
-2. **Validation**: Holiday must exist before deletion
+1. **Future Holidays Only**: Only holidays with dates in the future can be deleted
+2. **Same Day Restriction**: Holidays cannot be deleted on the same day (due to trigger activation)
+3. **One Day Before Restriction**: Holidays cannot be deleted one day before the holiday date
+4. **Emergency Holiday Restriction**: Holidays created on or after the holiday date cannot be deleted
+5. **Past Holidays**: Past holidays cannot be deleted as attendance tables have already been updated
+6. **Soft Delete**: Currently hard delete (can be modified)
+7. **Validation**: Holiday must exist before deletion
 
 ### **Past Date Holiday Rules**
 1. **Automatic Adjustment**: When HR or Admin creates a holiday for a past date, attendance is automatically adjusted

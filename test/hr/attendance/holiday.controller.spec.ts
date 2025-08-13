@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HolidayController } from '../../../src/modules/hr/attendance/holiday.controller';
 import { HolidayService } from '../../../src/modules/hr/attendance/holiday.service';
 import { CreateHolidayDto } from '../../../src/modules/hr/attendance/dto/create-holiday.dto';
-import { UpdateHolidayDto } from '../../../src/modules/hr/attendance/dto/update-holiday.dto';
 import { BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 
 describe('HolidayController', () => {
