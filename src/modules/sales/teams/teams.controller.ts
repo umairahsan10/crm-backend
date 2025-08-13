@@ -70,23 +70,7 @@ export class TeamsController {
     return this.teamsService.unassignEmployeesFromTeam(teamId);
   }
 
-  // 7. Get Team Details
-  @Get(':teamId')
-  @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
-  @Departments('Sales')
-  async getTeamDetails(@Param('teamId', ParseIntPipe) teamId: number) {
-    return this.teamsService.getTeamDetails(teamId);
-  }
-
-  // 8. Get Employee's Team
-  @Get('employee/:employeeId')
-  @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
-  @Departments('Sales')
-  async getEmployeeTeam(@Param('employeeId', ParseIntPipe) employeeId: number) {
-    return this.teamsService.getEmployeeTeam(employeeId);
-  }
-
-  // 9. Get All Sales Teams (with optional unit filtering)
+  // 7. Get All Sales Teams (with optional unit filtering)
   @Get('all')
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
@@ -98,7 +82,39 @@ export class TeamsController {
     return this.teamsService.getAllTeams(unitId);
   }
 
-  // 10. Assign Team to Sales Unit
+  // 8. Get Available Teams
+  @Get('available')
+  @Roles('dep_manager')
+  @Departments('Sales')
+  async getAvailableTeams() {
+    return this.teamsService.getAvailableTeams();
+  }
+
+  // 9. Get Teams in Sales Unit (existing method, updated)
+  @Get('unit/:id')
+  @Roles('dep_manager', 'unit_head')
+  @Departments('Sales')
+  async getTeamsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.teamsService.getTeamsInUnit(id, req.user);
+  }
+
+  // 10. Get Team Details
+  @Get(':teamId')
+  @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
+  @Departments('Sales')
+  async getTeamDetails(@Param('teamId', ParseIntPipe) teamId: number) {
+    return this.teamsService.getTeamDetails(teamId);
+  }
+
+  // 11. Get Employee's Team
+  @Get('employee/:employeeId')
+  @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
+  @Departments('Sales')
+  async getEmployeeTeam(@Param('employeeId', ParseIntPipe) employeeId: number) {
+    return this.teamsService.getEmployeeTeam(employeeId);
+  }
+
+  // 12. Assign Team to Sales Unit
   @Post('assign')
   @Roles('dep_manager')
   @Departments('Sales')
@@ -109,43 +125,21 @@ export class TeamsController {
     return this.teamsService.assignTeamToUnit(assignTeamDto.teamId, assignTeamDto.salesUnitId);
   }
 
-  // 12. Get Teams in Sales Unit (existing method, updated)
-  @Get('unit/:id')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Sales')
-  async getTeamsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.teamsService.getTeamsInUnit(id, req.user);
-  }
-
-  // 13. Get Available Teams
-  @Get('available')
+  // 13. Delete Team
+  @Delete(':teamId')
   @Roles('dep_manager')
   @Departments('Sales')
-  async getAvailableTeams() {
-    return this.teamsService.getAvailableTeams();
+  async deleteTeam(@Param('teamId', ParseIntPipe) teamId: number) {
+    return this.teamsService.deleteTeam(teamId);
   }
 
-  // Sync completed leads counter for a team
-  @Post(':teamId/sync-completed-leads')
-  @UseGuards(JwtAuthGuard, RolesWithServiceGuard, DepartmentsGuard)
-  @Roles('dep_manager', 'unit_head')
+  // 14. Unassign Team from Sales Unit
+  @Delete('unassign/:teamId')
+  @Roles('dep_manager')
   @Departments('Sales')
-  async syncCompletedLeadsCounter(@Param('teamId') teamId: string) {
-    const id = parseInt(teamId, 10);
-    if (isNaN(id)) {
-      throw new BadRequestException('teamId must be a valid number');
-    }
-    return this.teamsService.syncCompletedLeadsCounter(id);
+  async unassignTeamFromUnit(@Param('teamId', ParseIntPipe) teamId: number) {
+    return this.teamsService.unassignTeamFromUnit(teamId);
   }
 
-  // Update completed leads counter (for internal use when lead status changes)
-  @Post('update-completed-leads-counter')
-  @UseGuards(JwtAuthGuard, RolesWithServiceGuard, DepartmentsGuard)
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Sales')
-  async updateCompletedLeadsCounter(
-    @Body() body: { salesUnitId: number; increment: boolean }
-  ) {
-    return this.teamsService.updateCompletedLeadsCounter(body.salesUnitId, body.increment);
-  }
+
 } 

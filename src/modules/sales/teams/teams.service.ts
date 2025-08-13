@@ -583,8 +583,8 @@ export class TeamsService {
       }
     });
 
-    // Get completed leads count from team counter (faster than querying leads table)
-    const completedLeadsCount = (team as any).completedLeads || 0;
+    // Get completed leads count from team counter
+    const completedLeadsCount = team.completedLeads || 0;
 
     // Calculate actual employee count
     const actualEmployeeCount = teamMembers.length + (team.teamLeadId ? 1 : 0);
@@ -595,7 +595,6 @@ export class TeamsService {
         id: team.id,
         name: team.name,
         teamLeadId: team.teamLeadId,
-        currentProjectId: team.currentProjectId,
         employeeCount: team.employeeCount,
         salesUnitId: team.salesUnitId,
         createdAt: team.createdAt,
@@ -676,12 +675,15 @@ export class TeamsService {
           id: team.id,
           name: team.name,
           teamLeadId: team.teamLeadId,
-          currentProjectId: team.currentProjectId,
           employeeCount: team.employeeCount,
           salesUnitId: team.salesUnitId,
           createdAt: team.createdAt,
           updatedAt: team.updatedAt,
           teamLead: team.teamLead,
+          completedLeads: {
+            count: team.completedLeads || 0,
+            status: 'completed'
+          },
           salesUnit: team.salesUnit
         }
       }
@@ -690,7 +692,10 @@ export class TeamsService {
 
   // 9. Get All Sales Teams (with optional unit filtering)
   async getAllTeams(salesUnitId?: number) {
-    const whereClause: any = {};
+    const whereClause: any = {
+      // Only get teams that belong to Sales department (have a salesUnitId)
+      salesUnitId: { not: null }
+    };
     
     if (salesUnitId) {
       whereClause.salesUnitId = salesUnitId;
@@ -726,8 +731,9 @@ export class TeamsService {
           where: { teamLeadId: team.teamLeadId }
         });
 
+        const { currentProjectId, ...teamWithoutProject } = team;
         return {
-          ...team,
+          ...teamWithoutProject,
           actualEmployeeCount: actualEmployeeCount + (team.teamLeadId ? 1 : 0)
         };
       })
@@ -855,8 +861,9 @@ export class TeamsService {
           where: { teamLeadId: team.teamLeadId }
         });
 
+        const { currentProjectId, ...teamWithoutProject } = team;
         return {
-          ...team,
+          ...teamWithoutProject,
           actualEmployeeCount: actualEmployeeCount + 1 // +1 for team lead
         };
       })
@@ -938,65 +945,144 @@ export class TeamsService {
     };
   }
 
-  // Sync completed leads counter for a team
-  async syncCompletedLeadsCounter(teamId: number) {
+  // 13. Delete Team
+  async deleteTeam(teamId: number) {
+    // Validate that the team exists
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },
-      select: { salesUnitId: true }
-    });
-
-    if (!team || !team.salesUnitId) {
-      throw new BadRequestException(`Team with ID ${teamId} is not assigned to a sales unit`);
-    }
-
-    // Count actual completed leads in the team's sales unit
-    const actualCompletedLeads = await this.prisma.lead.count({
-      where: {
-        salesUnitId: team.salesUnitId,
-        status: 'completed'
+      include: {
+        teamLead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
       }
     });
 
-    // Update the team's completed leads counter
-    await this.prisma.team.update({
-      where: { id: teamId },
-      data: { completedLeads: actualCompletedLeads }
+    if (!team) {
+      throw new NotFoundException(`Team with ID ${teamId} does not exist`);
+    }
+
+    // Get all team members (excluding team lead)
+    // Only check for team members if team has a team lead, otherwise no team members to check
+    const teamMembers = team.teamLeadId ? await this.prisma.employee.findMany({
+      where: { 
+        teamLeadId: team.teamLeadId,
+        id: { not: team.teamLeadId } // Exclude team lead
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true
+      }
+    }) : [];
+
+    // Check if team has employees or team lead
+    if (teamMembers.length > 0 || team.teamLeadId) {
+      const totalAssigned = teamMembers.length + (team.teamLeadId ? 1 : 0);
+      const message = team.teamLeadId 
+        ? `Cannot delete team. ${teamMembers.length} employee(s) and team lead are still assigned to this team. Please unassign all employees and team lead first using the unassign-employees endpoint.`
+        : `Cannot delete team. ${teamMembers.length} employee(s) are still assigned to this team. Please unassign all employees first using the unassign-employees endpoint.`;
+      
+      return {
+        success: false,
+        message,
+        data: {
+          teamId: team.id,
+          teamName: team.name,
+          teamLead: team.teamLead,
+          assignedEmployees: teamMembers,
+          canDelete: false,
+          reason: 'employees_or_team_lead_assigned',
+          suggestion: 'Use POST /sales/teams/:teamId/unassign-employees'
+        }
+      };
+    }
+
+    // Reassign team lead (set their teamLeadId to null) before deleting team
+    if (team.teamLeadId) {
+      await this.prisma.employee.update({
+        where: { id: team.teamLeadId },
+        data: { teamLeadId: null }
+      });
+    }
+
+    // Store team details before deletion
+    const teamDetails = {
+      id: team.id,
+      name: team.name,
+      teamLead: team.teamLead
+    };
+
+    // Delete the team
+    await this.prisma.team.delete({
+      where: { id: teamId }
     });
 
     return {
       success: true,
-      message: `Completed leads counter synced for team ID ${teamId}`,
+      message: `Team "${team.name}" successfully deleted. Team lead has been unassigned.`,
       data: {
-        teamId,
-        salesUnitId: team.salesUnitId,
-        completedLeads: actualCompletedLeads
+        ...teamDetails,
+        assignedEmployees: teamMembers,
+        canDelete: true
       }
     };
   }
 
-  // Update completed leads counter when lead status changes
-  async updateCompletedLeadsCounter(salesUnitId: number, increment: boolean = true) {
-    if (!salesUnitId) return;
-
-    // Find all teams in this sales unit
-    const teams = await this.prisma.team.findMany({
-      where: { salesUnitId },
-      select: { id: true }
+  // 14. Unassign Team from Sales Unit
+  async unassignTeamFromUnit(teamId: number) {
+    // Validate that the team exists
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+      include: {
+        teamLead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        salesUnit: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
     });
 
-    // Update completed leads counter for each team
-    for (const team of teams) {
-      if (increment) {
-        await this.prisma.team.update({
-          where: { id: team.id },
-          data: { completedLeads: { increment: 1 } }
-        });
-      } else {
-        await this.prisma.team.update({
-          where: { id: team.id },
-          data: { completedLeads: { decrement: 1 } }
-        });
-      }
+    if (!team) {
+      throw new NotFoundException(`Team with ID ${teamId} does not exist`);
     }
+
+    // Check if team is assigned to any sales unit
+    if (!team.salesUnitId) {
+      throw new BadRequestException('Team is not assigned to any sales unit');
+    }
+
+    // Store previous unit details
+    const previousUnit = team.salesUnit;
+
+    // Unassign team from the sales unit
+    await this.prisma.team.update({
+      where: { id: teamId },
+      data: { salesUnitId: null }
+    });
+
+    return {
+      success: true,
+      message: `Team "${team.name}" successfully unassigned from sales unit "${previousUnit?.name || 'Unknown Unit'}"`,
+      data: {
+        teamId: team.id,
+        teamName: team.name,
+        teamLead: team.teamLead,
+        previousUnit
+      }
+    };
   }
+
+
 } 

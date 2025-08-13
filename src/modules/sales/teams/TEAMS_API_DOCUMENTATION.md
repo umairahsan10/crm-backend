@@ -2,7 +2,6 @@
 
 This document contains all the APIs for the Sales Teams module.
 
----
 
 ## 1. Create Team
 
@@ -493,16 +492,62 @@ This API unassigns all employees and the team lead from a team (sets their teamL
 - **Endpoint**: `/sales/teams/:teamId`
 
 ### API Description and Flow
-**Note: This API is not yet implemented due to unclear business requirements.**
+This API deletes a team. The flow includes:
+1. Validates that the team exists
+2. Checks if team has employees or team lead assigned
+3. If team has employees/team lead, returns detailed response with assignment info (doesn't delete)
+4. If no blocking issues, deletes the team
+5. Returns success response with deletion details
 
-This API would delete a team. The implementation would need to consider:
-1. Whether teams with completed leads can be deleted
-2. How to handle team members with active leads
-3. Business rules for team deletion in sales context
+### Request Body/Parameters
+- **Path Parameter**: `teamId` (number) - Team ID to delete
+- **Request Body**: None
+
+### Response Format
+
+**Success Response (200) - When Deletion is Allowed:**
+```json
+{
+  "success": true,
+  "message": "Team \"Sales Team A\" successfully deleted.",
+  "data": {
+    "teamId": 1,
+    "teamName": "Sales Team A",
+    "teamLead": null,
+    "assignedEmployees": 0,
+    "hasTeamLead": false,
+    "totalAssigned": 0,
+    "canDelete": true
+  }
+}
+```
+
+**Blocked Response (200) - When Employees or Team Lead are Assigned:**
+```json
+{
+  "success": false,
+  "message": "Cannot delete team. 3 employee(s) and team lead are still assigned to this team. Please unassign all employees and team lead first using the unassign-employees endpoint.",
+  "data": {
+    "teamId": 1,
+    "teamName": "Sales Team A",
+    "teamLead": {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe"
+    },
+    "assignedEmployees": 2,
+    "hasTeamLead": true,
+    "totalAssigned": 3,
+    "canDelete": false,
+    "reason": "employees_or_team_lead_assigned",
+    "suggestion": "Use POST /sales/teams/:teamId/unassign-employees"
+  }
+}
+```
 
 ### Access Control
 - **Authentication**: JWT token required
-- **Roles**: `dep_manager` OR `unit_head` role required
+- **Roles**: `dep_manager` role required
 - **Departments**: `Sales` department required
 - **Admin Access**: Admins (admin, supermanager) have automatic access
 
@@ -519,15 +564,15 @@ This API would delete a team. The implementation would need to consider:
 1. **Team Validation**: Ensures the team exists and is assigned to a Sales unit
 2. **Team Lead Validation**: Verifies team has a team lead assigned
 3. **Team Members Retrieval**: Gets all employees who follow the team lead
-4. **Completed Leads Calculation**: Counts completed leads in the team's sales unit (direct query)
+4. **Completed Leads Retrieval**: Gets the completed leads count from the team's database field
 5. **Employee Count Calculation**: Calculates actual team size (team lead + members)
 6. **Response**: Returns comprehensive team details with performance metrics
 
 **Business Rules**:
 - **Sales Unit Required**: Team must be assigned to a sales unit
 - **Team Lead Required**: Team must have a team lead assigned
-- **Completed Leads Metric**: Counts ALL completed leads in the team's sales unit
-- **Performance Measurement**: Team success is measured by unit-level completed leads
+- **Completed Leads Metric**: Returns the completed leads count stored in the team's database field
+- **Performance Measurement**: Team success is measured by the completed leads counter
 
 ### Request Body/Parameters
 - **Path Parameter**: `teamId` (number) - Team ID to get details for
@@ -543,7 +588,6 @@ This API would delete a team. The implementation would need to consider:
     "id": 1,
     "name": "Sales Team A",
     "teamLeadId": 123,
-    "currentProjectId": null,
     "employeeCount": 6,
     "salesUnitId": 1,
     "createdAt": "2024-01-15T10:30:00Z",
@@ -633,7 +677,6 @@ This API retrieves information about which team an employee belongs to. The flow
       "id": 1,
       "name": "Sales Team A",
       "teamLeadId": 123,
-      "currentProjectId": null,
       "employeeCount": 6,
       "salesUnitId": 1,
       "createdAt": "2024-01-15T10:30:00Z",
@@ -642,6 +685,10 @@ This API retrieves information about which team an employee belongs to. The flow
         "id": 123,
         "firstName": "John",
         "lastName": "Doe"
+      },
+      "completedLeads": {
+        "count": 45,
+        "status": "completed"
       },
       "salesUnit": {
         "id": 1,
@@ -686,6 +733,9 @@ This API retrieves information about which team an employee belongs to. The flow
 - **Method**: `GET`
 - **Endpoint**: `/sales/teams/all`
 
+GET /sales/teams/all - Get all sales teams across all units
+GET /sales/teams/all?salesUnitId=1 - Get teams from specific unit
+
 ### API Description and Flow
 This API retrieves all teams in the Sales department with optional unit filtering. The flow includes:
 1. Fetches all teams with team lead and sales unit information
@@ -709,7 +759,6 @@ This API retrieves all teams in the Sales department with optional unit filterin
       "id": 1,
       "name": "Sales Team A",
       "teamLeadId": 123,
-      "currentProjectId": null,
       "employeeCount": 6,
       "salesUnitId": 1,
       "createdAt": "2024-01-15T10:30:00Z",
@@ -740,11 +789,10 @@ This API retrieves all teams in the Sales department with optional unit filterin
       "id": 1,
       "name": "Sales Team A",
       "teamLeadId": 123,
-      "currentProjectId": null,
       "employeeCount": 6,
       "salesUnitId": 1,
       "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
       "teamLead": {
         "id": 123,
         "firstName": "John",
@@ -770,7 +818,7 @@ This API retrieves all teams in the Sales department with optional unit filterin
 
 ---
 
-## 10. Assign Team to Sales Unit
+## 10. Assign Team to New Sales Unit
 
 ### Method and Endpoint
 - **Method**: `POST`
@@ -883,19 +931,65 @@ This API assigns a team to a sales unit. The flow includes:
 
 ---
 
-## 11. Unassign Team from Sales Unit
+## 11. Unassign Team from Previous Sales Unit
 
 ### Method and Endpoint
 - **Method**: `DELETE`
 - **Endpoint**: `/sales/teams/unassign/:teamId`
 
 ### API Description and Flow
-**Note: This API is not yet implemented due to unclear business requirements.**
+This API unassigns a team from its current sales unit. The flow includes:
+1. Validates that the team exists
+2. Checks if team is assigned to any sales unit
+3. Unassigns team from the sales unit (no restrictions)
+4. Returns success response with unassignment details
 
-This API would unassign a team from its current sales unit. The implementation would need to consider:
-1. Whether teams with active leads can be unassigned
-2. Business rules for unassignment in sales context
-3. How to handle team members with ongoing lead activities
+### Request Body/Parameters
+- **Path Parameter**: `teamId` (number) - Team ID to unassign
+- **Request Body**: None
+
+### Response Format
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "Team \"Sales Team A\" successfully unassigned from sales unit \"Sales Unit A\"",
+  "data": {
+    "teamId": 1,
+    "teamName": "Sales Team A",
+    "teamLead": {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe"
+    },
+    "previousUnit": {
+      "id": 1,
+      "name": "Sales Unit A"
+    }
+  }
+}
+```
+
+**Error Responses:**
+
+**Not Found Error (404):**
+```json
+{
+  "statusCode": 404,
+  "message": "Team with ID 123 does not exist",
+  "error": "Not Found"
+}
+```
+
+**Bad Request Error (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "Team is not assigned to any sales unit",
+  "error": "Bad Request"
+}
+```
 
 ### Access Control
 - **Authentication**: JWT token required
@@ -1012,7 +1106,7 @@ This API retrieves all teams assigned to a specific sales unit. The flow include
 
 ---
 
-## 13. Get Available Teams
+## 13. Get Available Teams No Unit 
 
 ### Method and Endpoint
 - **Method**: `GET`
@@ -1042,7 +1136,6 @@ This API retrieves all teams that are available for assignment to sales units. T
       "id": 2,
       "name": "QA Team",
       "teamLeadId": 456,
-      "currentProjectId": null,
       "employeeCount": 5,
       "salesUnitId": null,
       "createdAt": "2024-01-20T14:30:00Z",
@@ -1081,74 +1174,7 @@ This API retrieves all teams that are available for assignment to sales units. T
 
 ---
 
-## 14. Sync Completed Leads Counter
 
-**Endpoint**: `POST /sales/teams/:teamId/sync-completed-leads`
-
-**Description**: Synchronizes the completed leads counter for a team by counting actual completed leads in the leads table and updating the team's counter.
-
-**Request Body**: None (uses team ID from URL)
-
-**API Description and Flow**:
-1. **Team Validation**: Ensures the team exists and is assigned to a sales unit
-2. **Leads Count**: Queries the leads table for completed leads in the team's sales unit
-3. **Counter Update**: Updates the team's `completedLeads` field with the actual count
-4. **Response**: Returns the synced counter value
-
-**Success Response**:
-```json
-{
-  "success": true,
-  "message": "Completed leads counter synced for team ID 8",
-  "data": {
-    "teamId": 8,
-    "salesUnitId": 10,
-    "completedLeads": 5
-  }
-}
-```
-
-## 15. Update Completed Leads Counter
-
-**Endpoint**: `POST /sales/teams/update-completed-leads-counter`
-
-**Description**: Updates the completed leads counter for all teams in a sales unit when lead status changes. This is typically called internally when lead status is updated.
-
-**Request Body**:
-```json
-{
-  "salesUnitId": 10,
-  "increment": true
-}
-```
-
-**Required Fields**:
-- `salesUnitId`: ID of the sales unit
-- `increment`: Boolean - true to increment, false to decrement
-
-**API Description and Flow**:
-1. **Sales Unit Validation**: Ensures the sales unit exists
-2. **Team Discovery**: Finds all teams assigned to the sales unit
-3. **Counter Update**: Updates `completedLeads` counter for each team
-4. **Response**: Confirms the update operation
-
-**Success Response**:
-```json
-{
-  "success": true,
-  "message": "Completed leads counter updated for sales unit 10",
-  "data": {
-    "salesUnitId": 10,
-    "teamsUpdated": 2,
-    "operation": "increment"
-  }
-}
-```
-
-### Access Control
-- **Roles**: `dep_manager`, `unit_head`
-- **Department**: Sales
-- **Authentication**: JWT required
 
 ---
 
@@ -1186,9 +1212,9 @@ This API retrieves all teams that are available for assignment to sales units. T
 4. **Department Boundary**: All operations are strictly limited to Sales department data
 
 ### Team Success Metrics:
-1. **Completed Leads**: Team performance is measured by completed leads count
-2. **Lead Status**: Only leads with 'completed' status count towards team success
-3. **Team Evaluation**: Teams are judged based on their ability to convert leads to completed status
+1. **Completed Leads**: Team performance is measured by the completed leads count stored in the database
+2. **Performance Tracking**: The completed leads field is maintained separately and displayed in team details
+3. **Team Evaluation**: Teams are evaluated based on their completed leads counter
 
 ### Unit Assignment Rules:
 1. **One Unit Per Team**: A team can only be assigned to one sales unit at a time
@@ -1214,7 +1240,7 @@ This API retrieves all teams that are available for assignment to sales units. T
 | Add Team Member | ✅ | ✅ | ❌ | ❌ |
 | Remove Team Member | ✅ | ✅ | ❌ | ❌ |
 | Unassign All From Team | ✅ | ✅ | ❌ | ❌ |
-| Delete Team | ✅ | ✅ | ❌ | ❌ |
+| Delete Team | ✅ | ❌ | ❌ | ❌ |
 | Assign Team to Unit | ✅ | ❌ | ❌ | ❌ |
 | Unassign Team from Unit | ✅ | ❌ | ❌ | ❌ |
 | View Teams in Unit | ✅ | ✅ | ✅ | ✅ |
@@ -1245,7 +1271,7 @@ This API retrieves all teams that are available for assignment to sales units. T
 2. **Team Lead Replacement**: UPDATE teams and employees tables
 3. **Employee Assignment**: UPDATE employees table
 4. **Team Queries**: SELECT with JOINs for comprehensive data
-5. **Lead Metrics**: COUNT leads with completed status for team performance
+5. **Completed Leads**: READ from team's completedLeads field for performance metrics
 
 ---
 
