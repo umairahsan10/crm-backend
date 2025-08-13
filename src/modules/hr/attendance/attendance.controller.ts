@@ -23,8 +23,11 @@ import { LeaveLogsListResponseDto } from './dto/leave-logs-list-response.dto';
 import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
 import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { ProcessLeaveActionDto } from './dto/process-leave-action.dto';
+import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
+import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
+import { FutureHolidayTrigger } from './triggers/future-holiday-trigger';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PermissionName } from '../../../common/constants/permission.enum';
@@ -37,7 +40,9 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly monthlyLatesResetTrigger: MonthlyLatesResetTrigger,
-    private readonly quarterlyLeavesUpdateTrigger: QuarterlyLeavesUpdateTrigger
+    private readonly quarterlyLeavesUpdateTrigger: QuarterlyLeavesUpdateTrigger,
+    private readonly weekendAutoPresentTrigger: WeekendAutoPresentTrigger,
+    private readonly futureHolidayTrigger: FutureHolidayTrigger
   ) {}
 
   @Get('logs')
@@ -318,5 +323,83 @@ export class AttendanceController {
   async triggerAutoMarkAbsent(): Promise<{ message: string; absent_marked: number; leave_applied: number }> {
     return this.attendanceService.autoMarkAbsent();
   }
-}
 
+  @Post('triggers/weekend-auto-present/override')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async triggerWeekendAutoPresentOverride(): Promise<{ message: string; marked_present: number; errors: number }> {
+    const result = await this.weekendAutoPresentTrigger.manualOverride();
+    return {
+      message: 'Weekend auto-present override activated successfully (bypassing weekend check)',
+      marked_present: result.marked_present,
+      errors: result.errors
+    };
+  }
+
+  @Get('triggers/weekend-status')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getWeekendStatus(): Promise<{
+    isWeekend: boolean;
+    dayOfWeek: number;
+    dayName: string;
+    currentTime: string;
+    activeEmployees: number;
+  }> {
+    return this.weekendAutoPresentTrigger.getWeekendStatus();
+  }
+
+  // ==================== FUTURE HOLIDAY TRIGGER ENDPOINTS ====================
+
+  /**
+   * Get status of future holiday trigger
+   * Shows if trigger is active, next check time, and today's holiday status
+   */
+  @Get('triggers/future-holiday-status')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getFutureHolidayTriggerStatus(): Promise<{
+    isActive: boolean;
+    nextCheck: string;
+    todayHoliday?: string;
+    activeEmployees: number;
+  }> {
+    return this.futureHolidayTrigger.getTriggerStatus();
+  }
+
+  /**
+   * Manually trigger future holiday attendance marking for a specific date
+   * Useful for testing or immediate processing
+   */
+  @Post('triggers/future-holiday-manual/:date')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async manualTriggerFutureHoliday(@Param('date') date: string): Promise<{
+    marked_present: number;
+    errors: number;
+    message: string;
+  }> {
+    try {
+      // Validate date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(date)) {
+        throw new BadRequestException('Date must be in YYYY-MM-DD format');
+      }
+
+      return await this.futureHolidayTrigger.manualTriggerForDate(date);
+    } catch (error) {
+      this.logger.error(`Error in manual future holiday trigger: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Post('bulk-mark-present')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async bulkMarkPresent(@Body() bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
+    return this.attendanceService.bulkMarkAllEmployeesPresent(bulkMarkData);
+  }
+}

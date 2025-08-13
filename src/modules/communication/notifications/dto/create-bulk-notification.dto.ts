@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsNumber, IsEnum } from 'class-validator';
 import { NotificationStatus, UserType, NotificationType } from '@prisma/client';
 
-export class CreateNotificationDto {
+export class CreateBulkNotificationDto {
   @IsString()
   heading: string;
 
@@ -10,11 +10,7 @@ export class CreateNotificationDto {
 
   @IsOptional()
   @IsNumber()
-  sentTo?: number; // Optional for bulk notifications
-
-  @IsOptional()
-  @IsNumber()
-  sentBy?: number; 
+  sentBy?: number;
 
   @IsEnum(UserType)
   userType: UserType;
@@ -24,7 +20,7 @@ export class CreateNotificationDto {
 
   @IsOptional()
   @IsNumber()
-  targetDepartmentId?: number; // For department-specific bulk notifications
+  targetDepartmentId?: number; // Required for 'bulk_department', null for 'bulk_all'
 
   @IsOptional()
   @IsEnum(NotificationStatus)

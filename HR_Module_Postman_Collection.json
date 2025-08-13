@@ -652,6 +652,187 @@
               "path": ["hr", "attendance", "trigger", "auto-mark-absent"]
             }
           }
+        },
+        {
+          "name": "Bulk Mark All Employees Present",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{$timestamp}}\",\n  \"reason\": \"System outage prevented normal attendance recording\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/hr/attendance/bulk-mark-present",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "hr",
+                "attendance",
+                "bulk-mark-present"
+              ]
+            },
+            "description": "Marks all active employees as present for a specific date. This is useful for situations like system outages, power failures, or technical issues that prevented normal attendance recording. **Important: Works for current day and past dates, but not for future dates.**"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Holiday Management",
+      "item": [
+        {
+          "name": "Create Holiday",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"holidayName\": \"Independence Day\",\n  \"holidayDate\": \"2025-08-14\",\n  \"description\": \"National Independence Day holiday\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/hr/attendance/holidays",
+              "host": ["{{base_url}}"],
+              "path": [
+                "hr",
+                "attendance",
+                "holidays"
+              ]
+            },
+            "description": "Creates a new holiday. If the holiday date is in the past, attendance records are automatically adjusted for all active employees."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Holidays",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hr/attendance/holidays?year=2025&month=8",
+              "host": ["{{base_url}}"],
+              "path": [
+                "hr",
+                "attendance",
+                "holidays"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2025"
+                },
+                {
+                  "key": "month",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": "Retrieves all holidays with optional filtering by year and month."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Holiday by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hr/attendance/holidays/1",
+              "host": ["{{base_url}}"],
+              "path": [
+                "hr",
+                "attendance",
+                "holidays",
+                "1"
+              ]
+            },
+            "description": "Retrieves a specific holiday by its ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Upcoming Holidays",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hr/attendance/holidays/upcoming?limit=10",
+              "host": ["{{base_url}}"],
+              "path": [
+                "hr",
+                "attendance",
+                "holidays",
+                "upcoming"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Retrieves upcoming holidays with optional limit parameter (1-100)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Holiday Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hr/attendance/holidays/stats?year=2025",
+              "host": ["{{base_url}}"],
+              "path": [
+                "hr",
+                "attendance",
+                "holidays",
+                "stats"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2025"
+                }
+              ]
+            },
+            "description": "Retrieves holiday statistics including total holidays, holidays by year, and upcoming holidays."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Holiday",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/hr/attendance/holidays/1",
+              "host": ["{{base_url}}"],
+              "path": [
+                "hr",
+                "attendance",
+                "holidays",
+                "1"
+              ]
+            },
+            "description": "Deletes a holiday. **Restrictions apply:** Only future holidays can be deleted, not on the same day, not one day before, and emergency holidays cannot be deleted after creation."
+          },
+          "response": []
         }
       ]
     },

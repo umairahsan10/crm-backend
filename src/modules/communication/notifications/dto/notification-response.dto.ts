@@ -1,4 +1,4 @@
-import { NotificationStatus, UserType } from '@prisma/client';
+import { NotificationStatus, UserType, NotificationType } from '@prisma/client';
 
 export class NotificationResponseDto {
   id: number;
@@ -7,6 +7,8 @@ export class NotificationResponseDto {
   sentTo: number;
   sentBy?: number;
   userType: UserType;
+  notificationType: NotificationType;
+  targetDepartmentId?: number | null;
   status: NotificationStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -33,4 +35,9 @@ export class NotificationResponseDto {
       name: string;
     };
   };
+
+  targetDepartment?: {
+    id: number;
+    name: string;
+  } | null;
 }
