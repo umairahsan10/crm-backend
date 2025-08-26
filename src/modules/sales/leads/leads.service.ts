@@ -351,6 +351,11 @@ export class LeadsService {
                                 createdAt: new Date() // Add required createdAt field
                             }
                         });
+
+                        // Delete the lead from leads table after archiving
+                        await prisma.lead.delete({
+                            where: { id }
+                        });
                     } else {
                         // Just update the failed count
                         await prisma.lead.update({
@@ -376,7 +381,11 @@ export class LeadsService {
                 });
 
                 // Special handling for "cracked" status
-                if (updateLeadDto.status === 'cracked' && lead.outcome === 'interested') {
+                if (updateLeadDto.status === 'cracked') {
+                    // Validate that lead must have "interested" outcome to be cracked
+                    if (lead.outcome !== 'interested') {
+                        throw new BadRequestException('Lead must have "interested" outcome before it can be marked as cracked');
+                    }
                     // Validate required fields for cracked lead
                     if (!updateLeadDto.industryId) {
                         throw new BadRequestException('industryId is required when marking lead as cracked');
@@ -389,6 +398,14 @@ export class LeadsService {
                     }
                     if (!userId) {
                         throw new BadRequestException('closedById (current user) is required when marking lead as cracked');
+                    }
+
+                    // Validate industry exists
+                    const industry = await prisma.industry.findUnique({
+                        where: { id: updateLeadDto.industryId }
+                    });
+                    if (!industry) {
+                        throw new BadRequestException('Industry with the provided industryId does not exist');
                     }
 
                     // Create cracked lead record
