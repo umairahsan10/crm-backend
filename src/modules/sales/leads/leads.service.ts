@@ -43,7 +43,7 @@ export class LeadsService {
 
     async findAll(query: any, userRole: string, userUnitId?: number) {
         console.log('🔍 findAll called with userRole:', userRole, 'userUnitId:', userUnitId);
-        
+
         const where: any = {};
 
         // Apply filters
@@ -325,7 +325,7 @@ export class LeadsService {
 
                     // Check if failedCount reaches 4 (configurable threshold)
                     if (newFailedCount >= 4) {
-                                                // Mark Status as "failed"
+                        // Mark Status as "failed"
                         await prisma.lead.update({
                             where: { id },
                             data: {
@@ -378,8 +378,17 @@ export class LeadsService {
                 // Special handling for "cracked" status
                 if (updateLeadDto.status === 'cracked' && lead.outcome === 'interested') {
                     // Validate required fields for cracked lead
-                    if (!updateLeadDto.industryId || !updateLeadDto.totalAmount || !updateLeadDto.commission) {
-                        throw new BadRequestException('industryId, totalAmount, and commission are required when marking lead as cracked');
+                    if (!updateLeadDto.industryId) {
+                        throw new BadRequestException('industryId is required when marking lead as cracked');
+                    }
+                    if (!updateLeadDto.totalAmount) {
+                        throw new BadRequestException('totalAmount is required when marking lead as cracked');
+                    }
+                    if (!updateLeadDto.commission) {
+                        throw new BadRequestException('commission is required when marking lead as cracked');
+                    }
+                    if (!userId) {
+                        throw new BadRequestException('closedById (current user) is required when marking lead as cracked');
                     }
 
                     // Create cracked lead record
@@ -406,53 +415,64 @@ export class LeadsService {
                     });
                 }
 
-                                        // Special handling for "completed" status
-                        if (updateLeadDto.status === 'completed') {
-                            // Automatically change type to upsell
-                            await prisma.lead.update({
-                                where: { id },
+                // Special handling for "completed" status
+                if (updateLeadDto.status === 'completed') {
+                    // Validate that lead has required fields for completion
+                    if (!lead.crackedById) {
+                        throw new BadRequestException('Lead must be cracked before it can be marked as completed');
+                    }
+                    if (!lead.assignedToId) {
+                        throw new BadRequestException('Lead must be assigned to an employee before it can be marked as completed');
+                    }
+                    if (!lead.startedById) {
+                        throw new BadRequestException('Lead must have a started by employee before it can be marked as completed');
+                    }
+
+                    // Automatically change type to upsell
+                    await prisma.lead.update({
+                        where: { id },
+                        data: {
+                            type: 'upsell',
+                            closedAt: new Date(),
+                            closedById: userId
+                        }
+                    });
+
+                    // Get commission rate from sales department and update cracked lead
+                    if (lead.crackedById) {
+                        const salesDept = await prisma.salesDepartment.findFirst({
+                            where: { employeeId: lead.crackedById }
+                        });
+
+                        if (salesDept?.commissionRate) {
+                            // Update commission rate in cracked_leads table
+                            await prisma.crackedLead.updateMany({
+                                where: { leadId: id },
                                 data: {
-                                    type: 'upsell',
-                                    closedAt: new Date(),
-                                    closedById: userId
+                                    commissionRate: salesDept.commissionRate
                                 }
                             });
-
-                            // Get commission rate from sales department and update cracked lead
-                            if (lead.crackedById) {
-                                const salesDept = await prisma.salesDepartment.findFirst({
-                                    where: { employeeId: lead.crackedById }
-                                });
-
-                                if (salesDept?.commissionRate) {
-                                    // Update commission rate in cracked_leads table
-                                    await prisma.crackedLead.updateMany({
-                                        where: { leadId: id },
-                                        data: {
-                                            commissionRate: salesDept.commissionRate
-                                        }
-                                    });
-                                }
-
-                                // Update team statistics
-                                const employee = await prisma.employee.findUnique({
-                                    where: { id: lead.crackedById },
-                                    include: { teamsAsLead: true }
-                                });
-
-                                if (employee?.teamsAsLead?.[0]) {
-                                    const teamId = employee.teamsAsLead[0].id;
-
-                                    // Update team statistics
-                                    await prisma.team.update({
-                                        where: { id: teamId },
-                                        data: {
-                                            completedLeads: { increment: 1 }
-                                        }
-                                    });
-                                }
-                            }
                         }
+
+                        // Update team statistics
+                        const employee = await prisma.employee.findUnique({
+                            where: { id: lead.crackedById },
+                            include: { teamsAsLead: true }
+                        });
+
+                        if (employee?.teamsAsLead?.[0]) {
+                            const teamId = employee.teamsAsLead[0].id;
+
+                            // Update team statistics
+                            await prisma.team.update({
+                                where: { id: teamId },
+                                data: {
+                                    completedLeads: { increment: 1 }
+                                }
+                            });
+                        }
+                    }
+                }
             }
 
             // Handle push action
@@ -514,64 +534,6 @@ export class LeadsService {
         });
     }
 
-    async markUpsell(id: number, markUpsellDto: MarkUpsellDto, userId: number) {
-        const lead = await this.prisma.lead.findUnique({
-            where: { id }
-        });
-
-        if (!lead) {
-            throw new NotFoundException('Lead not found');
-        }
-
-        if (lead.status !== 'completed') {
-            throw new BadRequestException('Lead must be completed to mark as upsell');
-        }
-
-        return await this.prisma.$transaction(async (prisma) => {
-            // Create comment
-            const comment = await prisma.leadComment.create({
-                data: {
-                    leadId: id,
-                    commentBy: userId,
-                    commentText: markUpsellDto.comment
-                }
-            });
-
-            // Create history
-            await prisma.leadOutcomeHistory.create({
-                data: {
-                    leadId: id,
-                    outcome: 'upsell',
-                    changedBy: userId,
-                    commentId: comment.id
-                }
-            });
-
-            // Update lead type
-            const updatedLead = await prisma.lead.update({
-                where: { id },
-                data: {
-                    type: 'upsell',
-                    updatedAt: new Date()
-                }
-            });
-
-            return {
-                ...updatedLead,
-                comment: {
-                    id: comment.id,
-                    commentText: markUpsellDto.comment,
-                    commentBy: userId
-                },
-                outcomeHistory: {
-                    outcome: 'upsell',
-                    changedBy: userId,
-                    commentId: comment.id
-                }
-            };
-        });
-    }
-
     async getCrackedLeads(query: any) {
         const where: any = {};
 
@@ -612,35 +574,6 @@ export class LeadsService {
         };
     }
 
-    async updateCrackedLead(id: number, updateCrackedLeadDto: UpdateCrackedLeadDto) {
-        const crackedLead = await this.prisma.crackedLead.findUnique({
-            where: { id }
-        });
-
-        if (!crackedLead) {
-            throw new NotFoundException('Cracked lead not found');
-        }
-
-        const updatedCrackedLead = await this.prisma.crackedLead.update({
-            where: { id },
-            data: {
-                ...updateCrackedLeadDto,
-                updatedAt: new Date()
-            },
-            include: {
-                lead: {
-                    include: {
-                        assignedTo: { select: { firstName: true, lastName: true } },
-                        salesUnit: { select: { name: true } }
-                    }
-                },
-                employee: { select: { firstName: true, lastName: true } }
-            }
-        });
-
-        return updatedCrackedLead;
-    }
-
     // Additional utility method for bulk operations
     async bulkUpdateLeads(leadIds: number[], updateData: Partial<UpdateLeadDto>, userId: number) {
         const results = await Promise.allSettled(
@@ -666,7 +599,7 @@ export class LeadsService {
     // Method to get lead statistics
     async getLeadStatistics(userRole: string, userUnitId?: number) {
         const where: any = {};
-        
+
         // Apply unit restriction for non-admin users
         if (userUnitId && userRole !== 'admin') {
             where.salesUnitId = userUnitId;

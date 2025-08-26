@@ -15,8 +15,6 @@ import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { RequestLeadsDto } from './dto/request-leads.dto';
-import { MarkUpsellDto } from './dto/mark-upsell.dto';
-import { UpdateCrackedLeadDto } from './dto/update-cracked-lead.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { LeadsAccessGuard, LeadCreationGuard } from './guards';
 
@@ -63,27 +61,9 @@ export class LeadsController {
     return this.leadsService.update(id, updateLeadDto, userId);
   }
 
-  @Put(':id/upsell')
-  markUpsell(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() markUpsellDto: MarkUpsellDto,
-    @Request() req: any
-  ) {
-    const userId = req.user.id;
-    return this.leadsService.markUpsell(id, markUpsellDto, userId);
-  }
-
   @Get('cracked-leads')
   getCrackedLeads(@Query() query: any) {
     return this.leadsService.getCrackedLeads(query);
-  }
-
-  @Put('cracked-leads/:id')
-  updateCrackedLead(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateCrackedLeadDto: UpdateCrackedLeadDto
-  ) {
-    return this.leadsService.updateCrackedLead(id, updateCrackedLeadDto);
   }
 
   @Post('bulk-update')
