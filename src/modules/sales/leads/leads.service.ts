@@ -289,6 +289,7 @@ export class LeadsService {
             let commentId: number | null = null;
             let crackedLeadData: any = null;
             let teamUpdateData: any = null;
+            let isLeadArchived = false;
 
             // Create comment if provided
             if (updateLeadDto.comment) {
@@ -308,6 +309,11 @@ export class LeadsService {
                     throw new BadRequestException('Comment is required when updating outcome');
                 }
 
+                // Check if lead is in progress before setting outcome to interested
+                if (updateLeadDto.outcome === 'interested' && lead.status !== 'in_progress') {
+                    throw new BadRequestException('Lead must be in progress before it can be marked as interested');
+                }
+
                 // Create outcome history
                 await prisma.leadOutcomeHistory.create({
                     data: {
@@ -320,11 +326,16 @@ export class LeadsService {
 
                 // Automatic Failed Lead Handling (if outcome = "denied")
                 if (updateLeadDto.outcome === 'denied') {
+                    console.log('🔍 Lead denied - current failedCount:', lead.failedCount);
+                    
                     // Increment failedCount by 1
                     const newFailedCount = (lead.failedCount || 0) + 1;
+                    console.log('🔍 New failedCount will be:', newFailedCount);
 
                     // Check if failedCount reaches 4 (configurable threshold)
                     if (newFailedCount >= 4) {
+                        console.log('🔍 Lead reached 4 denials - marking as failed and archiving');
+                        
                         // Mark Status as "failed"
                         await prisma.lead.update({
                             where: { id },
@@ -335,6 +346,7 @@ export class LeadsService {
                                 closedById: userId
                             }
                         });
+                        console.log('🔍 Lead marked as failed successfully');
 
                         // Move the lead to archived_leads table
                         await prisma.archiveLead.create({
@@ -351,12 +363,13 @@ export class LeadsService {
                                 createdAt: new Date() // Add required createdAt field
                             }
                         });
+                        console.log('🔍 Lead moved to archived_leads successfully');
 
-                        // Delete the lead from leads table after archiving
-                        await prisma.lead.delete({
-                            where: { id }
-                        });
+                        // Mark that lead has been archived
+                        isLeadArchived = true;
+                        console.log('🔍 Lead archived flag set to true');
                     } else {
+                        console.log('🔍 Lead denied but not yet at threshold - updating failed count only');
                         // Just update the failed count
                         await prisma.lead.update({
                             where: { id },
@@ -366,6 +379,17 @@ export class LeadsService {
                         });
                     }
                 }
+            }
+
+            // If lead was archived, return early with success message
+            if (isLeadArchived) {
+                console.log('🔍 Returning early due to lead being archived');
+                return {
+                    message: 'Lead moved to Archived lead',
+                    leadId: id,
+                    status: 'failed',
+                    archived: true
+                };
             }
 
             // Handle status update
@@ -380,21 +404,45 @@ export class LeadsService {
                     }
                 });
 
+                // Ensure lead has proper ownership when status is set to in_progress
+                if (updateLeadDto.status === 'in_progress') {
+                    // Set startedById and assignedToId to current user if not already set
+                    if (!lead.startedById) {
+                        await prisma.lead.update({
+                            where: { id },
+                            data: { startedById: userId }
+                        });
+                    }
+                    if (!lead.assignedToId) {
+                        await prisma.lead.update({
+                            where: { id },
+                            data: { assignedToId: userId }
+                        });
+                    }
+                }
+
                 // Special handling for "cracked" status
                 if (updateLeadDto.status === 'cracked') {
                     // Validate that lead must have "interested" outcome to be cracked
                     if (lead.outcome !== 'interested') {
                         throw new BadRequestException('Lead must have "interested" outcome before it can be marked as cracked');
                     }
+                    
+                    // Validate that lead must have startedBy and assignedTo set to the current user
+                    if (!lead.startedById || lead.startedById !== userId) {
+                        throw new BadRequestException('Lead must be started by the current user before it can be marked as cracked');
+                    }
+                    
+                    if (!lead.assignedToId || lead.assignedToId !== userId) {
+                        throw new BadRequestException('Lead must be assigned to the current user before it can be marked as cracked');
+                    }
+                    
                     // Validate required fields for cracked lead
                     if (!updateLeadDto.industryId) {
                         throw new BadRequestException('industryId is required when marking lead as cracked');
                     }
                     if (!updateLeadDto.totalAmount) {
                         throw new BadRequestException('totalAmount is required when marking lead as cracked');
-                    }
-                    if (!updateLeadDto.commission) {
-                        throw new BadRequestException('commission is required when marking lead as cracked');
                     }
                     if (!userId) {
                         throw new BadRequestException('closedById (current user) is required when marking lead as cracked');
@@ -408,6 +456,17 @@ export class LeadsService {
                         throw new BadRequestException('Industry with the provided industryId does not exist');
                     }
 
+                    // Automatically fetch commission rate from sales department
+                    const salesDept = await prisma.salesDepartment.findFirst({
+                        where: { employeeId: userId }
+                    });
+
+                    if (!salesDept?.commissionRate) {
+                        throw new BadRequestException('Commission rate not found for the current user in sales department');
+                    }
+
+                    const commissionRate = Number(salesDept.commissionRate);
+
                     // Create cracked lead record
                     crackedLeadData = await prisma.crackedLead.create({
                         data: {
@@ -415,7 +474,7 @@ export class LeadsService {
                             closedBy: userId,
                             industryId: updateLeadDto.industryId,
                             amount: updateLeadDto.totalAmount,
-                            commissionRate: updateLeadDto.commission,
+                            commissionRate: commissionRate,
                             description: updateLeadDto.description || '',
                             totalPhases: updateLeadDto.totalPhases || 1,
                             currentPhase: updateLeadDto.currentPhase || 1
@@ -652,3 +711,4 @@ export class LeadsService {
         };
     }
 }
+

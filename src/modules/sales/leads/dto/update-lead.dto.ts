@@ -29,10 +29,6 @@ export class UpdateLeadDto {
 
   @IsOptional()
   @IsNumber()
-  commission?: number;
-
-  @IsOptional()
-  @IsNumber()
   industryId?: number;
 
   @IsOptional()
