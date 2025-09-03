@@ -577,6 +577,7 @@ model CrackedLead {
 
   // Opposite relations
   projects Project[]
+  payments ClientPayment[] @relation("CrackedLeadPayment")
 
   @@map("cracked_leads")
 }
@@ -1534,6 +1535,7 @@ model ClientPayment {
   clientId      Int           @map("client_id")
   invoiceId     Int?          @map("invoice_id")
   projectId     Int?          @map("project_id")
+  crackedLeadId Int?          @map("cracked_lead_id")
   paymentDate   DateTime      @default(now()) @map("payment_date")
   amountPaid    Decimal       @map("amount_paid") @db.Decimal(12, 2)
   paymentMethod String        @map("payment_method") @db.VarChar(50)
@@ -1546,10 +1548,11 @@ model ClientPayment {
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
   // Foreign key relations
-  client   Client   @relation("ClientPayment", fields: [clientId], references: [id])
-  invoice  Invoice? @relation("InvoicePayment", fields: [invoiceId], references: [id])
-  project  Project? @relation("ProjectPayment", fields: [projectId], references: [id])
-  employee Employee @relation("PaymentProcessor", fields: [paymentPhase], references: [id])
+  client      Client      @relation("ClientPayment", fields: [clientId], references: [id])
+  invoice     Invoice?    @relation("InvoicePayment", fields: [invoiceId], references: [id])
+  project     Project?    @relation("ProjectPayment", fields: [projectId], references: [id])
+  employee    Employee    @relation("PaymentProcessor", fields: [paymentPhase], references: [id])
+  crackedLead CrackedLead? @relation("CrackedLeadPayment", fields: [crackedLeadId], references: [id])
 
   @@map("client_payment")
 }
