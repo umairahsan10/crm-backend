@@ -2,10 +2,14 @@ import { Injectable, BadRequestException, ForbiddenException, NotFoundException 
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { GeneratePaymentLinkDto } from './dto/generate-payment-link.dto';
 import { PaymentLinkResponseDto } from './dto/payment-link-response.dto';
+import { RevenueService } from '../../finance/accountant/revenue/revenue.service';
 
 @Injectable()
 export class PaymentsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private revenueService: RevenueService
+    ) { }
 
     async generatePaymentLink(
         dto: GeneratePaymentLinkDto,
@@ -99,13 +103,36 @@ export class PaymentsService {
                     }
                 });
 
+                // Get max invoice ID and increment by 1
+                const maxInvoice = await prisma.invoice.findFirst({
+                    orderBy: { id: 'desc' }
+                });
+                const nextInvoiceId = (maxInvoice?.id || 0) + 1;
+
+                // Create invoice record with custom ID
+                const invoice = await prisma.invoice.create({
+                    data: {
+                        id: nextInvoiceId,
+                        leadId: dto.leadId,
+                        issueDate: new Date(),
+                        amount: dto.amount,
+                        notes: `Invoice generated for payment link - Lead ${dto.leadId} - Client: ${client.clientName}`
+                    }
+                });
+
+                // Update transaction with invoice ID
+                const updatedTransaction = await prisma.transaction.update({
+                    where: { id: transaction.id },
+                    data: { invoiceId: invoice.id }
+                });
+
                 // Update lead status to payment_link_generated
                 await prisma.lead.update({
                     where: { id: dto.leadId },
                     data: { status: 'payment_link_generated' }
                 });
 
-                return { client, transaction };
+                return { client, transaction: updatedTransaction, invoice };
             });
 
             return {
@@ -114,6 +141,7 @@ export class PaymentsService {
                 data: {
                     clientId: result.client.id,
                     transactionId: result.transaction.id,
+                    invoiceId: result.invoice.id,
                     paymentLink: `https://payment.example.com/pay/${result.transaction.id}`, // TODO: Generate actual payment link
                     leadStatus: 'payment_link_generated'
                 }
@@ -261,5 +289,86 @@ export class PaymentsService {
                 }
             }
         };
+    }
+
+    // Method to handle payment completion and generate revenue
+    async handlePaymentCompletion(
+        transactionId: number,
+        userId: number,
+        paymentDetails: {
+            amount: number;
+            paymentMethod: string;
+            category?: string;
+        }
+    ) {
+        try {
+            // 1. Verify transaction exists and user has access
+            const transaction = await this.prisma.transaction.findFirst({
+                where: { id: transactionId },
+                include: { client: true, invoice: true }
+            });
+
+            if (!transaction) {
+                throw new NotFoundException('Transaction not found');
+            }
+
+            if (transaction.employeeId !== userId) {
+                throw new ForbiddenException('Only the creator can complete this payment');
+            }
+
+            // // 2. Update transaction status to completed
+            // const updatedTransaction = await this.prisma.transaction.update({
+            //     where: { id: transactionId },
+            //     data: { status: 'completed' }
+            // });
+
+            // 3. Generate revenue using existing revenue service
+            const revenueDto = {
+                source: 'Lead Revenue',
+                category: paymentDetails.category || 'Payment Link Revenue',
+                amount: paymentDetails.amount,
+                receivedFrom: transaction.invoice?.leadId || undefined,
+                receivedOn: new Date().toISOString(),
+                paymentMethod: (paymentDetails.paymentMethod as any) || 'bank',
+                relatedInvoiceId: transaction.invoiceId || undefined,
+                transactionId: transactionId
+            };
+
+            const revenueResult = await this.revenueService.createRevenue(revenueDto, userId);
+
+            if (revenueResult.status === 'error') {
+                // If revenue creation fails, revert transaction status
+                await this.prisma.transaction.update({
+                    where: { id: transactionId },
+                    data: { status: 'pending' }
+                });
+                throw new BadRequestException(`Revenue creation failed: ${revenueResult.message}`);
+            }
+
+            return {
+                success: true,
+                message: 'Payment completed and revenue generated successfully',
+                data: {
+                    transactionId: transactionId,
+                    transactionStatus: 'completed',
+                    revenue: (revenueResult as any).data?.revenue,
+                    clientId: transaction.clientId,
+                    invoiceId: transaction.invoiceId
+                }
+            };
+
+        } catch (error) {
+            if (error instanceof BadRequestException ||
+                error instanceof ForbiddenException ||
+                error instanceof NotFoundException) {
+                throw error;
+            }
+
+            return {
+                success: false,
+                message: 'Payment completion failed',
+                error: error.message
+            };
+        }
     }
 }

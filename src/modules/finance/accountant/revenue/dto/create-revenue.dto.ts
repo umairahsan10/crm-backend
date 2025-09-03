@@ -30,5 +30,8 @@ export class CreateRevenueDto {
   @IsPositive()
   relatedInvoiceId?: number; // Invoice ID
 
-
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  transactionId?: number; // Transaction ID
 }

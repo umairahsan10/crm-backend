@@ -4,6 +4,7 @@ export class PaymentLinkResponseDto {
   data?: {
     clientId: number;
     transactionId: number;
+    invoiceId: number;
     paymentLink?: string;
     leadStatus: string;
   };

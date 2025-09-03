@@ -40,4 +40,18 @@ export class PaymentsController {
     const userId = req.user.id;
     return await this.paymentsService.updatePaymentLinkDetails(transactionId, updateDto, userId);
   }
+
+  @Post('payment-link-complete/:id') //pass transactionId in getparams
+  async completePayment(
+    @Param('id', ParseIntPipe) transactionId: number,
+    @Body() paymentDetails: {
+      amount: number;
+      paymentMethod: string;
+      category?: string;
+    },
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    return await this.paymentsService.handlePaymentCompletion(transactionId, userId, paymentDetails);
+  }
 }

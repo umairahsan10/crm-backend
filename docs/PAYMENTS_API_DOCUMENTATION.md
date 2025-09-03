@@ -64,6 +64,7 @@ Generates a payment link for a cracked lead, creates client and transaction reco
   "data": {
     "clientId": 456,
     "transactionId": 789,
+    "invoiceId": 101,
     "paymentLink": "https://square.link/abc123",
     "squarePaymentLinkId": "abc123",
     "leadStatus": "payment_link_generated"
@@ -83,6 +84,7 @@ Generates a payment link for a cracked lead, creates client and transaction reco
 4. **Database Operations**: 
    - Create client record with industry ID from cracked lead
    - Create transaction record with "pending" status and Square payment link ID
+   - Create invoice record linked to the lead and transaction
    - Update lead status to "payment_link_generated"
 5. **Transaction Safety**: All operations wrapped in database transaction
 6. **Webhook Integration**: Handle real-time payment status updates from Square
@@ -99,6 +101,7 @@ Generates a payment link for a cracked lead, creates client and transaction reco
 - **`cracked_leads`**: Read industry ID and closed by user
 - **`clients`**: Create new client record
 - **`transactions`**: Create new transaction record with Square payment link ID
+- **`invoices`**: Create new invoice record linked to lead and transaction
 
 ---
 
@@ -236,13 +239,14 @@ Updates the payment link details including client information and transaction de
 4. API Call: POST /leads/payments/payment-link-generate
 5. Validation: Lead exists, user authorized, fields valid
 6. Square API: Simulated payment link generation
-7. Success Path: Create client + transaction + update lead status
+7. Success Path: Create client + transaction + invoice + update lead status
 8. Failure Path: Return error, no database changes
 ```
 
 ### Database Transaction Safety
 - **Client Creation**: Industry ID from cracked lead, createdBy = current user
 - **Transaction Creation**: Status = "pending", employeeId = current user
+- **Invoice Creation**: Linked to lead and transaction, issueDate = current date
 - **Lead Update**: Status changed to "payment_link_generated"
 - **Rollback**: If any operation fails, all changes are rolled back
 
