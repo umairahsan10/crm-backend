@@ -35,7 +35,7 @@ Generates a payment link for a cracked lead, creates client and transaction reco
   "country": "United States",
   "state": "California",
   "postalCode": "90210",
-  "amount": 1500.00,
+  "amount": 1500.00,    //phase amount <= remaining amount and remaining amount > 0
   "type": "payment",
   "method": "bank"
 }

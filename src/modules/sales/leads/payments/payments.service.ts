@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../../prisma/prisma.service';
+import { PrismaService } from '../../../../../prisma/prisma.service';
 import { GeneratePaymentLinkDto } from './dto/generate-payment-link.dto';
 import { PaymentLinkResponseDto } from './dto/payment-link-response.dto';
-import { RevenueService } from '../../finance/accountant/revenue/revenue.service';
+import { RevenueService } from '../../../finance/accountant/revenue/revenue.service';
 
 @Injectable()
 export class PaymentsService {

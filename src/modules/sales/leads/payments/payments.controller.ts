@@ -3,8 +3,8 @@ import { PaymentsService } from './payments.service';
 import { GeneratePaymentLinkDto } from './dto/generate-payment-link.dto';
 import { PaymentLinkResponseDto } from './dto/payment-link-response.dto';
 import { UpdatePaymentLinkDto } from './dto/update-payment-link.dto';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { LeadsAccessGuard } from '../leads/guards';
+import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { LeadsAccessGuard } from '../guards';
 
 @Controller('leads')
 @UseGuards(JwtAuthGuard, LeadsAccessGuard)

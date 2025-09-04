@@ -473,7 +473,7 @@ export class LeadsService {
                             leadId: id,
                             closedBy: userId,
                             industryId: updateLeadDto.industryId,
-                            amount: updateLeadDto.totalAmount,
+                            amount: updateLeadDto.totalAmount, //remaining amount = 0
                             commissionRate: commissionRate,
                             description: updateLeadDto.description || '',
                             totalPhases: updateLeadDto.totalPhases || 1,
