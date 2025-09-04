@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsEmail, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional, IsEmail, IsEnum, ValidateIf } from 'class-validator';
 import { TransactionType, PaymentWays } from '@prisma/client';
 
 export class GeneratePaymentLinkDto {
@@ -6,36 +6,46 @@ export class GeneratePaymentLinkDto {
   @IsNumber()
   leadId: number;
 
-  // Client fields
+  // Optional client ID - if provided, use existing client
+  @IsOptional()
+  @IsNumber()
+  clientId?: number;
+
+  // Client fields - required only if clientId is not provided
+  @ValidateIf(o => !o.clientId)
   @IsNotEmpty()
   @IsString()
-  clientName: string;
+  clientName?: string;
 
+  @ValidateIf(o => !o.clientId)
   @IsOptional()
   @IsString()
   companyName?: string;
 
+  @ValidateIf(o => !o.clientId)
   @IsNotEmpty()
   @IsEmail()
-  email: string;
+  email?: string;
 
+  @ValidateIf(o => !o.clientId)
   @IsNotEmpty()
   @IsString()
-  phone: string;
+  phone?: string;
 
+  @ValidateIf(o => !o.clientId)
   @IsNotEmpty()
   @IsString()
-  country: string;
+  country?: string;
 
+  @ValidateIf(o => !o.clientId)
   @IsNotEmpty()
   @IsString()
-  state: string;
+  state?: string;
 
+  @ValidateIf(o => !o.clientId)
   @IsNotEmpty()
   @IsString()
-  postalCode: string;
-
-  // industryId will be retrieved from the cracked lead, not from form
+  postalCode?: string;
 
   // Transaction fields
   @IsNotEmpty()

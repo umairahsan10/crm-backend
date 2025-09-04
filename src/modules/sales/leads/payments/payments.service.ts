@@ -41,7 +41,18 @@ export class PaymentsService {
             if (crackedLead.closedBy !== userId) {
                 throw new ForbiddenException('Only the sales representative who cracked this lead can generate payment link');
             }
+            if (crackedLead.remainingAmount !== null && dto.amount > crackedLead.remainingAmount) {
+                throw new BadRequestException(`Phase amount (${dto.amount}) cannot exceed remaining amount (${crackedLead.remainingAmount})`);
+            }
 
+            // Check if this is the final phase (current phase equals total phases)
+            if (crackedLead.currentPhase && crackedLead.totalPhases && 
+                crackedLead.currentPhase === crackedLead.totalPhases) {
+                // For final phase, amount must exactly match remaining amount
+                if (crackedLead.remainingAmount !== null && dto.amount !== crackedLead.remainingAmount) {
+                    throw new BadRequestException(`Final phase amount (${dto.amount}) must exactly match remaining amount (${crackedLead.remainingAmount})`);
+                }
+            }
             // 3. Validate all required fields (already done by DTO validation)
 
             // 4. Square API Simulation - For now, just validate fields
@@ -58,30 +69,81 @@ export class PaymentsService {
 
             // 5. Database Operations - If validation passes
             const result = await this.prisma.$transaction(async (prisma) => {
-                // Get max client ID and increment by 1
-                const maxClient = await prisma.client.findFirst({
-                    orderBy: { id: 'desc' }
-                });
-                const nextClientId = (maxClient?.id || 0) + 1;
+                let client;
 
-                // Create client record with custom ID
-                const client = await prisma.client.create({
-                    data: {
-                        id: nextClientId,
-                        clientName: dto.clientName,
-                        companyName: dto.companyName,
-                        email: dto.email,
-                        phone: dto.phone,
-                        country: dto.country,
-                        state: dto.state,
-                        postalCode: dto.postalCode,
-                        industryId: crackedLead.industryId, // Get industry ID from cracked lead
-                        passwordHash: 'temp123', // Required field
-                        accountStatus: 'prospect',
-                        createdBy: userId,
-                        notes: `Created from lead ${dto.leadId} payment link generation`
+                // If clientId is provided, update existing client
+                if (dto.clientId) {
+                    client = await prisma.client.findUnique({
+                        where: { id: dto.clientId }
+                    });
+
+                    if (!client) {
+                        throw new BadRequestException(`Client with ID ${dto.clientId} not found. Please provide client information to create a new client.`);
                     }
-                });
+
+                    // Update existing client with new information
+                    client = await prisma.client.update({
+                        where: { id: dto.clientId },
+                        data: {
+                            clientName: dto.clientName || client.clientName,
+                            companyName: dto.companyName || client.companyName,
+                            email: dto.email || client.email,
+                            phone: dto.phone || client.phone,
+                            country: dto.country || client.country,
+                            state: dto.state || client.state,
+                            postalCode: dto.postalCode || client.postalCode,
+                            notes: `Updated from lead ${dto.leadId} payment link generation`
+                        }
+                    });
+                } else {
+                    // Check if client already exists by email
+                    client = await prisma.client.findFirst({
+                        where: { email: dto.email }
+                    });
+
+                    // If client doesn't exist, create new one
+                    if (!client) {
+                        // Get max client ID and increment by 1
+                        const maxClient = await prisma.client.findFirst({
+                            orderBy: { id: 'desc' }
+                        });
+                        const nextClientId = (maxClient?.id || 0) + 1;
+
+                        // Create client record with custom ID
+                        client = await prisma.client.create({
+                            data: {
+                                id: nextClientId,
+                                clientName: dto.clientName!,
+                                companyName: dto.companyName,
+                                email: dto.email!,
+                                phone: dto.phone!,
+                                country: dto.country!,
+                                state: dto.state!,
+                                postalCode: dto.postalCode!,
+                                industryId: crackedLead.industryId, // Get industry ID from cracked lead
+                                passwordHash: 'temp123', // Required field
+                                accountStatus: 'prospect',
+                                createdBy: userId,
+                                notes: `Created from lead ${dto.leadId} payment link generation`
+                            }
+                        });
+                    } else {
+                        // Update existing client with new information if provided
+                        client = await prisma.client.update({
+                            where: { id: client.id },
+                            data: {
+                                clientName: dto.clientName!,
+                                companyName: dto.companyName!,
+                                email: dto.email!,
+                                phone: dto.phone!,
+                                country: dto.country!,
+                                state: dto.state!,
+                                postalCode: dto.postalCode!,
+                                notes: `Updated from lead ${dto.leadId} payment link generation`
+                            }
+                        });
+                    }
+                }
 
                 // Get max transaction ID and increment by 1
                 const maxTransaction = await prisma.transaction.findFirst({
@@ -205,7 +267,7 @@ export class PaymentsService {
         // Get transaction with client details
         const transaction = await this.prisma.transaction.findFirst({
             where: { id: transactionId },
-            include: { client: true }
+            include: { client: true, invoice: true }
         });
 
         if (!transaction) {
@@ -223,6 +285,27 @@ export class PaymentsService {
 
             // Prepare transaction update data
             if (updateDto.amount !== undefined) {
+                // Validate phase amount against remaining amount in cracked lead
+                if (!transaction.invoice?.leadId) {
+                    throw new BadRequestException('No associated lead found for this transaction');
+                }
+                
+                const crackedLead = await prisma.crackedLead.findFirst({
+                    where: { 
+                        leadId: transaction.invoice.leadId 
+                    }
+                });
+
+                if (crackedLead && crackedLead.remainingAmount !== null) {
+                    if (crackedLead.remainingAmount <= 0) {
+                        throw new BadRequestException('No remaining amount available for this lead');
+                    }
+                    
+                    if (updateDto.amount > crackedLead.remainingAmount) {
+                        throw new BadRequestException(`Phase amount (${updateDto.amount}) cannot exceed remaining amount (${crackedLead.remainingAmount})`);
+                    }
+                }
+                
                 updateData.amount = updateDto.amount;
             }
             if (updateDto.type !== undefined) {
@@ -261,7 +344,7 @@ export class PaymentsService {
                 updatedTransaction = await prisma.transaction.update({
                     where: { id: transactionId },
                     data: updateData,
-                    include: { client: true }
+                    include: { client: true, invoice: true }
                 });
             }
 
@@ -296,8 +379,8 @@ export class PaymentsService {
         transactionId: number,
         userId: number,
         paymentDetails: {
-            amount: number;
-            paymentMethod: string;
+            // amount: number;
+            paymentMethod?: string;
             category?: string;
         }
     ) {
@@ -315,18 +398,71 @@ export class PaymentsService {
             if (transaction.employeeId !== userId) {
                 throw new ForbiddenException('Only the creator can complete this payment');
             }
+            const amount = transaction.amount.toNumber();
 
-            // // 2. Update transaction status to completed
-            // const updatedTransaction = await this.prisma.transaction.update({
-            //     where: { id: transactionId },
-            //     data: { status: 'completed' }
-            // });
+            // 2. Complete transaction, subtract amount from remaining amount, and log client payment
+            await this.prisma.$transaction(async (prisma) => {
+                // Update transaction status to completed
+                await prisma.transaction.update({
+                    where: { id: transactionId },
+                    data: { status: 'completed' }
+                });
 
-            // 3. Generate revenue using existing revenue service
+                // Update remaining amount in cracked lead
+                let crackedLead: any = null;
+                if (transaction.invoice?.leadId) {
+                    crackedLead = await prisma.crackedLead.findFirst({
+                        where: { leadId: transaction.invoice.leadId }
+                    });
+
+                    if (crackedLead && crackedLead.remainingAmount !== null) {
+                        const newRemainingAmount = Math.max(0, crackedLead.remainingAmount - amount);
+                        await prisma.crackedLead.update({
+                            where: { id: crackedLead.id },
+                            data: { remainingAmount: newRemainingAmount }
+                        });
+                    }
+                }
+
+                // Create client payment record
+                if (transaction.clientId && transaction.invoiceId) {
+                    // Get the next available client payment ID
+                    const maxClientPaymentId = await prisma.clientPayment.aggregate({
+                        _max: { id: true }
+                    });
+                    const nextClientPaymentId = (maxClientPaymentId._max.id || 0) + 1;
+
+                    await prisma.clientPayment.create({
+                        data: {
+                            id: nextClientPaymentId,
+                            clientId: transaction.clientId,
+                            invoiceId: transaction.invoiceId,
+                            paymentDate: new Date(),
+                            amountPaid: amount,
+                            paymentMethod: paymentDetails.paymentMethod || 'bank',
+                            transactionId: transactionId.toString(),
+                            paymentStatus: 'completed',
+                            paymentPhase: 1, // Default phase, can be updated based on business logic
+                            notes: `Payment completed via payment link for transaction ${transactionId}`,
+                            cracked_lead_id: crackedLead?.id || null
+                        }
+                    });
+                }
+            });
+
+            // 3. Update lead status to completed for revenue generation
+            if (transaction.invoice?.leadId) {
+                await this.prisma.lead.update({
+                    where: { id: transaction.invoice.leadId },
+                    data: { status: 'completed' }
+                });
+            }
+
+            // 4. Generate revenue after transaction is completed
             const revenueDto = {
                 source: 'Lead Revenue',
                 category: paymentDetails.category || 'Payment Link Revenue',
-                amount: paymentDetails.amount,
+                amount: amount,
                 receivedFrom: transaction.invoice?.leadId || undefined,
                 receivedOn: new Date().toISOString(),
                 paymentMethod: (paymentDetails.paymentMethod as any) || 'bank',
@@ -337,21 +473,55 @@ export class PaymentsService {
             const revenueResult = await this.revenueService.createRevenue(revenueDto, userId);
 
             if (revenueResult.status === 'error') {
-                // If revenue creation fails, revert transaction status
-                await this.prisma.transaction.update({
-                    where: { id: transactionId },
-                    data: { status: 'pending' }
+                // If revenue creation fails, we don't revert transaction since it's already completed
+                // This is intentional - transaction completion is separate from revenue recording
+                console.warn(`Revenue creation failed for transaction ${transactionId}: ${revenueResult.message}`);
+            }
+
+            // 5. Check remaining amount and update lead status/phase accordingly
+            if (transaction.invoice?.leadId) {
+                const updatedCrackedLead = await this.prisma.crackedLead.findFirst({
+                    where: { leadId: transaction.invoice.leadId }
                 });
-                throw new BadRequestException(`Revenue creation failed: ${revenueResult.message}`);
+
+                if (updatedCrackedLead) {
+                    // If remaining amount is not 0, revert lead status to cracked and increment current phase
+                    if (updatedCrackedLead.remainingAmount !== null && updatedCrackedLead.remainingAmount > 0) {
+                        const newCurrentPhase = (updatedCrackedLead.currentPhase || 0) + 1;
+                        
+                        // Check if current phase would exceed total phases
+                        if (updatedCrackedLead.totalPhases && newCurrentPhase > updatedCrackedLead.totalPhases) {
+                            throw new BadRequestException(`Current phase (${newCurrentPhase}) cannot exceed total phases (${updatedCrackedLead.totalPhases})`);
+                        }
+                        
+                        const finalCurrentPhase = newCurrentPhase;
+
+                        await this.prisma.$transaction(async (prisma) => {
+                            // Update lead status back to cracked
+                            await prisma.lead.update({
+                                where: { id: transaction.invoice!.leadId! },
+                                data: { status: 'cracked' }
+                            });
+
+                            // Update current phase in cracked lead
+                            await prisma.crackedLead.update({
+                                where: { id: updatedCrackedLead.id },
+                                data: { currentPhase: finalCurrentPhase }
+                            });
+                        });
+                    }
+                }
             }
 
             return {
                 success: true,
-                message: 'Payment completed and revenue generated successfully',
+                message: 'Payment completed, client payment logged, and revenue generated successfully',
                 data: {
                     transactionId: transactionId,
                     transactionStatus: 'completed',
-                    revenue: (revenueResult as any).data?.revenue,
+                    clientPaymentLogged: true,
+                    revenue: revenueResult.status === 'success' ? (revenueResult as any).data?.revenue : null,
+                    revenueStatus: revenueResult.status,
                     clientId: transaction.clientId,
                     invoiceId: transaction.invoiceId
                 }

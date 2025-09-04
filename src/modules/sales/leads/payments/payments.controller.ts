@@ -45,10 +45,9 @@ export class PaymentsController {
   async completePayment(
     @Param('id', ParseIntPipe) transactionId: number,
     @Body() paymentDetails: {
-      amount: number;
-      paymentMethod: string;
+      paymentMethod?: string;
       category?: string;
-    },
+    } = {},
     @Request() req
   ) {
     const userId = req.user.id;
