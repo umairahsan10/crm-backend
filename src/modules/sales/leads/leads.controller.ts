@@ -41,6 +41,26 @@ export class LeadsController {
     return this.leadsService.findAll(query, userRole, userUnitId);
   }
 
+  @Get('my-leads')
+  getMyLeads(@Query() query: any, @Request() req: any) {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const userUnitId = req.user.salesUnitId;
+    return this.leadsService.getMyLeads(query, userId, userRole, userUnitId);
+  }
+
+  @Get('cracked-leads')
+  getCrackedLeads(@Query() query: any) {
+    return this.leadsService.getCrackedLeads(query);
+  }
+
+  @Get('statistics/overview')
+  getLeadStatistics(@Request() req: any) {
+    const userRole = req.user.role;
+    const userUnitId = req.user.salesUnitId;
+    return this.leadsService.getLeadStatistics(userRole, userUnitId);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.leadsService.findOne(id);
@@ -61,11 +81,6 @@ export class LeadsController {
     return this.leadsService.update(id, updateLeadDto, userId);
   }
 
-  @Get('cracked-leads')
-  getCrackedLeads(@Query() query: any) {
-    return this.leadsService.getCrackedLeads(query);
-  }
-
   @Post('bulk-update')
   bulkUpdateLeads(
     @Body() body: { leadIds: number[]; updateData: UpdateLeadDto },
@@ -73,12 +88,5 @@ export class LeadsController {
   ) {
     const userId = req.user.id;
     return this.leadsService.bulkUpdateLeads(body.leadIds, body.updateData, userId);
-  }
-
-  @Get('statistics/overview')
-  getLeadStatistics(@Request() req: any) {
-    const userRole = req.user.role;
-    const userUnitId = req.user.salesUnitId;
-    return this.leadsService.getLeadStatistics(userRole, userUnitId);
   }
 }

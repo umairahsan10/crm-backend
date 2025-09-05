@@ -9,9 +9,4 @@ export class RequestLeadsDto {
   @IsArray()
   @IsNumber({}, { each: true })
   keptLeadIds?: number[];
-
-  @IsOptional()
-  @IsArray()
-  @IsNumber({}, { each: true })
-  circulateLeadIds?: number[];
 }

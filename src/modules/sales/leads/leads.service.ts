@@ -41,6 +41,75 @@ export class LeadsService {
         return lead;
     }
 
+    async getMyLeads(query: any, userId: number, userRole: string, userUnitId?: number) {
+        console.log('🔍 getMyLeads called for userId:', userId, 'userRole:', userRole, 'userUnitId:', userUnitId);
+
+        const where: any = {
+            assignedToId: userId // Only leads assigned to the logged-in user
+        };
+
+        // Apply filters
+        if (query.status) where.status = query.status;
+        if (query.outcome) where.outcome = query.outcome;
+        if (query.salesUnitId) where.salesUnitId = parseInt(query.salesUnitId);
+
+        // Role-based type filtering
+        if (query.type) {
+            where.type = query.type;
+            console.log('🔍 Using explicit type filter:', query.type);
+        } else {
+            // Apply role-based restrictions based on schema enum values
+            const roleAccessMap = {
+                'junior': ['warm', 'cold'],
+                'senior': ['warm', 'cold', 'push'],
+                'dep_manager': ['warm', 'cold', 'push', 'upsell'],
+                'team_lead': ['warm', 'cold', 'push', 'upsell'],
+                'unit_head': ['warm', 'cold', 'push', 'upsell'],
+                'admin': ['warm', 'cold', 'push', 'upsell']
+            };
+
+            if (roleAccessMap[userRole]) {
+                where.type = { in: roleAccessMap[userRole] };
+                console.log('🔍', userRole, 'role - can see:', roleAccessMap[userRole], 'leads');
+            } else {
+                // Default fallback - restrict to warm and cold for unknown roles
+                where.type = { in: ['warm', 'cold'] };
+                console.log('🔍 Unknown role:', userRole, '- restricted to warm/cold leads');
+            }
+        }
+
+        // Unit restriction for non-admin users
+        if (userUnitId && userRole !== 'admin') {
+            where.salesUnitId = userUnitId;
+        }
+
+        const page = parseInt(query.page) || 1;
+        const limit = parseInt(query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const [leads, total] = await Promise.all([
+            this.prisma.lead.findMany({
+                where,
+                include: {
+                    assignedTo: { select: { firstName: true, lastName: true } },
+                    salesUnit: { select: { name: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            }),
+            this.prisma.lead.count({ where })
+        ]);
+
+        return {
+            leads,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        };
+    }
+
     async findAll(query: any, userRole: string, userUnitId?: number) {
         console.log('🔍 findAll called with userRole:', userRole, 'userUnitId:', userUnitId);
 
@@ -142,7 +211,7 @@ export class LeadsService {
     }
 
     async requestLeads(requestLeadsDto: RequestLeadsDto) {
-        const { employeeId, keptLeadIds = [], circulateLeadIds = [] } = requestLeadsDto;
+        const { employeeId, keptLeadIds = [] } = requestLeadsDto;
 
         // Validate employee exists and is active
         const employee = await this.prisma.employee.findFirst({
@@ -168,51 +237,49 @@ export class LeadsService {
         const salesUnitId = employee.salesDepartment[0].salesUnitId;
 
         return await this.prisma.$transaction(async (prisma) => {
-            // Step 2.1: Handle circulated leads
-            if (circulateLeadIds.length > 0) {
+            // Step 1: Auto-circulate all non-kept leads assigned to this employee
+            const allAssignedLeads = await prisma.lead.findMany({
+                where: {
+                    assignedToId: employeeId,
+                    status: { not: 'failed' }
+                },
+                select: { id: true, outcome: true, status: true }
+            });
+
+            // Find leads to circulate (only in_progress leads except kept ones)
+            const leadsToCirculate = allAssignedLeads.filter(lead => 
+                !keptLeadIds.includes(lead.id) && lead.status === 'in_progress'
+            );
+
+            // Validate that leads to circulate have outcomes
+            const invalidLeads = leadsToCirculate.filter(lead => 
+                lead.outcome === null
+            );
+
+            if (invalidLeads.length > 0) {
+                throw new BadRequestException(
+                    `Cannot circulate leads without outcomes. Invalid lead IDs: ${invalidLeads.map(l => l.id).join(', ')}`
+                );
+            }
+
+            // Circulate all non-kept leads
+            if (leadsToCirculate.length > 0) {
                 await prisma.lead.updateMany({
                     where: {
-                        id: { in: circulateLeadIds },
+                        id: { in: leadsToCirculate.map(l => l.id) },
                         assignedToId: employeeId
                     },
                     data: {
                         assignedToId: null,
-                        outcome: null,
+                        startedById: null,
                         status: 'new',
+                        outcome: null,
                         updatedAt: new Date()
                     }
                 });
             }
 
-            // Count current assigned leads
-            const currentAssignedCount = await prisma.lead.count({
-                where: {
-                    assignedToId: employeeId,
-                    status: { not: 'failed' }
-                }
-            });
-
-            const keptCount = keptLeadIds.length;
-            const neededLeads = 10 - keptCount - currentAssignedCount;
-
-            if (neededLeads <= 0) {
-                // Return existing leads if already have 10
-                const existingLeads = await prisma.lead.findMany({
-                    where: { assignedToId: employeeId },
-                    include: {
-                        assignedTo: { select: { firstName: true, lastName: true } },
-                        salesUnit: { select: { name: true } }
-                    }
-                });
-
-                return {
-                    assignedLeads: [],
-                    keptLeads: existingLeads.slice(0, 10),
-                    totalActiveLeads: existingLeads.length
-                };
-            }
-
-            // Step 2.2: Assign new leads (prioritize warm over cold)
+            // Step 2: Always assign exactly 10 new leads
             const availableLeads = await prisma.lead.findMany({
                 where: {
                     assignedToId: null,
@@ -222,16 +289,16 @@ export class LeadsService {
                 },
                 orderBy: [
                     { type: 'asc' }, // warm comes before cold
-                    { createdAt: 'asc' } // oldest first
+                    { updatedAt: 'asc' } // oldest first
                 ],
-                take: neededLeads
+                take: 10
             });
 
-            if (availableLeads.length < neededLeads) {
-                throw new NotFoundException(`Insufficient leads available. Need ${neededLeads}, only ${availableLeads.length} available.`);
+            if (availableLeads.length < 10) {
+                throw new NotFoundException(`Insufficient leads available. Need 10, only ${availableLeads.length} available.`);
             }
 
-            // Assign leads
+            // Assign exactly 10 new leads
             const assignedLeads = await Promise.all(
                 availableLeads.map(lead =>
                     prisma.lead.update({
@@ -262,7 +329,8 @@ export class LeadsService {
             return {
                 assignedLeads,
                 keptLeads,
-                totalActiveLeads: keptLeads.length + assignedLeads.length
+                totalActiveLeads: keptLeads.length + assignedLeads.length,
+                circulatedLeads: leadsToCirculate.length
             };
         });
     }
@@ -712,4 +780,3 @@ export class LeadsService {
         };
     }
 }
-
