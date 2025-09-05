@@ -70,38 +70,49 @@ export class RevenueService {
         const currentDate = this.getCurrentDateInPKT();
         const receivedOn = dto.receivedOn ? new Date(dto.receivedOn) : currentDate;
 
-        // 1. Create transaction record first
-        // Get the next available ID (largest ID + 1)
-        const maxTransactionId = await prisma.transaction.aggregate({
-          _max: { id: true }
-        });
-        const nextTransactionId = (maxTransactionId._max.id || 0) + 1;
+        let transaction;
 
-        // Determine transaction notes based on the scenario
-        let transactionNotes = '';
-        if (finalReceivedFrom && finalRelatedInvoiceId) {
-          const lead = await prisma.lead.findUnique({ where: { id: finalReceivedFrom } });
-          transactionNotes = `Revenue from Lead: ${lead?.name || 'Unknown'} - ${dto.category}`;
-        } else if (finalRelatedInvoiceId) {
-          transactionNotes = `Revenue from Invoice: ${finalRelatedInvoiceId} - ${dto.category}`;
+        // Check if transaction ID exists
+        if (dto.transactionId) {
+          // Update existing transaction status to completed
+          transaction = await prisma.transaction.update({
+            where: { id: dto.transactionId },
+            data: { status: TransactionStatus.completed }
+          });
         } else {
-          transactionNotes = `Admin Revenue Entry: ${finalSource} - ${dto.category}`;
-        }
+          // 1. Create transaction record first
+          // Get the next available ID (largest ID + 1)
+          const maxTransactionId = await prisma.transaction.aggregate({
+            _max: { id: true }
+          });
+          const nextTransactionId = (maxTransactionId._max.id || 0) + 1;
 
-        const transaction = await prisma.transaction.create({
-          data: {
-            id: nextTransactionId, // Use explicit ID to avoid sequence conflicts
-            employeeId: currentUserId,
-            clientId: null, // Revenue transactions don't need client reference
-            invoiceId: finalRelatedInvoiceId || null,
-            amount: new Prisma.Decimal(dto.amount),
-            transactionType: TransactionType.payment,
-            paymentMethod: dto.paymentMethod ? this.mapPaymentMethodToPaymentWays(dto.paymentMethod) : PaymentWays.bank,
-            transactionDate: currentDate,
-            status: TransactionStatus.completed,
-            notes: transactionNotes,
-          },
-        });
+          // Determine transaction notes based on the scenario
+          let transactionNotes = '';
+          if (finalReceivedFrom && finalRelatedInvoiceId) {
+            const lead = await prisma.lead.findUnique({ where: { id: finalReceivedFrom } });
+            transactionNotes = `Revenue from Lead: ${lead?.name || 'Unknown'} - ${dto.category}`;
+          } else if (finalRelatedInvoiceId) {
+            transactionNotes = `Revenue from Invoice: ${finalRelatedInvoiceId} - ${dto.category}`;
+          } else {
+            transactionNotes = `Admin Revenue Entry: ${finalSource} - ${dto.category}`;
+          }
+
+          transaction = await prisma.transaction.create({
+            data: {
+              id: nextTransactionId, // Use explicit ID to avoid sequence conflicts
+              employeeId: currentUserId,
+              clientId: null, // Revenue transactions don't need client reference
+              invoiceId: finalRelatedInvoiceId || null,
+              amount: new Prisma.Decimal(dto.amount),
+              transactionType: TransactionType.payment,
+              paymentMethod: dto.paymentMethod ? this.mapPaymentMethodToPaymentWays(dto.paymentMethod) : PaymentWays.bank,
+              transactionDate: currentDate,
+              status: TransactionStatus.completed,
+              notes: transactionNotes,
+            },
+          });
+        }
 
         // 2. Create revenue record
         // Get the next available ID (largest ID + 1)

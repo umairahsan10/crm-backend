@@ -1080,6 +1080,317 @@ Automatically mark employees as absent if they don't arrive after their shift en
 
 ---
 
+## Weekend Auto-Present System
+
+### Overview
+The system automatically marks employees as present on weekends when their shift start time arrives, eliminating the need for manual weekend attendance management.
+
+### How It Works
+- **Automatic Detection**: Runs every minute to check for weekend shifts
+- **Shift Time Matching**: Compares current time with employee shift start times
+- **Grace Period**: 5-minute window before and after shift start time
+- **Auto-Present**: Creates attendance logs and updates summaries automatically
+
+### Weekend Definition
+- **Saturday**: 6th day of the week (Day 6)
+- **Sunday**: 7th day of the week (Day 7)
+- **Shift Ownership**: Based on shift start time (not end time)
+
+### API Endpoints
+
+#### 1. Manual Weekend Auto-Present Override (Testing)
+**Endpoint**: `POST /hr/attendance/triggers/weekend-auto-present/override`  
+**Method**: POST  
+**Access**: HR, Admin (requires `attendance_permission`)
+
+**Description**: **Testing endpoint** that bypasses weekend checks and processes employees immediately. Use this for testing the system regardless of current day.
+
+**Response**:
+```json
+{
+  "message": "Weekend auto-present override activated successfully (bypassing weekend check)",
+  "marked_present": 5,
+  "errors": 0
+}
+```
+
+**Testing Behavior**: 
+- **Processes all employees immediately** (no time restrictions)
+- **Creates attendance logs** with actual shift start/end times
+- **Updates all three tables** for comprehensive testing
+- **Perfect for development** and system verification
+
+#### 2. Get Weekend Status
+**Endpoint**: `GET /hr/attendance/triggers/weekend-status`  
+**Method**: GET  
+**Access**: HR, Admin (requires `attendance_permission`)
+
+**Description**: Get current weekend status and system information.
+
+**Response**:
+```json
+{
+  "isWeekend": true,
+  "dayOfWeek": 6,
+  "dayName": "Saturday",
+  "currentTime": "21:00",
+  "activeEmployees": 25
+}
+```
+
+### Configuration
+- **Timezone**: Asia/Karachi (PKT)
+- **Check Frequency**: Every minute
+- **Grace Period**: 5 minutes before/after shift start time
+- **Employee Filter**: Only active employees with defined shift start times
+
+### Business Logic
+1. **Weekend Detection**: Checks if current day is Saturday (6) or Sunday (7)
+2. **Time Matching**: Compares current time with employee shift start times
+3. **Attendance Creation**: Creates attendance logs with "present" status
+4. **Summary Updates**: Updates both attendance and monthly summary tables
+5. **Duplicate Prevention**: Skips if attendance log already exists for the day
+
+### Table Updates
+The system updates **all three tables** when marking employees present on weekends:
+
+#### 1. **attendance_logs** Table
+- **Creates new record** with:
+  - `employeeId`: Employee ID
+  - `date`: Current date
+  - `checkin`: Employee's shift start time (e.g., 21:00 for 9 PM)
+  - `checkout`: Employee's shift end time (e.g., 05:00 for 5 AM)
+  - `mode`: "onsite"
+  - `status`: "present"
+
+#### 2. **attendance** Table (Summary Table)
+- **Updates or creates record** with:
+  - `presentDays`: Increments by 1
+  - Creates new record if none exists
+  - Sets default values for other fields
+
+#### 3. **monthly_attendance_summary** Table
+- **Updates or creates monthly record** with:
+  - `totalPresent`: Increments by 1
+  - Creates new monthly record if none exists
+  - Tracks monthly attendance statistics
+
+### Data Flow
+```
+
+---
+
+### 26. Bulk Mark All Employees Present
+**Endpoint**: `POST /hr/attendance/bulk-mark-present`  
+**Method**: POST  
+**Access**: HR, Admin (requires `attendance_permission`)
+
+**Description:** Allows HR to mark all active employees as present for a specific date at once. This is useful for situations like:
+- System outages that prevented normal attendance recording
+- Power failures or technical issues
+- Company-wide events where all employees were present
+- Corrections for accidental absent markings
+- Historical corrections for past dates
+
+**Important:** This endpoint works for the current day and past dates, but not for future dates.
+
+**Request Body:**
+```json
+{
+  "date": "2024-01-15",
+  "reason": "System outage prevented normal attendance recording"
+}
+```
+
+**Parameters:**
+- `date` (required): Date in YYYY-MM-DD format. **Can be current day or past dates, but not future dates.**
+- `reason` (optional): Reason for bulk marking all employees present
+
+**Business Logic:**
+1. Validates that the date is the current day
+2. Fetches all active employees
+3. For each employee:
+   - Creates or updates attendance log with 'present' status
+   - Sets checkin/checkout times based on employee's shift schedule
+   - Updates attendance summary (increments present days, decrements absent days if applicable)
+   - Updates monthly attendance summary
+   - Creates HR log entry for audit trail
+
+**Tables Updated:**
+- `attendance_logs`: New records or status updates
+- `attendance`: Present days incremented, absent days decremented
+- `monthly_attendance_summary`: Monthly totals updated
+- `hr_logs`: Audit trail entry created
+
+**Sample Response:**
+```json
+{
+  "message": "Bulk mark present completed for 2024-01-15 - Reason: System outage prevented normal attendance recording",
+  "marked_present": 45,
+  "errors": 0,
+  "skipped": 2
+}
+```
+
+**Response Fields:**
+- `message`: Success message with date and reason
+- `marked_present`: Number of employees successfully marked present
+- `errors`: Number of employees that encountered errors
+- `skipped`: Number of employees already marked present (skipped)
+
+**Use Cases:**
+- Daily system maintenance where attendance couldn't be recorded
+- Technical issues preventing normal check-in/check-out
+- Company events where all employees were present
+- Immediate corrections for accidental absent markings on the same day
+
+**Note:** For past date corrections or individual employee updates, use the appropriate individual attendance endpoints to maintain data integrity and proper audit trails.
+
+---
+
+## Future Holiday Trigger System
+
+### **Overview**
+The Future Holiday Trigger System automatically marks employees as present on holidays when their individual shift start times arrive, ensuring proactive attendance management for planned holidays.
+
+### **How It Works**
+- **Automatic Detection**: Runs every minute to check for holidays and shift start times
+- **Shift Time Matching**: Compares current time with each employee's shift start time
+- **Grace Period**: 5-minute window before and after shift start time
+- **Auto-Present**: Creates attendance logs and updates summaries automatically
+- **Future Holiday Support**: Works with holidays created for future dates
+
+### **Holiday Detection**
+- **Daily Check**: System checks every minute if today is a holiday
+- **Holiday Lookup**: Queries holidays table for current date
+- **Employee Processing**: Only processes employees when their shift starts
+
+### **API Endpoints**
+
+#### 1. Get Future Holiday Trigger Status
+**Endpoint**: `GET /hr/attendance/triggers/future-holiday-status`  
+**Method**: GET  
+**Access**: HR, Admin (requires `attendance_permission`)
+
+**Description**: Get current status of the future holiday trigger system.
+
+**Response**:
+```json
+{
+  "isActive": true,
+  "nextCheck": "2025-01-15T10:01:00.000Z",
+  "todayHoliday": "Eid al-Fitr",
+  "activeEmployees": 56
+}
+```
+
+#### 2. Manual Future Holiday Trigger (Testing)
+**Endpoint**: `POST /hr/attendance/triggers/future-holiday-manual/:date`  
+**Method**: POST  
+**Access**: HR, Admin (requires `attendance_permission`)
+
+**Description**: **Testing endpoint** that manually triggers attendance marking for a specific holiday date.
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `date` | string | Yes | Date in YYYY-MM-DD format |
+
+**Sample Request**:
+```bash
+POST /hr/attendance/triggers/future-holiday-manual/2025-01-15
+```
+
+**Response**:
+```json
+{
+  "marked_present": 56,
+  "errors": 0,
+  "message": "Successfully marked 56 employees as present for holiday: Eid al-Fitr on 2025-01-15"
+}
+```
+
+### **Configuration**
+- **Timezone**: Asia/Karachi (PKT)
+- **Check Frequency**: Every minute
+- **Grace Period**: 5 minutes before/after shift start time
+- **Employee Filter**: Only active employees with defined shift start times
+
+### **Business Logic**
+1. **Holiday Detection**: Checks if current date is a holiday
+2. **Time Matching**: Compares current time with employee shift start times
+3. **Attendance Creation**: Creates attendance logs with "present" status
+4. **Summary Updates**: Updates both attendance and monthly summary tables
+5. **Duplicate Prevention**: Skips if attendance log already exists for the day
+
+### **Table Updates**
+The system updates **all three tables** when marking employees present on holidays:
+
+#### 1. **attendance_logs** Table
+- **Creates new record** with:
+  - `employeeId`: Employee ID
+  - `date`: Holiday date
+  - `checkin`: Employee's shift start time
+  - `checkout`: Employee's shift end time
+  - `mode`: "onsite"
+  - `status`: "present"
+
+#### 2. **attendance** Table (Summary Table)
+- **Updates or creates record** with:
+  - `presentDays`: Increments by 1
+  - Creates new record if none exists
+  - Sets default values for other fields
+
+#### 3. **monthly_attendance_summary** Table
+- **Updates or creates monthly record** with:
+  - `totalPresent`: Increments by 1
+  - Creates new monthly record if none exists
+  - Tracks monthly attendance statistics
+
+### **Use Cases**
+1. **Planned Holidays**: Eid, Christmas, Independence Day, etc.
+2. **Company Events**: Annual functions, team building days
+3. **Government Holidays**: National holidays, public holidays
+4. **Testing**: Manual triggers for immediate processing
+
+### **Benefits**
+- **Proactive Management**: No need to wait for holiday to pass
+- **Accurate Records**: Employees marked present at their actual shift times
+- **Automatic Processing**: No manual intervention required
+- **Comprehensive Updates**: All relevant tables updated automatically
+- **Testing Support**: Manual triggers for development and verification
+Weekend Trigger → Check Employee Shift Times → Create Attendance Log → Update Attendance Summary → Update Monthly Summary
+```
+
+### Shift Time Handling
+- **Shift Start Time**: Retrieved from `Employee.shiftStart` field
+- **Shift End Time**: Retrieved from `Employee.shiftEnd` field
+- **When Trigger Activates**:
+  - `checkin` field is set to employee's actual shift start time (e.g., 21:00)
+  - `checkout` field is set to employee's actual shift end time (e.g., 05:00)
+  - Shift times are converted to DateTime objects for proper storage
+  - System handles night shifts that cross midnight correctly
+
+### Trigger Activation Details
+- **Frequency**: Every minute
+- **Weekend Detection**: Saturday (Day 6) and Sunday (Day 7)
+- **Time Matching**: 5-minute grace period around shift start time
+- **Employee Filter**: Only active employees with defined shift start times
+- **Duplicate Prevention**: Won't create multiple attendance logs for same day
+
+### Benefits
+- **Automated Weekend Management**: No manual intervention needed
+- **Accurate Reporting**: Weekend shifts properly tracked
+- **Policy Compliance**: Consistent weekend attendance handling
+- **Reduced Errors**: Eliminates manual weekend attendance mistakes
+
+### Monitoring
+- **Logs**: All actions logged with employee details
+- **Error Tracking**: Failed operations are counted and logged
+- **Performance**: Efficient processing with minimal database impact
+
+---
+
 ## Maintenance
 
 ### Regular Tasks
