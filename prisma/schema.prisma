@@ -7,148 +7,1123 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Foundational TABLES
-
 model Employee {
-  id                 Int             @id @default(autoincrement()) @map("emp_id")
-  firstName          String          @map("first_name") @db.VarChar(255)
-  lastName           String          @map("last_name") @db.VarChar(255)
-  email              String          @unique @db.VarChar(255)
-  phone              String?         @db.VarChar(20)
-  gender             genderOpt
-  cnic               String?         @db.VarChar(50)
-  departmentId       Int             @map("department_id")
-  roleId             Int             @map("role_id")
-  managerId          Int?            @map("manager_id")
-  teamLeadId         Int?            @map("team_lead_id")
-  address            String?         @db.Text
-  maritalStatus      Boolean?        @map("marital_status")
-  status             EmployeeStatus  @default(active)
-  startDate          DateTime?       @map("start_date") @db.Date
-  endDate            DateTime?       @map("end_date") @db.Date
-  modeOfWork         WorkMode?       @map("mode_of_work")
-  remoteDaysAllowed  Int?            @map("remote_days_allowed")
-  dob                DateTime?       @db.Date
-  emergencyContact   String?         @map("emergency_contact") @db.VarChar(255)
-  shiftStart         String?         @map("shift_start") @db.VarChar(10)
-  shiftEnd           String?         @map("shift_end") @db.VarChar(10)
-  employmentType     EmploymentType? @map("employment_type")
-  dateOfConfirmation DateTime?       @map("date_of_confirmation") @db.Date
-  periodType         PeriodType?     @map("period_type")
-  createdAt          DateTime        @default(now()) @map("created_at")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
-  passwordHash       String          @map("password_hash") @db.VarChar(255)
-  bonus              Int?            @map("bonus")
-
-  // Foreign key relations
-  department Department @relation("EmployeeDepartment", fields: [departmentId], references: [id])
-  role       Role       @relation(fields: [roleId], references: [id])
-  manager    Employee?  @relation("EmployeeManager", fields: [managerId], references: [id])
-  teamLead   Employee?  @relation("EmployeeTeamLead", fields: [teamLeadId], references: [id])
-
-  // Self-referencing relations (opposite sides)
-  managedEmployees Employee[] @relation("EmployeeManager")
-  teamMembers      Employee[] @relation("EmployeeTeamLead")
-
+  firstName                 String                     @map("first_name") @db.VarChar(255)
+  lastName                  String                     @map("last_name") @db.VarChar(255)
+  email                     String                     @unique @db.VarChar(255)
+  phone                     String?                    @db.VarChar(20)
+  gender                    genderOpt
+  cnic                      String?                    @db.VarChar(50)
+  departmentId              Int                        @map("department_id")
+  roleId                    Int                        @map("role_id")
+  managerId                 Int?                       @map("manager_id")
+  teamLeadId                Int?                       @map("team_lead_id")
+  address                   String?
+  maritalStatus             Boolean?                   @map("marital_status")
+  status                    EmployeeStatus             @default(active)
+  startDate                 DateTime?                  @map("start_date") @db.Date
+  endDate                   DateTime?                  @map("end_date") @db.Date
+  modeOfWork                WorkMode?                  @map("mode_of_work")
+  remoteDaysAllowed         Int?                       @map("remote_days_allowed")
+  dob                       DateTime?                  @db.Date
+  emergencyContact          String?                    @map("emergency_contact") @db.VarChar(255)
+  shiftStart                String?                    @map("shift_start") @db.VarChar(10)
+  shiftEnd                  String?                    @map("shift_end") @db.VarChar(10)
+  employmentType            EmploymentType?            @map("employment_type")
+  dateOfConfirmation        DateTime?                  @map("date_of_confirmation") @db.Date
+  periodType                PeriodType?                @map("period_type")
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+  updatedAt                 DateTime                   @updatedAt @map("updated_at")
+  passwordHash              String                     @map("password_hash") @db.VarChar(255)
+  bonus                     Int?                       @map("bonus")
+  id                        Int                        @id @default(autoincrement()) @map("emp_id")
   accessLogs                AccessLog[]
-  leadOutcomeHistoryChanges LeadOutcomeHistory[]
+  accountant                Accountant?                @relation("EmployeeAccountant")
   accounts                  Account[]
-  accountant                Accountant?          @relation("EmployeeAccountant")
-  assetsCreated             Asset[]              @relation("AssetCreatedBy")
-  expensesCreated           Expense[]            @relation("ExpenseCreatedBy")
-  liabilitiesCreated        Liability[]          @relation("LiabilityCreatedBy")
-  revenuesCreated           Revenue[]            @relation("RevenueCreatedBy")
-  transactions              Transaction[]        @relation("TransactionEmployee")
+  archiveLeads              ArchiveLead[]              @relation("ArchiveLeadAssigned")
+  assetsCreated             Asset[]                    @relation("AssetCreatedBy")
+  attendance                Attendance[]
+  attendanceLogs            AttendanceLog[]
+  chargebacksHandled        Chargeback[]               @relation("ChargebackHandledBy")
+  sentMessages              ChatMessage[]              @relation("MessageSender")
+  chatParticipants          ChatParticipant[]
+  clientsCreated            Client[]                   @relation("ClientCreatedBy")
+  complaintsAgainst         Complaint[]                @relation("ComplaintAgainst")
+  complaintsAssigned        Complaint[]                @relation("ComplaintAssignedTo")
+  complaintsRaised          Complaint[]                @relation("ComplaintRaisedBy")
+  crackedLeads              CrackedLead[]              @relation("CrackedLeadClosedBy")
+  managedDepartment         Department?                @relation("DepartmentManager")
+  department                Department                 @relation("EmployeeDepartment", fields: [departmentId], references: [id])
+  manager                   Employee?                  @relation("EmployeeManager", fields: [managerId], references: [id])
+  managedEmployees          Employee[]                 @relation("EmployeeManager")
+  role                      Role                       @relation(fields: [roleId], references: [id])
+  teamLead                  Employee?                  @relation("EmployeeTeamLead", fields: [teamLeadId], references: [id])
+  teamMembers               Employee[]                 @relation("EmployeeTeamLead")
+  expensesCreated           Expense[]                  @relation("ExpenseCreatedBy")
+  halfDayLogsEmployee       HalfDayLog[]               @relation("LateLogEmployee")
+  halfDayLogsReviewed       HalfDayLog[]               @relation("LateLogReviewedBy")
+  hr                        HR?                        @relation("HrEmployee")
+  hrLogsAffected            HRLog[]                    @relation("HRAffectedEmployee")
+  hrRequestsAssigned        HrRequest[]                @relation("RequestAssignedTo")
+  hrRequestsMade            HrRequest[]                @relation("RequestMadeBy")
+  lateLogsEmployee          LateLog[]                  @relation("LateLogEmployee")
+  lateLogsReviewed          LateLog[]                  @relation("LateLogReviewedBy")
+  leadComments              LeadComment[]              @relation("LeadCommentBy")
+  leadOutcomeHistoryChanges LeadOutcomeHistory[]
+  leadsAssigned             Lead[]                     @relation("LeadAssignedTo")
+  leadsClosed               Lead[]                     @relation("LeadClosedBy")
+  leadsCracked              Lead[]                     @relation("LeadCrackedBy")
+  leadsStarted              Lead[]                     @relation("LeadStartedBy")
+  leaveRequestsMade         LeaveLog[]                 @relation("LeaveRequestedBy")
+  leaveRequestsReviewed     LeaveLog[]                 @relation("LeaveReviewedBy")
+  liabilitiesCreated        Liability[]                @relation("LiabilityCreatedBy")
+  marketingRecords          Marketing[]                @relation("MarketingEmployee")
+  marketingUnitHead         MarketingUnit[]            @relation("MarketingUnitHead")
+  meetingsAsEmployee        Meeting[]                  @relation("MeetingEmployee")
+  monthlyAttendanceSummary  MonthlyAttendanceSummary[]
   netSalaryLogs             NetSalaryLog[]
-  salaryLogsProcessed       NetSalaryLog[]       @relation("SalaryProcessedBy")
-  vendorsCreated            Vendor[]             @relation("VendorCreatedBy")
-
-  attendance               Attendance[]
-  attendanceLogs           AttendanceLog[]
-  hr                       HR?                        @relation("HrEmployee")
-  hrLogsAffected           HRLog[]                    @relation("HRAffectedEmployee")
-  leaveRequestsMade        LeaveLog[]                 @relation("LeaveRequestedBy")
-  leaveRequestsReviewed    LeaveLog[]                 @relation("LeaveReviewedBy")
-  lateLogsEmployee         LateLog[]                  @relation("LateLogEmployee")
-  lateLogsReviewed         LateLog[]                  @relation("LateLogReviewedBy")
-  monthlyAttendanceSummary MonthlyAttendanceSummary[]
-
-  transferredFromChats ProjectChat[]     @relation("ChatTransferredFrom")
-  transferredToChats   ProjectChat[]     @relation("ChatTransferredTo")
-  chatParticipants     ChatParticipant[]
-  sentMessages         ChatMessage[]     @relation("MessageSender")
-  meetingsAsEmployee   Meeting[]         @relation("MeetingEmployee")
-  notifications        Notification[]    @relation("NotificationSentTo")
-  notificationsSent    Notification[]    @relation("NotificationSentBy")
-  hrRequestsMade       HrRequest[]       @relation("RequestMadeBy")
-  hrRequestsAssigned   HrRequest[]       @relation("RequestAssignedTo")
-  complaintsRaised     Complaint[]       @relation("ComplaintRaisedBy")
-  complaintsAgainst    Complaint[]       @relation("ComplaintAgainst")
-  complaintsAssigned   Complaint[]       @relation("ComplaintAssignedTo")
-  reminders            Reminders[]
-
-  // Department management relation (opposite side)
-  managedDepartment Department? @relation("DepartmentManager")
-
-  // Additional missing opposite relations
-  marketingRecords    Marketing[]       @relation("MarketingEmployee")
-  marketingUnitHead   MarketingUnit[]   @relation("MarketingUnitHead")
-  projectsAsSalesRep  Project[]         @relation("ProjectSalesRep")
-  projectLogs         ProjectLog[]      @relation("ProjectLogDeveloper")
-  production          Production[]      @relation("ProductionEmployee")
-  productionUnitHead  ProductionUnit[]  @relation("ProductionUnitHead")
-  teamsAsLead         Team[]            @relation("TeamLead")
-  clientsCreated      Client[]          @relation("ClientCreatedBy")
-  leadsCracked        Lead[]            @relation("LeadCrackedBy")
-  leadsAssigned       Lead[]            @relation("LeadAssignedTo")
-  leadsStarted        Lead[]            @relation("LeadStartedBy")
-  leadsClosed         Lead[]            @relation("LeadClosedBy")
-  salesUnitHead       SalesUnit[]       @relation("SalesUnitHead")
-  leadComments        LeadComment[]     @relation("LeadCommentBy")
-  salesDepartment     SalesDepartment[] @relation("SalesDepartmentEmployee")
-  crackedLeads        CrackedLead[]     @relation("CrackedLeadClosedBy")
-  refundsProcessed    Refund[]          @relation("RefundProcessedBy")
-  chargebacksHandled  Chargeback[]      @relation("ChargebackHandledBy")
-  clientPayments      ClientPayment[]   @relation("PaymentProcessor")
-  archiveLeads        ArchiveLead[]     @relation("ArchiveLeadAssigned")
-  projectTasks        ProjectTask[]     @relation("TaskAssigner")
-  assignedTasks       ProjectTask[]     @relation("TaskAssignee")
-  halfDayLogsEmployee HalfDayLog[]      @relation("LateLogEmployee")
-  halfDayLogsReviewed HalfDayLog[]      @relation("LateLogReviewedBy")
+  salaryLogsProcessed       NetSalaryLog[]             @relation("SalaryProcessedBy")
+  notificationsSent         Notification[]             @relation("NotificationSentBy")
+  notifications             Notification[]             @relation("NotificationSentTo")
+  production                Production[]               @relation("ProductionEmployee")
+  productionUnitHead        ProductionUnit[]           @relation("ProductionUnitHead")
+  transferredFromChats      ProjectChat[]              @relation("ChatTransferredFrom")
+  transferredToChats        ProjectChat[]              @relation("ChatTransferredTo")
+  projectLogs               ProjectLog[]               @relation("ProjectLogDeveloper")
+  projectTasks              ProjectTask[]              @relation("TaskAssigner")
+  assignedTasks             ProjectTask[]              @relation("TaskAssignee")
+  projectsAsSalesRep        Project[]                  @relation("ProjectSalesRep")
+  refundsProcessed          Refund[]                   @relation("RefundProcessedBy")
+  reminders                 Reminders[]
+  revenuesCreated           Revenue[]                  @relation("RevenueCreatedBy")
+  salesDepartment           SalesDepartment[]          @relation("SalesDepartmentEmployee")
+  salesUnitHead             SalesUnit[]                @relation("SalesUnitHead")
+  teamsAsLead               Team[]                     @relation("TeamLead")
+  transactions              Transaction[]              @relation("TransactionEmployee")
+  vendorsCreated            Vendor[]                   @relation("VendorCreatedBy")
 
   @@map("employees")
 }
 
 model Department {
-  id          Int      @id @default(autoincrement()) @map("dept_id")
-  name        String   @unique @db.VarChar(255)
-  description String?  @db.Text
-  managerId   Int?     @unique @map("manager_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table - add relation name to match Employee model
-  manager Employee? @relation("DepartmentManager", fields: [managerId], references: [id])
-
-  // Opposite relation - employees in this department
-  employees  Employee[]  @relation("EmployeeDepartment")
-  hrRequests HrRequest[]
-  complaints Complaint[]
+  name          String         @unique @db.VarChar(255)
+  description   String?
+  managerId     Int?           @unique @map("manager_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  id            Int            @id @default(autoincrement()) @map("dept_id")
+  complaints    Complaint[]
+  manager       Employee?      @relation("DepartmentManager", fields: [managerId], references: [id])
+  employees     Employee[]     @relation("EmployeeDepartment")
+  hrRequests    HrRequest[]
+  notifications Notification[] @relation("NotificationTargetDepartment")
 
   @@map("departments")
 }
 
 model Role {
-  id          Int      @id @default(autoincrement()) @map("role_id")
-  name        RoleName @unique
-  description String?  @db.Text
+  name        RoleName   @unique
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  id          Int        @id @default(autoincrement()) @map("role_id")
+  employees   Employee[]
+
+  @@map("roles")
+}
+
+model Marketing {
+  employeeId        Int            @map("employee_id")
+  marketingUnitId   Int?           @map("marketing_unit_id")
+  totalCampaignsRun Int?           @map("total_campaigns_run")
+  platformFocus     String?        @map("platform_focus") @db.VarChar(255)
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  id                Int            @id @default(autoincrement()) @map("marketing_id")
+  employee          Employee       @relation("MarketingEmployee", fields: [employeeId], references: [id])
+  marketingUnit     MarketingUnit? @relation(fields: [marketingUnitId], references: [id])
+
+  @@map("marketing")
+}
+
+model MarketingUnit {
+  name               String        @unique @db.VarChar(255)
+  headId             Int?          @map("head_id")
+  leadQualityScore   Decimal?      @map("lead_quality_score") @db.Decimal(5, 2)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  id                 Int           @id @default(autoincrement()) @map("marketing_unit_id")
+  campaignLogs       CampaignLog[]
+  marketingEmployees Marketing[]
+  head               Employee?     @relation("MarketingUnitHead", fields: [headId], references: [id])
+  teams              Team[]
+
+  @@map("marketing_units")
+}
+
+model Project {
+  crackedLeadId     Int?             @map("cracked_lead_id")
+  salesRepId        Int?             @map("sales_rep_id")
+  clientId          Int?             @map("client_id")
+  status            ProjectStatus?
+  difficultyLevel   DifficultyLevel? @map("difficulty_level")
+  paymentStage      PaymentStage?    @map("payment_stage")
+  description       String?
+  deadline          DateTime?        @db.Date
+  liveProgress      Decimal?         @map("live_progress") @db.Decimal(5, 2)
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  id                Int              @id @default(autoincrement()) @map("project_id")
+  teamId            Int?             @map("team_id")
+  clientPayments    ClientPayment[]  @relation("ProjectPayment")
+  meetingsAsProject Meeting[]        @relation("MeetingProject")
+  projectChats      ProjectChat[]
+  projectLogs       ProjectLog[]
+  projectTasks      ProjectTask[]    @relation("ProjectTask")
+  client            Client?          @relation("ProjectClient", fields: [clientId], references: [id])
+  crackedLead       CrackedLead?     @relation(fields: [crackedLeadId], references: [id])
+  salesRep          Employee?        @relation("ProjectSalesRep", fields: [salesRepId], references: [id])
+  team              Team?            @relation("ProjectTeam", fields: [teamId], references: [id])
+  teams             Team[]           @relation("TeamCurrentProject")
+
+  @@map("projects")
+}
+
+model ProjectLog {
+  projectId   Int      @map("project_id")
+  developerId Int      @map("developer_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  id          Int      @id @default(autoincrement()) @map("project_log_id")
+  developer   Employee @relation("ProjectLogDeveloper", fields: [developerId], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id])
+
+  @@map("project_logs")
+}
+
+model Production {
+  employeeId        Int             @map("employee_id")
+  specialization    String?         @db.VarChar(255)
+  productionUnitId  Int?            @map("production_unit_id")
+  projectsCompleted Int?            @map("projects_completed")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  id                Int             @id @default(autoincrement()) @map("production_id")
+  employee          Employee        @relation("ProductionEmployee", fields: [employeeId], references: [id])
+  productionUnit    ProductionUnit? @relation(fields: [productionUnitId], references: [id])
+
+  @@map("production")
+}
+
+model ProductionUnit {
+  name                String        @unique @db.VarChar(255)
+  headId              Int?          @map("head_id")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  id                  Int           @id @default(autoincrement()) @map("production_unit_id")
+  campaignLogs        CampaignLog[]
+  productionEmployees Production[]
+  head                Employee?     @relation("ProductionUnitHead", fields: [headId], references: [id])
+  teams               Team[]
+
+  @@map("production_units")
+}
+
+model Team {
+  teamLeadId       Int?            @map("team_lead_id")
+  name             String?         @db.VarChar(255)
+  currentProjectId Int?            @map("current_project_id")
+  employeeCount    Int?            @map("employee_count")
+  salesUnitId      Int?            @map("sales_unit_id")
+  productionUnitId Int?            @map("production_unit_id")
+  marketingUnitId  Int?            @map("marketing_unit_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  id               Int             @id @default(autoincrement()) @map("team_id")
+  completedLeads   Int             @default(0) @map("completed_leads")
+  projects         Project[]       @relation("ProjectTeam")
+  currentProject   Project?        @relation("TeamCurrentProject", fields: [currentProjectId], references: [id])
+  marketingUnit    MarketingUnit?  @relation(fields: [marketingUnitId], references: [id])
+  productionUnit   ProductionUnit? @relation(fields: [productionUnitId], references: [id])
+  salesUnit        SalesUnit?      @relation(fields: [salesUnitId], references: [id])
+  teamLead         Employee?       @relation("TeamLead", fields: [teamLeadId], references: [id])
+
+  @@map("teams")
+}
+
+model Industry {
+  name         String        @unique @db.VarChar(150)
+  description  String?
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  id           Int           @id @default(autoincrement()) @map("industry_id")
+  clients      Client[]
+  crackedLeads CrackedLead[]
+
+  @@map("industries")
+}
+
+model Client {
+  clientType     String?         @map("client_type") @db.VarChar(20)
+  companyName    String?         @map("company_name") @db.VarChar(255)
+  clientName     String?         @map("client_name") @db.VarChar(100)
+  email          String?         @db.VarChar(150)
+  phone          String?         @db.VarChar(20)
+  passwordHash   String          @map("password_hash") @db.VarChar(255)
+  altPhone       String?         @map("alt_phone") @db.VarChar(20)
+  address        String?         @db.VarChar(255)
+  city           String?         @db.VarChar(100)
+  state          String?         @db.VarChar(100)
+  postalCode     String?         @map("postal_code") @db.VarChar(20)
+  country        String?         @db.VarChar(100)
+  industryId     Int?            @map("industry_id")
+  taxId          String?         @map("tax_id") @db.VarChar(50)
+  accountStatus  accStat         @map("account_status")
+  createdBy      Int?            @map("created_by")
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  id             Int             @id @default(autoincrement()) @map("client_id")
+  chargebacks    Chargeback[]
+  clientPayments ClientPayment[] @relation("ClientPayment")
+  employee       Employee?       @relation("ClientCreatedBy", fields: [createdBy], references: [id])
+  industry       Industry?       @relation(fields: [industryId], references: [id])
+  meetings       Meeting[]
+  Project        Project[]       @relation("ProjectClient")
+  refunds        Refund[]
+  transactions   Transaction[]
+
+  @@map("clients")
+}
+
+model Lead {
+  name           String?              @db.VarChar(255)
+  email          String?              @db.VarChar(255)
+  phone          String?              @db.VarChar(20)
+  source         LeadSource?
+  type           LeadType?
+  status         LeadStatus?
+  failedCount    Int?                 @map("failed_count")
+  crackedById    Int?                 @map("cracked_by")
+  assignedToId   Int?                 @map("assigned_to")
+  startedById    Int?                 @map("started_by")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  outcome        LeadOutcome?
+  salesUnitId    Int?                 @map("sales_unit_id")
+  closedAt       DateTime?            @map("closed_at") @db.Date
+  closedById     Int?                 @map("closed_by")
+  qualityRating  QualityRating?       @map("quality_rating")
+  id             Int                  @id @default(autoincrement()) @map("lead_id")
+  crackedLeads   CrackedLead[]
+  invoices       Invoice[]
+  comments       LeadComment[]
+  outcomeHistory LeadOutcomeHistory[]
+  assignedTo     Employee?            @relation("LeadAssignedTo", fields: [assignedToId], references: [id])
+  closedBy       Employee?            @relation("LeadClosedBy", fields: [closedById], references: [id])
+  crackedBy      Employee?            @relation("LeadCrackedBy", fields: [crackedById], references: [id])
+  salesUnit      SalesUnit?           @relation(fields: [salesUnitId], references: [id])
+  startedBy      Employee?            @relation("LeadStartedBy", fields: [startedById], references: [id])
+  revenues       Revenue[]
+
+  @@map("leads")
+}
+
+model SalesUnit {
+  name           String            @unique @db.VarChar(255)
+  email          String?           @unique @db.VarChar(255)
+  phone          String?           @unique @db.VarChar(20)
+  address        String?           @db.VarChar(255)
+  headId         Int?              @map("head_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  logoUrl        String?           @map("logo_url") @db.VarChar(255)
+  website        String?           @db.VarChar(255)
+  id             Int               @id @default(autoincrement()) @map("sales_unit_id")
+  archiveLeads   ArchiveLead[]     @relation("ArchiveLeadUnit")
+  leads          Lead[]
+  salesEmployees SalesDepartment[]
+  head           Employee?         @relation("SalesUnitHead", fields: [headId], references: [id])
+  teams          Team[]
+
+  @@map("sales_units")
+}
+
+model LeadComment {
+  leadId               Int                  @map("lead_id")
+  commentBy            Int                  @map("comment_by")
+  commentText          String?              @map("comment_text")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+  id                   Int                  @id @default(autoincrement()) @map("lead_comment_id")
+  employee             Employee             @relation("LeadCommentBy", fields: [commentBy], references: [id])
+  lead                 Lead                 @relation(fields: [leadId], references: [id])
+  leadOutcomeHistories LeadOutcomeHistory[]
+
+  @@map("lead_comments")
+}
+
+model SalesDepartment {
+  employeeId           Int        @map("employee_id")
+  leadsClosed          Int?       @map("leads_closed")
+  salesAmount          Decimal?   @map("sales_amount") @db.Decimal(12, 2)
+  salesUnitId          Int?       @map("sales_unit_id")
+  commissionRate       Decimal?   @map("commission_rate") @db.Decimal(5, 2)
+  commissionAmount     Decimal?   @map("commission_amount") @db.Decimal(12, 2)
+  withholdCommission   Decimal    @map("withhold_commission") @db.Decimal(12, 2)
+  withholdFlag         Boolean    @map("withhold_flag")
+  targetAmount         Decimal?   @map("target_amount") @db.Decimal(12, 2)
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+  id                   Int        @id @default(autoincrement()) @map("sales_department_id")
+  chargebackDeductions Decimal?   @default(0) @map("chargeback_deductions") @db.Decimal(12, 2)
+  refundDeductions     Decimal?   @default(0) @map("refund_deductions") @db.Decimal(12, 2)
+  salesBonus           Decimal?   @map("sales_bonus") @db.Decimal(12, 2)
+  employee             Employee   @relation("SalesDepartmentEmployee", fields: [employeeId], references: [id])
+  salesUnit            SalesUnit? @relation(fields: [salesUnitId], references: [id])
+
+  @@map("sales_departments")
+}
+
+model CrackedLead {
+  leadId         Int             @map("lead_id")
+  closedBy       Int             @map("closed_by")
+  description    String?
+  crackedAt      DateTime        @default(now()) @map("cracked_at") @db.Date
+  amount         Decimal?        @db.Decimal(12, 2)
+  commissionRate Decimal?        @map("commission_rate") @db.Decimal(5, 2)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  totalPhases    Int?            @map("total_phases")
+  currentPhase   Int?            @map("current_phase")
+  remainingAmount Int?           @map("remaining_amount") @default(0)
+  id             Int             @id @default(autoincrement()) @map("cracked_lead_id")
+  industryId     Int             @map("industry_id")
+  client_payment ClientPayment[]
+  employee       Employee        @relation("CrackedLeadClosedBy", fields: [closedBy], references: [id])
+  industry       Industry        @relation(fields: [industryId], references: [id])
+  lead           Lead            @relation(fields: [leadId], references: [id])
+  projects       Project[]
+
+  @@map("cracked_leads")
+}
+
+model Refund {
+  invoiceId    Int?          @map("invoice_id")
+  clientId     Int?          @map("client_id")
+  amount       Decimal?      @db.Decimal(12, 2)
+  reason       String?
+  refundedBy   Int?          @map("refunded_by")
+  refundMethod String?       @map("refund_method") @db.VarChar(50)
+  status       RefundStatus
+  processedOn  DateTime?     @map("processed_on") @db.Date
+  comments     String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  id           Int           @id @default(autoincrement()) @map("refund_id")
+  client       Client?       @relation(fields: [clientId], references: [id])
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id])
+  employee     Employee?     @relation("RefundProcessedBy", fields: [refundedBy], references: [id])
+  transactions Transaction[]
+
+  @@map("refunds")
+}
+
+model Chargeback {
+  transactionId String?           @map("transaction_id") @db.VarChar(100)
+  invoiceId     Int?              @map("invoice_id")
+  clientId      Int?              @map("client_id")
+  amount        Decimal?          @db.Decimal(12, 2)
+  reasonCode    String?           @map("reason_code") @db.VarChar(100)
+  bankReference String?           @map("bank_reference") @db.VarChar(100)
+  status        ChargebackStatus?
+  openedAt      DateTime?         @map("opened_at") @db.Date
+  resolvedAt    DateTime?         @map("resolved_at") @db.Date
+  handledBy     Int?              @map("handled_by")
+  comments      String?
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  id            Int               @id @default(autoincrement()) @map("chargeback_id")
+  client        Client?           @relation(fields: [clientId], references: [id])
+  employee      Employee?         @relation("ChargebackHandledBy", fields: [handledBy], references: [id])
+  invoice       Invoice?          @relation(fields: [invoiceId], references: [id])
+  transactions  Transaction[]
+
+  @@map("chargebacks")
+}
+
+model AccessLog {
+  employeeId Int       @map("employee_id")
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  loginTime  DateTime  @default(now()) @map("login_time")
+  logoutTime DateTime? @map("logout_time")
+  success    Boolean
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  id         Int       @id @default(autoincrement()) @map("access_log_id")
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+
+  @@map("access_logs")
+}
+
+model LeadOutcomeHistory {
+  leadId        Int          @map("lead_id")
+  outcome       String       @map("outcome") @db.VarChar(50)
+  changedBy     Int?         @map("changed_by")
+  commentId     Int?         @map("comment_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  id            Int          @id @default(autoincrement()) @map("lead_outcome_history_id")
+  changedByUser Employee?    @relation(fields: [changedBy], references: [id])
+  comment       LeadComment? @relation(fields: [commentId], references: [id])
+  lead          Lead         @relation(fields: [leadId], references: [id])
+
+  @@map("lead_outcome_history")
+}
+
+model Account {
+  employeeId   Int      @map("employee_id")
+  accountTitle String?  @map("account_title") @db.VarChar(255)
+  bankName     String?  @map("bank_name") @db.VarChar(255)
+  ibanNumber   String?  @map("iban_number") @db.VarChar(50)
+  baseSalary   Decimal? @map("base_salary") @db.Decimal(12, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement()) @map("account_id")
+  employee     Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("accounts")
+}
+
+model Accountant {
+  employeeId            Int      @unique @map("employee_id")
+  salaryPermission      Boolean? @map("salary_permission")
+  salesPermission       Boolean? @map("sales_permission")
+  invoicesPermission    Boolean? @map("invoices_permission")
+  expensesPermission    Boolean? @map("expenses_permission")
+  assetsPermission      Boolean? @map("assets_permission")
+  revenuesPermission    Boolean? @map("revenues_permission")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                    Int      @id @default(autoincrement()) @map("accountant_id")
+  liabilitiesPermission Boolean? @map("liabilities_permission")
+  employee              Employee @relation("EmployeeAccountant", fields: [employeeId], references: [id])
+
+  @@map("accountants")
+}
+
+model Asset {
+  title         String?     @db.VarChar(255)
+  category      String?     @db.VarChar(100)
+  purchaseDate  DateTime?   @map("purchase_date") @db.Date
+  purchaseValue Decimal?    @map("purchase_value") @db.Decimal(12, 2)
+  currentValue  Decimal?    @map("current_value") @db.Decimal(12, 2)
+  createdBy     Int?        @map("created_by")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  id            Int         @id @default(autoincrement()) @map("asset_id")
+  transactionId Int         @map("transaction_id")
+  employee      Employee?   @relation("AssetCreatedBy", fields: [createdBy], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+
+  @@map("assets")
+}
+
+model Expense {
+  title           String?          @db.VarChar(255)
+  category        String?          @db.VarChar(100)
+  amount          Decimal?         @db.Decimal(12, 2)
+  createdBy       Int?             @map("created_by")
+  paidOn          DateTime?        @map("paid_on") @db.Date
+  notes           String?
+  transactionId   Int?             @map("transaction_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  paymentMethod   PaymentMethod?   @map("payment_method")
+  id              Int              @id @default(autoincrement()) @map("expense_id")
+  processedByRole ProcessedByRole? @map("processed_by_role")
+  employee        Employee?        @relation("ExpenseCreatedBy", fields: [createdBy], references: [id])
+  transaction     Transaction?     @relation(fields: [transactionId], references: [id])
+
+  @@map("expenses")
+}
+
+model Liability {
+  name            String?     @db.VarChar(255)
+  category        String?     @db.VarChar(100)
+  amount          Decimal?    @db.Decimal(12, 2)
+  dueDate         DateTime?   @map("due_date") @db.Date
+  isPaid          Boolean?    @map("is_paid")
+  paidOn          DateTime?   @map("paid_on") @db.Date
+  relatedVendorId Int?        @map("related_vendor_id")
+  createdBy       Int?        @map("created_by")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id              Int         @id @default(autoincrement()) @map("liability_id")
+  transactionId   Int         @map("transaction_id")
+  employee        Employee?   @relation("LiabilityCreatedBy", fields: [createdBy], references: [id])
+  vendor          Vendor?     @relation(fields: [relatedVendorId], references: [id])
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+
+  @@map("liabilities")
+}
+
+model Revenue {
+  source           String?       @db.VarChar(255)
+  category         String?       @db.VarChar(100)
+  amount           Decimal?      @db.Decimal(12, 2)
+  receivedFrom     Int?          @map("received_from")
+  receivedOn       DateTime?     @map("received_on") @db.Date
+  paymentMethod    PaymentMethod @map("payment_method")
+  relatedInvoiceId Int?          @map("related_invoice_id")
+  createdBy        Int?          @map("created_by")
+  transactionId    Int?          @map("transaction_id")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id               Int           @id @default(autoincrement()) @map("revenue_id")
+  employee         Employee?     @relation("RevenueCreatedBy", fields: [createdBy], references: [id])
+  lead             Lead?         @relation(fields: [receivedFrom], references: [id])
+  invoice          Invoice?      @relation(fields: [relatedInvoiceId], references: [id])
+  transaction      Transaction?  @relation(fields: [transactionId], references: [id])
+
+  @@map("revenues")
+}
+
+model Invoice {
+  leadId         Int?            @map("lead_id")
+  issueDate      DateTime        @map("issue_date") @db.Date
+  amount         Decimal         @db.Decimal(12, 2)
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  id             Int             @id @default(autoincrement()) @map("invoice_id")
+  chargebacks    Chargeback[]
+  clientPayments ClientPayment[] @relation("InvoicePayment")
+  lead           Lead?           @relation(fields: [leadId], references: [id])
+  refunds        Refund[]
+  revenues       Revenue[]
+  transactions   Transaction[]
+
+  @@map("invoices")
+}
+
+model Transaction {
+  id                  Int               @id @default(autoincrement()) @map("transaction_id")
+  invoiceId           Int?              @map("invoice_id")
+  vendorId            Int?              @map("vendor_id")
+  clientId            Int?              @map("client_id")
+  employeeId          Int?              @map("employee_id")
+  amount              Decimal           @db.Decimal(12, 2)
+  transactionType     TransactionType
+  paymentMethod       PaymentWays       @map("payment_method")
+  transactionDate     DateTime          @default(now()) @map("transaction_date")
+  status              TransactionStatus
+  relatedRefundId     Int?              @map("related_refund_id")
+  relatedChargebackId Int?              @map("related_chargeback_id")
+  notes               String?
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  Asset               Asset[]
+  Expense             Expense[]
+  Liability           Liability[]
+  Revenue             Revenue[]
+  client              Client?           @relation(fields: [clientId], references: [id])
+  employee            Employee?         @relation("TransactionEmployee", fields: [employeeId], references: [id])
+  invoice             Invoice?          @relation(fields: [invoiceId], references: [id])
+  chargeback          Chargeback?       @relation(fields: [relatedChargebackId], references: [id])
+  refund              Refund?           @relation(fields: [relatedRefundId], references: [id])
+  vendor              Vendor?           @relation(fields: [vendorId], references: [id])
+
+  @@map("transactions")
+}
+
+model NetSalaryLog {
+  employeeId      Int              @map("employee_id")
+  month           String?          @db.VarChar(7)
+  netSalary       Decimal?         @map("net_salary") @db.Decimal(12, 2)
+  paidOn          DateTime?        @map("paid_on") @db.Date
+  processedBy     Int?             @map("processed_by")
+  deductions      Int?
+  status          SalaryStatus?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  id              Int              @id @default(autoincrement()) @map("net_salary_log_id")
+  processedByRole ProcessedByRole? @map("processed_by_role")
+  employee        Employee         @relation(fields: [employeeId], references: [id])
+  processor       Employee?        @relation("SalaryProcessedBy", fields: [processedBy], references: [id])
+
+  @@map("net_salary_logs")
+}
+
+model Vendor {
+  name          String?       @db.VarChar(255)
+  contactPerson String?       @map("contact_person") @db.VarChar(255)
+  email         String?       @db.VarChar(255)
+  phone         String?       @db.VarChar(50)
+  address       String?
+  city          String?       @db.VarChar(100)
+  country       String?       @db.VarChar(100)
+  bankAccount   String?       @map("bank_account") @db.VarChar(255)
+  status        String?       @db.VarChar(50)
+  createdBy     Int?          @map("created_by")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  id            Int           @id @default(autoincrement()) @map("vendor_id")
+  liabilities   Liability[]
+  Transaction   Transaction[]
+  employee      Employee?     @relation("VendorCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("vendors")
+}
+
+model ProfitLoss {
+  month         String?  @db.VarChar(2)
+  year          String?  @db.VarChar(4)
+  totalIncome   Decimal? @map("total_income") @db.Decimal(12, 2)
+  totalExpenses Decimal? @map("total_expenses") @db.Decimal(12, 2)
+  netProfit     Decimal? @map("net_profit") @db.Decimal(12, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  id            Int      @id @default(autoincrement()) @map("profit_loss_id")
+
+  @@map("profit_loss")
+}
+
+model Admin {
+  firstName String?    @map("first_name") @db.VarChar(255)
+  lastName  String?    @map("last_name") @db.VarChar(255)
+  email     String?    @db.VarChar(255)
+  password  String?    @db.VarChar(255)
+  role      AdminRole?
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  id        Int        @id @default(autoincrement()) @map("admin_id")
+
+  @@map("admins")
+}
+
+model AdminRequest {
+  hrLogId     Int?                @map("hr_log_id")
+  description String?
+  type        RequestType?
+  status      AdminRequestStatus?
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  id          Int                 @id @default(autoincrement()) @map("admin_request_id")
+  hrLog       HRLog?              @relation(fields: [hrLogId], references: [id])
+
+  @@map("admin_requests")
+}
+
+model Attendance {
+  employeeId      Int      @map("employee_id")
+  presentDays     Int?     @map("present_days")
+  absentDays      Int?     @map("absent_days")
+  lateDays        Int?     @map("late_days")
+  leaveDays       Int?     @map("leave_days")
+  remoteDays      Int?     @map("remote_days")
+  quarterlyLeaves Int?     @map("quarterly_leaves")
+  monthlyLates    Int?     @map("monthly_lates")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  id              Int      @id @default(autoincrement()) @map("attendance_id")
+  halfDays        Int?     @default(0) @map("half_days")
+  employee        Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("attendance")
+}
+
+model AttendanceLog {
+  employeeId Int               @map("employee_id")
+  date       DateTime?         @db.Date
+  checkin    DateTime?
+  checkout   DateTime?
+  mode       WorkingMode?
+  status     AttendanceStatus?
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  id         Int               @id @default(autoincrement()) @map("attendance_log_id")
+  employee   Employee          @relation(fields: [employeeId], references: [id])
+
+  @@map("attendance_logs")
+}
+
+model HalfDayLog {
+  empId           Int          @map("emp_id")
+  date            DateTime     @db.Date
+  scheduledTimeIn String       @map("scheduled_time_in") @db.VarChar(10)
+  actualTimeIn    String       @map("actual_time_in") @db.VarChar(10)
+  minutesLate     Int          @map("minutes_late")
+  reason          String?
+  justified       Boolean?     @default(false)
+  actionTaken     LateAction   @default(Pending) @map("action_taken")
+  reviewedBy      Int?         @map("reviewed_by")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  id              Int          @id @default(autoincrement()) @map("half_day_log_id")
+  halfDayType     HalfDayType? @default(unpaid) @map("half_day_type")
+  employee        Employee     @relation("LateLogEmployee", fields: [empId], references: [id])
+  reviewer        Employee?    @relation("LateLogReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@map("half_day_logs")
+}
+
+model HR {
+  employeeId              Int      @unique @map("employee_id")
+  attendancePermission    Boolean? @map("attendance_permission")
+  salaryPermission        Boolean? @map("salary_permission")
+  commissionPermission    Boolean? @map("commission_permission")
+  employeeAddPermission   Boolean? @map("employee_add_permission")
+  terminationsHandle      Boolean? @map("terminations_handle")
+  targetsSet              Boolean? @map("targets_set")
+  bonusesSet              Boolean? @map("bonuses_set")
+  shiftTimingSet          Boolean? @map("shift_timing_set")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  id                      Int      @id @default(autoincrement()) @map("hr_id")
+  monthlyRequestApprovals Boolean? @map("monthly_request_approvals")
+  employee                Employee @relation("HrEmployee", fields: [employeeId], references: [id])
+  hrLogs                  HRLog[]
+
+  @@map("hr")
+}
+
+model HRLog {
+  hrId               Int            @map("hr_id")
+  actionType         String?        @map("action_type") @db.VarChar(255)
+  affectedEmployeeId Int?           @map("affected_employee_id")
+  description        String?
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+  id                 Int            @id @default(autoincrement()) @map("hr_log_id")
+  adminRequests      AdminRequest[]
+  affectedEmployee   Employee?      @relation("HRAffectedEmployee", fields: [affectedEmployeeId], references: [id])
+  hr                 HR             @relation(fields: [hrId], references: [id])
+
+  @@map("hr_logs")
+}
+
+model LeaveLog {
+  empId              Int          @map("emp_id")
+  leaveType          String?      @map("leave_type") @db.VarChar(255)
+  startDate          DateTime     @map("start_date") @db.Date
+  endDate            DateTime     @map("end_date") @db.Date
+  reason             String?
+  status             LeaveStatus? @default(Pending)
+  appliedOn          DateTime     @default(now()) @map("applied_on")
+  reviewedBy         Int?         @map("reviewed_by")
+  reviewedOn         DateTime?    @map("reviewed_on")
+  confirmationReason String?      @map("confirmation_reason")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+  id                 Int          @id @default(autoincrement()) @map("leave_log_id")
+  employee           Employee     @relation("LeaveRequestedBy", fields: [empId], references: [id])
+  reviewer           Employee?    @relation("LeaveReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@map("leave_logs")
+}
+
+model LateLog {
+  id              Int        @id @default(autoincrement()) @map("late_log_id")
+  empId           Int        @map("emp_id")
+  date            DateTime   @db.Date
+  scheduledTimeIn String     @map("scheduled_time_in") @db.VarChar(10)
+  actualTimeIn    String     @map("actual_time_in") @db.VarChar(10)
+  minutesLate     Int        @map("minutes_late")
+  reason          String?
+  justified       Boolean?   @default(false)
+  actionTaken     LateAction @default(Created) @map("action_taken")
+  reviewedBy      Int?       @map("reviewed_by")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  lateType        LateType?  @default(unpaid) @map("late_type")
+  employee        Employee   @relation("LateLogEmployee", fields: [empId], references: [id])
+  reviewer        Employee?  @relation("LateLogReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@map("late_logs")
+}
+
+model MonthlyAttendanceSummary {
+  id              Int      @id @default(autoincrement()) @map("summary_id")
+  empId           Int      @map("emp_id")
+  month           String   @db.VarChar(7)
+  totalPresent    Int      @map("total_present")
+  totalAbsent     Int      @map("total_absent")
+  totalLeaveDays  Int      @map("total_leave_days")
+  totalLateDays   Int      @map("total_late_days")
+  totalRemoteDays Int      @map("total_remote_days")
+  generatedOn     DateTime @default(now()) @map("generated_on")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  totalHalfDays   Int      @default(0) @map("total_half_days")
+  employee        Employee @relation(fields: [empId], references: [id])
+
+  @@map("monthly_attendance_summary")
+}
+
+model ProjectChat {
+  projectId               Int?              @map("project_id")
+  transferredFrom         Int?              @map("transferred_from")
+  transferredTo           Int?              @map("transferred_to")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
+  id                      Int               @id @default(autoincrement()) @map("project_chat_id")
+  participants            Int?
+  chatMessages            ChatMessage[]
+  chatParticipants        ChatParticipant[]
+  project                 Project?          @relation(fields: [projectId], references: [id])
+  transferredFromEmployee Employee?         @relation("ChatTransferredFrom", fields: [transferredFrom], references: [id])
+  transferredToEmployee   Employee?         @relation("ChatTransferredTo", fields: [transferredTo], references: [id])
+
+  @@map("project_chats")
+}
+
+model ChatParticipant {
+  chatId     Int         @map("chat_id")
+  employeeId Int         @map("employee_id")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  memberType chPart      @map("member_type")
+  id         Int         @id @default(autoincrement()) @map("chat_participant_id")
+  chat       ProjectChat @relation(fields: [chatId], references: [id])
+  employee   Employee    @relation(fields: [employeeId], references: [id])
+
+  @@map("chat_participants")
+}
+
+model ChatMessage {
+  chatId    Int         @map("chat_id")
+  senderId  Int         @map("sender_id")
+  message   String?
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  id        Int         @id @default(autoincrement()) @map("chat_message_id")
+  chat      ProjectChat @relation(fields: [chatId], references: [id])
+  sender    Employee    @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model Meeting {
+  employeeId   Int?           @map("employee_id")
+  clientId     Int?           @map("client_id")
+  projectId    Int?           @map("project_id")
+  topic        String?
+  dateTime     DateTime?      @map("date_time")
+  status       MeetingStatus?
+  autoReminder Boolean        @default(true) @map("auto_reminder")
+  meetingLink  String         @db.VarChar(255)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  id           Int            @id @default(autoincrement()) @map("meeting_id")
+  client       Client?        @relation(fields: [clientId], references: [id])
+  employee     Employee?      @relation("MeetingEmployee", fields: [employeeId], references: [id])
+  project      Project?       @relation("MeetingProject", fields: [projectId], references: [id])
+
+  @@map("meetings")
+}
+
+model Notification {
+  status             NotificationStatus? @default(unread)
+  sentTo             Int?                @map("sent_to")
+  sentBy             Int?                @map("sent_by")
+  heading            String?             @db.VarChar(255)
+  content            String?
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  id                 Int                 @id @default(autoincrement()) @map("notification_id")
+  userType           UserType            @map("user_type")
+  notificationType   NotificationType    @default(individual)
+  targetDepartmentId Int?                @map("target_department_id")
+  sender             Employee?           @relation("NotificationSentBy", fields: [sentBy], references: [id])
+  employee           Employee?           @relation("NotificationSentTo", fields: [sentTo], references: [id])
+  targetDepartment   Department?         @relation("NotificationTargetDepartment", fields: [targetDepartmentId], references: [id])
+
+  @@map("notifications")
+}
+
+model HrRequest {
+  id                 Int              @id @default(autoincrement()) @map("request_id")
+  empId              Int              @map("emp_id")
+  departmentId       Int?             @map("department_id")
+  requestType        String?          @map("request_type") @db.VarChar(255)
+  subject            String?          @db.VarChar(255)
+  description        String?
+  priority           RequestPriority? @default(Low)
+  status             RequestStatus?   @default(Pending)
+  assignedTo         Int?             @map("assigned_to")
+  responseNotes      String?          @map("response_notes")
+  requestedOn        DateTime         @default(now()) @map("requested_on")
+  resolvedOn         DateTime?        @map("resolved_on")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  assignedToEmployee Employee?        @relation("RequestAssignedTo", fields: [assignedTo], references: [id])
+  department         Department?      @relation(fields: [departmentId], references: [id])
+  employee           Employee         @relation("RequestMadeBy", fields: [empId], references: [id])
+
+  @@map("hr_requested")
+}
+
+model Company {
+  name                String   @db.VarChar(255)
+  address             String?  @db.VarChar(255)
+  city                String?  @db.VarChar(100)
+  state               String?  @db.VarChar(100)
+  zip                 String?  @db.VarChar(20)
+  country             String?  @db.VarChar(100)
+  phone               String?  @db.VarChar(20)
+  email               String?  @db.VarChar(255)
+  website             String?  @db.VarChar(255)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  quarterlyLeavesDays Int      @default(0) @map("quarterly_leaves_days")
+  monthlyLatesDays    Int      @default(0) @map("monthly_lates_days")
+  absentDeduction     Int      @default(0) @map("absent_deduction")
+  lateDeduction       Int      @default(0) @map("late_deduction")
+  taxId               String?  @db.VarChar(100)
+  lateTime            Int      @default(0) @map("late_time")
+  halfTime            Int      @default(0) @map("half_time")
+  id                  Int      @id @default(autoincrement()) @map("company_id")
+  absentTime          Int      @default(0) @map("absent_time")
+  halfDeduction       Int      @default(0) @map("half_deduction")
+
+  @@map("companies")
+}
+
+model Complaint {
+  id                 Int                @id @default(autoincrement()) @map("complaint_id")
+  raisedBy           Int                @map("raised_by")
+  againstEmployeeId  Int?               @map("against_employee_id")
+  departmentId       Int?               @map("department_id")
+  complaintType      String?            @map("complaint_type") @db.VarChar(255)
+  subject            String?            @db.VarChar(255)
+  description        String?
+  status             ComplaintStatus?   @default(Open)
+  priority           ComplaintPriority? @default(Low)
+  assignedTo         Int?               @map("assigned_to")
+  resolutionNotes    String?            @map("resolution_notes")
+  resolutionDate     DateTime?          @map("resolution_date")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  againstEmployee    Employee?          @relation("ComplaintAgainst", fields: [againstEmployeeId], references: [id])
+  assignedToEmployee Employee?          @relation("ComplaintAssignedTo", fields: [assignedTo], references: [id])
+  department         Department?        @relation(fields: [departmentId], references: [id])
+  raisedByEmployee   Employee           @relation("ComplaintRaisedBy", fields: [raisedBy], references: [id])
+
+  @@map("complaints")
+}
+
+model Reminders {
+  id                Int                @id @default(autoincrement()) @map("reminder_id")
+  empId             Int                @map("emp_id")
+  title             String             @db.VarChar(255)
+  description       String?
+  reminderDate      DateTime           @map("reminder_date") @db.Date
+  reminderTime      String             @map("reminder_time") @db.VarChar(10)
+  isRecurring       Boolean            @map("is_recurring")
+  recurrencePattern RecurrencePattern? @map("recurrence_pattern")
+  status            ReminderStatus     @default(Pending)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  employee          Employee           @relation(fields: [empId], references: [id])
+
+  @@map("reminders")
+}
+
+model CampaignLog {
+  id               Int             @id @default(autoincrement()) @map("campaign_id")
+  campaignName     String          @map("campaign_name") @db.VarChar(255)
+  campaignType     String          @map("campaign_type") @db.VarChar(255)
+  startDate        DateTime        @map("start_date") @db.Date
+  endDate          DateTime        @map("end_date") @db.Date
+  status           CampaignStatus  @map("status")
+  budget           Decimal         @db.Decimal(12, 2)
+  actualCost       Decimal?        @map("actual_cost") @db.Decimal(12, 2)
+  unitId           Int             @map("unit_id")
+  description      String?
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  productionUnitId Int?
+  ProductionUnit   ProductionUnit? @relation(fields: [productionUnitId], references: [id])
+  marketingUnit    MarketingUnit   @relation(fields: [unitId], references: [id])
+
+  @@map("campaign_logs")
+}
+
+model ClientPayment {
+  id              Int           @id @default(autoincrement()) @map("payment_id")
+  clientId        Int           @map("client_id")
+  invoiceId       Int?          @map("invoice_id")
+  projectId       Int?          @map("project_id")
+  paymentDate     DateTime      @default(now()) @map("payment_date")
+  amountPaid      Decimal       @map("amount_paid") @db.Decimal(12, 2)
+  paymentMethod   String        @map("payment_method") @db.VarChar(50)
+  transactionId   String?       @map("transaction_id") @db.VarChar(255)
+  paymentStatus   PaymentStatus @map("payment_status")
+  notes           String?
+  paymentPhase    Int           @map("payment_phase")
+  receiptUrl      String?       @map("receipt_url") @db.VarChar(255)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  cracked_lead_id Int?
+  client          Client        @relation("ClientPayment", fields: [clientId], references: [id])
+  cracked_leads   CrackedLead?  @relation(fields: [cracked_lead_id], references: [id])
+  invoice         Invoice?      @relation("InvoicePayment", fields: [invoiceId], references: [id])
+  project         Project?      @relation("ProjectPayment", fields: [projectId], references: [id])
+
+  @@map("client_payment")
+}
+
+model ArchiveLead {
+  id            Int                      @id @default(autoincrement()) @map("archive_id")
+  leadId        Int                      @unique @map("lead_id")
+  name          String                   @db.VarChar(255)
+  email         String                   @db.VarChar(255)
+  phone         String                   @db.VarChar(20)
+  source        ArchiveLeadSource        @map("source")
+  assignedTo    Int                      @map("assigned_to")
+  unitId        Int?                     @map("unit_id")
+  outcome       ArchiveLeadOutcome       @map("outcome")
+  qualityRating ArchiveLeadQualityRating @map("quality_rating")
+  createdAt     DateTime                 @map("created_at")
+  archivedOn    DateTime                 @default(now()) @map("archived_on")
+  employee      Employee                 @relation("ArchiveLeadAssigned", fields: [assignedTo], references: [id])
+  unit          SalesUnit?               @relation("ArchiveLeadUnit", fields: [unitId], references: [id])
+
+  @@map("archive_leads")
+}
+
+model ProjectTask {
+  id          Int                    @id @default(autoincrement()) @map("task_id")
+  projectId   Int                    @map("project_id")
+  title       String                 @db.VarChar(255)
+  description String?
+  assignedBy  Int                    @map("assigned_by")
+  assignedTo  Int                    @map("assigned_to")
+  priority    ProjectTaskPriority    @map("priority")
+  status      ProjectTaskStatus      @map("status")
+  difficulty  ProjectTaskDifficulty? @map("difficulty")
+  startDate   DateTime?              @map("start_date") @db.Date
+  dueDate     DateTime?              @map("due_date") @db.Date
+  completedOn DateTime?              @map("completed_on") @db.Date
+  comments    String?
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  assigner    Employee               @relation("TaskAssigner", fields: [assignedBy], references: [id])
+  assignee    Employee               @relation("TaskAssignee", fields: [assignedTo], references: [id])
+  project     Project                @relation("ProjectTask", fields: [projectId], references: [id])
+
+  @@map("project_tasks")
+}
+
+model Holiday {
+  holidayId   Int      @id @default(autoincrement()) @map("holiday_id")
+  holidayName String   @map("holiday_name") @db.VarChar(100)
+  holidayDate DateTime @unique @map("holiday_date") @db.Date
+  description String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  // Opposite relation - employees with this role
-  employees Employee[]
-
-  @@map("roles")
+  @@map("holidays")
 }
 
 enum EmployeeStatus {
@@ -188,77 +1163,6 @@ enum RoleName {
   unit_head
 }
 
-// Marketing 
-
-model Marketing {
-  id                Int      @id @default(autoincrement()) @map("marketing_id")
-  employeeId        Int      @map("employee_id")
-  marketingUnitId   Int?     @map("marketing_unit_id")
-  totalCampaignsRun Int?     @map("total_campaigns_run")
-  platformFocus     String?  @map("platform_focus") @db.VarChar(255)
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee      Employee       @relation("MarketingEmployee", fields: [employeeId], references: [id])
-  marketingUnit MarketingUnit? @relation(fields: [marketingUnitId], references: [id])
-
-  @@map("marketing")
-}
-
-model MarketingUnit {
-  id               Int      @id @default(autoincrement()) @map("marketing_unit_id")
-  name             String   @unique @db.VarChar(255)
-  headId           Int?     @map("head_id")
-  leadQualityScore Decimal? @map("lead_quality_score") @db.Decimal(5, 2)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  head Employee? @relation("MarketingUnitHead", fields: [headId], references: [id])
-
-  // Opposite relations
-  marketingEmployees Marketing[]
-  teams              Team[]
-  campaignLogs       CampaignLog[]
-
-  @@map("marketing_units")
-}
-
-// Projects 
-
-model Project {
-  id              Int              @id @default(autoincrement()) @map("project_id")
-  crackedLeadId   Int?             @map("cracked_lead_id")
-  salesRepId      Int?             @map("sales_rep_id")
-  teamId          Int?             @map("team_id")
-  clientId        Int?             @map("client_id")
-  status          ProjectStatus?
-  difficultyLevel DifficultyLevel? @map("difficulty_level")
-  paymentStage    PaymentStage?    @map("payment_stage")
-  description     String?          @db.Text
-  deadline        DateTime?        @db.Date
-  liveProgress    Decimal?         @map("live_progress") @db.Decimal(5, 2)
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  // Foreign key relations
-  crackedLead     CrackedLead?     @relation(fields: [crackedLeadId], references: [id])
-  salesRep        Employee?        @relation("ProjectSalesRep", fields: [salesRepId], references: [id])
-  team            Team?            @relation("ProjectTeam", fields: [teamId], references: [id])
-  client          Client?          @relation("ProjectClient", fields: [clientId], references: [id]) // New relation
-
-  // Opposite relations
-  projectLogs       ProjectLog[]
-  // productionTeams   Production[]  @relation("ProductionCurrentProject")
-  teams             Team[]          @relation("TeamCurrentProject")
-  projectChats      ProjectChat[]
-  meetingsAsProject Meeting[]       @relation("MeetingProject")
-  clientPayments    ClientPayment[] @relation("ProjectPayment")
-  projectTasks      ProjectTask[]   @relation("ProjectTask")
-
-  @@map("projects")
-}
-
 enum ProjectStatus {
   in_progress
   onhold
@@ -280,177 +1184,11 @@ enum PaymentStage {
   approved
 }
 
-model ProjectLog {
-  id          Int      @id @default(autoincrement()) @map("project_log_id")
-  projectId   Int      @map("project_id")
-  developerId Int      @map("developer_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  project   Project  @relation(fields: [projectId], references: [id])
-  developer Employee @relation("ProjectLogDeveloper", fields: [developerId], references: [id])
-
-  @@map("project_logs")
-}
-
-model Production {
-  id                Int      @id @default(autoincrement()) @map("production_id")
-  employeeId        Int      @map("employee_id")
-  specialization    String?  @db.VarChar(255)
-  // currentProjectId  Int?     @map("current_project_id")
-  productionUnitId  Int?     @map("production_unit_id")
-  projectsCompleted Int?     @map("projects_completed")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee       Employee        @relation("ProductionEmployee", fields: [employeeId], references: [id])
-  // currentProject Project?        @relation("ProductionCurrentProject", fields: [currentProjectId], references: [id])
-  productionUnit ProductionUnit? @relation(fields: [productionUnitId], references: [id])
-
-  @@map("production")
-}
-
-model ProductionUnit {
-  id        Int      @id @default(autoincrement()) @map("production_unit_id")
-  name      String   @unique @db.VarChar(255)
-  headId    Int?     @map("head_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  head Employee? @relation("ProductionUnitHead", fields: [headId], references: [id])
-
-  // Opposite relations
-  productionEmployees Production[]
-  teams               Team[]
-  campaignLogs        CampaignLog[]
-
-  @@map("production_units")
-}
-
-model Team {
-  id               Int      @id @default(autoincrement()) @map("team_id")
-  teamLeadId       Int?     @map("team_lead_id")
-  name             String?  @db.VarChar(255)
-  currentProjectId Int?     @map("current_project_id")
-  employeeCount    Int?     @map("employee_count")
-  salesUnitId      Int?     @map("sales_unit_id")
-  productionUnitId Int?     @map("production_unit_id")
-  marketingUnitId  Int?     @map("marketing_unit_id")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  teamLead       Employee?       @relation("TeamLead", fields: [teamLeadId], references: [id])
-  currentProject Project?        @relation("TeamCurrentProject", fields: [currentProjectId], references: [id])
-  salesUnit      SalesUnit?      @relation(fields: [salesUnitId], references: [id])
-  productionUnit ProductionUnit? @relation(fields: [productionUnitId], references: [id])
-  marketingUnit  MarketingUnit?  @relation(fields: [marketingUnitId], references: [id])
-
-  // Opposite relations
-  projects Project[] @relation("ProjectTeam")
-
-  @@map("teams")
-}
-
-model Industry {
-  id          Int      @id @default(autoincrement()) @map("industry_id")
-  name        String   @unique @db.VarChar(150)
-  description String?  @db.Text
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Opposite relation
-  clients Client[]
-
-  @@map("industries")
-}
-
-model Client {
-  id            Int      @id @default(autoincrement()) @map("client_id")
-  clientType    String?  @map("client_type") @db.VarChar(20)
-  companyName   String?  @map("company_name") @db.VarChar(255)
-  clientName    String?  @map("client_name") @db.VarChar(100)
-  email         String?  @db.VarChar(150)
-  phone         String?  @db.VarChar(20)
-  passwordHash  String   @map("password_hash") @db.VarChar(255)
-  altPhone      String?  @map("alt_phone") @db.VarChar(20)
-  address       String?  @db.VarChar(255)
-  city          String?  @db.VarChar(100)
-  state         String?  @db.VarChar(100)
-  postalCode    String?  @map("postal_code") @db.VarChar(20)
-  country       String?  @db.VarChar(100)
-  industryId    Int?     @map("industry_id")
-  taxId         String?  @map("tax_id") @db.VarChar(50)
-  accountStatus accStat  @map("account_status")
-  createdBy     Int?     @map("created_by")
-  notes         String?  @db.Text
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  industry Industry? @relation(fields: [industryId], references: [id])
-  employee Employee? @relation("ClientCreatedBy", fields: [createdBy], references: [id])
-
-  // Opposite relations
-  transactions   Transaction[]
-  meetings       Meeting[]
-  refunds        Refund[]
-  chargebacks    Chargeback[]
-  Project        Project[]       @relation("ProjectClient")
-  clientPayments ClientPayment[] @relation("ClientPayment")
-
-  @@map("clients")
-}
-
 enum accStat {
   active
   inactive
   suspended
   prospect
-}
-
-// Sales 
-
-model Lead {
-  id            Int            @id @default(autoincrement()) @map("lead_id")
-  name          String?        @db.VarChar(255)
-  email         String?        @db.VarChar(255)
-  phone         String?        @db.VarChar(20)
-  source        LeadSource?
-  type          LeadType?
-  status        LeadStatus?
-  failedCount   Int?           @map("failed_count")
-  crackedById   Int?           @map("cracked_by")
-  assignedToId  Int?           @map("assigned_to")
-  startedById   Int?           @map("started_by")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  outcome       LeadOutcome?
-  salesUnitId   Int?           @map("sales_unit_id")
-  closedAt      DateTime?      @map("closed_at") @db.Date
-  closedById    Int?           @map("closed_by")
-  qualityRating QualityRating? @map("quality_rating")
-  archiveLead   ArchiveLead?   @relation("LeadArchive")
-
-  // Foreign key relations
-  crackedBy  Employee?  @relation("LeadCrackedBy", fields: [crackedById], references: [id])
-  assignedTo Employee?  @relation("LeadAssignedTo", fields: [assignedToId], references: [id])
-  startedBy  Employee?  @relation("LeadStartedBy", fields: [startedById], references: [id])
-  closedBy   Employee?  @relation("LeadClosedBy", fields: [closedById], references: [id])
-  salesUnit  SalesUnit? @relation(fields: [salesUnitId], references: [id])
-
-  // Opposite relations
-  comments       LeadComment[]
-  crackedLeads   CrackedLead[]
-  outcomeHistory LeadOutcomeHistory[]
-  revenues       Revenue[]
-  invoices       Invoice[]
-
-  @@map("leads")
 }
 
 enum LeadSource {
@@ -490,151 +1228,11 @@ enum QualityRating {
   useless
 }
 
-model SalesUnit {
-  id        Int      @id @default(autoincrement()) @map("sales_unit_id")
-  name      String   @unique @db.VarChar(255)
-  email     String?  @unique @db.VarChar(255)
-  phone     String?  @unique @db.VarChar(20)
-  address   String?  @db.VarChar(255)
-  headId    Int?     @map("head_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  logoUrl   String?  @map("logo_url") @db.VarChar(255)
-  website   String?  @db.VarChar(255)
-
-  // Foreign key relation to employees table
-  head Employee? @relation("SalesUnitHead", fields: [headId], references: [id])
-
-  // Opposite relations
-  leads          Lead[]
-  teams          Team[]
-  salesEmployees SalesDepartment[]
-  archiveLeads   ArchiveLead[]     @relation("ArchiveLeadUnit")
-
-  @@map("sales_units")
-}
-
-model LeadComment {
-  id          Int      @id @default(autoincrement()) @map("lead_comment_id")
-  leadId      Int      @map("lead_id")
-  commentBy   Int      @map("comment_by")
-  commentText String?  @map("comment_text") @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  lead                 Lead                 @relation(fields: [leadId], references: [id])
-  employee             Employee             @relation("LeadCommentBy", fields: [commentBy], references: [id])
-  leadOutcomeHistories LeadOutcomeHistory[]
-
-  @@map("lead_comments")
-}
-
-model SalesDepartment {
-  id                  Int      @id @default(autoincrement()) @map("sales_department_id")
-  employeeId          Int      @map("employee_id")
-  leadsClosed         Int?     @map("leads_closed")
-  salesAmount         Decimal? @map("sales_amount") @db.Decimal(12, 2)
-  salesUnitId         Int?     @map("sales_unit_id")
-  commissionRate      Decimal? @map("commission_rate") @db.Decimal(5, 2)
-  commissionAmount    Decimal? @map("commission_amount") @db.Decimal(12, 2)
-  salesBonus          Decimal? @map("sales_bonus") @db.Decimal(12, 2)
-  withholdCommission  Decimal  @map("withhold_commission") @db.Decimal(12, 2)
-  withholdFlag        Boolean  @map("withhold_flag")
-  targetAmount        Decimal? @map("target_amount") @db.Decimal(12, 2)
-  chargebackDeductions Decimal? @default(0) @db.Decimal(12, 2) @map("chargeback_deductions")
-  refundDeductions    Decimal? @default(0) @db.Decimal(12, 2) @map("refund_deductions")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee  Employee   @relation("SalesDepartmentEmployee", fields: [employeeId], references: [id])
-  salesUnit SalesUnit? @relation(fields: [salesUnitId], references: [id])
-
-  @@map("sales_departments")
-}
-
-model CrackedLead {
-  id             Int      @id @default(autoincrement()) @map("cracked_lead_id")
-  leadId         Int      @map("lead_id")
-  closedBy       Int      @map("closed_by")
-  category       String?  @db.VarChar(255)
-  description    String?  @db.Text
-  crackedAt      DateTime @default(now()) @map("cracked_at") @db.Date
-  amount         Decimal? @db.Decimal(12, 2)
-  commissionRate Decimal? @map("commission_rate") @db.Decimal(5, 2)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-  totalPhases    Int?     @map("total_phases")
-  currentPhase   Int?     @map("current_phase")
-
-  // Foreign key relations
-  lead     Lead     @relation(fields: [leadId], references: [id])
-  employee Employee @relation("CrackedLeadClosedBy", fields: [closedBy], references: [id])
-
-  // Opposite relations
-  projects Project[]
-
-  @@map("cracked_leads")
-}
-
-model Refund {
-  id           Int          @id @default(autoincrement()) @map("refund_id")
-  invoiceId    Int?         @map("invoice_id")
-  clientId     Int?         @map("client_id")
-  amount       Decimal?     @db.Decimal(12, 2)
-  reason       String?      @db.Text
-  refundedBy   Int?         @map("refunded_by")
-  refundMethod String?      @map("refund_method") @db.VarChar(50)
-  status       RefundStatus
-  processedOn  DateTime?    @map("processed_on") @db.Date
-  comments     String?      @db.Text
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  invoice  Invoice?  @relation(fields: [invoiceId], references: [id])
-  client   Client?   @relation(fields: [clientId], references: [id])
-  employee Employee? @relation("RefundProcessedBy", fields: [refundedBy], references: [id])
-
-  // Opposite relations
-  transactions Transaction[]
-
-  @@map("refunds")
-}
-
 enum RefundStatus {
   initiated
   processing
   completed
   rejected
-}
-
-model Chargeback {
-  id            Int               @id @default(autoincrement()) @map("chargeback_id")
-  transactionId String?           @map("transaction_id") @db.VarChar(100)
-  invoiceId     Int?              @map("invoice_id")
-  clientId      Int?              @map("client_id")
-  amount        Decimal?          @db.Decimal(12, 2)
-  reasonCode    String?           @map("reason_code") @db.VarChar(100)
-  bankReference String?           @map("bank_reference") @db.VarChar(100)
-  status        ChargebackStatus?
-  openedAt      DateTime?         @map("opened_at") @db.Date
-  resolvedAt    DateTime?         @map("resolved_at") @db.Date
-  handledBy     Int?              @map("handled_by")
-  comments      String?           @db.Text
-  createdAt     DateTime          @default(now()) @map("created_at")
-  updatedAt     DateTime          @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  invoice  Invoice?  @relation(fields: [invoiceId], references: [id])
-  client   Client?   @relation(fields: [clientId], references: [id])
-  employee Employee? @relation("ChargebackHandledBy", fields: [handledBy], references: [id])
-
-  // Opposite relations
-  transactions Transaction[]
-
-  @@map("chargebacks")
 }
 
 enum ChargebackStatus {
@@ -645,221 +1243,10 @@ enum ChargebackStatus {
   resolved
 }
 
-// Security 
-
-model AccessLog {
-  id         Int       @id @default(autoincrement()) @map("access_log_id")
-  employeeId Int       @map("employee_id")
-  ipAddress  String?   @map("ip_address") @db.VarChar(45)
-  loginTime  DateTime  @default(now()) @map("login_time")
-  logoutTime DateTime? @map("logout_time")
-  success    Boolean
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation(fields: [employeeId], references: [id])
-
-  @@map("access_logs")
-}
-
-model LeadOutcomeHistory {
-  id        Int      @id @default(autoincrement()) @map("lead_outcome_history_id")
-  leadId    Int      @map("lead_id")
-  outcome   String   @map("outcome") @db.VarChar(50)
-  changedBy Int?     @map("changed_by")
-  // changedAt DateTime @default(now()) @map("changed_at")
-  commentId Int?     @map("comment_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  // Foreign key relations
-  lead          Lead         @relation(fields: [leadId], references: [id])
-  changedByUser Employee?    @relation(fields: [changedBy], references: [id])
-  comment       LeadComment? @relation(fields: [commentId], references: [id])
-
-  @@map("lead_outcome_history")
-}
-
-// ACF
-
-model Account {
-  id           Int      @id @default(autoincrement()) @map("account_id")
-  employeeId   Int      @map("employee_id")
-  accountTitle String?  @map("account_title") @db.VarChar(255)
-  bankName     String?  @map("bank_name") @db.VarChar(255)
-  ibanNumber   String?  @map("iban_number") @db.VarChar(50)
-  baseSalary   Decimal? @map("base_salary") @db.Decimal(12, 2)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation(fields: [employeeId], references: [id])
-
-  @@map("accounts")
-}
-
-model Accountant {
-  id                    Int      @id @default(autoincrement()) @map("accountant_id")
-  employeeId            Int      @unique @map("employee_id")
-  liabilitiesPermission Boolean? @map("liabilities_permission")
-  salaryPermission      Boolean? @map("salary_permission")
-  salesPermission       Boolean? @map("sales_permission")
-  invoicesPermission    Boolean? @map("invoices_permission")
-  expensesPermission    Boolean? @map("expenses_permission")
-  assetsPermission      Boolean? @map("assets_permission")
-  revenuesPermission    Boolean? @map("revenues_permission")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation("EmployeeAccountant", fields: [employeeId], references: [id])
-
-  @@map("accountants")
-}
-
-model Asset {
-  id               Int       @id @default(autoincrement()) @map("asset_id")
-  title            String?   @db.VarChar(255)
-  category         String?   @db.VarChar(100)
-  purchaseDate     DateTime? @map("purchase_date") @db.Date
-  purchaseValue    Decimal?  @map("purchase_value") @db.Decimal(12, 2)
-  currentValue     Decimal?  @map("current_value") @db.Decimal(12, 2)
-  transactionId    Int       @map("transaction_id")
-  createdBy        Int?      @map("created_by")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee    Employee?    @relation("AssetCreatedBy", fields: [createdBy], references: [id])
-  transaction Transaction  @relation(fields: [transactionId], references: [id])
-
-  @@map("assets")
-}
-
-model Expense {
-  id             Int            @id @default(autoincrement()) @map("expense_id")
-  title          String?        @db.VarChar(255)
-  category       String?        @db.VarChar(100)
-  amount         Decimal?       @db.Decimal(12, 2)
-  createdBy      Int?           @map("created_by")
-  paidOn         DateTime?      @map("paid_on") @db.Date
-  notes          String?        @db.Text
-  transactionId  Int?           @map("transaction_id")
-  processedByRole ProcessedByRole? @map("processed_by_role")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  paymentMethod  PaymentMethod? @map("payment_method")
-
-  // Foreign key relation to employees table
-  employee    Employee?    @relation("ExpenseCreatedBy", fields: [createdBy], references: [id])
-  // Foreign key relation to transactions table
-  transaction Transaction? @relation(fields: [transactionId], references: [id])
-
-  @@map("expenses")
-}
-
 enum PaymentMethod {
   cash
   bank
   online
-}
-
-model Liability {
-  id              Int       @id @default(autoincrement()) @map("liability_id")
-  name            String?   @db.VarChar(255)
-  category        String?   @db.VarChar(100)
-  amount          Decimal?  @db.Decimal(12, 2)
-  dueDate         DateTime? @map("due_date") @db.Date
-  isPaid          Boolean?  @map("is_paid")
-  paidOn          DateTime? @map("paid_on") @db.Date
-  transactionId   Int       @map("transaction_id")
-  relatedVendorId Int?      @map("related_vendor_id")
-  createdBy       Int?      @map("created_by")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  vendor      Vendor?      @relation(fields: [relatedVendorId], references: [id])
-  employee    Employee?    @relation("LiabilityCreatedBy", fields: [createdBy], references: [id])
-  transaction Transaction  @relation(fields: [transactionId], references: [id])
-
-  @@map("liabilities")
-}
-
-model Revenue {
-  id               Int           @id @default(autoincrement()) @map("revenue_id")
-  source           String?       @db.VarChar(255)
-  category         String?       @db.VarChar(100)
-  amount           Decimal?      @db.Decimal(12, 2)
-  receivedFrom     Int?          @map("received_from")
-  receivedOn       DateTime?     @map("received_on") @db.Date
-  paymentMethod    PaymentMethod @map("payment_method")
-  relatedInvoiceId Int?          @map("related_invoice_id")
-  createdBy        Int?          @map("created_by")
-  transactionId    Int?          @map("transaction_id")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  lead        Lead?        @relation(fields: [receivedFrom], references: [id])
-  invoice     Invoice?     @relation(fields: [relatedInvoiceId], references: [id])
-  employee    Employee?    @relation("RevenueCreatedBy", fields: [createdBy], references: [id])
-  transaction Transaction? @relation(fields: [transactionId], references: [id])
-
-  @@map("revenues")
-}
-
-model Invoice {
-  id        Int      @id @default(autoincrement()) @map("invoice_id")
-  leadId    Int?     @map("lead_id")
-  issueDate DateTime @map("issue_date") @db.Date
-  amount    Decimal  @db.Decimal(12, 2)
-  notes     String?  @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-
-  // Foreign key relation
-  lead Lead? @relation(fields: [leadId], references: [id])
-
-  // Opposite relations
-  revenues       Revenue[]
-  transactions   Transaction[]
-  refunds        Refund[]
-  chargebacks    Chargeback[]
-  clientPayments ClientPayment[] @relation("InvoicePayment")
-
-  @@map("invoices")
-}
-
-model Transaction {
-  id                  Int               @id @default(autoincrement()) @map("transaction_id")
-  invoiceId           Int?              @map("invoice_id")
-  vendorId            Int?              @map("vendor_id")
-  clientId            Int?              @map("client_id")
-  employeeId          Int?              @map("employee_id")
-  amount              Decimal           @db.Decimal(12, 2)
-  transactionType     TransactionType
-  paymentMethod       PaymentWays       @map("payment_method")
-  transactionDate     DateTime          @default(now()) @map("transaction_date")
-  status              TransactionStatus
-  relatedRefundId     Int?              @map("related_refund_id")
-  relatedChargebackId Int?              @map("related_chargeback_id")
-  notes               String?           @db.Text
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  invoice    Invoice?    @relation(fields: [invoiceId], references: [id])
-  vendor     Vendor?     @relation(fields: [vendorId], references: [id])
-  client     Client?     @relation(fields: [clientId], references: [id])
-  employee   Employee?   @relation("TransactionEmployee", fields: [employeeId], references: [id])
-  refund     Refund?     @relation(fields: [relatedRefundId], references: [id])
-  chargeback Chargeback? @relation(fields: [relatedChargebackId], references: [id])
-  Expense    Expense[]
-  Revenue    Revenue[]
-  Asset      Asset[]
-  Liability  Liability[]
-
-  @@map("transactions")
 }
 
 enum PaymentWays {
@@ -868,64 +1255,6 @@ enum PaymentWays {
   online
   cashapp
   cash
-}
-
-model NetSalaryLog {
-  id             Int              @id @default(autoincrement()) @map("net_salary_log_id")
-  employeeId     Int              @map("employee_id")
-  month          String?          @db.VarChar(7)
-  netSalary      Decimal?         @map("net_salary") @db.Decimal(12, 2)
-  paidOn         DateTime?        @map("paid_on") @db.Date
-  processedBy    Int?             @map("processed_by")
-  processedByRole ProcessedByRole? @map("processed_by_role")
-  deductions     Int?
-  status         SalaryStatus?
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee  Employee  @relation(fields: [employeeId], references: [id])
-  processor Employee? @relation("SalaryProcessedBy", fields: [processedBy], references: [id])
-
-  @@map("net_salary_logs")
-}
-
-model Vendor {
-  id            Int      @id @default(autoincrement()) @map("vendor_id")
-  name          String?  @db.VarChar(255)
-  contactPerson String?  @map("contact_person") @db.VarChar(255)
-  email         String?  @db.VarChar(255)
-  phone         String?  @db.VarChar(50)
-  address       String?  @db.Text
-  city          String?  @db.VarChar(100)
-  country       String?  @db.VarChar(100)
-  bankAccount   String?  @map("bank_account") @db.VarChar(255)
-  status        String?  @db.VarChar(50)
-  createdBy     Int?     @map("created_by")
-  notes         String?  @db.Text
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee    Employee?     @relation("VendorCreatedBy", fields: [createdBy], references: [id])
-  // Opposite relations
-  liabilities Liability[]
-  Transaction Transaction[]
-
-  @@map("vendors")
-}
-
-model ProfitLoss {
-  id            Int      @id @default(autoincrement()) @map("profit_loss_id")
-  month         String?  @db.VarChar(2)
-  year          String?  @db.VarChar(4)
-  totalIncome   Decimal? @map("total_income") @db.Decimal(12, 2)
-  totalExpenses Decimal? @map("total_expenses") @db.Decimal(12, 2)
-  netProfit     Decimal? @map("net_profit") @db.Decimal(12, 2)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  @@map("profit_loss")
 }
 
 enum InvoiceStatus {
@@ -958,39 +1287,9 @@ enum ProcessedByRole {
   Admin
 }
 
-// ADMIN 
-
-model Admin {
-  id        Int        @id @default(autoincrement()) @map("admin_id")
-  firstName String?    @map("first_name") @db.VarChar(255)
-  lastName  String?    @map("last_name") @db.VarChar(255)
-  email     String?    @db.VarChar(255)
-  password  String?    @db.VarChar(255)
-  role      AdminRole?
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
-
-  @@map("admins")
-}
-
 enum AdminRole {
   admin
   super_manager
-}
-
-model AdminRequest {
-  id          Int                 @id @default(autoincrement()) @map("admin_request_id")
-  hrLogId     Int?                @map("hr_log_id")
-  description String?             @db.Text
-  type        RequestType?
-  status      AdminRequestStatus?
-  createdAt   DateTime            @default(now()) @map("created_at")
-  updatedAt   DateTime            @updatedAt @map("updated_at")
-
-  // Foreign key relation to hr_logs table
-  hrLog HRLog? @relation(fields: [hrLogId], references: [id])
-
-  @@map("admin_requests")
 }
 
 enum RequestType {
@@ -1003,45 +1302,6 @@ enum AdminRequestStatus {
   approved
   declined
   pending
-}
-
-// Attendance + HR
-
-model Attendance {
-  id              Int      @id @default(autoincrement()) @map("attendance_id")
-  employeeId      Int      @map("employee_id")
-  presentDays     Int?     @map("present_days")
-  absentDays      Int?     @map("absent_days")
-  lateDays        Int?     @map("late_days")
-  leaveDays       Int?     @map("leave_days")
-  remoteDays      Int?     @map("remote_days")
-  quarterlyLeaves Int?     @map("quarterly_leaves")
-  monthlyLates    Int?     @map("monthly_lates")
-  halfDays        Int?     @default(0) @map("half_days")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation(fields: [employeeId], references: [id])
-
-  @@map("attendance")
-}
-
-model AttendanceLog {
-  id         Int               @id @default(autoincrement()) @map("attendance_log_id")
-  employeeId Int               @map("employee_id")
-  date       DateTime?         @db.Date
-  checkin    DateTime?
-  checkout   DateTime?
-  mode       WorkingMode?
-  status     AttendanceStatus?
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation(fields: [employeeId], references: [id])
-
-  @@map("attendance_logs")
 }
 
 enum WorkingMode {
@@ -1057,122 +1317,15 @@ enum AttendanceStatus {
   leave
 }
 
-model HalfDayLog {
-  id              Int          @id @default(autoincrement()) @map("half_day_log_id")
-  empId           Int          @map("emp_id")
-  date            DateTime     @db.Date
-  scheduledTimeIn String       @map("scheduled_time_in") @db.VarChar(10)
-  actualTimeIn    String       @map("actual_time_in") @db.VarChar(10)
-  minutesLate     Int          @map("minutes_late")
-  reason          String?      @db.Text
-  justified       Boolean?     @default(false)
-  actionTaken     LateAction   @default(Pending) @map("action_taken")
-  halfDayType     HalfDayType? @default(unpaid) @map("half_day_type")
-  reviewedBy      Int?         @map("reviewed_by")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee Employee  @relation("LateLogEmployee", fields: [empId], references: [id])
-  reviewer Employee? @relation("LateLogReviewedBy", fields: [reviewedBy], references: [id])
-
-  @@map("half_day_logs")
-}
-
 enum HalfDayType {
   paid
   unpaid
-}
-
-model HR {
-  id                       Int      @id @default(autoincrement()) @map("hr_id")
-  employeeId               Int      @unique @map("employee_id")
-  attendancePermission     Boolean? @map("attendance_permission")
-  salaryPermission         Boolean? @map("salary_permission")
-  commissionPermission     Boolean? @map("commission_permission")
-  employeeAddPermission    Boolean? @map("employee_add_permission")
-  terminationsHandle       Boolean? @map("terminations_handle")
-  monthlyRequestApprovals  Boolean? @map("monthly_request_approvals")
-  targetsSet               Boolean? @map("targets_set")
-  bonusesSet               Boolean? @map("bonuses_set")
-  shiftTimingSet           Boolean? @map("shift_timing_set")
-  createdAt                DateTime @default(now()) @map("created_at")
-  updatedAt                DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation("HrEmployee", fields: [employeeId], references: [id])
-  // Opposite relations
-  hrLogs   HRLog[]
-
-  @@map("hr")
-}
-
-model HRLog {
-  id                 Int      @id @default(autoincrement()) @map("hr_log_id")
-  hrId               Int      @map("hr_id")
-  actionType         String?  @map("action_type") @db.VarChar(255)
-  affectedEmployeeId Int?     @map("affected_employee_id")
-  description        String?  @db.Text
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  hr               HR             @relation(fields: [hrId], references: [id])
-  affectedEmployee Employee?      @relation("HRAffectedEmployee", fields: [affectedEmployeeId], references: [id])
-  // Opposite relations
-  adminRequests    AdminRequest[]
-
-  @@map("hr_logs")
-}
-
-model LeaveLog {
-  id                 Int          @id @default(autoincrement()) @map("leave_log_id")
-  empId              Int          @map("emp_id")
-  leaveType          String?      @map("leave_type") @db.VarChar(255)
-  startDate          DateTime     @map("start_date") @db.Date
-  endDate            DateTime     @map("end_date") @db.Date
-  reason             String?      @db.Text
-  status             LeaveStatus? @default(Pending)
-  appliedOn          DateTime     @default(now()) @map("applied_on")
-  reviewedBy         Int?         @map("reviewed_by")
-  reviewedOn         DateTime?    @map("reviewed_on")
-  confirmationReason String?      @map("confirmation_reason") @db.Text
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee Employee  @relation("LeaveRequestedBy", fields: [empId], references: [id])
-  reviewer Employee? @relation("LeaveReviewedBy", fields: [reviewedBy], references: [id])
-
-  @@map("leave_logs")
 }
 
 enum LeaveStatus {
   Pending
   Approved
   Rejected
-}
-
-model LateLog {
-  id              Int        @id @default(autoincrement()) @map("late_log_id")
-  empId           Int        @map("emp_id")
-  date            DateTime   @db.Date
-  scheduledTimeIn String     @map("scheduled_time_in") @db.VarChar(10)
-  actualTimeIn    String     @map("actual_time_in") @db.VarChar(10)
-  minutesLate     Int        @map("minutes_late")
-  reason          String?    @db.Text
-  justified       Boolean?   @default(false)
-  lateType        LateType?  @default(unpaid) @map("late_type")
-  actionTaken     LateAction @default(Created) @map("action_taken")
-  reviewedBy      Int?       @map("reviewed_by")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee Employee  @relation("LateLogEmployee", fields: [empId], references: [id])
-  reviewer Employee? @relation("LateLogReviewedBy", fields: [reviewedBy], references: [id])
-
-  @@map("late_logs")
 }
 
 enum LateAction {
@@ -1186,126 +1339,20 @@ enum LateType {
   unpaid
 }
 
-model MonthlyAttendanceSummary {
-  id              Int      @id @default(autoincrement()) @map("summary_id")
-  empId           Int      @map("emp_id")
-  month           String   @db.VarChar(7)
-  totalPresent    Int      @map("total_present")
-  totalAbsent     Int      @map("total_absent")
-  totalLeaveDays  Int      @map("total_leave_days")
-  totalLateDays   Int      @map("total_late_days")
-  totalHalfDays   Int      @default(0) @map("total_half_days")
-  totalRemoteDays Int      @map("total_remote_days")
-  generatedOn     DateTime @default(now()) @map("generated_on")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation(fields: [empId], references: [id])
-
-  @@map("monthly_attendance_summary")
-}
-
-// Communication 
-
-model ProjectChat {
-  id              Int      @id @default(autoincrement()) @map("project_chat_id")
-  projectId       Int?     @map("project_id")
-  participants    Int?
-  transferredFrom Int?     @map("transferred_from")
-  transferredTo   Int?     @map("transferred_to")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  project                 Project?  @relation(fields: [projectId], references: [id])
-  transferredFromEmployee Employee? @relation("ChatTransferredFrom", fields: [transferredFrom], references: [id])
-  transferredToEmployee   Employee? @relation("ChatTransferredTo", fields: [transferredTo], references: [id])
-
-  // Opposite relations
-  chatParticipants ChatParticipant[]
-  chatMessages     ChatMessage[]
-
-  @@map("project_chats")
-}
-
-model ChatParticipant {
-  id         Int      @id @default(autoincrement()) @map("chat_participant_id")
-  chatId     Int      @map("chat_id")
-  employeeId Int      @map("employee_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  memberType chPart   @map("member_type")
-
-  // Foreign key relations
-  chat     ProjectChat @relation(fields: [chatId], references: [id])
-  employee Employee    @relation(fields: [employeeId], references: [id])
-
-  @@map("chat_participants")
-}
-
 enum chPart {
   owner
   participant
 }
 
-model ChatMessage {
-  id        Int      @id @default(autoincrement()) @map("chat_message_id")
-  chatId    Int      @map("chat_id")
-  senderId  Int      @map("sender_id")
-  message   String?  @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  chat   ProjectChat @relation(fields: [chatId], references: [id])
-  sender Employee    @relation("MessageSender", fields: [senderId], references: [id])
-
-  @@map("chat_messages")
-}
-
-model Meeting {
-  id           Int            @id @default(autoincrement()) @map("meeting_id")
-  employeeId   Int?           @map("employee_id")
-  clientId     Int?           @map("client_id")
-  projectId    Int?           @map("project_id")
-  topic        String?        @db.Text
-  dateTime     DateTime?      @map("date_time")
-  status       MeetingStatus?
-  autoReminder Boolean        @default(true) @map("auto_reminder")
-  meetingLink  String         @db.VarChar(255)
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee Employee? @relation("MeetingEmployee", fields: [employeeId], references: [id])
-  client   Client?   @relation(fields: [clientId], references: [id])
-  project  Project?  @relation("MeetingProject", fields: [projectId], references: [id])
-
-  @@map("meetings")
-}
-
-model Notification {
-  id        Int                 @id @default(autoincrement()) @map("notification_id")
-  status    NotificationStatus? @default(unread)
-  sentTo    Int?                @map("sent_to")
-  sentBy    Int?                @map("sent_by")
-  userType  UserType            @map("user_type")
-  heading   String?             @db.VarChar(255)
-  content   String?             @db.Text
-  createdAt DateTime            @default(now()) @map("created_at")
-  updatedAt DateTime            @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee Employee? @relation("NotificationSentTo", fields: [sentTo], references: [id])
-  sender   Employee? @relation("NotificationSentBy", fields: [sentBy], references: [id])
-
-  @@map("notifications")
-}
-
 enum NotificationStatus {
   read
   unread
+}
+
+enum NotificationType {
+  individual
+  bulk_department
+  bulk_all
 }
 
 enum UserType {
@@ -1319,35 +1366,6 @@ enum MeetingStatus {
   missed
   declined
   delayed
-}
-
-//enum NotificationType {
-//  zendesk
-//  square
-//  three_cx
-//}
-
-model HrRequest {
-  id            Int              @id @default(autoincrement()) @map("request_id")
-  empId         Int              @map("emp_id")
-  departmentId  Int?             @map("department_id")
-  requestType   String?          @map("request_type") @db.VarChar(255)
-  subject       String?          @db.VarChar(255)
-  description   String?          @db.Text
-  priority      RequestPriority? @default(Low)
-  status        RequestStatus?   @default(Pending)
-  assignedTo    Int?             @map("assigned_to")
-  responseNotes String?          @map("response_notes") @db.Text
-  requestedOn   DateTime         @default(now()) @map("requested_on")
-  resolvedOn    DateTime?        @map("resolved_on")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  employee           Employee    @relation("RequestMadeBy", fields: [empId], references: [id])
-  department         Department? @relation(fields: [departmentId], references: [id])
-  assignedToEmployee Employee?   @relation("RequestAssignedTo", fields: [assignedTo], references: [id])
-
-  @@map("hr_requested")
 }
 
 enum RequestPriority {
@@ -1365,69 +1383,6 @@ enum RequestStatus {
   Cancelled
 }
 
-// Company 
-
-model Company {
-  id                  Int      @id @default(autoincrement()) @map("company_id")
-  name                String   @db.VarChar(255)
-  address             String?  @db.VarChar(255)
-  city                String?  @db.VarChar(100)
-  state               String?  @db.VarChar(100)
-  zip                 String?  @db.VarChar(20)
-  country             String?  @db.VarChar(100)
-  phone               String?  @db.VarChar(20)
-  email               String?  @db.VarChar(255)
-  website             String?  @db.VarChar(255)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  quarterlyLeavesDays Int      @default(0) @map("quarterly_leaves_days")
-  monthlyLatesDays    Int      @default(0) @map("monthly_lates_days") // Fixed mapping name
-  absentDeduction     Int      @default(0) @map("absent_deduction")
-  lateDeduction       Int      @default(0) @map("late_deduction")
-  halfDeduction       Int      @default(0) @map("half_deduction")
-  taxId               String?  @db.VarChar(100)
-  lateTime            Int      @default(0) @map("late_time")
-  halfTime            Int      @default(0) @map("half_time")
-  absentTime          Int      @default(0) @map("absent_time")
-
-  @@map("companies")
-}
-
-// Complaints 
-
-model Complaint {
-  id                Int                @id @default(autoincrement()) @map("complaint_id")
-  raisedBy          Int                @map("raised_by")
-  againstEmployeeId Int?               @map("against_employee_id")
-  departmentId      Int?               @map("department_id")
-  complaintType     String?            @map("complaint_type") @db.VarChar(255)
-  subject           String?            @db.VarChar(255)
-  description       String?            @db.Text
-  status            ComplaintStatus?   @default(Open)
-  priority          ComplaintPriority? @default(Low)
-  assignedTo        Int?               @map("assigned_to")
-  resolutionNotes   String?            @map("resolution_notes") @db.Text
-  resolutionDate    DateTime?          @map("resolution_date")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  raisedByEmployee   Employee    @relation("ComplaintRaisedBy", fields: [raisedBy], references: [id])
-  againstEmployee    Employee?   @relation("ComplaintAgainst", fields: [againstEmployeeId], references: [id])
-  department         Department? @relation(fields: [departmentId], references: [id])
-  assignedToEmployee Employee?   @relation("ComplaintAssignedTo", fields: [assignedTo], references: [id])
-
-  @@map("complaints")
-}
-
-// enum ComplaintType {
-// HR
-// Managerial
-// Technical
-// Facility
-// Others
-// }
-
 enum ComplaintStatus {
   Open
   In_Progress
@@ -1442,25 +1397,6 @@ enum ComplaintPriority {
   Critical
 }
 
-model Reminders {
-  id                Int                @id @default(autoincrement()) @map("reminder_id")
-  empId             Int                @map("emp_id")
-  title             String             @db.VarChar(255)
-  description       String?            @db.Text
-  reminderDate      DateTime           @map("reminder_date") @db.Date
-  reminderTime      String             @map("reminder_time") @db.VarChar(10)
-  isRecurring       Boolean            @map("is_recurring")
-  recurrencePattern RecurrencePattern? @map("recurrence_pattern")
-  status            ReminderStatus     @default(Pending)
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-
-  // Foreign key relation to employees table
-  employee Employee @relation(fields: [empId], references: [id])
-
-  @@map("reminders")
-}
-
 enum RecurrencePattern {
   Daily
   Weekly
@@ -1473,14 +1409,6 @@ enum ReminderStatus {
   Overdue
 }
 
-//enum CampaignType {
-//  Email
-//  Social_Media
-//  Cold_Call
-//  Webinar
-//  Other
-//}
-
 enum CampaignStatus {
   Planned
   Running
@@ -1488,58 +1416,11 @@ enum CampaignStatus {
   Cancelled
 }
 
-model CampaignLog {
-  id               Int            @id @default(autoincrement()) @map("campaign_id")
-  campaignName     String         @map("campaign_name") @db.VarChar(255)
-  campaignType     String         @map("campaign_type") @db.VarChar(255)
-  startDate        DateTime       @map("start_date") @db.Date
-  endDate          DateTime       @map("end_date") @db.Date
-  status           CampaignStatus @map("status")
-  budget           Decimal        @db.Decimal(12, 2)
-  actualCost       Decimal?       @map("actual_cost") @db.Decimal(12, 2)
-  unitId           Int            @map("unit_id")
-  description      String?        @db.Text
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-  productionUnitId Int?
-
-  // Foreign key relation
-  marketingUnit  MarketingUnit   @relation(fields: [unitId], references: [id])
-  ProductionUnit ProductionUnit? @relation(fields: [productionUnitId], references: [id])
-
-  @@map("campaign_logs")
-}
-
 enum PaymentStatus {
   pending
   completed
   failed
   refunded
-}
-
-model ClientPayment {
-  id            Int           @id @default(autoincrement()) @map("payment_id")
-  clientId      Int           @map("client_id")
-  invoiceId     Int?          @map("invoice_id")
-  projectId     Int?          @map("project_id")
-  paymentDate   DateTime      @default(now()) @map("payment_date")
-  amountPaid    Decimal       @map("amount_paid") @db.Decimal(12, 2)
-  paymentMethod String        @map("payment_method") @db.VarChar(50)
-  transactionId String?       @map("transaction_id") @db.VarChar(255)
-  paymentStatus PaymentStatus @map("payment_status")
-  notes         String?       @db.Text
-  paymentPhase  Int           @map("payment_phase")
-  receiptUrl    String?       @map("receipt_url") @db.VarChar(255)
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  client   Client   @relation("ClientPayment", fields: [clientId], references: [id])
-  invoice  Invoice? @relation("InvoicePayment", fields: [invoiceId], references: [id])
-  project  Project? @relation("ProjectPayment", fields: [projectId], references: [id])
-  employee Employee @relation("PaymentProcessor", fields: [paymentPhase], references: [id])
-
-  @@map("client_payment")
 }
 
 enum ArchiveLeadSource {
@@ -1563,28 +1444,6 @@ enum ArchiveLeadQualityRating {
   useless
 }
 
-model ArchiveLead {
-  id            Int                      @id @default(autoincrement()) @map("archive_id")
-  leadId        Int                      @unique @map("lead_id")
-  name          String                   @db.VarChar(255)
-  email         String                   @db.VarChar(255)
-  phone         String                   @db.VarChar(20)
-  source        ArchiveLeadSource        @map("source")
-  assignedTo    Int                      @map("assigned_to")
-  unitId        Int?                     @map("unit_id")
-  outcome       ArchiveLeadOutcome       @map("outcome")
-  qualityRating ArchiveLeadQualityRating @map("quality_rating")
-  createdAt     DateTime                 @map("created_at")
-  archivedOn    DateTime                 @default(now()) @map("archived_on")
-
-  // Foreign key relations
-  lead     Lead      @relation("LeadArchive", fields: [leadId], references: [id])
-  employee Employee  @relation("ArchiveLeadAssigned", fields: [assignedTo], references: [id])
-  unit     SalesUnit? @relation("ArchiveLeadUnit", fields: [unitId], references: [id])
-
-  @@map("archive_leads")
-}
-
 enum ProjectTaskPriority {
   low
   medium
@@ -1605,29 +1464,4 @@ enum ProjectTaskDifficulty {
   medium
   hard
   difficult
-}
-
-model ProjectTask {
-  id          Int                    @id @default(autoincrement()) @map("task_id")
-  projectId   Int                    @map("project_id")
-  title       String                 @db.VarChar(255)
-  description String?                @db.Text
-  assignedBy  Int                    @map("assigned_by")
-  assignedTo  Int                    @map("assigned_to")
-  priority    ProjectTaskPriority    @map("priority")
-  status      ProjectTaskStatus      @map("status")
-  difficulty  ProjectTaskDifficulty? @map("difficulty")
-  startDate   DateTime?              @map("start_date") @db.Date
-  dueDate     DateTime?              @map("due_date") @db.Date
-  completedOn DateTime?              @map("completed_on") @db.Date
-  comments    String?                @db.Text
-  createdAt   DateTime               @default(now()) @map("created_at")
-  updatedAt   DateTime               @updatedAt @map("updated_at")
-
-  // Foreign key relations
-  project  Project  @relation("ProjectTask", fields: [projectId], references: [id])
-  assigner Employee @relation("TaskAssigner", fields: [assignedBy], references: [id])
-  assignee Employee @relation("TaskAssignee", fields: [assignedTo], references: [id])
-
-  @@map("project_tasks")
 }
