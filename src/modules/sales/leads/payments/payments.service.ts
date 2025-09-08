@@ -3,12 +3,14 @@ import { PrismaService } from '../../../../../prisma/prisma.service';
 import { GeneratePaymentLinkDto } from './dto/generate-payment-link.dto';
 import { PaymentLinkResponseDto } from './dto/payment-link-response.dto';
 import { RevenueService } from '../../../finance/accountant/revenue/revenue.service';
+import { ProjectsService } from '../../../projects/projects.service';
 
 @Injectable()
 export class PaymentsService {
     constructor(
         private prisma: PrismaService,
-        private revenueService: RevenueService
+        private revenueService: RevenueService,
+        private projectsService: ProjectsService
     ) { }
 
     async generatePaymentLink(
@@ -442,7 +444,7 @@ export class PaymentsService {
                             paymentMethod: paymentDetails.paymentMethod || 'bank',
                             transactionId: transactionId.toString(),
                             paymentStatus: 'completed',
-                            paymentPhase: 1, // Default phase, can be updated based on business logic
+                            paymentPhase: crackedLead?.currentPhase || 1, // Default phase, can be updated based on business logic
                             notes: `Payment completed via payment link for transaction ${transactionId}`,
                             cracked_lead_id: crackedLead?.id || null
                         }
@@ -458,7 +460,40 @@ export class PaymentsService {
                 });
             }
 
-            // 4. Generate revenue after transaction is completed
+            // 4. Create project if this is the first phase payment (before phase update)
+            let projectCreated = false;
+            let projectData: any = null;
+            
+            if (transaction.invoice?.leadId) {
+                const crackedLead = await this.prisma.crackedLead.findFirst({
+                    where: { leadId: transaction.invoice.leadId }
+                });
+
+                if (crackedLead && crackedLead.currentPhase === 1) {
+                    // This is the first phase payment, create project using external API
+                    console.log(`Creating project for first phase payment - Transaction: ${transactionId}, CrackedLead: ${crackedLead.id}`);
+                    try {
+                        const projectResult = await this.projectsService.createFromPayment({
+                            crackedLeadId: crackedLead.id,
+                            clientId: transaction.clientId!,
+                            salesRepId: transaction.employeeId!,
+                            amount: amount
+                        }, null); // null for internal call
+                        
+                        if (projectResult.success) {
+                            projectCreated = true;
+                            projectData = projectResult.data;
+                            console.log(`Project created successfully: ${projectResult.data.id}`);
+                        } else {
+                            console.warn(`Project creation failed: ${projectResult.message}`);
+                        }
+                    } catch (error) {
+                        console.warn(`Project creation failed for transaction ${transactionId}: ${error.message}`);
+                    }
+                }
+            }
+
+            // 5. Generate revenue after transaction is completed
             const revenueDto = {
                 source: 'Lead Revenue',
                 category: paymentDetails.category || 'Payment Link Revenue',
@@ -478,7 +513,42 @@ export class PaymentsService {
                 console.warn(`Revenue creation failed for transaction ${transactionId}: ${revenueResult.message}`);
             }
 
-            // 5. Check remaining amount and update lead status/phase accordingly
+            // 6. Update project payment stage based on current phase
+            if (transaction.invoice?.leadId) {
+                const updatedCrackedLead = await this.prisma.crackedLead.findFirst({
+                    where: { leadId: transaction.invoice.leadId }
+                });
+
+                if (updatedCrackedLead) {
+                    // Find the project associated with this cracked lead
+                    const project = await this.prisma.project.findFirst({
+                        where: { crackedLeadId: updatedCrackedLead.id }
+                    });
+
+                    if (project) {
+                        let paymentStage: string;
+                        
+                        // Determine payment stage based on current phase
+                        if (updatedCrackedLead.currentPhase === updatedCrackedLead.totalPhases) {
+                            paymentStage = 'final';
+                        } else if (updatedCrackedLead.currentPhase === 1) {
+                            paymentStage = 'initial';
+                        } else {
+                            paymentStage = 'in_between';
+                        }
+
+                        // Update project payment stage
+                        await this.prisma.project.update({
+                            where: { id: project.id },
+                            data: { paymentStage: paymentStage as any }
+                        });
+
+                        console.log(`Updated project ${project.id} payment stage to: ${paymentStage} (Phase: ${updatedCrackedLead.currentPhase}/${updatedCrackedLead.totalPhases})`);
+                    }
+                }
+            }
+
+            // 7. Check remaining amount and update lead status/phase accordingly
             if (transaction.invoice?.leadId) {
                 const updatedCrackedLead = await this.prisma.crackedLead.findFirst({
                     where: { leadId: transaction.invoice.leadId }
@@ -515,11 +585,13 @@ export class PaymentsService {
 
             return {
                 success: true,
-                message: 'Payment completed, client payment logged, and revenue generated successfully',
+                message: 'Payment completed, project created (if first phase), payment stage updated, client payment logged, and revenue generated successfully',
                 data: {
                     transactionId: transactionId,
                     transactionStatus: 'completed',
                     clientPaymentLogged: true,
+                    projectCreated: projectCreated,
+                    project: projectData,
                     revenue: revenueResult.status === 'success' ? (revenueResult as any).data?.revenue : null,
                     revenueStatus: revenueResult.status,
                     clientId: transaction.clientId,

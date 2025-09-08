@@ -1,9 +1,21 @@
 import { Module } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { ProjectsController } from './projects.controller';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { RolesGuard, DepartmentsGuard } from '../../common/guards';
+import { ProjectAccessGuard } from './guards/project-access.guard';
+import { ProjectAssignmentGuard } from './guards/project-assignment.guard';
 
 @Module({
   controllers: [ProjectsController],
-  providers: [ProjectsService],
+  providers: [
+    ProjectsService,
+    PrismaService,
+    RolesGuard,
+    DepartmentsGuard,
+    ProjectAccessGuard,
+    ProjectAssignmentGuard
+  ],
+  exports: [ProjectsService]
 })
 export class ProjectsModule {}

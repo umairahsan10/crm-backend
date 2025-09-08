@@ -93,6 +93,7 @@ model Employee {
   projectTasks              ProjectTask[]              @relation("TaskAssigner")
   assignedTasks             ProjectTask[]              @relation("TaskAssignee")
   projectsAsSalesRep        Project[]                  @relation("ProjectSalesRep")
+  projectsAsUnitHead        Project[]                  @relation("ProjectUnitHead")
   refundsProcessed          Refund[]                   @relation("RefundProcessedBy")
   reminders                 Reminders[]
   revenuesCreated           Revenue[]                  @relation("RevenueCreatedBy")
@@ -165,6 +166,7 @@ model Project {
   crackedLeadId     Int?             @map("cracked_lead_id")
   salesRepId        Int?             @map("sales_rep_id")
   clientId          Int?             @map("client_id")
+  unitHeadId        Int?             @map("unit_head_id")
   status            ProjectStatus?
   difficultyLevel   DifficultyLevel? @map("difficulty_level")
   paymentStage      PaymentStage?    @map("payment_stage")
@@ -183,6 +185,7 @@ model Project {
   client            Client?          @relation("ProjectClient", fields: [clientId], references: [id])
   crackedLead       CrackedLead?     @relation(fields: [crackedLeadId], references: [id])
   salesRep          Employee?        @relation("ProjectSalesRep", fields: [salesRepId], references: [id])
+  unitHead          Employee?        @relation("ProjectUnitHead", fields: [unitHeadId], references: [id])
   team              Team?            @relation("ProjectTeam", fields: [teamId], references: [id])
   teams             Team[]           @relation("TeamCurrentProject")
 
