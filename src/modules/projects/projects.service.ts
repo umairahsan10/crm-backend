@@ -284,7 +284,7 @@ export class ProjectsService {
   async assignUnitHead(id: number, dto: AssignUnitHeadDto, user: any) {
     try {
       // Verify user is manager
-      if (user.roleId !== 1) {
+      if (user.role !== 'dep_manager') {
         throw new ForbiddenException('Only managers can assign unit heads');
       }
 
@@ -306,7 +306,7 @@ export class ProjectsService {
         throw new NotFoundException('Unit head not found');
       }
 
-      if (unitHead.roleId !== 2) {
+      if (unitHead.role?.name !== 'unit_head') {
         throw new BadRequestException('Assigned user is not a unit head');
       }
 
@@ -315,7 +315,6 @@ export class ProjectsService {
         where: { id },
         data: {
           unitHeadId: dto.unitHeadId,
-          deadline: new Date(dto.deadline),
           status: 'in_progress'
         },
         include: {
@@ -376,15 +375,7 @@ export class ProjectsService {
         }
       }
 
-      // If team is being assigned, validate prerequisites
-      if (dto.teamId !== undefined) {
-        const teamValidation = await this.validateTeamAssignment(project, dto.teamId);
-        if (!teamValidation.valid) {
-          throw new BadRequestException(teamValidation.reason);
-        }
-      }
-
-      // Prepare update data
+      // Prepare update data (excluding teamId for now)
       const updateData: any = {};
       
       if (dto.description !== undefined) updateData.description = dto.description;
@@ -393,13 +384,6 @@ export class ProjectsService {
       if (dto.liveProgress !== undefined) updateData.liveProgress = dto.liveProgress;
       if (dto.deadline !== undefined) updateData.deadline = new Date(dto.deadline);
       if (dto.status !== undefined) updateData.status = dto.status;
-      if (dto.teamId !== undefined) {
-        updateData.teamId = dto.teamId;
-        // If team is assigned and status is not set, automatically set to in_progress
-        if (dto.status === undefined && !project.status) {
-          updateData.status = 'in_progress';
-        }
-      }
 
       // Auto-update logic when status is set to completed
       if (dto.status === 'completed') {
@@ -408,6 +392,7 @@ export class ProjectsService {
         console.log(`Project ${id} marked as completed - auto-updating payment stage to 'approved' and live progress to 100%`);
       }
 
+      // First, update the project with all fields except teamId
       const updatedProject = await this.prisma.project.update({
         where: { id },
         data: updateData,
@@ -428,6 +413,68 @@ export class ProjectsService {
           }
         }
       });
+
+      // Handle team assignment separately
+      if (dto.teamId !== undefined) {
+        // Check if project already has deadline and difficulty set
+        const hasDeadline = updatedProject.deadline !== null;
+        const hasDifficulty = updatedProject.difficultyLevel !== null;
+
+        // If either deadline or difficulty is missing from project, require both in request
+        if (!hasDeadline || !hasDifficulty) {
+          if (!dto.deadline || !dto.difficulty) {
+            throw new BadRequestException('Deadline and difficulty must be provided in order to assign team');
+          }
+        }
+
+        // Use deadline from request if provided, otherwise use existing project deadline
+        const deadlineToUse = dto.deadline || updatedProject.deadline?.toISOString();
+
+        // Validate team assignment prerequisites
+        const teamValidation = await this.validateTeamAssignment(updatedProject, dto.teamId, deadlineToUse);
+        if (!teamValidation.valid) {
+          throw new BadRequestException(teamValidation.reason);
+        }
+
+        // Update team's current_project_id
+        await this.prisma.team.update({
+          where: { id: dto.teamId },
+          data: { currentProjectId: id }
+        });
+
+        // Update project's teamId and status if needed
+        const finalUpdateData: any = { teamId: dto.teamId };
+        if (dto.status === undefined && !updatedProject.status) {
+          finalUpdateData.status = 'in_progress';
+        }
+
+        const finalUpdatedProject = await this.prisma.project.update({
+          where: { id },
+          data: finalUpdateData,
+          include: {
+            unitHead: {
+              include: { role: true }
+            },
+            team: {
+              include: {
+                teamLead: {
+                  include: { role: true }
+                }
+              }
+            },
+            client: true,
+            salesRep: {
+              include: { role: true }
+            }
+          }
+        });
+
+        return {
+          success: true,
+          message: 'Project updated and team assigned successfully',
+          data: finalUpdatedProject
+        };
+      }
 
       // Prepare success message
       let message = 'Project updated successfully';
@@ -741,13 +788,13 @@ export class ProjectsService {
   }
 
   private async checkUnifiedUpdatePermission(user: any, project: any, dto: UnifiedUpdateProjectDto): Promise<{ allowed: boolean; reason?: string }> {
-    // Manager (Role 1) - Can update all fields
-    if (user.roleId === 1) {
+    // Manager (dep_manager) - Can update all fields
+    if (user.role === 'dep_manager') {
       return { allowed: true };
     }
 
-    // Unit Head (Role 2) - Can update status, difficulty, deadline, liveProgress, teamId
-    if (user.roleId === 2) {
+    // Unit Head (unit_head) - Can update status, difficulty, deadline, liveProgress, teamId
+    if (user.role === 'unit_head') {
       if (project.unitHeadId !== user.id) {
         return { allowed: false, reason: 'Only assigned unit head can update this project' };
       }
@@ -763,8 +810,8 @@ export class ProjectsService {
       return { allowed: true };
     }
 
-    // Team Lead (Role 3) - Can only update liveProgress
-    if (user.roleId === 3) {
+    // Team Lead (team_lead) - Can only update liveProgress
+    if (user.role === 'team_lead') {
       if (!project.teamId) {
         return { allowed: false, reason: 'Project not assigned to a team' };
       }
@@ -792,21 +839,16 @@ export class ProjectsService {
     return { allowed: false, reason: 'Insufficient permissions' };
   }
 
-  private async validateTeamAssignment(project: any, teamId: number): Promise<{ valid: boolean; reason?: string }> {
-    // Check if deadline is set and is in the future
-    if (!project.deadline) {
-      return { valid: false, reason: 'Deadline must be set before assigning team' };
+  private async validateTeamAssignment(project: any, teamId: number, deadline?: string): Promise<{ valid: boolean; reason?: string }> {
+    // Check if deadline is provided when assigning team
+    if (!deadline) {
+      return { valid: false, reason: 'Deadline must be provided when assigning team' };
     }
     
-    const deadline = new Date(project.deadline);
+    const deadlineDate = new Date(deadline);
     const now = new Date();
-    if (deadline <= now) {
+    if (deadlineDate <= now) {
       return { valid: false, reason: 'Deadline must be in the future' };
-    }
-    
-    // Check if difficulty level is set
-    if (!project.difficultyLevel) {
-      return { valid: false, reason: 'Difficulty level must be set before assigning team' };
     }
     
     // Validate team exists

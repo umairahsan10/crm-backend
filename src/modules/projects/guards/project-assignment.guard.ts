@@ -44,13 +44,13 @@ export class ProjectAssignmentGuard implements CanActivate {
   }
 
   private async checkAssignmentPermission(user: any, project: any): Promise<boolean> {
-    // Manager (Role 1) - Can assign unit heads
-    if (user.roleId === 1) {
+    // Manager (dep_manager) - Can assign unit heads
+    if (user.role === 'dep_manager') {
       return true;
     }
 
-    // Unit Head (Role 2) - Can assign teams to their projects
-    if (user.roleId === 2) {
+    // Unit Head (unit_head) - Can assign teams to their projects
+    if (user.role === 'unit_head') {
       return project.unitHeadId === user.id;
     }
 

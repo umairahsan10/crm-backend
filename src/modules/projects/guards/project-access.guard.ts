@@ -45,18 +45,18 @@ export class ProjectAccessGuard implements CanActivate {
   }
 
   private async checkProjectAccess(user: any, project: any): Promise<boolean> {
-    // Manager (Role 1) - Access to all projects
-    if (user.roleId === 1) {
+    // Manager (dep_manager) - Access to all projects
+    if (user.role === 'dep_manager') {
       return true;
     }
 
-    // Unit Head (Role 2) - Access to assigned projects
-    if (user.roleId === 2) {
+    // Unit Head (unit_head) - Access to assigned projects
+    if (user.role === 'unit_head') {
       return project.unitHeadId === user.id;
     }
 
-    // Team Lead (Role 3) and Employee - Access to team projects
-    if (user.roleId === 3 || user.roleId === 4) {
+    // Team Lead (team_lead) and Employee (senior/junior) - Access to team projects
+    if (user.role === 'team_lead' || user.role === 'senior' || user.role === 'junior') {
       if (!project.teamId) {
         return false;
       }
@@ -72,7 +72,7 @@ export class ProjectAccessGuard implements CanActivate {
       }
 
       // For team lead, check if they lead the assigned team
-      if (user.roleId === 3) {
+      if (user.role === 'team_lead') {
         return project.team.teamLeadId === user.id;
       }
 
