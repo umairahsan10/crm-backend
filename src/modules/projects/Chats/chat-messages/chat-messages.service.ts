@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../../../prisma/prisma.service';
+import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
 
@@ -149,7 +149,7 @@ export class ChatMessagesService {
     }
   }
 
-  async getChatMessagesByChatId(chatId: number, limit?: number, offset?: number) {
+  async getChatMessagesByChatId(chatId: number, requesterId: number, limit?: number, offset?: number) {
     try {
       // Validate if chat exists
       const chat = await this.prisma.projectChat.findUnique({
@@ -158,6 +158,18 @@ export class ChatMessagesService {
 
       if (!chat) {
         throw new NotFoundException(`Chat with ID ${chatId} not found. Please check the chat ID and try again.`);
+      }
+
+      // Check if requester is a participant in this chat
+      const requesterParticipant = await this.prisma.chatParticipant.findFirst({
+        where: {
+          chatId: chatId,
+          employeeId: requesterId,
+        },
+      });
+
+      if (!requesterParticipant) {
+        throw new ForbiddenException(`Only chat participants can access messages. You are not a participant in this chat.`);
       }
 
       const messages = await this.prisma.chatMessage.findMany({
@@ -287,9 +299,9 @@ export class ChatMessagesService {
     }
   }
 
-  async createChatMessage(createChatMessageDto: CreateChatMessageDto) {
+  async createChatMessage(createChatMessageDto: CreateChatMessageDto, senderId: number) {
     try {
-      const { chatId, senderId, content, messageType, attachmentUrl } = createChatMessageDto;
+      const { chatId, content, messageType, attachmentUrl } = createChatMessageDto;
 
       // Validate if chat exists
       const chat = await this.prisma.projectChat.findUnique({
@@ -413,18 +425,34 @@ export class ChatMessagesService {
         throw new NotFoundException(`Chat message with ID ${id} not found. Please check the ID and try again.`);
       }
 
-      // Check if sender is the original message sender or a chat participant
+      // Check if sender is the original message sender
       const isOriginalSender = existingMessage.senderId === senderId;
       
-      const isParticipant = await this.prisma.chatParticipant.findFirst({
+      // Get sender's participant info
+      const senderParticipant = await this.prisma.chatParticipant.findFirst({
         where: {
           chatId: existingMessage.chatId,
           employeeId: senderId,
         },
       });
 
-      if (!isOriginalSender && !isParticipant) {
-        throw new ForbiddenException(`Employee with ID ${senderId} is not authorized to update this message. Only the original sender or chat participants can update messages.`);
+      if (!senderParticipant) {
+        throw new ForbiddenException(`Employee with ID ${senderId} is not a participant in this chat.`);
+      }
+
+      // Time-based restrictions
+      const now = new Date();
+      const messageCreatedAt = existingMessage.createdAt;
+      const timeDifference = now.getTime() - messageCreatedAt.getTime();
+      const twoMinutesInMs = 2 * 60 * 1000; // 2 minutes in milliseconds
+
+      // Only original sender can edit their own messages within 2 minutes
+      if (!isOriginalSender) {
+        throw new ForbiddenException(`Only the original sender can edit their own messages.`);
+      }
+
+      if (timeDifference > twoMinutesInMs) {
+        throw new ForbiddenException(`You can only edit messages within 2 minutes of sending.`);
       }
 
       // If chatId is being updated, validate the new chat and participant status
@@ -557,7 +585,42 @@ export class ChatMessagesService {
         throw new ForbiddenException(`Employee with ID ${senderId} is not authorized to delete this message. Only the original sender or chat owners can delete messages.`);
       }
 
-      // Delete the message
+      // Time-based restrictions for participants
+      if (isOriginalSender && !isOwner) {
+        const now = new Date();
+        const messageCreatedAt = existingMessage.createdAt;
+        const timeDifference = now.getTime() - messageCreatedAt.getTime();
+        const sixtyMinutesInMs = 60 * 60 * 1000; // 60 minutes in milliseconds
+
+        if (timeDifference > sixtyMinutesInMs) {
+          throw new ForbiddenException(`You can only delete your own messages within 60 minutes of sending.`);
+        }
+      }
+
+      // If owner is deleting someone else's message, update the message content instead of deleting
+      if (isOwner && !isOriginalSender) {
+        const owner = await this.prisma.employee.findUnique({
+          where: { id: senderId },
+          select: { firstName: true, lastName: true }
+        });
+
+        const ownerName = `${owner?.firstName} ${owner?.lastName}`;
+        
+        await this.prisma.chatMessage.update({
+          where: { id },
+          data: {
+            message: `Owner: ${ownerName} deleted the message`,
+            updatedAt: new Date(),
+          },
+        });
+
+        return {
+          message: 'Message marked as deleted by owner',
+          data: { id },
+        };
+      }
+
+      // Delete the message (for original sender within time limit)
       await this.prisma.chatMessage.delete({
         where: { id },
       });

@@ -102,6 +102,9 @@ export class ProjectsService {
         }
       });
 
+      // Automatically create project chat with HR and Production managers as owners
+      await this.createProjectChatWithDefaultOwners(project.id);
+
       return {
         success: true,
         message: 'Project created successfully',
@@ -328,6 +331,9 @@ export class ProjectsService {
         }
       });
 
+      // Add unit head as owner to project chat
+      await this.addUnitHeadToProjectChat(id, dto.unitHeadId);
+
       return {
         success: true,
         message: 'Unit head assigned successfully',
@@ -441,6 +447,9 @@ export class ProjectsService {
           where: { id: dto.teamId },
           data: { currentProjectId: id }
         });
+
+        // Add all team members to project chat as participants
+        await this.addTeamMembersToProjectChat(id, dto.teamId);
 
         // Update project's teamId and status if needed
         const finalUpdateData: any = { teamId: dto.teamId };
@@ -941,5 +950,194 @@ export class ProjectsService {
     }
 
     return false;
+  }
+
+  // Helper method to create project chat with HR and Production managers as owners
+  private async createProjectChatWithDefaultOwners(projectId: number) {
+    try {
+      // Find HR manager (dep_manager role in HR department)
+      const hrManager = await this.prisma.employee.findFirst({
+        where: {
+          role: { name: 'dep_manager' },
+          department: { name: 'HR' }
+        }
+      });
+
+      // Find Production manager (dep_manager role in Production department)
+      const productionManager = await this.prisma.employee.findFirst({
+        where: {
+          role: { name: 'dep_manager' },
+          department: { name: 'Production' }
+        }
+      });
+
+      if (!hrManager || !productionManager) {
+        throw new BadRequestException('HR Manager or Production Manager not found. Cannot create project chat.');
+      }
+
+      // Create project chat
+      const projectChat = await this.prisma.projectChat.create({
+        data: {
+          projectId: projectId,
+          participants: 2 // Initially 2 participants (HR and Production managers)
+        }
+      });
+
+      // Add HR manager as owner
+      await this.prisma.chatParticipant.create({
+        data: {
+          chatId: projectChat.id,
+          employeeId: hrManager.id,
+          memberType: 'owner'
+        }
+      });
+
+      // Add Production manager as owner
+      await this.prisma.chatParticipant.create({
+        data: {
+          chatId: projectChat.id,
+          employeeId: productionManager.id,
+          memberType: 'owner'
+        }
+      });
+
+      console.log(`Project chat created for project ${projectId} with HR manager (${hrManager.id}) and Production manager (${productionManager.id}) as owners`);
+    } catch (error) {
+      console.error(`Failed to create project chat for project ${projectId}:`, error);
+      throw new BadRequestException(`Failed to create project chat: ${error.message}`);
+    }
+  }
+
+  // Helper method to add unit head as owner to project chat
+  private async addUnitHeadToProjectChat(projectId: number, unitHeadId: number) {
+    try {
+      // Find the project chat
+      const projectChat = await this.prisma.projectChat.findFirst({
+        where: { projectId: projectId }
+      });
+
+      if (!projectChat) {
+        throw new BadRequestException(`Project chat not found for project ${projectId}`);
+      }
+
+      // Check if unit head is already a participant
+      const existingParticipant = await this.prisma.chatParticipant.findFirst({
+        where: {
+          chatId: projectChat.id,
+          employeeId: unitHeadId
+        }
+      });
+
+      if (existingParticipant) {
+        // Update existing participant to owner
+        await this.prisma.chatParticipant.update({
+          where: { id: existingParticipant.id },
+          data: { memberType: 'owner' }
+        });
+      } else {
+        // Add unit head as owner
+        await this.prisma.chatParticipant.create({
+          data: {
+            chatId: projectChat.id,
+            employeeId: unitHeadId,
+            memberType: 'owner'
+          }
+        });
+      }
+
+      // Update participant count
+      const participantCount = await this.prisma.chatParticipant.count({
+        where: { chatId: projectChat.id }
+      });
+
+      await this.prisma.projectChat.update({
+        where: { id: projectChat.id },
+        data: { participants: participantCount }
+      });
+
+      console.log(`Unit head (${unitHeadId}) added as owner to project chat for project ${projectId}`);
+    } catch (error) {
+      console.error(`Failed to add unit head to project chat for project ${projectId}:`, error);
+      throw new BadRequestException(`Failed to add unit head to project chat: ${error.message}`);
+    }
+  }
+
+  // Helper method to add all team members to project chat as participants
+  private async addTeamMembersToProjectChat(projectId: number, teamId: number) {
+    try {
+      // Find the project chat
+      const projectChat = await this.prisma.projectChat.findFirst({
+        where: { projectId: projectId }
+      });
+
+      if (!projectChat) {
+        throw new BadRequestException(`Project chat not found for project ${projectId}`);
+      }
+
+      // Get team details
+      const team = await this.prisma.team.findUnique({
+        where: { id: teamId },
+        include: {
+          teamLead: true
+        }
+      });
+
+      if (!team) {
+        throw new BadRequestException(`Team with ID ${teamId} not found`);
+      }
+
+      // Get all team members (team lead + employees where teamLeadId = team.teamLeadId)
+      if (!team.teamLeadId) {
+        throw new BadRequestException(`Team with ID ${teamId} has no team lead assigned`);
+      }
+
+      const teamMembers = await this.prisma.employee.findMany({
+        where: {
+          OR: [
+            { id: team.teamLeadId }, // Team lead
+            { teamLeadId: team.teamLeadId } // Team members
+          ]
+        }
+      });
+
+      if (teamMembers.length === 0) {
+        throw new BadRequestException(`No team members found for team ${teamId}`);
+      }
+
+      // Add each team member as participant (if not already a participant)
+      for (const member of teamMembers) {
+        const existingParticipant = await this.prisma.chatParticipant.findFirst({
+          where: {
+            chatId: projectChat.id,
+            employeeId: member.id
+          }
+        });
+
+        if (!existingParticipant) {
+          await this.prisma.chatParticipant.create({
+            data: {
+              chatId: projectChat.id,
+              employeeId: member.id,
+              memberType: 'participant'
+            }
+          });
+        }
+      }
+
+      // Update participant count
+      const participantCount = await this.prisma.chatParticipant.count({
+        where: { chatId: projectChat.id }
+      });
+
+      await this.prisma.projectChat.update({
+        where: { id: projectChat.id },
+        data: { participants: participantCount }
+      });
+
+      console.log(`Added ${teamMembers.length} team members to project chat for project ${projectId}`);
+    } catch (error) {
+      console.error(`Failed to add team members to project chat for project ${projectId}:`, error);
+      throw new BadRequestException(`Failed to add team members to project chat: ${error.message}`);
+    }
   }
 }

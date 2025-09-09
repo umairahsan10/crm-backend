@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus, Request, UseGuards } from '@nestjs/common';
 import { ChatMessagesService } from './chat-messages.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
+import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 
-@Controller('communication/chat-messages')
+@Controller('chat-messages')
+@UseGuards(JwtAuthGuard)
 export class ChatMessagesController {
   constructor(private readonly chatMessagesService: ChatMessagesService) {}
 
@@ -20,13 +22,14 @@ export class ChatMessagesController {
   @Get('chat/:chatId')
   async getChatMessagesByChatId(
     @Param('chatId', ParseIntPipe) chatId: number,
+    @Request() req,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query('offset') offset?: string
   ) {
     const limitNum = limit ? parseInt(limit, 10) : undefined;
     const offsetNum = offset ? parseInt(offset, 10) : undefined;
     
-    return this.chatMessagesService.getChatMessagesByChatId(chatId, limitNum, offsetNum);
+    return this.chatMessagesService.getChatMessagesByChatId(chatId, req.user.id, limitNum, offsetNum);
   }
 
   @Get('chat/:chatId/latest')
@@ -36,37 +39,25 @@ export class ChatMessagesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createChatMessage(@Body() createChatMessageDto: CreateChatMessageDto) {
-    return this.chatMessagesService.createChatMessage(createChatMessageDto);
+  async createChatMessage(@Body() createChatMessageDto: CreateChatMessageDto, @Request() req) {
+    return this.chatMessagesService.createChatMessage(createChatMessageDto, req.user.id);
   }
 
   @Put(':id')
   async updateChatMessage(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateChatMessageDto: UpdateChatMessageDto,
-    @Query('senderId') senderId: string,
+    @Request() req
   ) {
-    const senderIdNum = parseInt(senderId, 10);
-    
-    if (!senderIdNum) {
-      throw new Error('Sender ID is required for updating messages');
-    }
-    
-    return this.chatMessagesService.updateChatMessage(id, updateChatMessageDto, senderIdNum);
+    return this.chatMessagesService.updateChatMessage(id, updateChatMessageDto, req.user.id);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteChatMessage(
     @Param('id', ParseIntPipe) id: number,
-    @Query('senderId') senderId: string,
+    @Request() req
   ) {
-    const senderIdNum = parseInt(senderId, 10);
-    
-    if (!senderIdNum) {
-      throw new Error('Sender ID is required for deleting messages');
-    }
-    
-    return this.chatMessagesService.deleteChatMessage(id, senderIdNum);
+    return this.chatMessagesService.deleteChatMessage(id, req.user.id);
   }
 }
