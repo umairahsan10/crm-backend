@@ -1,14 +1,19 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateProjectTaskDto } from './dto/create-project-task.dto';
 import { UpdateProjectTaskDto } from './dto/update-project-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { TaskQueryDto } from './dto/task-query.dto';
 import { ProjectTaskStatus, ProjectTaskPriority } from '@prisma/client';
+import { AutoLogService } from '../Logs/auto-log.service';
 
 @Injectable()
 export class ProjectTasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => AutoLogService))
+    private autoLogService: AutoLogService
+  ) {}
 
   // Helper method to normalize user object
   private normalizeUser(user: any) {
@@ -236,6 +241,8 @@ export class ProjectTasksService {
           }
         }
       });
+
+      // No auto log needed for task creation - only track team assignments
 
       return {
         success: true,
@@ -599,6 +606,8 @@ export class ProjectTasksService {
           }
         }
       });
+
+      // No auto log needed for status changes - only track employee assignments
 
       return {
         success: true,

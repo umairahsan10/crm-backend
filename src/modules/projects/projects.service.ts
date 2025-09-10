@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProjectFromPaymentDto } from './dto/create-project-from-payment.dto';
 import { AssignUnitHeadDto } from './dto/assign-unit-head.dto';
@@ -6,10 +6,15 @@ import { UpdateProjectDetailsDto, ProjectStatus } from './dto/update-project-det
 import { AssignTeamDto } from './dto/assign-team.dto';
 import { ProjectQueryDto } from './dto/project-query.dto';
 import { UnifiedUpdateProjectDto } from './dto/unified-update-project.dto';
+import { AutoLogService } from './Logs/auto-log.service';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => AutoLogService))
+    private autoLogService: AutoLogService
+  ) {}
 
   // Helper method to normalize user object
   private normalizeUser(user: any) {
@@ -104,6 +109,9 @@ export class ProjectsService {
 
       // Automatically create project chat with HR and Production managers as owners
       await this.createProjectChatWithDefaultOwners(project.id);
+
+      // Note: Manager ID is not added to project logs during project creation
+      // Only unit heads and team members are tracked in project logs
 
       return {
         success: true,
@@ -334,6 +342,10 @@ export class ProjectsService {
       // Add unit head as owner to project chat
       await this.addUnitHeadToProjectChat(id, dto.unitHeadId);
 
+      // Add unit head to project logs
+      const normalizedUser = this.normalizeUser(user);
+      await this.autoLogService.addEmployeeToProject(id, dto.unitHeadId);
+
       return {
         success: true,
         message: 'Unit head assigned successfully',
@@ -450,6 +462,9 @@ export class ProjectsService {
 
         // Add all team members to project chat as participants
         await this.addTeamMembersToProjectChat(id, dto.teamId);
+
+        // Add all team members to project logs
+        await this.addTeamMembersToProjectLogs(id, dto.teamId);
 
         // Update project's teamId and status if needed
         const finalUpdateData: any = { teamId: dto.teamId };
@@ -1059,6 +1074,51 @@ export class ProjectsService {
     } catch (error) {
       console.error(`Failed to add unit head to project chat for project ${projectId}:`, error);
       throw new BadRequestException(`Failed to add unit head to project chat: ${error.message}`);
+    }
+  }
+
+  // Helper method to add all team members to project logs
+  private async addTeamMembersToProjectLogs(projectId: number, teamId: number) {
+    try {
+      // Get team details
+      const team = await this.prisma.team.findUnique({
+        where: { id: teamId },
+        include: {
+          teamLead: true
+        }
+      });
+
+      if (!team) {
+        throw new BadRequestException(`Team with ID ${teamId} not found`);
+      }
+
+      // Get all team members (team lead + employees where teamLeadId = team.teamLeadId)
+      if (!team.teamLeadId) {
+        throw new BadRequestException(`Team with ID ${teamId} has no team lead assigned`);
+      }
+
+      const teamMembers = await this.prisma.employee.findMany({
+        where: {
+          OR: [
+            { id: team.teamLeadId }, // Team lead
+            { teamLeadId: team.teamLeadId } // Team members
+          ]
+        }
+      });
+
+      if (teamMembers.length === 0) {
+        throw new BadRequestException(`No team members found for team ${teamId}`);
+      }
+
+      // Add each team member to project logs
+      for (const member of teamMembers) {
+        await this.autoLogService.addEmployeeToProject(projectId, member.id);
+      }
+
+      console.log(`Added ${teamMembers.length} team members to project logs for project ${projectId}`);
+    } catch (error) {
+      console.error(`Failed to add team members to project logs for project ${projectId}:`, error);
+      throw new BadRequestException(`Failed to add team members to project logs: ${error.message}`);
     }
   }
 
