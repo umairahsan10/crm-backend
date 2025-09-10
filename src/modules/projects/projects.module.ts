@@ -5,8 +5,10 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { RolesGuard, DepartmentsGuard } from '../../common/guards';
 import { ProjectAccessGuard } from './guards/project-access.guard';
 import { ProjectAssignmentGuard } from './guards/project-assignment.guard';
+import { ProjectTasksModule } from './Tasks/project-tasks.module';
 
 @Module({
+  imports: [ProjectTasksModule],
   controllers: [ProjectsController],
   providers: [
     ProjectsService,
