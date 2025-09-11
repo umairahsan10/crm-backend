@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { PrismaService } from '../../../../prisma/prisma.service';
+import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateChatParticipantDto } from './dto/create-chat-participant.dto';
 import { UpdateChatParticipantDto } from './dto/update-chat-participant.dto';
 
@@ -216,7 +216,7 @@ export class ChatParticipantsService {
     }
   }
 
-  async createChatParticipant(createChatParticipantDto: CreateChatParticipantDto) {
+  async createChatParticipant(createChatParticipantDto: CreateChatParticipantDto, requesterId: number) {
     try {
       // Validate foreign key references
       const chat = await this.prisma.projectChat.findUnique({
@@ -233,6 +233,19 @@ export class ChatParticipantsService {
         throw new BadRequestException(`Employee with ID ${createChatParticipantDto.employeeId} not found. Please provide a valid employee ID.`);
       }
 
+      // Check if requester is an owner of this chat
+      const requesterParticipant = await this.prisma.chatParticipant.findFirst({
+        where: {
+          chatId: createChatParticipantDto.chatId,
+          employeeId: requesterId,
+          memberType: 'owner'
+        },
+      });
+
+      if (!requesterParticipant) {
+        throw new BadRequestException(`Only chat owners can add participants. You are not an owner of this chat.`);
+      }
+
       // Check if participant already exists in this chat
       const existingParticipant = await this.prisma.chatParticipant.findFirst({
         where: {
@@ -245,14 +258,17 @@ export class ChatParticipantsService {
         throw new BadRequestException(`Employee with ID ${createChatParticipantDto.employeeId} is already a participant in chat ID ${createChatParticipantDto.chatId}.`);
       }
 
-      // Multiple owners are now allowed per chat
+      // Only owners can add participants - participants cannot add other participants
+      if (createChatParticipantDto.memberType === 'owner') {
+        throw new BadRequestException(`Only system can assign owners. You can only add participants.`);
+      }
 
       // Create the chat participant
       const newParticipant = await this.prisma.chatParticipant.create({
         data: {
           chatId: createChatParticipantDto.chatId,
           employeeId: createChatParticipantDto.employeeId,
-          memberType: createChatParticipantDto.memberType,
+          memberType: 'participant', // Force participant type for manually added members
         },
         include: {
           chat: {
@@ -469,7 +485,7 @@ export class ChatParticipantsService {
     }
   }
 
-  async deleteChatParticipant(id: number) {
+  async deleteChatParticipant(id: number, requesterId: number) {
     try {
       // Check if chat participant exists
       const existingParticipant = await this.prisma.chatParticipant.findUnique({
@@ -523,6 +539,24 @@ export class ChatParticipantsService {
         throw new NotFoundException(`Chat participant with ID ${id} not found. Please check the ID and try again.`);
       }
 
+      // Check if requester is an owner of this chat
+      const requesterParticipant = await this.prisma.chatParticipant.findFirst({
+        where: {
+          chatId: existingParticipant.chatId,
+          employeeId: requesterId,
+          memberType: 'owner'
+        },
+      });
+
+      if (!requesterParticipant) {
+        throw new BadRequestException(`Only chat owners can remove participants. You are not an owner of this chat.`);
+      }
+
+      // Prevent removal of owners (HR, Production managers, Unit heads)
+      if (existingParticipant.memberType === 'owner') {
+        throw new BadRequestException(`Cannot remove chat owners. Only participants can be removed.`);
+      }
+
       const chatId = existingParticipant.chatId;
 
       // Delete the chat participant
@@ -546,7 +580,7 @@ export class ChatParticipantsService {
         updatedParticipantCount: participantCount
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       if (error.code === 'P2003') {

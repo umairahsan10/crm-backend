@@ -5,10 +5,6 @@ export class CreateChatMessageDto {
   @IsNumber({}, { message: 'Chat ID must be a number' })
   chatId: number;
 
-  @IsNotEmpty({ message: 'Sender ID is required' })
-  @IsNumber({}, { message: 'Sender ID must be a number' })
-  senderId: number;
-
   @IsNotEmpty({ message: 'Message content is required' })
   @IsString({ message: 'Message content must be a string' })
   @MaxLength(1000, { message: 'Message content cannot exceed 1000 characters' })

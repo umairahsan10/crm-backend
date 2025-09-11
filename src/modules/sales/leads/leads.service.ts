@@ -21,9 +21,18 @@ export class LeadsService {
             throw new BadRequestException('Sales unit not found');
         }
 
-        // Create lead with defaults
+        // Get the maximum ID and increment it
+        const maxLead = await this.prisma.lead.findFirst({
+            orderBy: { id: 'desc' },
+            select: { id: true }
+        });
+
+        const nextId = maxLead ? maxLead.id + 1 : 1;
+
+        // Create lead with manual ID assignment
         const lead = await this.prisma.lead.create({
             data: {
+                id: nextId,
                 name: createLeadDto.name,
                 email: createLeadDto.email,
                 phone: createLeadDto.phone,

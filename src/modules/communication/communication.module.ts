@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { CommunicationService } from './communication.service';
 import { CommunicationController } from './communication.controller';
-import { ProjectChatsModule } from './project-chats/project-chats.module';
-import { ChatParticipantsModule } from './chat-participants/chat-participants.module';
-import { ChatMessagesModule } from './chat-messages/chat-messages.module';
+import { ProjectChatsModule } from '../projects/Chats/project-chats/project-chats.module';
+import { ChatParticipantsModule } from '../projects/Chats/chat-participants/chat-participants.module';
+import { ChatMessagesModule } from '../projects/Chats/chat-messages/chat-messages.module';
 import { EmployeeModule } from './employee/employee.module';
 import { ComplaintsModule } from './complaints/complaints.module';
 import { ReminderModule } from './reminder/reminder.module';

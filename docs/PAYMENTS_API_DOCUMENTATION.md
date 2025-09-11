@@ -19,8 +19,17 @@ Complete API documentation for the Payment Link Generation System. This system h
 
 ## 📋 API Endpoints
 
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/leads/payment-link-generate` | Generate payment link for cracked lead |
+| `GET` | `/leads/transaction/:id` | Get payment details by transaction ID |
+| `PATCH` | `/leads/payment-link-generate/:id` | Update payment link details |
+| `POST` | `/leads/payment-link-complete/:id` | Mark payment as completed |
+
+---
+
 ### 1. Generate Payment Link
-**`POST /leads/payments/payment-link-generate`**
+**`POST /leads/payment-link-generate`**
 
 Generates a payment link for a cracked lead, creates client and transaction records.
 
@@ -106,7 +115,7 @@ Generates a payment link for a cracked lead, creates client and transaction reco
 ---
 
 ### 2. Get Payment Details
-**`GET /leads/payments/transaction/:id`**
+**`GET /leads/transaction/:id`**
 
 Retrieves payment details for a specific transaction.
 
@@ -140,38 +149,8 @@ Retrieves payment details for a specific transaction.
 
 ---
 
-### 3. Update Payment Status
-**`PATCH /leads/payments/transaction/:id/status`**
-
-Updates the status of a payment transaction.
-
-#### Request Parameters
-- `id`: Transaction ID (number)
-
-#### Request Body
-```json
-{
-  "status": "completed"
-}
-```
-
-#### Response Format
-```json
-{
-  "id": 789,
-  "status": "completed",
-  "updatedAt": "2024-01-15T10:30:00Z"
-}
-```
-
-#### Access Control
-- **Authentication**: JWT token required
-- **Authorization**: Only the creator of the transaction can update status
-
----
-
-### 4. Update Payment Link Details
-**`PATCH /leads/payments/transaction/:id/details`**
+### 3. Update Payment Link Details
+**`PATCH /leads/payment-link-generate/:id`**
 
 Updates the payment link details including client information and transaction details. Only the salesperson who created the payment link can update these fields.
 
@@ -229,6 +208,55 @@ Updates the payment link details including client information and transaction de
 
 ---
 
+### 4. Complete Payment
+**`POST /leads/payment-link-complete/:id`**
+
+Marks a payment as completed and handles payment completion logic.
+
+#### Request Parameters
+- `id`: Transaction ID (number)
+
+#### Request Body
+```json
+{
+  "paymentMethod": "credit_card",
+  "category": "phase_1"
+}
+```
+
+#### Optional Fields
+- `paymentMethod`: Payment method used (e.g., "credit_card", "bank_transfer", "cash")
+- `category`: Payment category or phase identifier
+
+#### Response Format
+```json
+{
+  "success": true,
+  "message": "Payment completed successfully",
+  "data": {
+    "transactionId": 789,
+    "status": "completed",
+    "completedAt": "2024-01-15T10:30:00Z",
+    "paymentMethod": "credit_card",
+    "category": "phase_1"
+  }
+}
+```
+
+#### Access Control
+- **Authentication**: JWT token required
+- **Authorization**: Only the creator of the payment link can complete the payment
+
+#### Business Logic
+1. **Transaction Validation**: Verify transaction exists and is in "pending" status
+2. **User Verification**: Ensure JWT user matches the transaction creator
+3. **Status Update**: Change transaction status to "completed"
+4. **Payment Tracking**: Record payment method and category
+5. **Lead Status**: Update related lead status if applicable
+6. **Commission Calculation**: Trigger commission calculations for the sales rep
+
+---
+
 ## 🔄 Workflow
 
 ### Payment Link Generation Flow
@@ -236,11 +264,23 @@ Updates the payment link details including client information and transaction de
 1. Lead Status: "cracked" ✅
 2. User Clicks: "Generate Payment Link" button
 3. Form Opens: Client + Transaction information
-4. API Call: POST /leads/payments/payment-link-generate
+4. API Call: POST /leads/payment-link-generate
 5. Validation: Lead exists, user authorized, fields valid
 6. Square API: Simulated payment link generation
 7. Success Path: Create client + transaction + invoice + update lead status
 8. Failure Path: Return error, no database changes
+```
+
+### Payment Completion Flow
+```
+1. Payment Link Generated ✅
+2. Client Makes Payment (via Square or manual)
+3. Sales Rep Confirms Payment Received
+4. API Call: POST /leads/payment-link-complete/:id
+5. Validation: Transaction exists, user authorized, status is pending
+6. Update: Transaction status to "completed"
+7. Trigger: Commission calculations and lead status updates
+8. Success: Payment marked as completed
 ```
 
 ### Database Transaction Safety
@@ -286,7 +326,7 @@ Updates the payment link details including client information and transaction de
 ### Test Payment Link Generation
 ```bash
 # Valid request - should succeed
-POST /leads/payments/payment-link-generate
+POST /leads/payment-link-generate
 {
   "leadId": 123,
   "clientName": "Test Client",
@@ -299,7 +339,7 @@ POST /leads/payments/payment-link-generate
 }
 
 # Invalid lead - should fail
-POST /leads/payments/payment-link-generate
+POST /leads/payment-link-generate
 {
   "leadId": 999,  # Non-existent lead
   ...
@@ -307,6 +347,54 @@ POST /leads/payments/payment-link-generate
 
 # Unauthorized user - should fail
 # Use JWT token of different user
+```
+
+### Test Payment Completion
+```bash
+# Valid payment completion - should succeed
+POST /leads/payment-link-complete/789
+{
+  "paymentMethod": "credit_card",
+  "category": "phase_1"
+}
+
+# Invalid transaction ID - should fail
+POST /leads/payment-link-complete/999
+{
+  "paymentMethod": "bank_transfer"
+}
+
+# Unauthorized user - should fail
+# Use JWT token of different user
+```
+
+### Test Payment Details Retrieval
+```bash
+# Valid request - should succeed
+GET /leads/transaction/789
+
+# Invalid transaction ID - should fail
+GET /leads/transaction/999
+
+# Unauthorized user - should fail
+# Use JWT token of different user
+```
+
+### Test Payment Link Update
+```bash
+# Valid update - should succeed
+PATCH /leads/payment-link-generate/789
+{
+  "clientName": "Updated Client Name",
+  "amount": 2000.00,
+  "method": "credit_card"
+}
+
+# Invalid transaction ID - should fail
+PATCH /leads/payment-link-generate/999
+{
+  "amount": 1500.00
+}
 ```
 
 ### Test Access Control
