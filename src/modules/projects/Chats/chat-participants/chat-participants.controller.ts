@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, Body, Request, UseGuards } from '@nestjs/common';
 import { ChatParticipantsService } from './chat-participants.service';
 import { CreateChatParticipantDto } from './dto/create-chat-participant.dto';
 import { UpdateChatParticipantDto } from './dto/update-chat-participant.dto';
+import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 
-@Controller('communication/chat-participants')
+@Controller('chat-participants')
+@UseGuards(JwtAuthGuard)
 export class ChatParticipantsController {
   constructor(private readonly chatParticipantsService: ChatParticipantsService) {}
 
@@ -23,8 +25,8 @@ export class ChatParticipantsController {
   }
 
   @Post()
-  async createChatParticipant(@Body() createChatParticipantDto: CreateChatParticipantDto) {
-    return this.chatParticipantsService.createChatParticipant(createChatParticipantDto);
+  async createChatParticipant(@Body() createChatParticipantDto: CreateChatParticipantDto, @Request() req) {
+    return this.chatParticipantsService.createChatParticipant(createChatParticipantDto, req.user.id);
   }
 
   @Put(':id')
@@ -36,7 +38,7 @@ export class ChatParticipantsController {
   }
 
   @Delete(':id')
-  async deleteChatParticipant(@Param('id', ParseIntPipe) id: number) {
-    return this.chatParticipantsService.deleteChatParticipant(id);
+  async deleteChatParticipant(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.chatParticipantsService.deleteChatParticipant(id, req.user.id);
   }
 }

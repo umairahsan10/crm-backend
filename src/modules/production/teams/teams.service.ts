@@ -315,29 +315,87 @@ export class TeamsService {
       );
     }
 
-    // Add employee to team
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { teamLeadId: existingTeam.teamLeadId }
-    });
+    // Use transaction to ensure all operations succeed or fail together
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Add employee to team
+      await tx.employee.update({
+        where: { id: employeeId },
+        data: { teamLeadId: existingTeam.teamLeadId }
+      });
 
-    // Update team employee count (include team lead + team members)
-    const teamMembers = await this.prisma.employee.findMany({
-      where: { teamLeadId: existingTeam.teamLeadId }
-    });
-    
-    // Count includes team lead + team members
-    const totalCount = teamMembers.length + 1; // +1 for the team lead
+      // Update team employee count (include team lead + team members)
+      const teamMembers = await tx.employee.findMany({
+        where: { teamLeadId: existingTeam.teamLeadId }
+      });
+      
+      // Count includes team lead + team members
+      const totalCount = teamMembers.length + 1; // +1 for the team lead
 
-    await this.prisma.team.update({
-      where: { id: teamId },
-      data: { employeeCount: totalCount }
-    });
+      await tx.team.update({
+        where: { id: teamId },
+        data: { employeeCount: totalCount }
+      });
 
-    return {
-      success: true,
-      message: `Employee "${employee.firstName} ${employee.lastName}" successfully added to team "${existingTeam.name}"`,
-      data: {
+      // Add employee to all team projects' chat participants
+      const teamProjects = await tx.project.findMany({
+        where: { teamId: teamId },
+        include: {
+          projectChats: true
+        }
+      });
+
+      for (const project of teamProjects) {
+        // Only work with projects that have existing chats
+        const projectChat = project.projectChats[0];
+        if (projectChat) {
+          // Add employee as chat participant if not already a participant
+          const existingParticipant = await tx.chatParticipant.findFirst({
+            where: {
+              chatId: projectChat.id,
+              employeeId: employeeId
+            }
+          });
+
+          if (!existingParticipant) {
+            await tx.chatParticipant.create({
+              data: {
+                chatId: projectChat.id,
+                employeeId: employeeId,
+                memberType: 'participant'
+              }
+            });
+
+            // Update chat participants count
+            const participantCount = await tx.chatParticipant.count({
+              where: { chatId: projectChat.id }
+            });
+
+            await tx.projectChat.update({
+              where: { id: projectChat.id },
+              data: { participants: participantCount }
+            });
+          }
+        }
+
+        // Add employee to project logs (regardless of chat existence)
+        const existingLog = await tx.projectLog.findFirst({
+          where: {
+            projectId: project.id,
+            developerId: employeeId
+          }
+        });
+
+        if (!existingLog) {
+          await tx.projectLog.create({
+            data: {
+              projectId: project.id,
+              developerId: employeeId
+            }
+          });
+        }
+      }
+
+      return {
         teamId: existingTeam.id,
         teamName: existingTeam.name,
         teamLead: existingTeam.teamLead,
@@ -346,8 +404,15 @@ export class TeamsService {
           firstName: employee.firstName,
           lastName: employee.lastName
         },
-        newEmployeeCount: totalCount
-      }
+        newEmployeeCount: totalCount,
+        projectsUpdated: teamProjects.length
+      };
+    });
+
+    return {
+      success: true,
+      message: `Employee "${employee.firstName} ${employee.lastName}" successfully added to team "${existingTeam.name}" and all team projects`,
+      data: result
     };
   }
 
@@ -410,29 +475,67 @@ export class TeamsService {
       );
     }
 
-    // Remove employee from team
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { teamLeadId: null }
-    });
+    // Use transaction to ensure all operations succeed or fail together
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Remove employee from team
+      await tx.employee.update({
+        where: { id: employeeId },
+        data: { teamLeadId: null }
+      });
 
-    // Update team employee count (include team lead + team members)
-    const teamMembers = await this.prisma.employee.findMany({
-      where: { teamLeadId: existingTeam.teamLeadId }
-    });
-    
-    // Count includes team lead + team members
-    const totalCount = teamMembers.length + 1; // +1 for the team lead
+      // Update team employee count (include team lead + team members)
+      const teamMembers = await tx.employee.findMany({
+        where: { teamLeadId: existingTeam.teamLeadId }
+      });
+      
+      // Count includes team lead + team members
+      const totalCount = teamMembers.length + 1; // +1 for the team lead
 
-    await this.prisma.team.update({
-      where: { id: teamId },
-      data: { employeeCount: totalCount }
-    });
+      await tx.team.update({
+        where: { id: teamId },
+        data: { employeeCount: totalCount }
+      });
 
-    return {
-      success: true,
-      message: `Employee "${employee.firstName} ${employee.lastName}" successfully removed from team "${existingTeam.name}"`,
-      data: {
+      // Remove employee from all team projects' chat participants
+      const teamProjects = await tx.project.findMany({
+        where: { teamId: teamId },
+        include: {
+          projectChats: true
+        }
+      });
+
+      for (const project of teamProjects) {
+        const projectChat = project.projectChats[0];
+        if (projectChat) {
+          // Remove employee as chat participant
+          await tx.chatParticipant.deleteMany({
+            where: {
+              chatId: projectChat.id,
+              employeeId: employeeId
+            }
+          });
+
+          // Update chat participants count
+          const participantCount = await tx.chatParticipant.count({
+            where: { chatId: projectChat.id }
+          });
+
+          await tx.projectChat.update({
+            where: { id: projectChat.id },
+            data: { participants: participantCount }
+          });
+        }
+
+        // Remove employee from project logs
+        await tx.projectLog.deleteMany({
+          where: {
+            projectId: project.id,
+            developerId: employeeId
+          }
+        });
+      }
+
+      return {
         teamId: existingTeam.id,
         teamName: existingTeam.name,
         removedEmployee: {
@@ -440,8 +543,15 @@ export class TeamsService {
           firstName: employee.firstName,
           lastName: employee.lastName
         },
-        newEmployeeCount: totalCount
-      }
+        newEmployeeCount: totalCount,
+        projectsUpdated: teamProjects.length
+      };
+    });
+
+    return {
+      success: true,
+      message: `Employee "${employee.firstName} ${employee.lastName}" successfully removed from team "${existingTeam.name}" and all team projects`,
+      data: result
     };
   }
 

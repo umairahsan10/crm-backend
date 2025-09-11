@@ -259,27 +259,85 @@ export class TeamsService {
         throw new ConflictException(`Employee with ID ${employeeId} is already a team lead of another team`);
       }
 
-      // Assign employee as team lead
-      await this.prisma.team.update({
-        where: { id: teamId },
-        data: { teamLeadId: employeeId }
-      });
+      // Use transaction to ensure all operations succeed or fail together
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Assign employee as team lead
+        await tx.team.update({
+          where: { id: teamId },
+          data: { teamLeadId: employeeId }
+        });
 
-      // Update team employee count - team lead counts as 1, plus any existing members
-      const existingMembersCount = await this.prisma.employee.count({
-        where: { teamLeadId: employeeId }
-      });
-      const newEmployeeCount = existingMembersCount + 1; // +1 for team lead
+        // Update team employee count - team lead counts as 1, plus any existing members
+        const existingMembersCount = await tx.employee.count({
+          where: { teamLeadId: employeeId }
+        });
+        const newEmployeeCount = existingMembersCount + 1; // +1 for team lead
 
-      await this.prisma.team.update({
-        where: { id: teamId },
-        data: { employeeCount: newEmployeeCount }
-      });
+        await tx.team.update({
+          where: { id: teamId },
+          data: { employeeCount: newEmployeeCount }
+        });
 
-      return {
-        success: true,
-        message: `Employee "${employee.firstName} ${employee.lastName}" successfully assigned as team lead to team "${team.name}"`,
-        data: {
+        // Add team lead to all team projects' chat participants and project logs
+        const teamProjects = await tx.project.findMany({
+          where: { teamId: teamId },
+          include: {
+            projectChats: true
+          }
+        });
+
+        for (const project of teamProjects) {
+          // Only work with projects that have existing chats
+          const projectChat = project.projectChats[0];
+          if (projectChat) {
+            // Add team lead as chat participant if not already a participant
+            const existingParticipant = await tx.chatParticipant.findFirst({
+              where: {
+                chatId: projectChat.id,
+                employeeId: employeeId
+              }
+            });
+
+            if (!existingParticipant) {
+              await tx.chatParticipant.create({
+                data: {
+                  chatId: projectChat.id,
+                  employeeId: employeeId,
+                  memberType: 'owner'
+                }
+              });
+
+              // Update chat participants count
+              const participantCount = await tx.chatParticipant.count({
+                where: { chatId: projectChat.id }
+              });
+
+              await tx.projectChat.update({
+                where: { id: projectChat.id },
+                data: { participants: participantCount }
+              });
+            }
+          }
+
+          // Add team lead to project logs (regardless of chat existence)
+          const existingLog = await tx.projectLog.findFirst({
+            where: {
+              projectId: project.id,
+              developerId: employeeId
+            }
+          });
+
+          if (!existingLog) {
+            await tx.projectLog.create({
+              data: {
+                projectId: project.id,
+                developerId: employeeId
+              }
+            });
+          }
+        }
+
+        return {
           teamId: team.id,
           teamName: team.name,
           teamLead: {
@@ -294,8 +352,15 @@ export class TeamsService {
             role: employee.role.name
           },
           newEmployeeCount: newEmployeeCount,
-          action: 'assigned_as_team_lead'
-        }
+          action: 'assigned_as_team_lead',
+          projectsUpdated: teamProjects.length
+        };
+      });
+
+      return {
+        success: true,
+        message: `Employee "${employee.firstName} ${employee.lastName}" successfully assigned as team lead to team "${team.name}" and all team projects`,
+        data: result
       };
     }
 
@@ -316,27 +381,85 @@ export class TeamsService {
       throw new BadRequestException(`Only employees with senior or junior role can be added to teams. Current role: ${employee.role.name}`);
     }
 
-    // Add employee to team
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { teamLeadId: team.teamLeadId }
-    });
+    // Use transaction to ensure all operations succeed or fail together
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Add employee to team
+      await tx.employee.update({
+        where: { id: employeeId },
+        data: { teamLeadId: team.teamLeadId }
+      });
 
-    // Update team employee count - includes team lead + team members
-    const existingMembersCount = await this.prisma.employee.count({
-      where: { teamLeadId: team.teamLeadId }
-    });
-    const newEmployeeCount = existingMembersCount + 1; // +1 for team lead
+      // Update team employee count - includes team lead + team members
+      const existingMembersCount = await tx.employee.count({
+        where: { teamLeadId: team.teamLeadId }
+      });
+      const newEmployeeCount = existingMembersCount + 1; // +1 for team lead
 
-    await this.prisma.team.update({
-      where: { id: teamId },
-      data: { employeeCount: newEmployeeCount }
-    });
+      await tx.team.update({
+        where: { id: teamId },
+        data: { employeeCount: newEmployeeCount }
+      });
 
-    return {
-      success: true,
-      message: `Employee "${employee.firstName} ${employee.lastName}" successfully added to team "${team.name}"`,
-      data: {
+      // Add employee to all team projects' chat participants
+      const teamProjects = await tx.project.findMany({
+        where: { teamId: teamId },
+        include: {
+          projectChats: true
+        }
+      });
+
+      for (const project of teamProjects) {
+        // Only work with projects that have existing chats
+        const projectChat = project.projectChats[0];
+        if (projectChat) {
+          // Add employee as chat participant if not already a participant
+          const existingParticipant = await tx.chatParticipant.findFirst({
+            where: {
+              chatId: projectChat.id,
+              employeeId: employeeId
+            }
+          });
+
+          if (!existingParticipant) {
+            await tx.chatParticipant.create({
+              data: {
+                chatId: projectChat.id,
+                employeeId: employeeId,
+                memberType: 'participant'
+              }
+            });
+
+            // Update chat participants count
+            const participantCount = await tx.chatParticipant.count({
+              where: { chatId: projectChat.id }
+            });
+
+            await tx.projectChat.update({
+              where: { id: projectChat.id },
+              data: { participants: participantCount }
+            });
+          }
+        }
+
+        // Add employee to project logs (regardless of chat existence)
+        const existingLog = await tx.projectLog.findFirst({
+          where: {
+            projectId: project.id,
+            developerId: employeeId
+          }
+        });
+
+        if (!existingLog) {
+          await tx.projectLog.create({
+            data: {
+              projectId: project.id,
+              developerId: employeeId
+            }
+          });
+        }
+      }
+
+      return {
         teamId: team.id,
         teamName: team.name,
         teamLead: team.teamLead,
@@ -346,8 +469,15 @@ export class TeamsService {
           lastName: employee.lastName
         },
         newEmployeeCount: newEmployeeCount,
-        action: 'added_as_member'
-      }
+        action: 'added_as_member',
+        projectsUpdated: teamProjects.length
+      };
+    });
+
+    return {
+      success: true,
+      message: `Employee "${employee.firstName} ${employee.lastName}" successfully added to team "${team.name}" and all team projects`,
+      data: result
     };
   }
 
@@ -414,27 +544,65 @@ export class TeamsService {
       throw new ConflictException(`Cannot remove employee. ${activeLeads} completed lead(s) are assigned to this employee. Please reassign these leads first.`);
     }
 
-    // Remove employee from team
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { teamLeadId: null }
-    });
+    // Use transaction to ensure all operations succeed or fail together
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Remove employee from team
+      await tx.employee.update({
+        where: { id: employeeId },
+        data: { teamLeadId: null }
+      });
 
-    // Update team employee count - includes team lead + remaining members
-    const remainingMembersCount = await this.prisma.employee.count({
-      where: { teamLeadId: team.teamLeadId }
-    });
-    const newEmployeeCount = remainingMembersCount + 1; // +1 for team lead
+      // Update team employee count - includes team lead + remaining members
+      const remainingMembersCount = await tx.employee.count({
+        where: { teamLeadId: team.teamLeadId }
+      });
+      const newEmployeeCount = remainingMembersCount + 1; // +1 for team lead
 
-    await this.prisma.team.update({
-      where: { id: teamId },
-      data: { employeeCount: newEmployeeCount }
-    });
+      await tx.team.update({
+        where: { id: teamId },
+        data: { employeeCount: newEmployeeCount }
+      });
 
-    return {
-      success: true,
-      message: `Employee "${employee.firstName} ${employee.lastName}" successfully removed from team "${team.name}"`,
-      data: {
+      // Remove employee from all team projects' chat participants
+      const teamProjects = await tx.project.findMany({
+        where: { teamId: teamId },
+        include: {
+          projectChats: true
+        }
+      });
+
+      for (const project of teamProjects) {
+        const projectChat = project.projectChats[0];
+        if (projectChat) {
+          // Remove employee as chat participant
+          await tx.chatParticipant.deleteMany({
+            where: {
+              chatId: projectChat.id,
+              employeeId: employeeId
+            }
+          });
+
+          // Update chat participants count
+          const participantCount = await tx.chatParticipant.count({
+            where: { chatId: projectChat.id }
+          });
+
+          await tx.projectChat.update({
+            where: { id: projectChat.id },
+            data: { participants: participantCount }
+          });
+        }
+
+        // Remove employee from project logs
+        await tx.projectLog.deleteMany({
+          where: {
+            projectId: project.id,
+            developerId: employeeId
+          }
+        });
+      }
+
+      return {
         teamId: team.id,
         teamName: team.name,
         removedEmployee: {
@@ -442,8 +610,15 @@ export class TeamsService {
           firstName: employee.firstName,
           lastName: employee.lastName
         },
-        newEmployeeCount: newEmployeeCount
-      }
+        newEmployeeCount: newEmployeeCount,
+        projectsUpdated: teamProjects.length
+      };
+    });
+
+    return {
+      success: true,
+      message: `Employee "${employee.firstName} ${employee.lastName}" successfully removed from team "${team.name}" and all team projects`,
+      data: result
     };
   }
 
