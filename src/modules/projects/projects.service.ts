@@ -6,7 +6,7 @@ import { UpdateProjectDetailsDto, ProjectStatus } from './dto/update-project-det
 import { AssignTeamDto } from './dto/assign-team.dto';
 import { ProjectQueryDto } from './dto/project-query.dto';
 import { UnifiedUpdateProjectDto } from './dto/unified-update-project.dto';
-import { AutoLogService } from './Logs/auto-log.service';
+import { AutoLogService } from './Projects-Logs/auto-log.service';
 
 @Injectable()
 export class ProjectsService {

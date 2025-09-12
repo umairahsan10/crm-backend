@@ -4,7 +4,7 @@ import { ProjectTasksController } from './project-tasks.controller';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
-import { AutoLogService } from '../Logs/auto-log.service';
+import { AutoLogService } from '../Projects-Logs/auto-log.service';
 
 @Module({
   controllers: [ProjectTasksController],

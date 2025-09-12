@@ -5,7 +5,7 @@ import { UpdateProjectTaskDto } from './dto/update-project-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { TaskQueryDto } from './dto/task-query.dto';
 import { ProjectTaskStatus, ProjectTaskPriority } from '@prisma/client';
-import { AutoLogService } from '../Logs/auto-log.service';
+import { AutoLogService } from '../Projects-Logs/auto-log.service';
 
 @Injectable()
 export class ProjectTasksService {
