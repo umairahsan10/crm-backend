@@ -5,6 +5,23 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
+  // Enable CORS for frontend communication
+  app.enableCors({
+    origin: [
+      'http://localhost:5173',  // Vite dev server (your frontend)
+      'http://localhost:3000',  // Backend itself
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'Accept',
+      'Origin',
+      'X-Requested-With'
+    ],
+    credentials: true, // Allow cookies and authorization headers
+  });
+  
   // Enable validation pipe for DTOs
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -15,5 +32,6 @@ async function bootstrap() {
   const PORT = process.env.PORT || 3000;
   await app.listen(PORT);
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🌐 CORS enabled for frontend: http://localhost:5173`);
 }
 bootstrap();
