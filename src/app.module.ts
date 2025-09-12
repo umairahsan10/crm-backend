@@ -13,6 +13,7 @@ import { CampaignModule } from './modules/campaign/campaign.module';
 import { ProductionModule } from './modules/production/production.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SalesModule } from './modules/sales/sales.module';
+import { ClientModule } from './modules/client/client.module';
 
 @Global() // Make this module global so PrismaService is available everywhere
 @Module({
@@ -29,6 +30,7 @@ import { SalesModule } from './modules/sales/sales.module';
     ProductionModule,
     ProjectsModule,
     SalesModule,
+    ClientModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

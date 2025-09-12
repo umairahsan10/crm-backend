@@ -6,7 +6,7 @@ import { RolesGuard, DepartmentsGuard } from '../../common/guards';
 import { ProjectAccessGuard } from './guards/project-access.guard';
 import { ProjectAssignmentGuard } from './guards/project-assignment.guard';
 import { ProjectTasksModule } from './Tasks/project-tasks.module';
-import { ProjectLogsModule } from './Logs/project-logs.module';
+import { ProjectLogsModule } from './Projects-Logs/project-logs.module';
 
 @Module({
   imports: [ProjectTasksModule, ProjectLogsModule],
