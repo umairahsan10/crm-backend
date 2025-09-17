@@ -10,7 +10,8 @@ async function bootstrap() {
     origin: [
       'http://localhost:5173',  // Vite dev server (your frontend)
       'http://localhost:3000',  // Backend itself
-      'https://crm-frontend-14zu7mefp-nmeinertias-projects.vercel.app',  // Your Vercel domain
+      'https://crm-frontend-14zu7mefp-nmeinertias-projects.vercel.app',  // Your Vercel preview domain
+      "https://crm-frontend-eight-gamma.vercel.app",  // Your Vercel domain
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
