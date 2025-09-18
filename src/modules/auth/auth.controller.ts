@@ -34,4 +34,10 @@ export class AuthController {
   getProfile(@Request() req: AuthenticatedRequest) {
     return req.user;
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  async logout(@Request() req: AuthenticatedRequest) {
+    return this.authService.logout();
+  }
 }

@@ -7,7 +7,7 @@ import { DepartmentsGuard } from '../../common/guards/departments.guard';
 
 @Module({
   controllers: [CampaignController],
-  providers: [CampaignService, PrismaService, JwtAuthGuard, DepartmentsGuard],
+  providers: [CampaignService, JwtAuthGuard, DepartmentsGuard],
   exports: [CampaignService]
 })
 export class CampaignModule {}

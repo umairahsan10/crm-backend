@@ -14,6 +14,7 @@ import { ProductionModule } from './modules/production/production.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { ClientModule } from './modules/client/client.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Global() // Make this module global so PrismaService is available everywhere
 @Module({
@@ -21,6 +22,7 @@ import { ClientModule } from './modules/client/client.module';
     ScheduleModule.forRoot(),
     AuthModule,
     EmployeeModule,
+    AdminModule,
     CommunicationModule,
     CompanyModule,
     FinanceModule,

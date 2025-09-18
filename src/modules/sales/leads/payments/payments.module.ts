@@ -8,7 +8,7 @@ import { ProjectsModule } from '../../../projects/projects.module';
 @Module({
   imports: [ProjectsModule],
   controllers: [PaymentsController],
-  providers: [PaymentsService, PrismaService, RevenueService],
+  providers: [PaymentsService, RevenueService],
   exports: [PaymentsService]
 })
 export class PaymentsModule {}
