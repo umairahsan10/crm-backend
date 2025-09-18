@@ -6,7 +6,7 @@ import { LeadsAccessGuard, LeadCreationGuard } from './guards';
 
 @Module({
   controllers: [LeadsController],
-  providers: [LeadsService, PrismaService, LeadsAccessGuard, LeadCreationGuard],
+  providers: [LeadsService, LeadsAccessGuard, LeadCreationGuard],
   exports: [LeadsService]
 })
 export class LeadsModule {}

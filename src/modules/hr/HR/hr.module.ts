@@ -8,7 +8,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 @Module({
   imports: [],
   controllers: [HrManagementController, AdminRequestsController],
-  providers: [HrManagementService, AdminRequestsService, PrismaService],
+  providers: [HrManagementService, AdminRequestsService],
   exports: [HrManagementService, AdminRequestsService],
 })
 export class HrManagementModule {} 

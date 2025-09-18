@@ -62,7 +62,6 @@ export class EmployeeController {
   @Get('employees')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
-  @Permissions(PermissionName.employee_add_permission)
   async getEmployees(@Query() query: GetEmployeesDto, @Request() req: AuthenticatedRequest): Promise<EmployeesListResponseDto> {
     return await this.hrService.getEmployees(query);
   }
@@ -73,7 +72,6 @@ export class EmployeeController {
   @Get('employees/:id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
-  @Permissions(PermissionName.employee_add_permission)
   async getEmployeeById(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest): Promise<EmployeeResponseDto> {
     return await this.hrService.getEmployeeById(id);
   }
@@ -84,7 +82,6 @@ export class EmployeeController {
   @Put('employees/:id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
-  @Permissions(PermissionName.employee_add_permission)
   async updateEmployee(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateEmployeeDto,

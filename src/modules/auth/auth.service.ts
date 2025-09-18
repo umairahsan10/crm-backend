@@ -149,4 +149,17 @@ export class AuthService {
       user: payload,
     };
   }
+
+  async logout() {
+    // For JWT-based authentication, logout is typically handled client-side
+    // by removing the token from storage. This method can be used for:
+    // 1. Logging logout events
+    // 2. Future token blacklisting implementation
+    // 3. Session cleanup if needed
+    
+    return {
+      message: 'Successfully logged out',
+      success: true,
+    };
+  }
 }
