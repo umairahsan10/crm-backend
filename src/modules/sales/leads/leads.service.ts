@@ -62,6 +62,15 @@ export class LeadsService {
         if (query.outcome) where.outcome = query.outcome;
         if (query.salesUnitId) where.salesUnitId = parseInt(query.salesUnitId);
 
+        // Search support
+        if (query.search) {
+            where.OR = [
+                { name: { contains: query.search, mode: 'insensitive' } },
+                { email: { contains: query.search, mode: 'insensitive' } },
+                { phone: { contains: query.search } }
+            ];
+        }
+
         // Role-based type filtering
         if (query.type) {
             where.type = query.type;
@@ -96,14 +105,27 @@ export class LeadsService {
         const limit = parseInt(query.limit) || 20;
         const skip = (page - 1) * limit;
 
+        // Flexible sorting
+        const sortBy = query.sortBy || 'createdAt';
+        const sortOrder = query.sortOrder || 'desc';
+
         const [leads, total] = await Promise.all([
             this.prisma.lead.findMany({
                 where,
-                include: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    status: true,
+                    outcome: true,
+                    type: true,
+                    createdAt: true,
+                    updatedAt: true,
                     assignedTo: { select: { firstName: true, lastName: true } },
                     salesUnit: { select: { name: true } }
                 },
-                orderBy: { createdAt: 'desc' },
+                orderBy: { [sortBy]: sortOrder },
                 skip,
                 take: limit
             }),
@@ -129,6 +151,15 @@ export class LeadsService {
         if (query.salesUnitId) where.salesUnitId = parseInt(query.salesUnitId);
         if (query.assignedTo) where.assignedToId = parseInt(query.assignedTo);
 
+        // Search support
+        if (query.search) {
+            where.OR = [
+                { name: { contains: query.search, mode: 'insensitive' } },
+                { email: { contains: query.search, mode: 'insensitive' } },
+                { phone: { contains: query.search } }
+            ];
+        }
+
         // Role-based type filtering
         if (query.type) {
             where.type = query.type;
@@ -163,17 +194,30 @@ export class LeadsService {
         const limit = parseInt(query.limit) || 20;
         const skip = (page - 1) * limit;
 
+        // Flexible sorting
+        const sortBy = query.sortBy || 'createdAt';
+        const sortOrder = query.sortOrder || 'desc';
+
         const [leads, total] = await Promise.all([
             this.prisma.lead.findMany({
                 where,
-                include: {
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    status: true,
+                    outcome: true,
+                    type: true,
+                    createdAt: true,
+                    updatedAt: true,
                     assignedTo: { select: { firstName: true, lastName: true } },
                     startedBy: { select: { firstName: true, lastName: true } },
                     salesUnit: { select: { name: true } },
                 },
                 skip,
                 take: limit,
-                orderBy: { createdAt: 'desc' }
+                orderBy: { [sortBy]: sortOrder }
             }),
             this.prisma.lead.count({ where })
         ]);
@@ -193,21 +237,98 @@ export class LeadsService {
         const lead = await this.prisma.lead.findUnique({
             where: { id },
             include: {
-                assignedTo: { select: { firstName: true, lastName: true } },
-                startedBy: { select: { firstName: true, lastName: true } },
-                salesUnit: { select: { name: true } },
+                assignedTo: { 
+                    select: { 
+                        id: true,
+                        firstName: true, 
+                        lastName: true,
+                        email: true,
+                        phone: true
+                    } 
+                },
+                startedBy: { 
+                    select: { 
+                        id: true,
+                        firstName: true, 
+                        lastName: true,
+                        email: true,
+                        phone: true
+                    } 
+                },
+                crackedBy: { 
+                    select: { 
+                        id: true,
+                        firstName: true, 
+                        lastName: true,
+                        email: true,
+                        phone: true
+                    } 
+                },
+                closedBy: { 
+                    select: { 
+                        id: true,
+                        firstName: true, 
+                        lastName: true,
+                        email: true,
+                        phone: true
+                    } 
+                },
+                salesUnit: { 
+                    select: { 
+                        id: true,
+                        name: true
+                    } 
+                },
                 comments: {
                     include: {
-                        employee: { select: { firstName: true, lastName: true } }
+                        employee: { 
+                            select: { 
+                                id: true,
+                                firstName: true, 
+                                lastName: true,
+                                email: true
+                            } 
+                        }
                     },
                     orderBy: { createdAt: 'desc' }
                 },
                 outcomeHistory: {
                     include: {
-                        changedByUser: { select: { firstName: true, lastName: true } },
-                        comment: { select: { commentText: true } }
+                        changedByUser: { 
+                            select: { 
+                                id: true,
+                                firstName: true, 
+                                lastName: true,
+                                email: true
+                            } 
+                        },
+                        comment: { 
+                            select: { 
+                                id: true,
+                                commentText: true,
+                                createdAt: true
+                            } 
+                        }
                     },
                     orderBy: { createdAt: 'desc' }
+                },
+                crackedLeads: {
+                    include: {
+                        industry: {
+                            select: {
+                                id: true,
+                                name: true
+                            }
+                        },
+                        employee: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true,
+                                email: true
+                            }
+                        }
+                    }
                 }
             }
         });

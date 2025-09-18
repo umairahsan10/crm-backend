@@ -93,6 +93,9 @@ Retrieves leads with role-based filtering and pagination. Access restricted to S
 - `type`: Filter by lead type
 - `salesUnitId`: Filter by sales unit
 - `assignedTo`: Filter by assigned employee
+- `search`: Search by name, email, or phone (case-insensitive)
+- `sortBy`: Sort field (default: "createdAt")
+- `sortOrder`: Sort direction - "asc" or "desc" (default: "desc")
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 20)
 
@@ -101,7 +104,7 @@ Retrieves leads with role-based filtering and pagination. Access restricted to S
 - **Senior**: Sees `warm`, `cold`, and `push` leads
 - **dep_manager, team_lead, unit_head, admin**: See all types including `upsell`
 
-#### Response
+#### Response (Lightweight List Format)
 ```json
 {
   "leads": [
@@ -109,8 +112,12 @@ Retrieves leads with role-based filtering and pagination. Access restricted to S
       "id": 1,
       "name": "John Doe",
       "email": "john.doe@example.com",
-      "type": "warm",
+      "phone": "+1234567890",
       "status": "new",
+      "outcome": null,
+      "type": "warm",
+      "createdAt": "2025-01-15T10:00:00.000Z",
+      "updatedAt": "2025-01-15T10:00:00.000Z",
       "assignedTo": {
         "firstName": "Jane",
         "lastName": "Smith"
@@ -133,48 +140,178 @@ Retrieves leads with role-based filtering and pagination. Access restricted to S
 }
 ```
 
+#### Example Queries
+```bash
+# Search for leads containing "john"
+GET /leads?search=john
+
+# Sort by name ascending
+GET /leads?sortBy=name&sortOrder=asc
+
+# Search and filter with pagination
+GET /leads?search=company&status=new&sortBy=createdAt&sortOrder=desc&page=1&limit=10
+```
+
 ---
 
-### 3. Get Single Lead
+### 3. Get My Leads
+**`GET /leads/my-leads`**
+
+Retrieves leads assigned to the current user with role-based filtering and pagination.
+
+#### Query Parameters
+- `status`: Filter by lead status
+- `type`: Filter by lead type
+- `salesUnitId`: Filter by sales unit
+- `search`: Search by name, email, or phone (case-insensitive)
+- `sortBy`: Sort field (default: "createdAt")
+- `sortOrder`: Sort direction - "asc" or "desc" (default: "desc")
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 20)
+
+#### Response (Same lightweight format as GET /leads)
+```json
+{
+  "leads": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john.doe@example.com",
+      "phone": "+1234567890",
+      "status": "in_progress",
+      "outcome": "interested",
+      "type": "warm",
+      "createdAt": "2025-01-15T10:00:00.000Z",
+      "updatedAt": "2025-01-15T10:00:00.000Z",
+      "assignedTo": {
+        "firstName": "Jane",
+        "lastName": "Smith"
+      },
+      "salesUnit": {
+        "name": "Sales Unit A"
+      }
+    }
+  ],
+  "total": 25,
+  "page": 1,
+  "limit": 20,
+  "totalPages": 2
+}
+```
+
+---
+
+### 4. Get Single Lead
 **`GET /leads/:id`**
 
 Retrieves a specific lead by ID with full details including comments and history.
 
-#### Response
+#### Response (Comprehensive Detail Format)
 ```json
 {
   "id": 1,
   "name": "John Doe",
   "email": "john.doe@example.com",
+  "phone": "+1234567890",
+  "source": "PPC",
   "type": "warm",
-  "status": "new",
+  "status": "cracked",
+  "outcome": "interested",
+  "failedCount": 0,
+  "assignedToId": 2,
+  "startedById": 2,
+  "crackedById": 2,
+  "closedById": null,
+  "salesUnitId": 1,
+  "createdAt": "2025-01-15T10:00:00.000Z",
+  "updatedAt": "2025-01-15T11:30:00.000Z",
+  "closedAt": null,
+  
+  // Employee Details
   "assignedTo": {
+    "id": 2,
     "firstName": "Jane",
-    "lastName": "Smith"
+    "lastName": "Smith",
+    "email": "jane.smith@company.com",
+    "phone": "+1234567891"
   },
+  "startedBy": {
+    "id": 2,
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@company.com",
+    "phone": "+1234567891"
+  },
+  "crackedBy": {
+    "id": 2,
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@company.com",
+    "phone": "+1234567891"
+  },
+  "closedBy": null,
+  
+  // Sales Unit Details
+  "salesUnit": {
+    "id": 1,
+    "name": "Sales Unit A"
+  },
+  
+  // Comments with Employee Details
   "comments": [
     {
       "id": 1,
-      "commentText": "Initial contact made",
+      "commentText": "Initial contact made. Customer very interested in our services.",
+      "createdAt": "2025-01-15T10:00:00.000Z",
       "employee": {
+        "id": 2,
         "firstName": "Jane",
-        "lastName": "Smith"
-      },
-      "createdAt": "2025-01-15T10:00:00.000Z"
+        "lastName": "Smith",
+        "email": "jane.smith@company.com"
+      }
     }
   ],
+  
+  // Outcome History with Full Details
   "outcomeHistory": [
     {
       "id": 1,
       "outcome": "interested",
+      "createdAt": "2025-01-15T11:30:00.000Z",
       "changedByUser": {
+        "id": 2,
         "firstName": "Jane",
-        "lastName": "Smith"
+        "lastName": "Smith",
+        "email": "jane.smith@company.com"
       },
       "comment": {
-        "commentText": "Customer showed interest"
+        "id": 1,
+        "commentText": "Customer showed interest",
+        "createdAt": "2025-01-15T10:00:00.000Z"
+      }
+    }
+  ],
+  
+  // Cracked Lead Details (if applicable)
+  "crackedLeads": [
+    {
+      "id": 1,
+      "amount": 50000,
+      "commissionRate": 5.0,
+      "industryId": 1,
+      "description": "Enterprise software solution",
+      "totalPhases": 3,
+      "currentPhase": 1,
+      "industry": {
+        "id": 1,
+        "name": "Technology"
       },
-      "createdAt": "2025-01-15T10:00:00.000Z"
+      "employee": {
+        "id": 2,
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "email": "jane.smith@company.com"
+      }
     }
   ]
 }
@@ -182,7 +319,7 @@ Retrieves a specific lead by ID with full details including comments and history
 
 ---
 
-### 4. Request Leads (Get 10 Leads)
+### 5. Request Leads (Get 10 Leads)
 **`POST /leads/request`**
 
 Allows salespersons to request leads (get 10 total). Implements the "Getting Leads" workflow.
@@ -232,7 +369,7 @@ Allows salespersons to request leads (get 10 total). Implements the "Getting Lea
 
 ---
 
-### 5. Update Lead (Main API)
+### 6. Update Lead (Main API)
 **`PUT /leads/:id`**
 
 Main API for updating leads with complex business logic. Handles all lead modifications including outcome, status, and special actions.
@@ -330,7 +467,7 @@ Main API for updating leads with complex business logic. Handles all lead modifi
 
 ---
 
-### 6. Mark Upsell Lead
+### 7. Mark Upsell Lead
 **`PUT /leads/:id/upsell`**
 
 Separate API for marking leads as upsell. Lead must be in "completed" status.
@@ -362,7 +499,7 @@ Separate API for marking leads as upsell. Lead must be in "completed" status.
 
 ---
 
-### 7. Get Cracked Leads
+### 8. Get Cracked Leads
 **`GET /leads/cracked-leads`**
 
 Retrieves all cracked leads with filtering and pagination.
@@ -406,7 +543,7 @@ Retrieves all cracked leads with filtering and pagination.
 
 ---
 
-### 8. Update Cracked Lead
+### 9. Update Cracked Lead
 **`PUT /leads/cracked-leads/:id`**
 
 Updates details of a cracked lead.
@@ -436,7 +573,7 @@ Updates details of a cracked lead.
 
 ---
 
-### 9. Bulk Update Leads
+### 10. Bulk Update Leads
 **`POST /leads/bulk-update`**
 
 Updates multiple leads at once with batch processing and error handling.
@@ -477,7 +614,7 @@ Updates multiple leads at once with batch processing and error handling.
 
 ---
 
-### 10. Lead Statistics
+### 11. Lead Statistics
 **`GET /leads/statistics/overview`**
 
 Returns comprehensive lead analytics with role-based filtering.
@@ -501,6 +638,16 @@ Returns comprehensive lead analytics with role-based filtering.
   "conversionRate": "23.33"
 }
 ```
+
+---
+
+## 🚫 DELETE Endpoints
+
+**Note**: There are no DELETE endpoints for leads in this API. Leads are managed through status updates and archiving:
+
+- **Failed Leads**: Automatically archived after 4 "denied" outcomes
+- **Completed Leads**: Status changes to "completed" and type becomes "upsell"
+- **Lead Management**: Use PUT endpoints to update status, not DELETE
 
 ---
 
