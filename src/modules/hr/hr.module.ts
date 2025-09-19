@@ -10,6 +10,7 @@ import { AccountantsModule } from './Accountants/accountants.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { FinanceModule } from '../finance/finance.module';
 
+
 @Module({
   imports: [
     FinanceModule, 
@@ -21,7 +22,7 @@ import { FinanceModule } from '../finance/finance.module';
     HrManagementModule, 
     AccountsModule,
     AccountantsModule,
-    AttendanceModule
+    AttendanceModule,
   ],
 })
 export class HrModule {}
