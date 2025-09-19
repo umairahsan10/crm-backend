@@ -15,6 +15,8 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { ClientModule } from './modules/client/client.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { DepartmentsModule } from './modules/Departments/departments.module';
+import { RolesModule } from './modules/Roles/roles.module';
 
 @Global() // Make this module global so PrismaService is available everywhere
 @Module({
@@ -33,6 +35,8 @@ import { AdminModule } from './modules/admin/admin.module';
     ProjectsModule,
     SalesModule,
     ClientModule,
+    DepartmentsModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],

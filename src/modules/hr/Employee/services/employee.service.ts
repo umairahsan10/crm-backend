@@ -4,6 +4,8 @@ import { FinanceService } from '../../../finance/finance.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { GetEmployeesDto } from '../dto/get-employees.dto';
+import { EmployeeStatisticsDto } from '../dto/employee-statistics.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class EmployeeService {
@@ -61,24 +63,35 @@ export class EmployeeService {
     }
 
     try {
-      await this.prisma.employee.update({
-        where: { id: employeeId },
-        data: {
-          endDate: parsedDate,
-          status: 'terminated',
-        },
+      // Use transaction to ensure atomicity
+      await this.prisma.$transaction(async (tx) => {
+        // Update employee status first
+        await tx.employee.update({
+          where: { id: employeeId },
+          data: {
+            endDate: parsedDate,
+            status: 'terminated',
+          },
+        });
+
+        // Try to calculate salary - this might fail if no base salary is set
+        try {
+          await this.financeService.calculateSalaryManual(employeeId);
+          this.logger.log(`Salary calculated for terminated employee ${employeeId}`);
+        } catch (salaryError) {
+          this.logger.warn(`Could not calculate salary for employee ${employeeId}: ${salaryError.message}. Employee terminated but no salary processed.`);
+          // Continue with termination even if salary calculation fails
+        }
+
+        // Create HR log entry
+        const logDescription = description ||
+          `Employee ${employee.firstName} ${employee.lastName} terminated on ${terminationDate}`;
+        
+        await this.createHrLog(hrEmployeeId, 'employee_terminated', employeeId, logDescription);
       });
 
-      await this.financeService.calculateSalaryManual(employeeId);
-
-      // Create HR log entry
-      const logDescription = description ||
-        `Employee ${employee.firstName} ${employee.lastName} terminated on ${terminationDate}`;
-      
-      await this.createHrLog(hrEmployeeId, 'employee_terminated', employeeId, logDescription);
-
       this.logger.log(
-        `Employee ${employeeId} terminated on ${terminationDate} and salary processed.`,
+        `Employee ${employeeId} terminated on ${terminationDate}.`,
       );
     } catch (error) {
       this.logger.error(`Failed to terminate employee ${employeeId}: ${error.message}`);
@@ -214,7 +227,7 @@ export class EmployeeService {
           employmentType: dto.employmentType,
           dateOfConfirmation: dto.dateOfConfirmation ? new Date(dto.dateOfConfirmation) : null,
           periodType: dto.periodType,
-          passwordHash: dto.passwordHash,
+          passwordHash: await bcrypt.hash(dto.passwordHash, 10),
           bonus: dto.bonus,
         },
         include: {
@@ -465,7 +478,7 @@ export class EmployeeService {
       if (dto.employmentType !== undefined) updateData.employmentType = dto.employmentType;
       if (dto.dateOfConfirmation !== undefined) updateData.dateOfConfirmation = dto.dateOfConfirmation ? new Date(dto.dateOfConfirmation) : null;
       if (dto.periodType !== undefined) updateData.periodType = dto.periodType;
-      if (dto.passwordHash !== undefined) updateData.passwordHash = dto.passwordHash;
+      if (dto.passwordHash !== undefined) updateData.passwordHash = await bcrypt.hash(dto.passwordHash, 10);
       if (dto.bonus !== undefined) updateData.bonus = dto.bonus;
 
       const employee = await this.prisma.employee.update({
@@ -1015,6 +1028,148 @@ export class EmployeeService {
     } catch (error) {
       this.logger.error(`Failed to update shift times for employee ${id}: ${error.message}`);
       throw new BadRequestException(`Failed to update shift times: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get comprehensive employee statistics
+   */
+  async getEmployeeStatistics(): Promise<EmployeeStatisticsDto> {
+    try {
+      // Get all employees with necessary relations
+      const employees = await this.prisma.employee.findMany({
+        include: {
+          department: true,
+          role: true,
+        },
+      });
+
+      if (employees.length === 0) {
+        return {
+          total: 0,
+          active: 0,
+          inactive: 0,
+          byDepartment: {},
+          byRole: {},
+          byGender: {},
+          byEmploymentType: {},
+          byModeOfWork: {},
+          byMaritalStatus: {},
+          averageAge: 0,
+          averageBonus: 0,
+          thisMonth: {
+            new: 0,
+            active: 0,
+            inactive: 0,
+          },
+        };
+      }
+
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+
+      // Basic counts
+      const activeEmployees = employees.filter(emp => emp.status === 'active');
+      const inactiveEmployees = employees.filter(emp => emp.status !== 'active');
+
+      // New employees this month
+      const newThisMonth = employees.filter(emp => {
+        if (!emp.startDate) return false;
+        const startDate = new Date(emp.startDate);
+        return startDate >= firstDayOfMonth;
+      });
+
+      // Department breakdown
+      const byDepartment = employees.reduce((acc, emp) => {
+        const deptName = emp.department?.name || 'Unknown';
+        acc[deptName] = (acc[deptName] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Role breakdown
+      const byRole = employees.reduce((acc, emp) => {
+        const roleName = emp.role?.name || 'Unknown';
+        acc[roleName] = (acc[roleName] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Gender breakdown
+      const byGender = employees.reduce((acc, emp) => {
+        const gender = emp.gender || 'Unknown';
+        acc[gender] = (acc[gender] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Employment type breakdown
+      const byEmploymentType = employees.reduce((acc, emp) => {
+        const type = emp.employmentType || 'Unknown';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Mode of work breakdown
+      const byModeOfWork = employees.reduce((acc, emp) => {
+        const mode = emp.modeOfWork || 'Unknown';
+        acc[mode] = (acc[mode] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Average age calculation
+      const validAges = employees
+        .filter(emp => emp.dob)
+        .map(emp => {
+          const dob = new Date(emp.dob!);
+          const age = now.getFullYear() - dob.getFullYear();
+          const monthDiff = now.getMonth() - dob.getMonth();
+          return monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate()) ? age - 1 : age;
+        });
+
+      const averageAge = validAges.length > 0 
+        ? Math.round(validAges.reduce((sum, age) => sum + age, 0) / validAges.length)
+        : 0;
+
+      // Average bonus calculation
+      const validBonuses = employees
+        .filter(emp => emp.bonus && emp.bonus > 0)
+        .map(emp => emp.bonus!);
+
+      const averageBonus = validBonuses.length > 0
+        ? Math.round(validBonuses.reduce((sum, bonus) => sum + bonus, 0) / validBonuses.length)
+        : 0;
+
+      // Marital status breakdown
+      const byMaritalStatus = employees.reduce((acc, emp) => {
+        const status = emp.maritalStatus ? 'Married' : 'Single';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const statistics: EmployeeStatisticsDto = {
+        total: employees.length,
+        active: activeEmployees.length,
+        inactive: inactiveEmployees.length,
+        byDepartment,
+        byRole,
+        byGender,
+        byEmploymentType,
+        byModeOfWork,
+        byMaritalStatus,
+        averageAge,
+        averageBonus,
+        thisMonth: {
+          new: newThisMonth.length,
+          active: newThisMonth.filter(emp => emp.status === 'active').length,
+          inactive: newThisMonth.filter(emp => emp.status !== 'active').length,
+        },
+      };
+
+      this.logger.log('Employee statistics calculated successfully');
+      return statistics;
+    } catch (error) {
+      this.logger.error(`Failed to get employee statistics: ${error.message}`);
+      throw new BadRequestException(`Failed to get employee statistics: ${error.message}`);
     }
   }
 

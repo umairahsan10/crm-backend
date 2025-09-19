@@ -8,6 +8,7 @@ import { UpdateBonusDto } from '../dto/update-bonus.dto';
 import { UpdateShiftDto } from '../dto/update-shift.dto';
 import { GetEmployeesDto } from '../dto/get-employees.dto';
 import { EmployeeResponseDto, EmployeesListResponseDto } from '../dto/employee-response.dto';
+import { EmployeeStatisticsResponseDto } from '../dto/employee-statistics.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -64,6 +65,17 @@ export class EmployeeController {
   @Departments('HR')
   async getEmployees(@Query() query: GetEmployeesDto, @Request() req: AuthenticatedRequest): Promise<EmployeesListResponseDto> {
     return await this.hrService.getEmployees(query);
+  }
+
+  /**
+   * Get comprehensive employee statistics
+   */
+  @Get('employees/stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  async getEmployeeStatistics(@Request() req: AuthenticatedRequest): Promise<EmployeeStatisticsResponseDto> {
+    const statistics = await this.hrService.getEmployeeStatistics();
+    return { statistics };
   }
 
   /**
