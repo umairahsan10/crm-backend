@@ -111,8 +111,40 @@ Commissions Submodule:
 ├── GET    /sales/commissions/... # Commission endpoints
 
 Leads Submodule:
-├── GET    /sales/leads/...  # Lead management endpoints
+├── GET    /sales/leads/...  # Lead management endpoints with hierarchical access control
+├── POST   /sales/leads/...  # Lead creation and management
+├── PUT    /sales/leads/...  # Lead updates with business logic
+├── DELETE /sales/leads/...  # Lead deletion and archiving
+├── 🔐 Hierarchical Access Control: Role-based filtering (dep_manager, unit_head, team_lead, senior, junior)
+├── 🏗️ Business Logic: Lead lifecycle management, commission tracking, team statistics
+├── 📊 Advanced Features: Bulk operations, statistics, cracked leads management
 ```
+
+## 🔐 Advanced Features
+
+### Hierarchical Access Control System
+The CRM implements a sophisticated hierarchical access control system, particularly in the Lead Management module:
+
+#### **Access Control Hierarchy**
+1. **Admin** - Full system access
+2. **Department Manager** - All sales units access
+3. **Unit Head** - Single sales unit access
+4. **Team Lead** - Team-based access within unit
+5. **Senior** - Individual level access
+6. **Junior** - Restricted individual access
+
+#### **Implementation Details**
+- **Database-Driven**: Uses `sales_department` table for unit relationships
+- **Team-Based Filtering**: Team leads see their team members' leads
+- **Role-Based Type Filtering**: Different roles see different lead types
+- **Performance Optimized**: Single query with conditional joins
+- **Comprehensive Logging**: Detailed console logs for debugging
+
+#### **Security Features**
+- **JWT Authentication**: Secure token-based authentication
+- **Role-Based Guards**: Multiple guard layers for access control
+- **Data Isolation**: Users only see data appropriate to their role
+- **Audit Trail**: Complete history of lead changes and access
 
 ## Benefits of Modular Architecture
 

@@ -50,17 +50,33 @@ export class LeadsService {
         return lead;
     }
 
-    async getMyLeads(query: any, userId: number, userRole: string, userUnitId?: number) {
-        console.log('🔍 getMyLeads called for userId:', userId, 'userRole:', userRole, 'userUnitId:', userUnitId);
+    async getMyLeads(query: any, userId: number, userRole: string) {
+        console.log('🔍 ===== GET MY LEADS START =====');
+        console.log('🔍 User ID:', userId, '| Role:', userRole);
+        console.log('🔍 Query params:', query);
+
+        // Get user's sales department info for proper access control
+        const userSalesDept = await this.getUserSalesDepartment(userId);
+        console.log('🔍 User sales department info for my leads:', JSON.stringify(userSalesDept, null, 2));
 
         const where: any = {
             assignedToId: userId // Only leads assigned to the logged-in user
         };
+        console.log('🔍 Initial WHERE clause (my leads):', where);
 
-        // Apply filters
-        if (query.status) where.status = query.status;
-        if (query.outcome) where.outcome = query.outcome;
-        if (query.salesUnitId) where.salesUnitId = parseInt(query.salesUnitId);
+        // Apply basic filters
+        if (query.status) {
+            where.status = query.status;
+            console.log('🔍 Added status filter:', query.status);
+        }
+        if (query.outcome) {
+            where.outcome = query.outcome;
+            console.log('🔍 Added outcome filter:', query.outcome);
+        }
+        if (query.salesUnitId) {
+            where.salesUnitId = parseInt(query.salesUnitId);
+            console.log('🔍 Added salesUnitId filter:', query.salesUnitId);
+        }
 
         // Search support
         if (query.search) {
@@ -69,36 +85,19 @@ export class LeadsService {
                 { email: { contains: query.search, mode: 'insensitive' } },
                 { phone: { contains: query.search } }
             ];
+            console.log('🔍 Added search filter for:', query.search);
         }
 
-        // Role-based type filtering
-        if (query.type) {
-            where.type = query.type;
-            console.log('🔍 Using explicit type filter:', query.type);
-        } else {
-            // Apply role-based restrictions based on schema enum values
-            const roleAccessMap = {
-                'junior': ['warm', 'cold'],
-                'senior': ['warm', 'cold', 'push'],
-                'dep_manager': ['warm', 'cold', 'push', 'upsell'],
-                'team_lead': ['warm', 'cold', 'push', 'upsell'],
-                'unit_head': ['warm', 'cold', 'push', 'upsell'],
-                'admin': ['warm', 'cold', 'push', 'upsell']
-            };
+        // Apply role-based type filtering
+        const typeFilters = this.getRoleTypeFilters(userRole, query.type);
+        Object.assign(where, typeFilters);
+        console.log('🔍 After type filtering, WHERE clause:', JSON.stringify(where, null, 2));
 
-            if (roleAccessMap[userRole]) {
-                where.type = { in: roleAccessMap[userRole] };
-                console.log('🔍', userRole, 'role - can see:', roleAccessMap[userRole], 'leads');
-            } else {
-                // Default fallback - restrict to warm and cold for unknown roles
-                where.type = { in: ['warm', 'cold'] };
-                console.log('🔍 Unknown role:', userRole, '- restricted to warm/cold leads');
-            }
-        }
-
-        // Unit restriction for non-admin users
-        if (userUnitId && userRole !== 'admin') {
-            where.salesUnitId = userUnitId;
+        // Apply unit restriction for non-admin users
+        const { salesUnitId } = userSalesDept || {};
+        if (salesUnitId && userRole !== 'admin') {
+            where.salesUnitId = salesUnitId;
+            console.log('🔍 Added unit restriction for non-admin:', salesUnitId);
         }
 
         const page = parseInt(query.page) || 1;
@@ -109,6 +108,11 @@ export class LeadsService {
         const sortBy = query.sortBy || 'createdAt';
         const sortOrder = query.sortOrder || 'desc';
 
+        console.log('🔍 Pagination - Page:', page, 'Limit:', limit, 'Skip:', skip);
+        console.log('🔍 Sorting - By:', sortBy, 'Order:', sortOrder);
+        console.log('🔍 Final WHERE clause for my leads:', JSON.stringify(where, null, 2));
+
+        console.log('🔍 Executing database query for my leads...');
         const [leads, total] = await Promise.all([
             this.prisma.lead.findMany({
                 where,
@@ -132,24 +136,61 @@ export class LeadsService {
             this.prisma.lead.count({ where })
         ]);
 
-        return {
+        console.log('🔍 ===== MY LEADS QUERY RESULTS =====');
+        console.log('🔍 Total my leads found:', total);
+        console.log('🔍 My leads returned:', leads.length);
+        console.log('🔍 My lead details:');
+        leads.forEach((lead, index) => {
+            console.log(`🔍   My Lead ${index + 1}:`);
+            console.log(`🔍     ID: ${lead.id}`);
+            console.log(`🔍     Name: ${lead.name}`);
+            console.log(`🔍     Type: ${lead.type}`);
+            console.log(`🔍     Status: ${lead.status}`);
+            console.log(`🔍     Assigned To: ${lead.assignedTo?.firstName} ${lead.assignedTo?.lastName}`);
+            console.log(`🔍     Sales Unit: ${lead.salesUnit?.name}`);
+            console.log(`🔍     Created: ${lead.createdAt}`);
+        });
+
+        const result = {
             leads,
             total,
             page,
             limit,
             totalPages: Math.ceil(total / limit)
         };
+
+        console.log('🔍 ===== MY LEADS FINAL RESPONSE =====');
+        console.log('🔍 Response pagination:', { total, page, limit, totalPages: result.totalPages });
+        console.log('🔍 ===== GET MY LEADS END =====');
+
+        return result;
     }
 
-    async findAll(query: any, userRole: string, userUnitId?: number) {
-        console.log('🔍 findAll called with userRole:', userRole, 'userUnitId:', userUnitId);
+    async findAll(query: any, userRole: string, userId: number) {
+        console.log('🔍 ===== FIND ALL LEADS START =====');
+        console.log('🔍 User ID:', userId, '| Role:', userRole);
+        console.log('🔍 Query params:', query);
+
+        // Get user's sales department info for proper access control
+        const userSalesDept = await this.getUserSalesDepartment(userId);
+        console.log('🔍 User sales department info:', JSON.stringify(userSalesDept, null, 2));
 
         const where: any = {};
+        console.log('🔍 Initial WHERE clause:', where);
 
-        // Apply filters
-        if (query.status) where.status = query.status;
-        if (query.salesUnitId) where.salesUnitId = parseInt(query.salesUnitId);
-        if (query.assignedTo) where.assignedToId = parseInt(query.assignedTo);
+        // Apply basic filters
+        if (query.status) {
+            where.status = query.status;
+            console.log('🔍 Added status filter:', query.status);
+        }
+        if (query.salesUnitId) {
+            where.salesUnitId = parseInt(query.salesUnitId);
+            console.log('🔍 Added salesUnitId filter:', query.salesUnitId);
+        }
+        if (query.assignedTo) {
+            where.assignedToId = parseInt(query.assignedTo);
+            console.log('🔍 Added assignedTo filter:', query.assignedTo);
+        }
 
         // Search support
         if (query.search) {
@@ -158,37 +199,18 @@ export class LeadsService {
                 { email: { contains: query.search, mode: 'insensitive' } },
                 { phone: { contains: query.search } }
             ];
+            console.log('🔍 Added search filter for:', query.search);
         }
 
-        // Role-based type filtering
-        if (query.type) {
-            where.type = query.type;
-            console.log('🔍 Using explicit type filter:', query.type);
-        } else {
-            // Apply role-based restrictions based on schema enum values
-            const roleAccessMap = {
-                'junior': ['warm', 'cold'],
-                'senior': ['warm', 'cold', 'push'],
-                'dep_manager': ['warm', 'cold', 'push', 'upsell'],
-                'team_lead': ['warm', 'cold', 'push', 'upsell'],
-                'unit_head': ['warm', 'cold', 'push', 'upsell'],
-                'admin': ['warm', 'cold', 'push', 'upsell']
-            };
+        // Apply role-based type filtering
+        const typeFilters = this.getRoleTypeFilters(userRole, query.type);
+        Object.assign(where, typeFilters);
+        console.log('🔍 After type filtering, WHERE clause:', JSON.stringify(where, null, 2));
 
-            if (roleAccessMap[userRole]) {
-                where.type = { in: roleAccessMap[userRole] };
-                console.log('🔍', userRole, 'role - can see:', roleAccessMap[userRole], 'leads');
-            } else {
-                // Default fallback - restrict to warm and cold for unknown roles
-                where.type = { in: ['warm', 'cold'] };
-                console.log('🔍 Unknown role:', userRole, '- restricted to warm/cold leads');
-            }
-        }
-
-        // Unit restriction for non-admin users
-        if (userUnitId && userRole !== 'admin') {
-            where.salesUnitId = userUnitId;
-        }
+        // Apply hierarchical access control
+        const hierarchicalFilters = await this.getHierarchicalFilters(userRole, userId, userSalesDept);
+        Object.assign(where, hierarchicalFilters);
+        console.log('🔍 Final WHERE clause after hierarchical filtering:', JSON.stringify(where, null, 2));
 
         const page = parseInt(query.page) || 1;
         const limit = parseInt(query.limit) || 20;
@@ -198,6 +220,10 @@ export class LeadsService {
         const sortBy = query.sortBy || 'createdAt';
         const sortOrder = query.sortOrder || 'desc';
 
+        console.log('🔍 Pagination - Page:', page, 'Limit:', limit, 'Skip:', skip);
+        console.log('🔍 Sorting - By:', sortBy, 'Order:', sortOrder);
+
+        console.log('🔍 Executing database query...');
         const [leads, total] = await Promise.all([
             this.prisma.lead.findMany({
                 where,
@@ -222,7 +248,22 @@ export class LeadsService {
             this.prisma.lead.count({ where })
         ]);
 
-        return {
+        console.log('🔍 ===== QUERY RESULTS =====');
+        console.log('🔍 Total leads found:', total);
+        console.log('🔍 Leads returned:', leads.length);
+        console.log('🔍 Lead details:');
+        leads.forEach((lead, index) => {
+            console.log(`🔍   Lead ${index + 1}:`);
+            console.log(`🔍     ID: ${lead.id}`);
+            console.log(`🔍     Name: ${lead.name}`);
+            console.log(`🔍     Type: ${lead.type}`);
+            console.log(`🔍     Status: ${lead.status}`);
+            console.log(`🔍     Assigned To: ${lead.assignedTo?.firstName} ${lead.assignedTo?.lastName}`);
+            console.log(`🔍     Sales Unit: ${lead.salesUnit?.name}`);
+            console.log(`🔍     Created: ${lead.createdAt}`);
+        });
+
+        const result = {
             leads,
             pagination: {
                 page,
@@ -231,6 +272,12 @@ export class LeadsService {
                 totalPages: Math.ceil(total / limit)
             }
         };
+
+        console.log('🔍 ===== FINAL RESPONSE =====');
+        console.log('🔍 Response pagination:', result.pagination);
+        console.log('🔍 ===== FIND ALL LEADS END =====');
+
+        return result;
     }
 
     async findOne(id: number) {
@@ -908,5 +955,163 @@ export class LeadsService {
             },
             conversionRate: totalLeads > 0 ? ((completedLeads / totalLeads) * 100).toFixed(2) : '0.00'
         };
+    }
+
+    // Helper method to get user's sales department info
+    private async getUserSalesDepartment(userId: number) {
+        console.log('🔍 Getting sales department info for user ID:', userId);
+        
+        const userSalesDept = await this.prisma.salesDepartment.findFirst({
+            where: { employeeId: userId },
+            include: { 
+                salesUnit: { 
+                    select: { 
+                        id: true, 
+                        headId: true,
+                        teams: { 
+                            select: { 
+                                id: true, 
+                                teamLeadId: true 
+                            } 
+                        }
+                    }
+                }
+            }
+        });
+
+        if (userSalesDept) {
+            console.log('🔍 Found sales department record:');
+            console.log('🔍   Sales Unit ID:', userSalesDept.salesUnitId);
+            console.log('🔍   Sales Unit Name:', userSalesDept.salesUnit?.id);
+            console.log('🔍   Unit Head ID:', userSalesDept.salesUnit?.headId);
+            console.log('🔍   Teams in unit:', userSalesDept.salesUnit?.teams?.length || 0);
+            userSalesDept.salesUnit?.teams?.forEach((team, index) => {
+                console.log(`🔍     Team ${index + 1}: ID=${team.id}, Lead=${team.teamLeadId}`);
+            });
+        } else {
+            console.log('🔍 ❌ No sales department record found for user ID:', userId);
+        }
+
+        return userSalesDept;
+    }
+
+    // Helper method to get role-based type filters
+    private getRoleTypeFilters(userRole: string, explicitType?: string) {
+        console.log('🔍 ===== TYPE FILTERING =====');
+        console.log('🔍 User role:', userRole, '| Explicit type:', explicitType);
+        
+        if (explicitType) {
+            console.log('🔍 Using explicit type filter:', explicitType);
+            return { type: explicitType };
+        }
+
+        const roleAccessMap = {
+            'junior': ['warm', 'cold'],
+            'senior': ['warm', 'cold', 'push'],
+            'dep_manager': ['warm', 'cold', 'push', 'upsell'],
+            'team_lead': ['warm', 'cold', 'push', 'upsell'],
+            'unit_head': ['warm', 'cold', 'push', 'upsell'],
+            'admin': ['warm', 'cold', 'push', 'upsell']
+        };
+
+        if (roleAccessMap[userRole]) {
+            console.log('🔍 ✅', userRole, 'role - can see lead types:', roleAccessMap[userRole]);
+            return { type: { in: roleAccessMap[userRole] } };
+        } else {
+            // Default fallback - restrict to warm and cold for unknown roles
+            console.log('🔍 ⚠️ Unknown role:', userRole, '- restricted to warm/cold leads');
+            return { type: { in: ['warm', 'cold'] } };
+        }
+    }
+
+    // Helper method to get hierarchical access control filters
+    private async getHierarchicalFilters(userRole: string, userId: number, userSalesDept: any) {
+        console.log('🔍 ===== HIERARCHICAL FILTERING =====');
+        const { salesUnitId, salesUnit } = userSalesDept || {};
+        
+        console.log('🔍 User role:', userRole);
+        console.log('🔍 User ID:', userId);
+        console.log('🔍 Sales Unit ID:', salesUnitId);
+        console.log('🔍 Sales Unit Head ID:', salesUnit?.headId);
+        console.log('🔍 Teams in unit:', salesUnit?.teams?.length || 0);
+
+        switch(userRole) {
+            case 'dep_manager':
+                console.log('🔍 ✅ dep_manager - NO RESTRICTIONS');
+                console.log('🔍   → Can see all leads from all units');
+                return {}; // No restrictions - all units, all leads
+                
+            case 'unit_head':
+                console.log('🔍 ✅ unit_head - UNIT RESTRICTION');
+                console.log('🔍   → Can see all leads from unit ID:', salesUnitId);
+                return { salesUnitId }; // Only their unit
+                
+            case 'team_lead':
+                console.log('🔍 ✅ team_lead - TEAM RESTRICTION');
+                console.log('🔍   → Can see leads from unit ID:', salesUnitId);
+                console.log('🔍   → Can see leads assigned to team members of user ID:', userId);
+                
+                // Get all team members for this team lead
+                console.log('🔍   → Querying team members for team lead ID:', userId);
+                const teamMembers = await this.prisma.employee.findMany({
+                    where: { teamLeadId: userId },
+                    select: { id: true, firstName: true, lastName: true }
+                });
+                
+                const teamMemberIds = teamMembers.map(member => member.id);
+                console.log('🔍   → Found team members:', teamMembers.length);
+                console.log('🔍   → Team member details:', teamMembers.map(m => `${m.id}: ${m.firstName} ${m.lastName}`));
+                console.log('🔍   → Team member IDs for filtering:', teamMemberIds);
+                
+                // If team lead has no team members, they can only see their own leads
+                if (teamMemberIds.length === 0) {
+                    console.log('🔍   → No team members found - team lead can only see their own leads');
+                    return { 
+                        salesUnitId,
+                        assignedToId: userId // Only their own leads
+                    };
+                }
+                
+                // Include the team lead themselves in the list
+                const allMemberIds = [...teamMemberIds, userId];
+                console.log('🔍   → Final member IDs (including team lead):', allMemberIds);
+                
+                return { 
+                    salesUnitId,
+                    assignedToId: { in: allMemberIds } // Team members + team lead
+                };
+                
+            case 'senior':
+                console.log('🔍 ✅ senior - ASSIGNMENT RESTRICTION');
+                console.log('🔍   → Can see leads from unit ID:', salesUnitId);
+                console.log('🔍   → Can see leads assigned to user ID:', userId);
+                return { 
+                    salesUnitId,
+                    assignedToId: userId // Only assigned to them
+                };
+                
+            case 'junior':
+                console.log('🔍 ✅ junior - ASSIGNMENT RESTRICTION');
+                console.log('🔍   → Can see leads from unit ID:', salesUnitId);
+                console.log('🔍   → Can see leads assigned to user ID:', userId);
+                return { 
+                    salesUnitId,
+                    assignedToId: userId // Only assigned to them
+                };
+                
+            case 'admin':
+                console.log('🔍 ✅ admin - NO RESTRICTIONS');
+                console.log('🔍   → Can see all leads from all units');
+                return {}; // No restrictions for admin
+                
+            default:
+                console.log('🔍 ⚠️ Unknown role - DEFAULTING TO ASSIGNED LEADS');
+                console.log('🔍   → Can see leads from unit ID:', salesUnitId);
+                console.log('🔍   → Can see leads assigned to user ID:', userId);
+                return { 
+                    salesUnitId,
+                    assignedToId: userId 
+                };
+        }
     }
 }
