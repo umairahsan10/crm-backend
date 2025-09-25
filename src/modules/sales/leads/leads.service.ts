@@ -927,7 +927,26 @@ export class LeadsService {
             where.salesUnitId = userUnitId;
         }
 
-        const [totalLeads, newLeads, inProgressLeads, completedLeads, failedLeads, warmLeads, coldLeads, pushLeads, upsellLeads] = await Promise.all([
+        // Get today's date range
+        const today = new Date();
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+        const [
+            totalLeads, 
+            newLeads, 
+            inProgressLeads, 
+            completedLeads, 
+            failedLeads, 
+            warmLeads, 
+            coldLeads, 
+            pushLeads, 
+            upsellLeads,
+            // Today's activity
+            todayNew,
+            todayCompleted,
+            todayInProgress
+        ] = await Promise.all([
             this.prisma.lead.count({ where }),
             this.prisma.lead.count({ where: { ...where, status: 'new' } }),
             this.prisma.lead.count({ where: { ...where, status: 'in_progress' } }),
@@ -936,24 +955,78 @@ export class LeadsService {
             this.prisma.lead.count({ where: { ...where, type: 'warm' } }),
             this.prisma.lead.count({ where: { ...where, type: 'cold' } }),
             this.prisma.lead.count({ where: { ...where, type: 'push' } }),
-            this.prisma.lead.count({ where: { ...where, type: 'upsell' } })
+            this.prisma.lead.count({ where: { ...where, type: 'upsell' } }),
+            // Today's activity
+            this.prisma.lead.count({ 
+                where: { 
+                    ...where, 
+                    status: 'new',
+                    createdAt: {
+                        gte: startOfToday,
+                        lt: endOfToday
+                    }
+                } 
+            }),
+            this.prisma.lead.count({ 
+                where: { 
+                    ...where, 
+                    status: 'completed',
+                    updatedAt: {
+                        gte: startOfToday,
+                        lt: endOfToday
+                    }
+                } 
+            }),
+            this.prisma.lead.count({ 
+                where: { 
+                    ...where, 
+                    status: 'in_progress',
+                    updatedAt: {
+                        gte: startOfToday,
+                        lt: endOfToday
+                    }
+                } 
+            })
         ]);
 
+        // Calculate derived metrics
+        const activeLeads = newLeads + inProgressLeads;
+        const conversionRate = totalLeads > 0 ? ((completedLeads / totalLeads) * 100).toFixed(2) : '0.00';
+        const completionRate = totalLeads > 0 ? ((completedLeads / totalLeads) * 100).toFixed(2) : '0.00';
+
         return {
+            // Basic counts
             totalLeads,
+            activeLeads,
+            completedLeads,
+            failedLeads,
+            
+            // Key performance
+            conversionRate: `${conversionRate}%`,
+            completionRate: `${completionRate}%`,
+            
+            // Current status breakdown
             byStatus: {
                 new: newLeads,
                 inProgress: inProgressLeads,
                 completed: completedLeads,
                 failed: failedLeads
             },
+            
+            // Lead types
             byType: {
                 warm: warmLeads,
                 cold: coldLeads,
                 push: pushLeads,
                 upsell: upsellLeads
             },
-            conversionRate: totalLeads > 0 ? ((completedLeads / totalLeads) * 100).toFixed(2) : '0.00'
+            
+            // Today's activity
+            today: {
+                new: todayNew,
+                completed: todayCompleted,
+                inProgress: todayInProgress
+            }
         };
     }
 
@@ -1113,5 +1186,114 @@ export class LeadsService {
                     assignedToId: userId 
                 };
         }
+    }
+
+    // Get sales units for filter dropdown
+    async getSalesUnitsForFilter(userRole?: string) {
+        console.log('🔍 Getting sales units for filter dropdown, userRole:', userRole);
+        
+        const salesUnits = await this.prisma.salesUnit.findMany({
+            select: {
+                id: true,
+                name: true,
+                email: true
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        });
+
+        console.log('🔍 Found sales units:', salesUnits.length);
+        
+        return {
+            success: true,
+            data: salesUnits,
+            total: salesUnits.length
+        };
+    }
+
+    // Get employees for filter dropdown
+    async getEmployeesForFilter(salesUnitId?: number, userRole?: string) {
+        console.log('🔍 Getting employees for filter dropdown, salesUnitId:', salesUnitId, 'userRole:', userRole);
+        
+        const where: any = {
+            status: 'active'
+        };
+
+        // For marketing managers, show all employees (sales + marketing)
+        if (userRole === 'marketing_manager') {
+            where.department = {
+                name: { in: ['Sales', 'Marketing'] }
+            };
+            console.log('🔍 Marketing manager - showing Sales and Marketing employees');
+        } else {
+            // For sales employees, show only sales employees
+            where.department = {
+                name: 'Sales'
+            };
+            console.log('🔍 Sales employee - showing only Sales employees');
+        }
+
+        // If salesUnitId is provided, filter by sales unit (only for sales employees)
+        if (salesUnitId && userRole !== 'marketing_manager') {
+            where.salesDepartment = {
+                some: {
+                    salesUnitId: salesUnitId
+                }
+            };
+            console.log('🔍 Filtering by sales unit:', salesUnitId);
+        }
+
+        const employees = await this.prisma.employee.findMany({
+            where,
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                department: {
+                    select: {
+                        name: true
+                    }
+                },
+                salesDepartment: {
+                    select: {
+                        salesUnit: {
+                            select: {
+                                id: true,
+                                name: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: [
+                { firstName: 'asc' },
+                { lastName: 'asc' }
+            ]
+        });
+
+        // Format the response
+        const formattedEmployees = employees.map(emp => ({
+            id: emp.id,
+            firstName: emp.firstName,
+            lastName: emp.lastName,
+            fullName: `${emp.firstName} ${emp.lastName}`,
+            email: emp.email,
+            department: emp.department.name,
+            salesUnit: emp.salesDepartment?.[0]?.salesUnit || null
+        }));
+
+        console.log('🔍 Found employees:', formattedEmployees.length);
+        console.log('🔍 Employee breakdown:', {
+            sales: formattedEmployees.filter(e => e.department === 'Sales').length,
+            marketing: formattedEmployees.filter(e => e.department === 'Marketing').length
+        });
+        
+        return {
+            success: true,
+            data: formattedEmployees,
+            total: formattedEmployees.length
+        };
     }
 }

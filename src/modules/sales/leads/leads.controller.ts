@@ -60,6 +60,19 @@ export class LeadsController {
     return this.leadsService.getLeadStatistics(userRole, userUnitId);
   }
 
+  @Get('filter-options/sales-units')
+  getSalesUnitsForFilter(@Request() req: any) {
+    const userRole = req.user.role;
+    return this.leadsService.getSalesUnitsForFilter(userRole);
+  }
+
+  @Get('filter-options/employees')
+  getEmployeesForFilter(@Query('salesUnitId') salesUnitId?: string, @Request() req?: any) {
+    const unitId = salesUnitId ? parseInt(salesUnitId) : undefined;
+    const userRole = req?.user?.role;
+    return this.leadsService.getEmployeesForFilter(unitId, userRole);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.leadsService.findOne(id);

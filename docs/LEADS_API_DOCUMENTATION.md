@@ -124,6 +124,102 @@ This logging helps developers understand exactly what data each role can access 
 
 ---
 
+## 🔧 Filter Options APIs
+
+### Get Sales Units for Filtering
+**`GET /leads/filter-options/sales-units`**
+
+Retrieves all sales units for use in filter dropdowns. Accessible by sales employees and marketing managers.
+
+#### Access Control
+- **Authentication**: JWT token required
+- **Department**: Sales, Marketing departments
+- **Roles**: All sales roles (junior, senior, team_lead, unit_head, dep_manager) + marketing_manager
+- **Admin**: Full access
+
+#### Response Format
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "North Region",
+      "email": "north@company.com"
+    },
+    {
+      "id": 2,
+      "name": "South Region", 
+      "email": "south@company.com"
+    }
+  ],
+  "total": 2
+}
+```
+
+---
+
+### Get Employees for Filtering
+**`GET /leads/filter-options/employees`**
+
+Retrieves active employees for use in filter dropdowns. Shows sales employees for sales users, and sales + marketing employees for marketing managers.
+
+#### Query Parameters
+- `salesUnitId` (optional): Filter employees by specific sales unit (only for sales employees)
+
+#### Access Control
+- **Authentication**: JWT token required
+- **Department**: Sales, Marketing departments
+- **Roles**: All sales roles (junior, senior, team_lead, unit_head, dep_manager) + marketing_manager
+- **Admin**: Full access
+
+#### Role-Based Data Access
+- **Sales Employees**: See only Sales department employees
+- **Marketing Managers**: See both Sales and Marketing department employees
+- **Sales Unit Filtering**: Only applies to sales employees (marketing managers see all employees)
+
+#### Response Format
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe",
+      "fullName": "John Doe",
+      "email": "john.doe@company.com",
+      "department": "Sales",
+      "salesUnit": {
+        "id": 1,
+        "name": "North Region"
+      }
+    },
+    {
+      "id": 456,
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "fullName": "Jane Smith",
+      "email": "jane.smith@company.com",
+      "department": "Marketing",
+      "salesUnit": null
+    }
+  ],
+  "total": 2
+}
+```
+
+#### Example Requests
+```bash
+# Get all sales employees
+GET /leads/filter-options/employees
+
+# Get employees from specific sales unit
+GET /leads/filter-options/employees?salesUnitId=1
+```
+
+---
+
 ## 📋 API Endpoints
 
 ### 1. Create Lead
@@ -729,12 +825,17 @@ Updates multiple leads at once with batch processing and error handling.
 ### 11. Lead Statistics
 **`GET /leads/statistics/overview`**
 
-Returns comprehensive lead analytics with role-based filtering.
+Returns essential lead analytics with role-based filtering.
 
 #### Response
 ```json
 {
   "totalLeads": 150,
+  "activeLeads": 105,
+  "completedLeads": 35,
+  "failedLeads": 10,
+  "conversionRate": "23.33%",
+  "completionRate": "23.33%",
   "byStatus": {
     "new": 45,
     "inProgress": 60,
@@ -747,9 +848,24 @@ Returns comprehensive lead analytics with role-based filtering.
     "push": 15,
     "upsell": 5
   },
-  "conversionRate": "23.33"
+  "today": {
+    "new": 3,
+    "completed": 2,
+    "inProgress": 5
+  }
 }
 ```
+
+#### Response Fields
+- **totalLeads**: Total number of leads
+- **activeLeads**: Leads currently being worked on (new + in_progress)
+- **completedLeads**: Successfully completed leads
+- **failedLeads**: Leads marked as failed
+- **conversionRate**: Percentage of leads converted to completed
+- **completionRate**: Same as conversion rate for clarity
+- **byStatus**: Breakdown by lead status
+- **byType**: Breakdown by lead type (warm, cold, push, upsell)
+- **today**: Today's activity (new leads created, completed, and in progress)
 
 ---
 
