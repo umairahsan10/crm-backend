@@ -31,22 +31,21 @@ export class LeadsController {
 
   @Get()
   findAll(@Query() query: any, @Request() req: any) {
-    // Extract user role and unit from JWT payload
+    // Extract user role and ID from JWT payload
     const userRole = req.user.role;
-    const userUnitId = req.user.salesUnitId;
+    const userId = req.user.id;
     
     console.log('🔍 Controller - req.user:', req.user);
-    console.log('🔍 Controller - userRole:', userRole, 'userUnitId:', userUnitId);
+    console.log('🔍 Controller - userRole:', userRole, 'userId:', userId);
     
-    return this.leadsService.findAll(query, userRole, userUnitId);
+    return this.leadsService.findAll(query, userRole, userId);
   }
 
   @Get('my-leads')
   getMyLeads(@Query() query: any, @Request() req: any) {
     const userId = req.user.id;
     const userRole = req.user.role;
-    const userUnitId = req.user.salesUnitId;
-    return this.leadsService.getMyLeads(query, userId, userRole, userUnitId);
+    return this.leadsService.getMyLeads(query, userId, userRole);
   }
 
   @Get('cracked-leads')
@@ -59,6 +58,19 @@ export class LeadsController {
     const userRole = req.user.role;
     const userUnitId = req.user.salesUnitId;
     return this.leadsService.getLeadStatistics(userRole, userUnitId);
+  }
+
+  @Get('filter-options/sales-units')
+  getSalesUnitsForFilter(@Request() req: any) {
+    const userRole = req.user.role;
+    return this.leadsService.getSalesUnitsForFilter(userRole);
+  }
+
+  @Get('filter-options/employees')
+  getEmployeesForFilter(@Query('salesUnitId') salesUnitId?: string, @Request() req?: any) {
+    const unitId = salesUnitId ? parseInt(salesUnitId) : undefined;
+    const userRole = req?.user?.role;
+    return this.leadsService.getEmployeesForFilter(unitId, userRole);
   }
 
   @Get(':id')

@@ -14,14 +14,209 @@ Complete API documentation for the Lead Management System. This system handles t
 
 ### Role-Based Access Matrix
 
-| User Type | Create Leads | Access Leads | Lead Types Visible |
-|-----------|--------------|--------------|-------------------|
-| **Sales Team** | ✅ YES | ✅ YES | All types |
-| **HR** | ❌ NO | ✅ YES | All types |
-| **Admin** | ✅ YES | ✅ YES | All types |
-| **Marketing** | ❌ NO | ❌ NO | None |
-| **Production** | ❌ NO | ❌ NO | None |
-| **Finance** | ❌ NO | ❌ NO | None |
+| User Type | Create Leads | Access Leads | Lead Types Visible | Scope of Access |
+|-----------|--------------|--------------|-------------------|-----------------|
+| **Sales Team** | ✅ YES | ✅ YES | All types | Based on role hierarchy |
+| **HR** | ❌ NO | ✅ YES | All types | Read-only access |
+| **Admin** | ✅ YES | ✅ YES | All types | All units, all leads |
+| **Marketing** | ❌ NO | ❌ NO | None | No access |
+| **Production** | ❌ NO | ❌ NO | None | No access |
+| **Finance** | ❌ NO | ❌ NO | None | No access |
+
+### 🏗️ Hierarchical Lead Access Control
+
+The system implements a sophisticated hierarchical access control system based on sales department structure:
+
+#### **Department Manager (dep_manager)**
+- **Scope**: All leads from all sales units
+- **Lead Types**: warm, cold, push, upsell
+- **Restrictions**: None - full access
+
+#### **Unit Head (unit_head)**
+- **Scope**: All leads from their sales unit only
+- **Lead Types**: warm, cold, push, upsell
+- **Restrictions**: Cannot see leads from other units
+
+#### **Team Lead (team_lead)**
+- **Scope**: All leads from their sales unit + leads assigned to their team members
+- **Lead Types**: warm, cold, push, upsell
+- **Restrictions**: Cannot see leads from other units or other teams
+- **Special**: Includes leads assigned to themselves
+
+#### **Senior (senior)**
+- **Scope**: Only leads assigned to them from their sales unit
+- **Lead Types**: warm, cold, push
+- **Restrictions**: Cannot see leads assigned to others
+
+#### **Junior (junior)**
+- **Scope**: Only leads assigned to them from their sales unit
+- **Lead Types**: warm, cold
+- **Restrictions**: Cannot see leads assigned to others, no push/upsell access
+
+#### **Admin**
+- **Scope**: All leads from all sales units
+- **Lead Types**: warm, cold, push, upsell
+- **Restrictions**: None - full access
+
+---
+
+## 🔧 Technical Implementation Details
+
+### Database Relationships
+The hierarchical access control system uses the following database relationships:
+
+- **`employees`** table: Contains user information and `team_lead_id` field
+- **`sales_department`** table: Links employees to sales units
+- **`sales_units`** table: Contains unit information and `head_id` field
+- **`teams`** table: Contains team information and `team_lead_id` field
+
+### Access Control Logic
+1. **User Authentication**: JWT token contains user ID and role
+2. **Sales Department Lookup**: System queries `sales_department` table to get user's sales unit
+3. **Hierarchical Filtering**: Based on role, applies appropriate WHERE clauses:
+   - **Team Lead**: Queries team members via `team_lead_id` relationship
+   - **Unit Head**: Filters by `sales_unit_id`
+   - **Senior/Junior**: Filters by `assigned_to_id = user_id`
+4. **Type Filtering**: Additional filtering based on role permissions
+5. **Database Query**: Single optimized query with conditional joins
+
+### Performance Optimizations
+- **Single Query**: All filtering done in one database query
+- **Conditional Joins**: Only joins necessary tables based on role
+- **Indexed Fields**: All filter fields are properly indexed
+- **Pagination**: Built-in pagination to handle large datasets
+
+### Debugging & Monitoring
+The system includes comprehensive console logging for debugging access control issues:
+
+#### Console Log Examples
+```
+🔍 ===== FIND ALL LEADS START =====
+🔍 User ID: 5 | Role: team_lead
+ Query params: {}
+🔍 Getting sales department info for user ID: 5
+🔍 Found sales department record:
+   Sales Unit ID: 1
+🔍   Sales Unit Name: 1
+🔍   Unit Head ID: 10
+   Teams in unit: 2
+🔍     Team 1: ID=1, Lead=5
+🔍     Team 2: ID=2, Lead=6
+🔍 ===== HIERARCHICAL FILTERING =====
+🔍 ✅ team_lead - TEAM RESTRICTION
+🔍   → Can see leads from unit ID: 1
+🔍   → Can see leads assigned to team members of user ID: 5
+🔍   → Querying team members for team lead ID: 5
+🔍   → Found team members: 3
+🔍   → Team member details: ["1: John Doe", "2: Jane Smith", "3: Bob Johnson"]
+🔍   → Team member IDs for filtering: [1, 2, 3]
+🔍   → Final member IDs (including team lead): [1, 2, 3, 5]
+🔍 Final WHERE clause after hierarchical filtering: {
+  "salesUnitId": 1,
+  "assignedToId": { "in": [1, 2, 3, 5] }
+}
+🔍 ===== QUERY RESULTS =====
+🔍 Total leads found: 15
+🔍 Leads returned: 15
+```
+
+This logging helps developers understand exactly what data each role can access and troubleshoot any access control issues.
+
+---
+
+## 🔧 Filter Options APIs
+
+### Get Sales Units for Filtering
+**`GET /leads/filter-options/sales-units`**
+
+Retrieves all sales units for use in filter dropdowns. Accessible by sales employees and marketing managers.
+
+#### Access Control
+- **Authentication**: JWT token required
+- **Department**: Sales, Marketing departments
+- **Roles**: All sales roles (junior, senior, team_lead, unit_head, dep_manager) + marketing_manager
+- **Admin**: Full access
+
+#### Response Format
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "North Region",
+      "email": "north@company.com"
+    },
+    {
+      "id": 2,
+      "name": "South Region", 
+      "email": "south@company.com"
+    }
+  ],
+  "total": 2
+}
+```
+
+---
+
+### Get Employees for Filtering
+**`GET /leads/filter-options/employees`**
+
+Retrieves active employees for use in filter dropdowns. Shows sales employees for sales users, and sales + marketing employees for marketing managers.
+
+#### Query Parameters
+- `salesUnitId` (optional): Filter employees by specific sales unit (only for sales employees)
+
+#### Access Control
+- **Authentication**: JWT token required
+- **Department**: Sales, Marketing departments
+- **Roles**: All sales roles (junior, senior, team_lead, unit_head, dep_manager) + marketing_manager
+- **Admin**: Full access
+
+#### Role-Based Data Access
+- **Sales Employees**: See only Sales department employees
+- **Marketing Managers**: See both Sales and Marketing department employees
+- **Sales Unit Filtering**: Only applies to sales employees (marketing managers see all employees)
+
+#### Response Format
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe",
+      "fullName": "John Doe",
+      "email": "john.doe@company.com",
+      "department": "Sales",
+      "salesUnit": {
+        "id": 1,
+        "name": "North Region"
+      }
+    },
+    {
+      "id": 456,
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "fullName": "Jane Smith",
+      "email": "jane.smith@company.com",
+      "department": "Marketing",
+      "salesUnit": null
+    }
+  ],
+  "total": 2
+}
+```
+
+#### Example Requests
+```bash
+# Get all sales employees
+GET /leads/filter-options/employees
+
+# Get employees from specific sales unit
+GET /leads/filter-options/employees?salesUnitId=1
+```
 
 ---
 
@@ -86,12 +281,22 @@ Creates a new lead with default values. Only sales team and admin users can crea
 ### 2. Get All Leads
 **`GET /leads`**
 
-Retrieves leads with role-based filtering and pagination. Access restricted to Sales, HR, and Admin users.
+Retrieves leads with hierarchical role-based filtering and pagination. Access restricted to Sales, HR, and Admin users.
+
+#### 🔐 Hierarchical Access Control
+The system automatically applies hierarchical filtering based on the user's role and sales department structure:
+
+- **Department Manager**: Sees all leads from all units
+- **Unit Head**: Sees all leads from their unit only
+- **Team Lead**: Sees leads from their unit + their team members' leads
+- **Senior**: Sees only leads assigned to them from their unit
+- **Junior**: Sees only leads assigned to them from their unit
+- **Admin**: Sees all leads from all units
 
 #### Query Parameters
-- `status`: Filter by lead status
-- `type`: Filter by lead type
-- `salesUnitId`: Filter by sales unit
+- `status`: Filter by lead status (new, in_progress, completed, failed, cracked)
+- `type`: Filter by lead type (warm, cold, push, upsell)
+- `salesUnitId`: Filter by sales unit (automatically restricted by role)
 - `assignedTo`: Filter by assigned employee
 - `search`: Search by name, email, or phone (case-insensitive)
 - `sortBy`: Sort field (default: "createdAt")
@@ -102,7 +307,10 @@ Retrieves leads with role-based filtering and pagination. Access restricted to S
 #### Role-Based Type Filtering
 - **Junior**: Only sees `warm` and `cold` leads
 - **Senior**: Sees `warm`, `cold`, and `push` leads
-- **dep_manager, team_lead, unit_head, admin**: See all types including `upsell`
+- **Team Lead**: Sees all types including `upsell`
+- **Unit Head**: Sees all types including `upsell`
+- **Department Manager**: Sees all types including `upsell`
+- **Admin**: Sees all types including `upsell`
 
 #### Response (Lightweight List Format)
 ```json
@@ -617,12 +825,17 @@ Updates multiple leads at once with batch processing and error handling.
 ### 11. Lead Statistics
 **`GET /leads/statistics/overview`**
 
-Returns comprehensive lead analytics with role-based filtering.
+Returns essential lead analytics with role-based filtering.
 
 #### Response
 ```json
 {
   "totalLeads": 150,
+  "activeLeads": 105,
+  "completedLeads": 35,
+  "failedLeads": 10,
+  "conversionRate": "23.33%",
+  "completionRate": "23.33%",
   "byStatus": {
     "new": 45,
     "inProgress": 60,
@@ -635,9 +848,24 @@ Returns comprehensive lead analytics with role-based filtering.
     "push": 15,
     "upsell": 5
   },
-  "conversionRate": "23.33"
+  "today": {
+    "new": 3,
+    "completed": 2,
+    "inProgress": 5
+  }
 }
 ```
+
+#### Response Fields
+- **totalLeads**: Total number of leads
+- **activeLeads**: Leads currently being worked on (new + in_progress)
+- **completedLeads**: Successfully completed leads
+- **failedLeads**: Leads marked as failed
+- **conversionRate**: Percentage of leads converted to completed
+- **completionRate**: Same as conversion rate for clarity
+- **byStatus**: Breakdown by lead status
+- **byType**: Breakdown by lead type (warm, cold, push, upsell)
+- **today**: Today's activity (new leads created, completed, and in progress)
 
 ---
 

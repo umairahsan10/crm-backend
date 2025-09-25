@@ -34,12 +34,12 @@ export class LeadsAccessGuard implements CanActivate {
 
     const departmentName = employee.department.name;
 
-    // Check if user can access leads (sales, HR, admin)
-    const allowedDepartments = ['Sales', 'HR', 'Admin'];
+    // Check if user can access leads (sales, HR, admin, marketing)
+    const allowedDepartments = ['Sales', 'HR', 'Admin', 'Marketing'];
     if (allowedDepartments.includes(departmentName)) {
       return true;
     }
 
-    throw new ForbiddenException('Access denied. Only sales, HR, and admin users can access leads.');
+    throw new ForbiddenException('Access denied. Only sales, HR, admin, and marketing users can access leads.');
   }
 }
