@@ -30,51 +30,78 @@ export class AttendanceService {
 
   // Helper function to create PKT timezone-aware date for storage
   private createPKTDateForStorage(dateString: string, timeString: string): Date {
-    // Parse the time input to get the time components
-    const timeInput = new Date(timeString);
-    const timeISOString = timeInput.toISOString();
-    const timeMatch = timeISOString.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    try {
+      // Extract time components directly from the ISO string
+      const timeMatch = timeString.match(/T(\d{2}):(\d{2}):(\d{2})/);
 
-    if (!timeMatch) {
-      throw new BadRequestException('Invalid time format');
+      if (!timeMatch) {
+        throw new BadRequestException('Invalid time format - could not extract time from: ' + timeString);
+      }
+
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      const seconds = parseInt(timeMatch[3], 10);
+
+      console.log(`Storage - Parsed time components: ${hours}:${minutes}:${seconds}`);
+
+      // Create the date
+      const date = new Date(dateString);
+      
+      if (isNaN(date.getTime())) {
+        throw new BadRequestException('Invalid date format: ' + dateString);
+      }
+
+      // Set UTC time directly to ensure it stores as entered time
+      // Since PKT is UTC+5, if we want to store 9:00 as 9:00, 
+      // we set UTC time to 9:00 (which will display as 9:00)
+      const pktDate = new Date(date);
+      pktDate.setUTCHours(hours, minutes, seconds, 0);
+
+      if (isNaN(pktDate.getTime())) {
+        throw new BadRequestException('Invalid time values for storage: ' + hours + ':' + minutes + ':' + seconds);
+      }
+
+      return pktDate;
+    } catch (error) {
+      console.error('Error in createPKTDateForStorage:', error);
+      throw new BadRequestException('Failed to parse time for storage: ' + error.message);
     }
-
-    const hours = parseInt(timeMatch[1], 10);
-    const minutes = parseInt(timeMatch[2], 10);
-    const seconds = parseInt(timeMatch[3], 10);
-
-    // Create the date
-    const date = new Date(dateString);
-
-    // Set UTC time directly to ensure it stores as entered time
-    // Since PKT is UTC+5, if we want to store 9:00 as 9:00, 
-    // we set UTC time to 9:00 (which will display as 9:00)
-    const pktDate = new Date(date);
-    pktDate.setUTCHours(hours, minutes, seconds, 0);
-
-    return pktDate;
   }
 
   // Helper function to create local time for calculations
   private createLocalTimeForCalculation(dateString: string, timeString: string): Date {
-    const timeInput = new Date(timeString);
-    const timeISOString = timeInput.toISOString();
-    const timeMatch = timeISOString.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    try {
+      // Extract time components directly from the ISO string
+      const timeMatch = timeString.match(/T(\d{2}):(\d{2}):(\d{2})/);
 
-    if (!timeMatch) {
-      throw new BadRequestException('Invalid time format');
+      if (!timeMatch) {
+        throw new BadRequestException('Invalid time format - could not extract time from: ' + timeString);
+      }
+
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      const seconds = parseInt(timeMatch[3], 10);
+
+      console.log(`Parsed time components: ${hours}:${minutes}:${seconds}`);
+
+      // Since input is already Pakistani time, treat it as local time
+      const date = new Date(dateString);
+      
+      if (isNaN(date.getTime())) {
+        throw new BadRequestException('Invalid date format: ' + dateString);
+      }
+
+      date.setHours(hours, minutes, seconds, 0);
+
+      if (isNaN(date.getTime())) {
+        throw new BadRequestException('Invalid time values: ' + hours + ':' + minutes + ':' + seconds);
+      }
+
+      return date;
+    } catch (error) {
+      console.error('Error in createLocalTimeForCalculation:', error);
+      throw new BadRequestException('Failed to parse time: ' + error.message);
     }
-
-    const hours = parseInt(timeMatch[1], 10);
-    const minutes = parseInt(timeMatch[2], 10);
-    const seconds = parseInt(timeMatch[3], 10);
-
-    // For calculations, we need to treat this as PKT time
-    // So if input is 9:00, we want to compare it with shift times in PKT
-    const date = new Date(dateString);
-    date.setHours(hours, minutes, seconds, 0);
-
-    return date;
   }
 
   async getAttendanceLogs(query: GetAttendanceLogsDto): Promise<AttendanceLogResponseDto[]> {
@@ -165,6 +192,9 @@ export class AttendanceService {
 
   async checkin(checkinData: CheckinDto): Promise<CheckinResponseDto> {
     try {
+      console.log('=== CHECKIN DEBUG START ===');
+      console.log('Input data:', checkinData);
+      
       const { employee_id, date, checkin, mode } = checkinData;
 
       // Ensure employee_id is a number
@@ -200,25 +230,67 @@ export class AttendanceService {
       }
 
       // Create dates - one for storage (PKT timezone-aware) and one for calculations (local)
+      console.log('About to parse time for storage...');
       const checkinTimeForStorage = this.createPKTDateForStorage(date, checkin);
+      console.log('Storage time parsed successfully:', checkinTimeForStorage);
+      
+      console.log('About to parse time for calculation...');
       const checkinTimeForCalculation = this.createLocalTimeForCalculation(date, checkin);
+      console.log('Calculation time parsed successfully:', checkinTimeForCalculation);
+      
       const checkinDatePKT = new Date(date);
+      console.log('Date PKT created:', checkinDatePKT);
 
       // Get employee's shift times (default to 9:00 AM - 5:00 PM if not set)
       const shiftStart = employee.shiftStart || '09:00';
       const shiftEnd = employee.shiftEnd || '17:00';
-      const [shiftStartHour, shiftStartMinute] = shiftStart.split(':').map(Number);
-      const [shiftEndHour, shiftEndMinute] = shiftEnd.split(':').map(Number);
+      console.log('Employee shift times:', { shiftStart, shiftEnd });
+      
+      // Handle shift times that might be stored as just hours (e.g., '21' instead of '21:00')
+      const shiftStartParts = shiftStart.split(':');
+      const shiftEndParts = shiftEnd.split(':');
+      
+      const shiftStartHour = parseInt(shiftStartParts[0], 10);
+      const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
+      
+      const shiftEndHour = parseInt(shiftEndParts[0], 10);
+      const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
+      
+      console.log('Parsed shift times:', { shiftStartHour, shiftStartMinute, shiftEndHour, shiftEndMinute });
 
-      // Create expected shift times for this date (for calculation purposes)
+      // Create expected shift times for the PKT date (for calculation purposes)
+      console.log('Creating expected shift start...');
       const expectedShiftStart = new Date(checkinDatePKT);
       expectedShiftStart.setHours(shiftStartHour, shiftStartMinute, 0, 0);
+      console.log('Expected shift start created:', expectedShiftStart);
 
+      console.log('Creating expected shift end...');
       const expectedShiftEnd = new Date(checkinDatePKT);
       expectedShiftEnd.setHours(shiftEndHour, shiftEndMinute, 0, 0);
+      console.log('Expected shift end created:', expectedShiftEnd);
 
       // Calculate minutes late from shift start using local calculation time
-      const minutesLate = Math.floor((checkinTimeForCalculation.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+      let minutesLate = Math.floor((checkinTimeForCalculation.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+      
+      // Handle night shifts that cross midnight
+      // If shift end is before shift start (e.g., 21:00 to 05:00), it's a night shift
+      if (shiftEndHour < shiftStartHour) {
+        // If check-in time is before shift start (e.g., 00:26 vs 21:00), 
+        // it means employee is checking in late for the previous day's shift
+        if (minutesLate < 0) {
+          // Add 24 hours to get the correct late time
+          minutesLate = minutesLate + (24 * 60);
+          console.log('Night shift detected - adjusted minutes late:', minutesLate);
+        }
+      }
+      
+      // Debug logging
+      console.log(`Check-in Debug Info:`);
+      console.log(`- Input time: ${checkin} (Pakistani time)`);
+      console.log(`- Calculated time: ${checkinTimeForCalculation.toISOString()}`);
+      console.log(`- Date: ${checkinDatePKT.toISOString().split('T')[0]}`);
+      console.log(`- Shift start: ${expectedShiftStart.toISOString()}`);
+      console.log(`- Minutes late: ${minutesLate}`);
 
       // Fetch company policy values from companies table
       const company = await this.prisma.company.findFirst();
@@ -282,7 +354,7 @@ export class AttendanceService {
         },
         create: {
           employeeId,
-          date: checkinDatePKT,
+          date: checkinDatePKT, // Use the PKT date (which might be next day)
           checkin: checkinTimeForStorage, // This will store as 9:00 if entered as 9:00
           mode: mode || null,
           status
@@ -308,7 +380,7 @@ export class AttendanceService {
         await this.prisma.lateLog.create({
           data: {
             empId: employeeId,
-            date: new Date(date),
+            date: checkinDatePKT, // Use the PKT date (which might be next day)
             scheduledTimeIn: shiftStart,
             actualTimeIn: actualTimeIn,
             minutesLate: minutesLate,
@@ -333,7 +405,7 @@ export class AttendanceService {
         await this.prisma.halfDayLog.create({
           data: {
             empId: employeeId,
-            date: new Date(date),
+            date: checkinDatePKT, // Use the PKT date (which might be next day)
             scheduledTimeIn: shiftStart,
             actualTimeIn: actualTimeIn,
             minutesLate: minutesLate,
@@ -918,6 +990,136 @@ export class AttendanceService {
         throw error;
       }
       throw new InternalServerErrorException(`Failed to update monthly attendance record: ${error.message}`);
+    }
+  }
+
+  async updateAttendanceLogStatus(
+    logId: number,
+    newStatus: 'present' | 'late' | 'half_day' | 'absent',
+    reason?: string,
+    reviewerId?: number,
+    checkin?: string,
+    checkout?: string
+  ): Promise<AttendanceLogResponseDto> {
+    try {
+      // Use transaction to ensure all updates succeed or fail together
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Get the current attendance log
+        const currentLog = await tx.attendanceLog.findUnique({
+          where: { id: logId },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                shiftStart: true,
+                shiftEnd: true
+              }
+            }
+          }
+        });
+
+        if (!currentLog) {
+          throw new BadRequestException('Attendance log not found');
+        }
+
+        const oldStatus = currentLog.status;
+        const employeeId = currentLog.employeeId;
+        const logDate = currentLog.date ? new Date(currentLog.date) : new Date();
+
+        // 2. Validate status change is allowed
+        if (oldStatus === newStatus) {
+          throw new BadRequestException('Status is already set to the requested value');
+        }
+
+        // 3. Update the attendance log
+        const updateData: any = {
+          status: newStatus,
+          updatedAt: new Date()
+        };
+
+        if (checkin) {
+          updateData.checkin = checkin;
+        }
+        if (checkout) {
+          updateData.checkout = checkout;
+        }
+
+        const updatedLog = await tx.attendanceLog.update({
+          where: { id: logId },
+          data: updateData,
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        });
+
+        // 4. Update attendance counters
+        await this.updateAttendanceCountersForStatusChange(
+          tx, 
+          employeeId, 
+          oldStatus || 'absent', 
+          newStatus
+        );
+
+        // 5. Update monthly attendance summary
+        await this.updateMonthlyAttendanceSummaryForStatusChange(
+          tx, 
+          employeeId, 
+          logDate, 
+          oldStatus || 'absent', 
+          newStatus
+        );
+
+        // 6. Create specific logs if needed
+        if (newStatus === 'late') {
+          await this.createLateLogForStatusChange(
+            tx, 
+            employeeId, 
+            logDate, 
+            reason || 'Status changed to late', 
+            reviewerId
+          );
+        }
+
+        if (newStatus === 'half_day') {
+          await this.createHalfDayLogForStatusChange(
+            tx, 
+            employeeId, 
+            logDate, 
+            reason || 'Status changed to half day', 
+            reviewerId
+          );
+        }
+
+        // 7. Return updated log
+        return {
+          id: updatedLog.id,
+          employee_id: updatedLog.employeeId,
+          employee_first_name: updatedLog.employee.firstName,
+          employee_last_name: updatedLog.employee.lastName,
+          date: updatedLog.date?.toISOString().split('T')[0] || '',
+          checkin: updatedLog.checkin?.toISOString() || null,
+          checkout: updatedLog.checkout?.toISOString() || null,
+          status: updatedLog.status,
+          mode: updatedLog.mode || 'onsite',
+          late_details: null, // Will be populated separately if needed
+          created_at: updatedLog.createdAt.toISOString(),
+          updated_at: updatedLog.updatedAt.toISOString()
+        };
+      });
+    } catch (error) {
+      console.error('Error in updateAttendanceLogStatus:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(`Failed to update attendance log status: ${error.message}`);
     }
   }
 
@@ -2483,5 +2685,251 @@ export class AttendanceService {
     shiftDateTime.setHours(hours, minutes, 0, 0);
 
     return shiftDateTime;
+  }
+
+  // Helper method to update attendance counters for status changes
+  private async updateAttendanceCountersForStatusChange(
+    tx: any,
+    employeeId: number,
+    oldStatus: string,
+    newStatus: string
+  ): Promise<void> {
+    try {
+      // Find existing attendance record
+      const attendance = await tx.attendance.findFirst({
+        where: { employeeId: employeeId }
+      });
+
+      if (!attendance) {
+        console.warn(`No attendance record found for employee ${employeeId}`);
+        return;
+      }
+
+      const updateData: any = {};
+
+      // Decrease old status counter
+      switch (oldStatus) {
+        case 'present':
+          updateData.presentDays = { decrement: 1 };
+          break;
+        case 'late':
+          updateData.lateDays = { decrement: 1 };
+          updateData.monthlyLates = { decrement: 1 };
+          break;
+        case 'half_day':
+          updateData.halfDays = { decrement: 1 };
+          updateData.presentDays = { decrement: 1 }; // half_day counts as present
+          break;
+        case 'absent':
+          updateData.absentDays = { decrement: 1 };
+          break;
+      }
+
+      // Increase new status counter
+      switch (newStatus) {
+        case 'present':
+          updateData.presentDays = { increment: 1 };
+          break;
+        case 'late':
+          updateData.lateDays = { increment: 1 };
+          updateData.monthlyLates = { increment: 1 };
+          break;
+        case 'half_day':
+          updateData.halfDays = { increment: 1 };
+          updateData.presentDays = { increment: 1 }; // half_day counts as present
+          break;
+        case 'absent':
+          updateData.absentDays = { increment: 1 };
+          break;
+      }
+
+      // Update attendance record
+      await tx.attendance.update({
+        where: { id: attendance.id },
+        data: updateData
+      });
+
+      console.log(`Updated attendance counters for employee ${employeeId}: ${oldStatus} -> ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating attendance counters:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to update monthly attendance summary for status changes
+  private async updateMonthlyAttendanceSummaryForStatusChange(
+    tx: any,
+    employeeId: number,
+    logDate: Date,
+    oldStatus: string,
+    newStatus: string
+  ): Promise<void> {
+    try {
+      const month = logDate.toISOString().slice(0, 7); // YYYY-MM format
+
+      // Find existing monthly summary
+      let monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
+        where: {
+          empId: employeeId,
+          month: month
+        }
+      });
+
+      if (!monthlySummary) {
+        // Create new monthly summary if it doesn't exist
+        monthlySummary = await tx.monthlyAttendanceSummary.create({
+          data: {
+            empId: employeeId,
+            month: month,
+            totalPresent: 0,
+            totalAbsent: 0,
+            totalLeaveDays: 0,
+            totalLateDays: 0,
+            totalHalfDays: 0,
+            totalRemoteDays: 0,
+            generatedOn: new Date()
+          }
+        });
+      }
+
+      const updateData: any = {};
+
+      // Decrease old status counter
+      switch (oldStatus) {
+        case 'present':
+          updateData.totalPresent = { decrement: 1 };
+          break;
+        case 'late':
+          updateData.totalLateDays = { decrement: 1 };
+          break;
+        case 'half_day':
+          updateData.totalHalfDays = { decrement: 1 };
+          updateData.totalPresent = { decrement: 1 }; // half_day counts as present
+          break;
+        case 'absent':
+          updateData.totalAbsent = { decrement: 1 };
+          break;
+      }
+
+      // Increase new status counter
+      switch (newStatus) {
+        case 'present':
+          updateData.totalPresent = { increment: 1 };
+          break;
+        case 'late':
+          updateData.totalLateDays = { increment: 1 };
+          break;
+        case 'half_day':
+          updateData.totalHalfDays = { increment: 1 };
+          updateData.totalPresent = { increment: 1 }; // half_day counts as present
+          break;
+        case 'absent':
+          updateData.totalAbsent = { increment: 1 };
+          break;
+      }
+
+      // Update monthly summary
+      await tx.monthlyAttendanceSummary.update({
+        where: { id: monthlySummary.id },
+        data: updateData
+      });
+
+      console.log(`Updated monthly summary for employee ${employeeId} in ${month}: ${oldStatus} -> ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating monthly attendance summary:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to create late log for status change
+  private async createLateLogForStatusChange(
+    tx: any,
+    employeeId: number,
+    logDate: Date,
+    reason: string,
+    reviewerId?: number
+  ): Promise<void> {
+    try {
+      // Get employee shift times
+      const employee = await tx.employee.findUnique({
+        where: { id: employeeId },
+        select: { shiftStart: true, shiftEnd: true }
+      });
+
+      if (!employee) {
+        throw new BadRequestException('Employee not found');
+      }
+
+      // Calculate minutes late (simplified - you might want to enhance this)
+      const scheduledTime = employee.shiftStart || '09:00';
+      const actualTime = '10:00'; // Default or calculate from checkin time
+      const minutesLate = 60; // Default or calculate
+
+      await tx.lateLog.create({
+        data: {
+          empId: employeeId,
+          date: logDate,
+          scheduledTimeIn: scheduledTime,
+          actualTimeIn: actualTime,
+          minutesLate: minutesLate,
+          reason: reason,
+          actionTaken: 'Completed',
+          reviewedBy: reviewerId || null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+      console.log(`Created late log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`);
+    } catch (error) {
+      console.error('Error creating late log:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to create half-day log for status change
+  private async createHalfDayLogForStatusChange(
+    tx: any,
+    employeeId: number,
+    logDate: Date,
+    reason: string,
+    reviewerId?: number
+  ): Promise<void> {
+    try {
+      // Get employee shift times
+      const employee = await tx.employee.findUnique({
+        where: { id: employeeId },
+        select: { shiftStart: true, shiftEnd: true }
+      });
+
+      if (!employee) {
+        throw new BadRequestException('Employee not found');
+      }
+
+      // Calculate minutes late (simplified - you might want to enhance this)
+      const scheduledTime = employee.shiftStart || '09:00';
+      const actualTime = '10:30'; // Default or calculate from checkin time
+      const minutesLate = 90; // Default or calculate
+
+      await tx.halfDayLog.create({
+        data: {
+          empId: employeeId,
+          date: logDate,
+          scheduledTimeIn: scheduledTime,
+          actualTimeIn: actualTime,
+          minutesLate: minutesLate,
+          reason: reason,
+          actionTaken: 'Completed',
+          reviewedBy: reviewerId || null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+      console.log(`Created half-day log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`);
+    } catch (error) {
+      console.error('Error creating half-day log:', error);
+      throw error;
+    }
   }
 }
