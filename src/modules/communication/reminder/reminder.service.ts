@@ -4,6 +4,7 @@ import { CreateReminderDto } from './dto/create-reminder.dto';
 import { UpdateReminderDto } from './dto/update-reminder.dto';
 import { FilterRemindersDto } from './dto/filter-reminders.dto';
 import { RecurrencePattern, ReminderStatus } from '@prisma/client';
+import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
 @Injectable()
 export class ReminderService {
@@ -44,7 +45,7 @@ export class ReminderService {
           empId,
           title: createReminderDto.title,
           description: createReminderDto.description,
-          reminderDate: new Date(createReminderDto.reminderDate),
+          reminderDate: TimeStorageUtil.createTimeForStorageFromStrings(createReminderDto.reminderDate, '00:00:00'),
           reminderTime: createReminderDto.reminderTime,
           isRecurring: createReminderDto.isRecurring,
           recurrencePattern: createReminderDto.recurrencePattern,
@@ -235,7 +236,7 @@ export class ReminderService {
 
       if (updateReminderDto.title !== undefined) updateData.title = updateReminderDto.title;
       if (updateReminderDto.description !== undefined) updateData.description = updateReminderDto.description;
-      if (updateReminderDto.reminderDate !== undefined) updateData.reminderDate = new Date(updateReminderDto.reminderDate);
+      if (updateReminderDto.reminderDate !== undefined) updateData.reminderDate = TimeStorageUtil.createTimeForStorageFromStrings(updateReminderDto.reminderDate, '00:00:00');
       if (updateReminderDto.reminderTime !== undefined) updateData.reminderTime = updateReminderDto.reminderTime;
       if (updateReminderDto.isRecurring !== undefined) updateData.isRecurring = updateReminderDto.isRecurring;
       if (updateReminderDto.recurrencePattern !== undefined) updateData.recurrencePattern = updateReminderDto.recurrencePattern;

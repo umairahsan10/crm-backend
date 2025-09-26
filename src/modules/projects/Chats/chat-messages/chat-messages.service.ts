@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, InternalServerError
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
+import { TimeStorageUtil } from '../../../../common/utils/time-storage.util';
 
 @Injectable()
 export class ChatMessagesService {
@@ -485,7 +486,7 @@ export class ChatMessagesService {
         data: {
           message: updateChatMessageDto.content,
           chatId: updateChatMessageDto.chatId,
-          updatedAt: new Date(),
+          updatedAt: TimeStorageUtil.getCurrentTimeForStorage(),
         },
         include: {
           chat: {
@@ -610,7 +611,7 @@ export class ChatMessagesService {
           where: { id },
           data: {
             message: `Owner: ${ownerName} deleted the message`,
-            updatedAt: new Date(),
+            updatedAt: TimeStorageUtil.getCurrentTimeForStorage(),
           },
         });
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateComplaintDto } from './dto/create-complaint.dto';
 import { HrActionDto } from './dto/hr-action.dto';
 import { ComplaintStatus, ComplaintPriority } from '@prisma/client';
+import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
 @Injectable()
 export class ComplaintsService {
@@ -480,7 +481,7 @@ export class ComplaintsService {
 
     // Update the complaint with all provided fields
     const updateData: any = {
-      updatedAt: new Date(),
+      updatedAt: TimeStorageUtil.getCurrentTimeForStorage(),
     };
 
     // Track changes for logging

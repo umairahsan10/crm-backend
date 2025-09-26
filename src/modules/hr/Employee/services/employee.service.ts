@@ -1388,4 +1388,160 @@ export class EmployeeService {
       // Don't fail the main operation if log creation fails
     }
   }
+
+  async getHrLogsForExport(query: any) {
+    const { 
+      hr_id, 
+      action_type, 
+      affected_employee_id, 
+      start_date, 
+      end_date,
+      created_start,
+      created_end,
+      updated_start,
+      updated_end,
+    } = query;
+
+    // Build where clause (same logic as getHrLogs but without pagination)
+    const where: any = {};
+
+    if (hr_id) {
+      where.hrId = hr_id;
+    }
+
+    if (action_type) {
+      where.actionType = action_type;
+    }
+
+    if (affected_employee_id) {
+      where.affectedEmployeeId = affected_employee_id;
+    }
+
+    // Handle date filtering - prioritize specific date parameters over generic ones
+    if (created_start || created_end) {
+      where.createdAt = {};
+      if (created_start) {
+        where.createdAt.gte = new Date(created_start);
+      }
+      if (created_end) {
+        where.createdAt.lte = new Date(created_end);
+      }
+    } else if (start_date || end_date) {
+      where.createdAt = {};
+      if (start_date) {
+        where.createdAt.gte = new Date(start_date);
+      }
+      if (end_date) {
+        where.createdAt.lte = new Date(end_date);
+      }
+    }
+
+    if (updated_start || updated_end) {
+      where.updatedAt = {};
+      if (updated_start) {
+        where.updatedAt.gte = new Date(updated_start);
+      }
+      if (updated_end) {
+        where.updatedAt.lte = new Date(updated_end);
+      }
+    }
+
+    return this.prisma.hRLog.findMany({
+      where,
+      include: {
+        hr: {
+          select: {
+            id: true,
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                department: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        affectedEmployee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            department: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  convertHrLogsToCSV(data: any[]): string {
+    if (!data || data.length === 0) {
+      return 'No data available';
+    }
+
+    // Define CSV headers
+    const headers = [
+      'ID',
+      'HR Employee ID',
+      'HR Employee Name',
+      'HR Employee Email',
+      'HR Department',
+      'Action Type',
+      'Affected Employee ID',
+      'Affected Employee Name',
+      'Affected Employee Email',
+      'Affected Employee Department',
+      'Description',
+      'Created At',
+      'Updated At',
+    ];
+
+    // Convert data to CSV rows
+    const rows = data.map(log => [
+      log.id,
+      log.hr?.employee?.id || 'N/A',
+      log.hr?.employee ? `${log.hr.employee.firstName} ${log.hr.employee.lastName}` : 'N/A',
+      log.hr?.employee?.email || 'N/A',
+      log.hr?.employee?.department?.name || 'N/A',
+      log.actionType,
+      log.affectedEmployeeId,
+      log.affectedEmployee ? `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}` : 'N/A',
+      log.affectedEmployee?.email || 'N/A',
+      log.affectedEmployee?.department?.name || 'N/A',
+      log.description,
+      log.createdAt ? new Date(log.createdAt).toISOString() : 'N/A',
+      log.updatedAt ? new Date(log.updatedAt).toISOString() : 'N/A',
+    ]);
+
+    // Escape CSV values
+    const escapeCsvValue = (value: any) => {
+      if (value === null || value === undefined) return '';
+      const stringValue = String(value);
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.map(escapeCsvValue).join(','),
+      ...rows.map(row => row.map(escapeCsvValue).join(','))
+    ].join('\n');
+
+    return csvContent;
+  }
 }
