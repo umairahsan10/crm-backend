@@ -4,6 +4,7 @@ import { CreateProjectLogDto } from './dto/create-project-log.dto';
 import { UpdateProjectLogDto } from './dto/update-project-log.dto';
 import { ProjectLogQueryDto } from './dto/project-log-query.dto';
 import { AutoLogService } from './auto-log.service';
+import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
 @Injectable()
 export class ProjectLogsService {
@@ -363,7 +364,7 @@ export class ProjectLogsService {
       const updatedLog = await this.prisma.projectLog.update({
         where: { id: logId },
         data: {
-          updatedAt: new Date()
+          updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
         },
         include: {
           project: {

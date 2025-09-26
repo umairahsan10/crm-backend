@@ -93,3 +93,10 @@ export class HrLogsListResponseDto {
   limit: number;
   totalPages: number;
 }
+
+export class ExportHrLogsDto extends GetHrLogsDto {
+  @IsOptional()
+  @IsString()
+  @IsIn(['csv', 'json'])
+  format?: string;
+}

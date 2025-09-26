@@ -6,6 +6,7 @@ import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { TaskQueryDto } from './dto/task-query.dto';
 import { ProjectTaskStatus, ProjectTaskPriority } from '@prisma/client';
 import { AutoLogService } from '../Projects-Logs/auto-log.service';
+import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
 @Injectable()
 export class ProjectTasksService {
@@ -467,7 +468,7 @@ export class ProjectTasksService {
         data: {
           ...dto,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-          updatedAt: new Date()
+          updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
         },
         include: {
           project: {
@@ -556,17 +557,17 @@ export class ProjectTasksService {
       // Prepare update data
       const updateData: any = {
         status: dto.status,
-        updatedAt: new Date()
+        updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
       };
 
       // Set start date when status changes to in_progress
       if (dto.status === 'in_progress' && task.status === 'not_started') {
-        updateData.startDate = new Date();
+        updateData.startDate = TimeStorageUtil.getCurrentTimeForStorage();
       }
 
       // Set completed date when status changes to completed
       if (dto.status === 'completed') {
-        updateData.completedOn = new Date();
+        updateData.completedOn = TimeStorageUtil.getCurrentTimeForStorage();
       }
 
       // Handle comments

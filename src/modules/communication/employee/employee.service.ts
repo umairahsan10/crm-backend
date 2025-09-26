@@ -3,6 +3,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
 import { HrActionDto } from './dto/hr-action.dto';
 import { RequestPriority, RequestStatus } from '@prisma/client';
+import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
 @Injectable()
 export class EmployeeService {
@@ -498,7 +499,7 @@ export class EmployeeService {
 
     // Update the request with all provided fields
     const updateData: any = {
-      updatedAt: new Date(),
+      updatedAt: TimeStorageUtil.getCurrentTimeForStorage(),
     };
 
     // Track changes for logging

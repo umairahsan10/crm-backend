@@ -1,7 +1,8 @@
-import { Body, Controller, Post, Get, Put, Patch, Delete, Param, Query, UseGuards, Request, Req, ParseIntPipe } from '@nestjs/common';
+import { Body, Controller, Post, Get, Put, Patch, Delete, Param, Query, UseGuards, Request, Req, ParseIntPipe, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { EmployeeService } from '../services/employee.service';
 import { TerminateEmployeeDto } from '../dto/terminate-employee.dto';
-import { HrLogResponseDto, HrLogsListResponseDto, GetHrLogsDto } from '../../dto/hr-log.dto';
+import { HrLogResponseDto, HrLogsListResponseDto, GetHrLogsDto, ExportHrLogsDto } from '../../dto/hr-log.dto';
 import { HrLogsStatsResponseDto } from '../../dto/hr-logs-stats.dto';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
@@ -168,5 +169,34 @@ export class EmployeeController {
   @Permissions(PermissionName.employee_add_permission)
   async getHrLogsStats(@Request() req: AuthenticatedRequest): Promise<HrLogsStatsResponseDto> {
     return await this.hrService.getHrLogsStats();
+  }
+
+  /**
+   * Export HR logs - Manager only access
+   */
+  @Get('logs/export')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @Roles(RoleName.dep_manager)
+  @Permissions(PermissionName.employee_add_permission)
+  async exportHrLogs(
+    @Res() res: Response,
+    @Query() query: ExportHrLogsDto,
+  ) {
+    const { format = 'csv', ...filterQuery } = query;
+    const data = await this.hrService.getHrLogsForExport(filterQuery);
+    const filename = `hr-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(this.hrService.convertHrLogsToCSV(data));
+    } else if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.json(data);
+    } else {
+      res.status(400).json({ message: 'Unsupported format. Use csv or json.' });
+    }
   }
 }

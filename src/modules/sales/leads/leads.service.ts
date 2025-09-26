@@ -6,6 +6,7 @@ import { RequestLeadsDto } from './dto/request-leads.dto';
 import { MarkUpsellDto } from './dto/mark-upsell.dto';
 import { UpdateCrackedLeadDto } from './dto/update-cracked-lead.dto';
 import { ArchiveLeadSource, ArchiveLeadOutcome, ArchiveLeadQualityRating } from '@prisma/client';
+import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
 @Injectable()
 export class LeadsService {
@@ -451,7 +452,7 @@ export class LeadsService {
                         startedById: null,
                         status: 'new',
                         outcome: null,
-                        updatedAt: new Date()
+                        updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
                     }
                 });
             }
@@ -484,7 +485,7 @@ export class LeadsService {
                             assignedToId: employeeId,
                             startedById: employeeId,
                             status: 'in_progress',
-                            updatedAt: new Date()
+                            updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
                         },
                         include: {
                             assignedTo: { select: { firstName: true, lastName: true } },
@@ -605,7 +606,7 @@ export class LeadsService {
                                 unitId: lead.salesUnitId,
                                 outcome: 'denied' as ArchiveLeadOutcome,
                                 qualityRating: 'bad' as ArchiveLeadQualityRating,
-                                createdAt: new Date() // Add required createdAt field
+                                createdAt: TimeStorageUtil.getCurrentTimeForStorage() // Add required createdAt field
                             }
                         });
                         console.log('🔍 Lead moved to archived_leads successfully');
@@ -827,7 +828,7 @@ export class LeadsService {
                         assignedToId: null,
                         outcome: null
                     }),
-                    updatedAt: new Date()
+                    updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
                 },
                 include: {
                     assignedTo: { select: { firstName: true, lastName: true } },
