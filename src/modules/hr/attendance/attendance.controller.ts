@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Query, Body, UseGuards, HttpCode, HttpStatus, Param, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Put, Query, Body, UseGuards, HttpCode, HttpStatus, Param, BadRequestException, Logger, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import { GetAttendanceLogsDto } from './dto/get-attendance-logs.dto';
 import { AttendanceLogResponseDto } from './dto/attendance-log-response.dto';
@@ -25,6 +26,12 @@ import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { ProcessLeaveActionDto } from './dto/process-leave-action.dto';
 import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
 import { UpdateAttendanceLogStatusDto } from './dto/update-attendance-log-status.dto';
+import { ExportLeaveLogsDto } from './dto/export-leave-logs.dto';
+import { LeaveLogsStatsDto, LeaveLogsStatsResponseDto } from './dto/leave-logs-stats.dto';
+import { ExportLateLogsDto } from './dto/export-late-logs.dto';
+import { LateLogsStatsDto, LateLogsStatsResponseDto } from './dto/late-logs-stats.dto';
+import { ExportHalfDayLogsDto } from './dto/export-half-day-logs.dto';
+import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto } from './dto/half-day-logs-stats.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
@@ -424,5 +431,128 @@ export class AttendanceController {
   @Permissions(PermissionName.attendance_permission)
   async bulkMarkPresent(@Body() bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
     return this.attendanceService.bulkMarkAllEmployeesPresent(bulkMarkData);
+  }
+
+  /**
+   * Export Leave Logs
+   * GET /hr/attendance/leave-logs/export
+   */
+  @Get('leave-logs/export')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async exportLeaveLogs(
+    @Res() res: Response,
+    @Query() query: ExportLeaveLogsDto
+  ) {
+    const { format = 'csv', ...filterQuery } = query;
+    const data = await this.attendanceService.getLeaveLogsForExport(filterQuery);
+    const filename = `leave-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(this.attendanceService.convertLeaveLogsToCSV(data, query));
+    } else if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.json(data);
+    } else {
+      res.status(400).json({ message: 'Unsupported format. Use csv or json.' });
+    }
+  }
+
+  /**
+   * Get Leave Logs Statistics
+   * GET /hr/attendance/leave-logs/stats
+   */
+  @Get('leave-logs/stats')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getLeaveLogsStats(
+    @Query() query: LeaveLogsStatsDto
+  ): Promise<LeaveLogsStatsResponseDto> {
+    return this.attendanceService.getLeaveLogsStats(query);
+  }
+
+  /**
+   * Export Late Logs
+   * GET /hr/attendance/late-logs/export
+   */
+  @Get('late-logs/export')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async exportLateLogs(
+    @Res() res: Response,
+    @Query() query: ExportLateLogsDto
+  ) {
+    const { format = 'csv', ...filterQuery } = query;
+    const data = await this.attendanceService.getLateLogsForExport(filterQuery);
+    const filename = `late-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(this.attendanceService.convertLateLogsToCSV(data, query));
+    } else if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.json(data);
+    } else {
+      res.status(400).json({ message: 'Unsupported format. Use csv or json.' });
+    }
+  }
+
+  /**
+   * Get Late Logs Statistics
+   * GET /hr/attendance/late-logs/stats
+   */
+  @Get('late-logs/stats')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getLateLogsStats(
+    @Query() query: LateLogsStatsDto
+  ): Promise<LateLogsStatsResponseDto> {
+    return this.attendanceService.getLateLogsStats(query);
+  }
+
+  /**
+   * Export Half Day Logs
+   * GET /hr/attendance/half-day-logs/export
+   */
+  @Get('half-day-logs/export')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async exportHalfDayLogs(
+    @Res() res: Response,
+    @Query() query: ExportHalfDayLogsDto
+  ) {
+    const { format = 'csv', ...filterQuery } = query;
+    const data = await this.attendanceService.getHalfDayLogsForExport(filterQuery);
+    const filename = `half-day-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(this.attendanceService.convertHalfDayLogsToCSV(data, query));
+    } else if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.json(data);
+    } else {
+      res.status(400).json({ message: 'Unsupported format. Use csv or json.' });
+    }
+  }
+
+  /**
+   * Get Half Day Logs Statistics
+   * GET /hr/attendance/half-day-logs/stats
+   */
+  @Get('half-day-logs/stats')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getHalfDayLogsStats(
+    @Query() query: HalfDayLogsStatsDto
+  ): Promise<HalfDayLogsStatsResponseDto> {
+    return this.attendanceService.getHalfDayLogsStats(query);
   }
 }
