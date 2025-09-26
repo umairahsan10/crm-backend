@@ -23,6 +23,12 @@ import { LeaveLogsListResponseDto } from './dto/leave-logs-list-response.dto';
 import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
 import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
+import { ExportLeaveLogsDto } from './dto/export-leave-logs.dto';
+import { LeaveLogsStatsDto, LeaveLogsStatsResponseDto, PeriodStatsDto, EmployeeLeaveStatsDto, LeaveTypeStatsDto, StatsPeriod } from './dto/leave-logs-stats.dto';
+import { ExportLateLogsDto } from './dto/export-late-logs.dto';
+import { LateLogsStatsDto, LateLogsStatsResponseDto, EmployeeLateStatsDto, ReasonStatsDto, PeriodStatsDto as LatePeriodStatsDto } from './dto/late-logs-stats.dto';
+import { ExportHalfDayLogsDto } from './dto/export-half-day-logs.dto';
+import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto, EmployeeHalfDayStatsDto, ReasonStatsDto as HalfDayReasonStatsDto, PeriodStatsDto as HalfDayPeriodStatsDto } from './dto/half-day-logs-stats.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -1440,6 +1446,334 @@ export class AttendanceService {
     }
   }
 
+  // Get Late Logs for Export (similar to HR logs pattern)
+  async getLateLogsForExport(query: any) {
+    const { 
+      employee_id, 
+      start_date, 
+      end_date 
+    } = query;
+
+    // Build where clause (same logic as getLateLogs but without pagination)
+    const where: any = {};
+
+    if (employee_id) {
+      where.empId = employee_id;
+    }
+
+    if (start_date || end_date) {
+      where.date = {};
+      if (start_date) {
+        where.date.gte = new Date(start_date);
+      }
+      if (end_date) {
+        where.date.lte = new Date(end_date);
+      }
+    }
+
+    return this.prisma.lateLog.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            id: true
+          }
+        },
+        reviewer: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+  }
+
+  // Convert Late Logs to CSV (similar to HR logs pattern)
+  convertLateLogsToCSV(lateLogs: any[], query: ExportLateLogsDto): string {
+    const headers = [
+      'Late Log ID',
+      'Employee ID',
+      'Employee Name',
+      'Employee Email',
+      'Date',
+      'Scheduled Time In',
+      'Actual Time In',
+      'Minutes Late',
+      'Reason',
+      'Justified',
+      'Action Taken'
+    ];
+
+    if (query.include_late_type) {
+      headers.push('Late Type');
+    }
+
+    if (query.include_reviewer_details) {
+      headers.push('Reviewed By', 'Reviewer Name', 'Reviewer Email', 'Reviewed On');
+    }
+
+    headers.push('Created At', 'Updated At');
+
+    const csvRows = [headers.join(',')];
+
+    lateLogs.forEach(log => {
+      const row = [
+        log.id,
+        log.empId,
+        `"${log.employee.firstName} ${log.employee.lastName}"`,
+        log.employee.email,
+        log.date.toISOString().split('T')[0],
+        log.scheduledTimeIn,
+        log.actualTimeIn,
+        log.minutesLate,
+        `"${log.reason || ''}"`,
+        log.justified !== null ? log.justified : '',
+        log.actionTaken
+      ];
+
+      if (query.include_late_type) {
+        row.push(log.lateType || '');
+      }
+
+      if (query.include_reviewer_details) {
+        row.push(
+          log.reviewedBy || '',
+          log.reviewer ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"` : '',
+          log.reviewer ? log.reviewer.email : '',
+          log.reviewedOn ? log.reviewedOn.toISOString() : ''
+        );
+      }
+
+      row.push(
+        log.createdAt.toISOString(),
+        log.updatedAt.toISOString()
+      );
+
+      csvRows.push(row.join(','));
+    });
+
+    return csvRows.join('\n');
+  }
+
+  // Get Late Logs Statistics
+  async getLateLogsStats(query: LateLogsStatsDto): Promise<LateLogsStatsResponseDto> {
+    try {
+      // Build where clause
+      const where: any = {};
+      
+      if (query.employee_id) {
+        where.empId = query.employee_id;
+      }
+
+      if (query.start_date && query.end_date) {
+        where.date = {
+          gte: new Date(query.start_date),
+          lte: new Date(query.end_date)
+        };
+      } else if (query.start_date) {
+        where.date = {
+          gte: new Date(query.start_date)
+        };
+      } else if (query.end_date) {
+        where.date = {
+          lte: new Date(query.end_date)
+        };
+      }
+
+      // Get all late logs for statistics
+      const lateLogs = await this.prisma.lateLog.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      });
+
+      // Calculate basic statistics
+      const totalLateLogs = lateLogs.length;
+      const pendingLateLogs = lateLogs.filter(log => log.actionTaken === 'Pending').length;
+      const completedLateLogs = lateLogs.filter(log => log.actionTaken === 'Completed').length;
+
+      // Calculate total minutes late
+      const totalMinutesLate = lateLogs.reduce((sum, log) => sum + log.minutesLate, 0);
+      const averageMinutesLate = totalLateLogs > 0 ? totalMinutesLate / totalLateLogs : 0;
+
+      // Count paid vs unpaid
+      const paidLateCount = lateLogs.filter(log => log.lateType === 'paid').length;
+      const unpaidLateCount = lateLogs.filter(log => log.lateType === 'unpaid').length;
+
+      // Find most common reason
+      const reasonCounts = lateLogs.reduce((acc, log) => {
+        const reason = log.reason || 'No reason provided';
+        acc[reason] = (acc[reason] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const mostCommonReason = Object.keys(reasonCounts).length > 0 
+        ? Object.keys(reasonCounts).reduce((a, b) => 
+            reasonCounts[a] > reasonCounts[b] ? a : b
+          )
+        : 'N/A';
+
+      // Generate period statistics
+      const periodStats = this.generateLateLogsPeriodStats(lateLogs, query.period || StatsPeriod.MONTHLY);
+
+      const response: LateLogsStatsResponseDto = {
+        total_late_logs: totalLateLogs,
+        pending_late_logs: pendingLateLogs,
+        completed_late_logs: completedLateLogs,
+        total_minutes_late: totalMinutesLate,
+        average_minutes_late: Math.round(averageMinutesLate * 100) / 100,
+        most_common_reason: mostCommonReason,
+        paid_late_count: paidLateCount,
+        unpaid_late_count: unpaidLateCount,
+        period_stats: periodStats
+      };
+
+      // Add breakdowns if requested
+      if (query.include_breakdown) {
+        response.employee_breakdown = this.generateLateLogsEmployeeBreakdown(lateLogs);
+        response.reason_breakdown = this.generateLateLogsReasonBreakdown(lateLogs);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error in getLateLogsStats:', error);
+      throw new InternalServerErrorException(`Failed to get late logs statistics: ${error.message}`);
+    }
+  }
+
+  // Generate period statistics for late logs
+  private generateLateLogsPeriodStats(lateLogs: any[], period: StatsPeriod): LatePeriodStatsDto[] {
+    const stats: LatePeriodStatsDto[] = [];
+    const groupedLogs = this.groupLateLogsByPeriod(lateLogs, period);
+
+    Object.keys(groupedLogs).forEach(periodKey => {
+      const logs = groupedLogs[periodKey];
+      const totalLateLogs = logs.length;
+      const pendingLateLogs = logs.filter(log => log.actionTaken === 'Pending').length;
+      const completedLateLogs = logs.filter(log => log.actionTaken === 'Completed').length;
+      const totalMinutes = logs.reduce((sum, log) => sum + log.minutesLate, 0);
+
+      stats.push({
+        period: periodKey,
+        total_late_logs: totalLateLogs,
+        completed_late_logs: completedLateLogs,
+        pending_late_logs: pendingLateLogs,
+        total_minutes: totalMinutes
+      });
+    });
+
+    return stats.sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  // Group late logs by period
+  private groupLateLogsByPeriod(lateLogs: any[], period: StatsPeriod): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+
+    lateLogs.forEach(log => {
+      let periodKey: string;
+      const date = new Date(log.date);
+
+      switch (period) {
+        case StatsPeriod.DAILY:
+          periodKey = date.toISOString().split('T')[0];
+          break;
+        case StatsPeriod.WEEKLY:
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          periodKey = weekStart.toISOString().split('T')[0];
+          break;
+        case StatsPeriod.MONTHLY:
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          break;
+        case StatsPeriod.YEARLY:
+          periodKey = date.getFullYear().toString();
+          break;
+        default:
+          periodKey = date.toISOString().split('T')[0];
+      }
+
+      if (!grouped[periodKey]) {
+        grouped[periodKey] = [];
+      }
+      grouped[periodKey].push(log);
+    });
+
+    return grouped;
+  }
+
+  // Generate employee breakdown for late logs
+  private generateLateLogsEmployeeBreakdown(lateLogs: any[]): EmployeeLateStatsDto[] {
+    const employeeStats: Record<number, any> = {};
+
+    lateLogs.forEach(log => {
+      if (!employeeStats[log.empId]) {
+        employeeStats[log.empId] = {
+          employee_id: log.empId,
+          employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+          total_late_logs: 0,
+          total_minutes: 0,
+          completed_late_logs: 0,
+          pending_late_logs: 0
+        };
+      }
+
+      const stats = employeeStats[log.empId];
+      stats.total_late_logs++;
+      stats.total_minutes += log.minutesLate;
+
+      if (log.actionTaken === 'Completed') stats.completed_late_logs++;
+      else if (log.actionTaken === 'Pending') stats.pending_late_logs++;
+    });
+
+    return Object.values(employeeStats).map(stats => ({
+      ...stats,
+      average_minutes_late: stats.total_late_logs > 0 ? Math.round((stats.total_minutes / stats.total_late_logs) * 100) / 100 : 0
+    })).sort((a, b) => b.total_late_logs - a.total_late_logs);
+  }
+
+  // Generate reason breakdown for late logs
+  private generateLateLogsReasonBreakdown(lateLogs: any[]): ReasonStatsDto[] {
+    const reasonStats: Record<string, any> = {};
+
+    lateLogs.forEach(log => {
+      const reason = log.reason || 'No reason provided';
+      if (!reasonStats[reason]) {
+        reasonStats[reason] = {
+          reason: reason,
+          count: 0,
+          total_minutes: 0,
+          completed_count: 0
+        };
+      }
+
+      const stats = reasonStats[reason];
+      stats.count++;
+      stats.total_minutes += log.minutesLate;
+      if (log.actionTaken === 'Completed') stats.completed_count++;
+    });
+
+    return Object.values(reasonStats).map(stats => ({
+      reason: stats.reason,
+      count: stats.count,
+      total_minutes: stats.total_minutes,
+      completion_rate: stats.count > 0 ? Math.round((stats.completed_count / stats.count) * 100) : 0
+    })).sort((a, b) => b.count - a.count);
+  }
+
   async getHalfDayLogs(query: GetHalfDayLogsDto): Promise<HalfDayLogsListResponseDto[]> {
     try {
       const { employee_id, start_date, end_date } = query;
@@ -1595,6 +1929,334 @@ export class AttendanceService {
       }
       throw new InternalServerErrorException(`Failed to fetch half-day logs for employee: ${error.message}`);
     }
+  }
+
+  // Get Half Day Logs for Export (similar to HR logs pattern)
+  async getHalfDayLogsForExport(query: any) {
+    const { 
+      employee_id, 
+      start_date, 
+      end_date 
+    } = query;
+
+    // Build where clause (same logic as getHalfDayLogs but without pagination)
+    const where: any = {};
+
+    if (employee_id) {
+      where.empId = employee_id;
+    }
+
+    if (start_date || end_date) {
+      where.date = {};
+      if (start_date) {
+        where.date.gte = new Date(start_date);
+      }
+      if (end_date) {
+        where.date.lte = new Date(end_date);
+      }
+    }
+
+    return this.prisma.halfDayLog.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            id: true
+          }
+        },
+        reviewer: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+  }
+
+  // Convert Half Day Logs to CSV (similar to HR logs pattern)
+  convertHalfDayLogsToCSV(halfDayLogs: any[], query: ExportHalfDayLogsDto): string {
+    const headers = [
+      'Half Day Log ID',
+      'Employee ID',
+      'Employee Name',
+      'Employee Email',
+      'Date',
+      'Scheduled Time In',
+      'Actual Time In',
+      'Minutes Late',
+      'Reason',
+      'Justified',
+      'Action Taken'
+    ];
+
+    if (query.include_half_day_type) {
+      headers.push('Half Day Type');
+    }
+
+    if (query.include_reviewer_details) {
+      headers.push('Reviewed By', 'Reviewer Name', 'Reviewer Email', 'Reviewed On');
+    }
+
+    headers.push('Created At', 'Updated At');
+
+    const csvRows = [headers.join(',')];
+
+    halfDayLogs.forEach(log => {
+      const row = [
+        log.id,
+        log.empId,
+        `"${log.employee.firstName} ${log.employee.lastName}"`,
+        log.employee.email,
+        log.date.toISOString().split('T')[0],
+        log.scheduledTimeIn,
+        log.actualTimeIn,
+        log.minutesLate,
+        `"${log.reason || ''}"`,
+        log.justified !== null ? log.justified : '',
+        log.actionTaken
+      ];
+
+      if (query.include_half_day_type) {
+        row.push(log.halfDayType || '');
+      }
+
+      if (query.include_reviewer_details) {
+        row.push(
+          log.reviewedBy || '',
+          log.reviewer ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"` : '',
+          log.reviewer ? log.reviewer.email : '',
+          log.reviewedOn ? log.reviewedOn.toISOString() : ''
+        );
+      }
+
+      row.push(
+        log.createdAt.toISOString(),
+        log.updatedAt.toISOString()
+      );
+
+      csvRows.push(row.join(','));
+    });
+
+    return csvRows.join('\n');
+  }
+
+  // Get Half Day Logs Statistics
+  async getHalfDayLogsStats(query: HalfDayLogsStatsDto): Promise<HalfDayLogsStatsResponseDto> {
+    try {
+      // Build where clause
+      const where: any = {};
+      
+      if (query.employee_id) {
+        where.empId = query.employee_id;
+      }
+
+      if (query.start_date && query.end_date) {
+        where.date = {
+          gte: new Date(query.start_date),
+          lte: new Date(query.end_date)
+        };
+      } else if (query.start_date) {
+        where.date = {
+          gte: new Date(query.start_date)
+        };
+      } else if (query.end_date) {
+        where.date = {
+          lte: new Date(query.end_date)
+        };
+      }
+
+      // Get all half day logs for statistics
+      const halfDayLogs = await this.prisma.halfDayLog.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      });
+
+      // Calculate basic statistics
+      const totalHalfDayLogs = halfDayLogs.length;
+      const pendingHalfDayLogs = halfDayLogs.filter(log => log.actionTaken === 'Pending').length;
+      const completedHalfDayLogs = halfDayLogs.filter(log => log.actionTaken === 'Completed').length;
+
+      // Calculate total minutes late
+      const totalMinutesLate = halfDayLogs.reduce((sum, log) => sum + log.minutesLate, 0);
+      const averageMinutesLate = totalHalfDayLogs > 0 ? totalMinutesLate / totalHalfDayLogs : 0;
+
+      // Count paid vs unpaid
+      const paidHalfDayCount = halfDayLogs.filter(log => log.halfDayType === 'paid').length;
+      const unpaidHalfDayCount = halfDayLogs.filter(log => log.halfDayType === 'unpaid').length;
+
+      // Find most common reason
+      const reasonCounts = halfDayLogs.reduce((acc, log) => {
+        const reason = log.reason || 'No reason provided';
+        acc[reason] = (acc[reason] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const mostCommonReason = Object.keys(reasonCounts).length > 0 
+        ? Object.keys(reasonCounts).reduce((a, b) => 
+            reasonCounts[a] > reasonCounts[b] ? a : b
+          )
+        : 'N/A';
+
+      // Generate period statistics
+      const periodStats = this.generateHalfDayLogsPeriodStats(halfDayLogs, query.period || StatsPeriod.MONTHLY);
+
+      const response: HalfDayLogsStatsResponseDto = {
+        total_half_day_logs: totalHalfDayLogs,
+        pending_half_day_logs: pendingHalfDayLogs,
+        completed_half_day_logs: completedHalfDayLogs,
+        total_minutes_late: totalMinutesLate,
+        average_minutes_late: Math.round(averageMinutesLate * 100) / 100,
+        most_common_reason: mostCommonReason,
+        paid_half_day_count: paidHalfDayCount,
+        unpaid_half_day_count: unpaidHalfDayCount,
+        period_stats: periodStats
+      };
+
+      // Add breakdowns if requested
+      if (query.include_breakdown) {
+        response.employee_breakdown = this.generateHalfDayLogsEmployeeBreakdown(halfDayLogs);
+        response.reason_breakdown = this.generateHalfDayLogsReasonBreakdown(halfDayLogs);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error in getHalfDayLogsStats:', error);
+      throw new InternalServerErrorException(`Failed to get half day logs statistics: ${error.message}`);
+    }
+  }
+
+  // Generate period statistics for half day logs
+  private generateHalfDayLogsPeriodStats(halfDayLogs: any[], period: StatsPeriod): HalfDayPeriodStatsDto[] {
+    const stats: HalfDayPeriodStatsDto[] = [];
+    const groupedLogs = this.groupHalfDayLogsByPeriod(halfDayLogs, period);
+
+    Object.keys(groupedLogs).forEach(periodKey => {
+      const logs = groupedLogs[periodKey];
+      const totalHalfDayLogs = logs.length;
+      const pendingHalfDayLogs = logs.filter(log => log.actionTaken === 'Pending').length;
+      const completedHalfDayLogs = logs.filter(log => log.actionTaken === 'Completed').length;
+      const totalMinutes = logs.reduce((sum, log) => sum + log.minutesLate, 0);
+
+      stats.push({
+        period: periodKey,
+        total_half_day_logs: totalHalfDayLogs,
+        completed_half_day_logs: completedHalfDayLogs,
+        pending_half_day_logs: pendingHalfDayLogs,
+        total_minutes: totalMinutes
+      });
+    });
+
+    return stats.sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  // Group half day logs by period
+  private groupHalfDayLogsByPeriod(halfDayLogs: any[], period: StatsPeriod): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+
+    halfDayLogs.forEach(log => {
+      let periodKey: string;
+      const date = new Date(log.date);
+
+      switch (period) {
+        case StatsPeriod.DAILY:
+          periodKey = date.toISOString().split('T')[0];
+          break;
+        case StatsPeriod.WEEKLY:
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          periodKey = weekStart.toISOString().split('T')[0];
+          break;
+        case StatsPeriod.MONTHLY:
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          break;
+        case StatsPeriod.YEARLY:
+          periodKey = date.getFullYear().toString();
+          break;
+        default:
+          periodKey = date.toISOString().split('T')[0];
+      }
+
+      if (!grouped[periodKey]) {
+        grouped[periodKey] = [];
+      }
+      grouped[periodKey].push(log);
+    });
+
+    return grouped;
+  }
+
+  // Generate employee breakdown for half day logs
+  private generateHalfDayLogsEmployeeBreakdown(halfDayLogs: any[]): EmployeeHalfDayStatsDto[] {
+    const employeeStats: Record<number, any> = {};
+
+    halfDayLogs.forEach(log => {
+      if (!employeeStats[log.empId]) {
+        employeeStats[log.empId] = {
+          employee_id: log.empId,
+          employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+          total_half_day_logs: 0,
+          total_minutes: 0,
+          completed_half_day_logs: 0,
+          pending_half_day_logs: 0
+        };
+      }
+
+      const stats = employeeStats[log.empId];
+      stats.total_half_day_logs++;
+      stats.total_minutes += log.minutesLate;
+
+      if (log.actionTaken === 'Completed') stats.completed_half_day_logs++;
+      else if (log.actionTaken === 'Pending') stats.pending_half_day_logs++;
+    });
+
+    return Object.values(employeeStats).map(stats => ({
+      ...stats,
+      average_minutes_late: stats.total_half_day_logs > 0 ? Math.round((stats.total_minutes / stats.total_half_day_logs) * 100) / 100 : 0
+    })).sort((a, b) => b.total_half_day_logs - a.total_half_day_logs);
+  }
+
+  // Generate reason breakdown for half day logs
+  private generateHalfDayLogsReasonBreakdown(halfDayLogs: any[]): HalfDayReasonStatsDto[] {
+    const reasonStats: Record<string, any> = {};
+
+    halfDayLogs.forEach(log => {
+      const reason = log.reason || 'No reason provided';
+      if (!reasonStats[reason]) {
+        reasonStats[reason] = {
+          reason: reason,
+          count: 0,
+          total_minutes: 0,
+          completed_count: 0
+        };
+      }
+
+      const stats = reasonStats[reason];
+      stats.count++;
+      stats.total_minutes += log.minutesLate;
+      if (log.actionTaken === 'Completed') stats.completed_count++;
+    });
+
+    return Object.values(reasonStats).map(stats => ({
+      reason: stats.reason,
+      count: stats.count,
+      total_minutes: stats.total_minutes,
+      completion_rate: stats.count > 0 ? Math.round((stats.completed_count / stats.count) * 100) : 0
+    })).sort((a, b) => b.count - a.count);
   }
 
   async submitHalfDayReason(halfDayData: SubmitHalfDayReasonDto): Promise<HalfDayLogResponseDto> {
@@ -1916,6 +2578,128 @@ export class AttendanceService {
       }
       throw new InternalServerErrorException(`Failed to get leave logs by employee: ${error.message}`);
     }
+  }
+
+  // Get Leave Logs for Export (similar to HR logs pattern)
+  async getLeaveLogsForExport(query: any) {
+    const { 
+      employee_id, 
+      start_date, 
+      end_date 
+    } = query;
+
+    // Build where clause (same logic as getLeaveLogs but without pagination)
+    const where: any = {};
+
+    if (employee_id) {
+      where.empId = employee_id;
+    }
+
+    if (start_date && end_date) {
+      where.appliedOn = {
+        gte: new Date(start_date),
+        lte: new Date(end_date)
+      };
+    } else if (start_date) {
+      where.appliedOn = {
+        gte: new Date(start_date)
+      };
+    } else if (end_date) {
+      where.appliedOn = {
+        lte: new Date(end_date)
+      };
+    }
+
+    return this.prisma.leaveLog.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            id: true
+          }
+        },
+        reviewer: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        appliedOn: 'desc'
+      }
+    });
+  }
+
+  // Convert Leave Logs to CSV (similar to HR logs pattern)
+  convertLeaveLogsToCSV(leaveLogs: any[], query: ExportLeaveLogsDto): string {
+    const headers = [
+      'Leave ID',
+      'Employee ID',
+      'Employee Name',
+      'Employee Email',
+      'Leave Type',
+      'Start Date',
+      'End Date',
+      'Reason',
+      'Status',
+      'Applied On',
+      'Total Days'
+    ];
+
+    if (query.include_reviewer_details) {
+      headers.push('Reviewed By', 'Reviewer Name', 'Reviewer Email', 'Reviewed On');
+    }
+
+    if (query.include_confirmation_reason) {
+      headers.push('Confirmation Reason');
+    }
+
+    headers.push('Created At', 'Updated At');
+
+    const csvRows = [headers.join(',')];
+
+    leaveLogs.forEach(log => {
+      const row = [
+        log.id,
+        log.empId,
+        `"${log.employee.firstName} ${log.employee.lastName}"`,
+        log.employee.email,
+        log.leaveType,
+        log.startDate.toISOString().split('T')[0],
+        log.endDate.toISOString().split('T')[0],
+        `"${log.reason || ''}"`,
+        log.status || 'Pending',
+        log.appliedOn.toISOString(),
+        this.calculateLeaveDays(log.startDate, log.endDate)
+      ];
+
+      if (query.include_reviewer_details) {
+        row.push(
+          log.reviewedBy || '',
+          log.reviewer ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"` : '',
+          log.reviewer ? log.reviewer.email : '',
+          log.reviewedOn ? log.reviewedOn.toISOString() : ''
+        );
+      }
+
+      if (query.include_confirmation_reason) {
+        row.push(`"${log.confirmationReason || ''}"`);
+      }
+
+      row.push(
+        log.createdAt.toISOString(),
+        log.updatedAt.toISOString()
+      );
+
+      csvRows.push(row.join(','));
+    });
+
+    return csvRows.join('\n');
   }
 
   async createLeaveLog(leaveData: CreateLeaveLogDto): Promise<LeaveLogResponseDto> {
@@ -2931,5 +3715,218 @@ export class AttendanceService {
       console.error('Error creating half-day log:', error);
       throw error;
     }
+  }
+
+
+
+  // Get Leave Logs Statistics
+  async getLeaveLogsStats(query: LeaveLogsStatsDto): Promise<LeaveLogsStatsResponseDto> {
+    try {
+      // Build where clause
+      const where: any = {};
+      
+      if (query.employee_id) {
+        where.empId = query.employee_id;
+      }
+
+      if (query.start_date && query.end_date) {
+        where.appliedOn = {
+          gte: new Date(query.start_date),
+          lte: new Date(query.end_date)
+        };
+      } else if (query.start_date) {
+        where.appliedOn = {
+          gte: new Date(query.start_date)
+        };
+      } else if (query.end_date) {
+        where.appliedOn = {
+          lte: new Date(query.end_date)
+        };
+      }
+
+      // Get all leave logs for statistics
+      const leaveLogs = await this.prisma.leaveLog.findMany({
+        where,
+        include: {
+          employee: {
+            select: {
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      });
+
+      // Calculate basic statistics
+      const totalLeaves = leaveLogs.length;
+      const pendingLeaves = leaveLogs.filter(log => log.status === 'Pending').length;
+      const approvedLeaves = leaveLogs.filter(log => log.status === 'Approved').length;
+      const rejectedLeaves = leaveLogs.filter(log => log.status === 'Rejected').length;
+
+      // Calculate total leave days
+      const totalLeaveDays = leaveLogs.reduce((sum, log) => {
+        return sum + this.calculateLeaveDays(log.startDate, log.endDate);
+      }, 0);
+
+      const averageLeaveDuration = totalLeaves > 0 ? totalLeaveDays / totalLeaves : 0;
+
+      // Find most common leave type
+      const leaveTypeCounts = leaveLogs.reduce((acc, log) => {
+        const leaveType = log.leaveType || 'Unknown';
+        acc[leaveType] = (acc[leaveType] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const mostCommonLeaveType = Object.keys(leaveTypeCounts).length > 0 
+        ? Object.keys(leaveTypeCounts).reduce((a, b) => 
+            leaveTypeCounts[a] > leaveTypeCounts[b] ? a : b
+          )
+        : 'N/A';
+
+      // Generate period statistics
+      const periodStats = this.generatePeriodStats(leaveLogs, query.period || StatsPeriod.MONTHLY);
+
+      const response: LeaveLogsStatsResponseDto = {
+        total_leaves: totalLeaves,
+        pending_leaves: pendingLeaves,
+        approved_leaves: approvedLeaves,
+        rejected_leaves: rejectedLeaves,
+        total_leave_days: totalLeaveDays,
+        average_leave_duration: Math.round(averageLeaveDuration * 100) / 100,
+        most_common_leave_type: mostCommonLeaveType,
+        period_stats: periodStats
+      };
+
+      // Add breakdowns if requested
+      if (query.include_breakdown) {
+        response.employee_breakdown = this.generateEmployeeBreakdown(leaveLogs);
+        response.leave_type_breakdown = this.generateLeaveTypeBreakdown(leaveLogs);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error in getLeaveLogsStats:', error);
+      throw new InternalServerErrorException(`Failed to get leave logs statistics: ${error.message}`);
+    }
+  }
+
+  // Generate period statistics
+  private generatePeriodStats(leaveLogs: any[], period: StatsPeriod): PeriodStatsDto[] {
+    const stats: PeriodStatsDto[] = [];
+    const groupedLogs = this.groupLogsByPeriod(leaveLogs, period);
+
+    Object.keys(groupedLogs).forEach(periodKey => {
+      const logs = groupedLogs[periodKey];
+      const totalLeaves = logs.length;
+      const pendingLeaves = logs.filter(log => log.status === 'Pending').length;
+      const approvedLeaves = logs.filter(log => log.status === 'Approved').length;
+      const rejectedLeaves = logs.filter(log => log.status === 'Rejected').length;
+      const totalDays = logs.reduce((sum, log) => sum + this.calculateLeaveDays(log.startDate, log.endDate), 0);
+
+      stats.push({
+        period: periodKey,
+        total_leaves: totalLeaves,
+        approved_leaves: approvedLeaves,
+        rejected_leaves: rejectedLeaves,
+        pending_leaves: pendingLeaves,
+        total_days: totalDays
+      });
+    });
+
+    return stats.sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  // Group logs by period
+  private groupLogsByPeriod(leaveLogs: any[], period: StatsPeriod): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+
+    leaveLogs.forEach(log => {
+      let periodKey: string;
+      const date = new Date(log.appliedOn);
+
+      switch (period) {
+        case StatsPeriod.DAILY:
+          periodKey = date.toISOString().split('T')[0];
+          break;
+        case StatsPeriod.WEEKLY:
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          periodKey = weekStart.toISOString().split('T')[0];
+          break;
+        case StatsPeriod.MONTHLY:
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          break;
+        case StatsPeriod.YEARLY:
+          periodKey = date.getFullYear().toString();
+          break;
+        default:
+          periodKey = date.toISOString().split('T')[0];
+      }
+
+      if (!grouped[periodKey]) {
+        grouped[periodKey] = [];
+      }
+      grouped[periodKey].push(log);
+    });
+
+    return grouped;
+  }
+
+  // Generate employee breakdown
+  private generateEmployeeBreakdown(leaveLogs: any[]): EmployeeLeaveStatsDto[] {
+    const employeeStats: Record<number, any> = {};
+
+    leaveLogs.forEach(log => {
+      if (!employeeStats[log.empId]) {
+        employeeStats[log.empId] = {
+          employee_id: log.empId,
+          employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
+          total_leaves: 0,
+          total_days: 0,
+          approved_leaves: 0,
+          rejected_leaves: 0,
+          pending_leaves: 0
+        };
+      }
+
+      const stats = employeeStats[log.empId];
+      stats.total_leaves++;
+      stats.total_days += this.calculateLeaveDays(log.startDate, log.endDate);
+
+      if (log.status === 'Approved') stats.approved_leaves++;
+      else if (log.status === 'Rejected') stats.rejected_leaves++;
+      else stats.pending_leaves++;
+    });
+
+    return Object.values(employeeStats).sort((a, b) => b.total_leaves - a.total_leaves);
+  }
+
+  // Generate leave type breakdown
+  private generateLeaveTypeBreakdown(leaveLogs: any[]): LeaveTypeStatsDto[] {
+    const typeStats: Record<string, any> = {};
+
+    leaveLogs.forEach(log => {
+      const leaveType = log.leaveType || 'Unknown';
+      if (!typeStats[leaveType]) {
+        typeStats[leaveType] = {
+          leave_type: leaveType,
+          count: 0,
+          total_days: 0,
+          approved_count: 0
+        };
+      }
+
+      const stats = typeStats[leaveType];
+      stats.count++;
+      stats.total_days += this.calculateLeaveDays(log.startDate, log.endDate);
+      if (log.status === 'Approved') stats.approved_count++;
+    });
+
+    return Object.values(typeStats).map(stats => ({
+      leave_type: stats.leave_type,
+      count: stats.count,
+      total_days: stats.total_days,
+      approval_rate: stats.count > 0 ? Math.round((stats.approved_count / stats.count) * 100) : 0
+    })).sort((a, b) => b.count - a.count);
   }
 }
