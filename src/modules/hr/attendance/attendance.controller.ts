@@ -24,6 +24,7 @@ import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
 import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { ProcessLeaveActionDto } from './dto/process-leave-action.dto';
 import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
+import { UpdateAttendanceLogStatusDto } from './dto/update-attendance-log-status.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
@@ -43,7 +44,7 @@ export class AttendanceController {
     private readonly quarterlyLeavesUpdateTrigger: QuarterlyLeavesUpdateTrigger,
     private readonly weekendAutoPresentTrigger: WeekendAutoPresentTrigger,
     private readonly futureHolidayTrigger: FutureHolidayTrigger
-  ) {}
+  ) { }
 
   @Get('logs')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -261,18 +262,40 @@ export class AttendanceController {
     if (isNaN(employeeId)) {
       throw new BadRequestException('Invalid employee ID');
     }
-         return this.attendanceService.getMonthlyAttendanceByEmployee(employeeId, month);
-   }
+    return this.attendanceService.getMonthlyAttendanceByEmployee(employeeId, month);
+  }
 
-   @Put('update')
-   @HttpCode(HttpStatus.OK)
-   @UseGuards(JwtAuthGuard, PermissionsGuard)
-   @Permissions(PermissionName.attendance_permission)
-   async updateAttendance(@Body() updateData: UpdateAttendanceDto): Promise<AttendanceListResponseDto> {
-     return this.attendanceService.updateAttendance(updateData);
-   }
+  @Put('update')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async updateAttendance(@Body() updateData: UpdateAttendanceDto): Promise<AttendanceListResponseDto> {
+    return this.attendanceService.updateAttendance(updateData);
+  }
 
-     @Put('monthly/update')
+  @Put('logs/:id/status')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async updateAttendanceLogStatus(
+    @Param('id') id: string,
+    @Body() statusData: UpdateAttendanceLogStatusDto
+  ): Promise<AttendanceLogResponseDto> {
+    const logId = Number(id);
+    if (isNaN(logId)) {
+      throw new BadRequestException('Invalid attendance log ID');
+    }
+    return this.attendanceService.updateAttendanceLogStatus(
+      logId,
+      statusData.status,
+      statusData.reason,
+      statusData.reviewer_id,
+      statusData.checkin,
+      statusData.checkout
+    );
+  }
+
+  @Put('monthly/update')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)

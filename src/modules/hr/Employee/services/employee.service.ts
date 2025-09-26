@@ -5,6 +5,7 @@ import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { GetEmployeesDto } from '../dto/get-employees.dto';
 import { EmployeeStatisticsDto } from '../dto/employee-statistics.dto';
+import { HrLogsStatsResponseDto } from '../../dto/hr-logs-stats.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -99,31 +100,103 @@ export class EmployeeService {
     }
   }
 
-  async getHrLogs(hrEmployeeId: number) {
-    // Get HR record
-    const hrRecord = await this.prisma.hR.findUnique({
-      where: { employeeId: hrEmployeeId },
-    });
+  private getOrderByClause(orderBy: string, orderDirection: string) {
+    // Map frontend field names to Prisma field names
+    const fieldMapping: { [key: string]: string } = {
+      'id': 'id',
+      'createdAt': 'createdAt',
+      'updatedAt': 'updatedAt',
+      'actionType': 'actionType',
+      'affectedEmployeeId': 'affectedEmployeeId'
+    };
 
-    if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+    const prismaField = fieldMapping[orderBy] || 'createdAt';
+    return { [prismaField]: orderDirection };
+  }
+
+  async getHrLogs(query: any) {
+    const { 
+      hr_id, 
+      action_type, 
+      affected_employee_id, 
+      start_date, 
+      end_date,
+      created_start,
+      created_end,
+      updated_start,
+      updated_end,
+      page = 1, 
+      limit = 10,
+      orderBy = 'createdAt',
+      orderDirection = 'desc'
+    } = query;
+
+    // Ensure page and limit are numbers
+    const pageNum = typeof page === 'string' ? parseInt(page, 10) : page;
+    const limitNum = typeof limit === 'string' ? parseInt(limit, 10) : limit;
+
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+
+    if (hr_id) {
+      where.hrId = hr_id;
     }
 
-    // Get HR logs with related data
-    const logs = await this.prisma.hRLog.findMany({
-      where: { hrId: hrRecord.id },
-      include: {
-        affectedEmployee: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        hr: {
+    if (action_type) {
+      where.actionType = action_type;
+    }
+
+    if (affected_employee_id) {
+      where.affectedEmployeeId = affected_employee_id;
+    }
+
+    // Handle date filtering - prioritize specific date parameters over generic ones
+    if (created_start || created_end) {
+      where.createdAt = {};
+      if (created_start) {
+        where.createdAt.gte = new Date(created_start);
+      }
+      if (created_end) {
+        where.createdAt.lte = new Date(created_end);
+      }
+    } else if (start_date || end_date) {
+      where.createdAt = {};
+      if (start_date) {
+        where.createdAt.gte = new Date(start_date);
+      }
+      if (end_date) {
+        where.createdAt.lte = new Date(end_date);
+      }
+    }
+
+    if (updated_start || updated_end) {
+      where.updatedAt = {};
+      if (updated_start) {
+        where.updatedAt.gte = new Date(updated_start);
+      }
+      if (updated_end) {
+        where.updatedAt.lte = new Date(updated_end);
+      }
+    }
+
+    try {
+      console.log('HR Logs Query Debug:', {
+        pageNum,
+        limitNum,
+        skip,
+        where,
+        orderBy,
+        orderDirection,
+        orderByClause: this.getOrderByClause(orderBy, orderDirection)
+      });
+
+      const [logs, total] = await Promise.all([
+        this.prisma.hRLog.findMany({
+          where,
           include: {
-            employee: {
+            affectedEmployee: {
               select: {
                 id: true,
                 firstName: true,
@@ -131,13 +204,58 @@ export class EmployeeService {
                 email: true,
               },
             },
+            hr: {
+              include: {
+                employee: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                  },
+                },
+              },
+            },
           },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+          orderBy: this.getOrderByClause(orderBy, orderDirection),
+          skip,
+          take: limitNum,
+        }),
+        this.prisma.hRLog.count({ where }),
+      ]);
 
-    return logs;
+      const totalPages = Math.ceil(total / limitNum);
+
+      console.log('HR Logs Result Debug:', {
+        logsCount: logs.length,
+        total,
+        pageNum,
+        limitNum,
+        totalPages,
+        skip
+      });
+
+      return {
+        logs: logs.map(log => ({
+          id: log.id,
+          hrId: log.hrId,
+          actionType: log.actionType,
+          affectedEmployeeId: log.affectedEmployeeId,
+          description: log.description,
+          createdAt: log.createdAt.toISOString(),
+          updatedAt: log.updatedAt.toISOString(),
+          affectedEmployee: log.affectedEmployee,
+          hr: log.hr,
+        })),
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get HR logs: ${error.message}`);
+      throw new BadRequestException(`Failed to get HR logs: ${error.message}`);
+    }
   }
 
   /**
@@ -1170,6 +1288,79 @@ export class EmployeeService {
     } catch (error) {
       this.logger.error(`Failed to get employee statistics: ${error.message}`);
       throw new BadRequestException(`Failed to get employee statistics: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get HR logs statistics
+   */
+  async getHrLogsStats(): Promise<HrLogsStatsResponseDto> {
+    try {
+      const now = new Date();
+      
+      // Get start of today (00:00:00)
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      // Get start of this week (Monday)
+      const startOfWeek = new Date(startOfToday);
+      const dayOfWeek = startOfToday.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, Monday = 1
+      startOfWeek.setDate(startOfToday.getDate() - daysToMonday);
+      
+      // Get start of this month
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const [totalLogs, todayLogs, thisWeekLogs, thisMonthLogs] = await Promise.all([
+        // Total logs
+        this.prisma.hRLog.count(),
+        
+        // Today's logs
+        this.prisma.hRLog.count({
+          where: {
+            createdAt: {
+              gte: startOfToday,
+            },
+          },
+        }),
+        
+        // This week's logs
+        this.prisma.hRLog.count({
+          where: {
+            createdAt: {
+              gte: startOfWeek,
+            },
+          },
+        }),
+        
+        // This month's logs
+        this.prisma.hRLog.count({
+          where: {
+            createdAt: {
+              gte: startOfMonth,
+            },
+          },
+        }),
+      ]);
+
+      console.log('HR Logs Stats Debug:', {
+        totalLogs,
+        todayLogs,
+        thisWeekLogs,
+        thisMonthLogs,
+        startOfToday: startOfToday.toISOString(),
+        startOfWeek: startOfWeek.toISOString(),
+        startOfMonth: startOfMonth.toISOString(),
+      });
+
+      return {
+        totalLogs,
+        todayLogs,
+        thisWeekLogs,
+        thisMonthLogs,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get HR logs stats: ${error.message}`);
+      throw new BadRequestException(`Failed to get HR logs stats: ${error.message}`);
     }
   }
 

@@ -1,7 +1,8 @@
 import { Body, Controller, Post, Get, Put, Patch, Delete, Param, Query, UseGuards, Request, Req, ParseIntPipe } from '@nestjs/common';
 import { EmployeeService } from '../services/employee.service';
 import { TerminateEmployeeDto } from '../dto/terminate-employee.dto';
-import { HrLogsResponseDto } from '../../dto/hr-log.dto';
+import { HrLogResponseDto, HrLogsListResponseDto, GetHrLogsDto } from '../../dto/hr-log.dto';
+import { HrLogsStatsResponseDto } from '../../dto/hr-logs-stats.dto';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { UpdateBonusDto } from '../dto/update-bonus.dto';
@@ -15,7 +16,9 @@ import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
 import { PermissionsGuard } from '../../../../common/guards/permissions.guard';
 import { Departments } from '../../../../common/decorators/departments.decorator';
 import { Permissions } from '../../../../common/decorators/permissions.decorator';
+import { Roles } from '../../../../common/decorators/roles.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
+import { RoleName } from '@prisma/client';
 
 
 interface AuthenticatedRequest extends Request {
@@ -141,5 +144,29 @@ export class EmployeeController {
   @Permissions(PermissionName.employee_add_permission)
   async deleteEmployee(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest): Promise<{ message: string }> {
     return await this.hrService.deleteEmployee(id, req.user.id);
+  }
+
+  /**
+   * Get HR logs - Manager only access
+   */
+  @Get('logs')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @Roles(RoleName.dep_manager)
+  @Permissions(PermissionName.employee_add_permission)
+  async getHrLogs(@Query() query: GetHrLogsDto, @Request() req: AuthenticatedRequest): Promise<HrLogsListResponseDto> {
+    return await this.hrService.getHrLogs(query);
+  }
+
+  /**
+   * Get HR logs statistics - Manager only access
+   */
+  @Get('logs/stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @Roles(RoleName.dep_manager)
+  @Permissions(PermissionName.employee_add_permission)
+  async getHrLogsStats(@Request() req: AuthenticatedRequest): Promise<HrLogsStatsResponseDto> {
+    return await this.hrService.getHrLogsStats();
   }
 }
