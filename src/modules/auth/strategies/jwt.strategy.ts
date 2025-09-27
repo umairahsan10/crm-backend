@@ -16,17 +16,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'your-secret-key',
+      secretOrKey: process.env.JWT_SECRET || 'your-super-secret-jwt-key-for-crm-backend-2024',
     });
   }
 
   validate(payload: JwtPayload) {
-    return {
+    console.log('🔍 JWT Strategy - validate called with payload:', JSON.stringify(payload, null, 2));
+    
+    const user = {
       id: payload.sub,
       role: payload.role,
       type: payload.type,
       ...(payload.department && { department: payload.department }),
       ...(payload.permissions && { permissions: payload.permissions }),
     };
+    
+    console.log('🔍 JWT Strategy - returning user:', JSON.stringify(user, null, 2));
+    
+    return user;
   }
 }

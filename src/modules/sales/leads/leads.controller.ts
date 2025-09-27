@@ -16,7 +16,7 @@ import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { RequestLeadsDto } from './dto/request-leads.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { LeadsAccessGuard, LeadCreationGuard } from './guards';
+import { LeadsAccessGuard, LeadCreationGuard, ArchivedLeadsAccessGuard } from './guards';
 
 @Controller('leads')
 @UseGuards(JwtAuthGuard, LeadsAccessGuard)
@@ -48,10 +48,6 @@ export class LeadsController {
     return this.leadsService.getMyLeads(query, userId, userRole);
   }
 
-  @Get('cracked-leads')
-  getCrackedLeads(@Query() query: any) {
-    return this.leadsService.getCrackedLeads(query);
-  }
 
   @Get('statistics/overview')
   getLeadStatistics(@Request() req: any) {
@@ -73,6 +69,38 @@ export class LeadsController {
     return this.leadsService.getEmployeesForFilter(unitId, userRole);
   }
 
+  @Get('cracked')
+  getCrackedLeads(@Query() query: any, @Request() req: any) {
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    console.log('🔍 Controller - req.user:', req.user);
+    console.log('🔍 Controller - userRole:', userRole, 'userId:', userId);
+    
+    return this.leadsService.getCrackedLeads(query, userRole, userId);
+  }
+
+  @Get('archived')
+  @UseGuards(ArchivedLeadsAccessGuard)
+  getArchivedLeads(@Query() query: any, @Request() req: any) {
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    console.log('🔍 Controller - Archived leads - req.user:', req.user);
+    console.log('🔍 Controller - userRole:', userRole, 'userId:', userId);
+    
+    return this.leadsService.getArchivedLeads(query, userRole, userId);
+  }
+
+  @Get('archived/:id')
+  @UseGuards(ArchivedLeadsAccessGuard)
+  getArchivedLead(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    return this.leadsService.getArchivedLead(id, userRole, userId);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.leadsService.findOne(id);
@@ -80,7 +108,28 @@ export class LeadsController {
 
   @Post('request')
   requestLeads(@Body() requestLeadsDto: RequestLeadsDto, @Request() req: any) {
-    return this.leadsService.requestLeads(requestLeadsDto);
+    console.log('🔍 ===== REQUEST LEADS DEBUG =====');
+    console.log('🔍 Raw request body:', JSON.stringify(requestLeadsDto, null, 2));
+    console.log('🔍 Body type:', typeof requestLeadsDto);
+    console.log('🔍 keptLeadIds type:', typeof requestLeadsDto.keptLeadIds);
+    console.log('🔍 keptLeadIds value:', requestLeadsDto.keptLeadIds);
+    console.log('🔍 req object keys:', Object.keys(req));
+    console.log('🔍 req.user:', req.user);
+    console.log('🔍 req.user type:', typeof req.user);
+    console.log('🔍 req.headers:', req.headers);
+    console.log('🔍 req.headers.authorization:', req.headers?.authorization);
+    
+    if (!req.user) {
+      console.log('🔍 ERROR: req.user is undefined - JWT authentication failed');
+      throw new ForbiddenException('Authentication required');
+    }
+    
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log('🔍 userId:', userId, 'userRole:', userRole);
+    
+    return this.leadsService.requestLeads(requestLeadsDto, userId, userRole);
   }
 
   @Put(':id')
@@ -101,4 +150,5 @@ export class LeadsController {
     const userId = req.user.id;
     return this.leadsService.bulkUpdateLeads(body.leadIds, body.updateData, userId);
   }
+
 }

@@ -4,6 +4,7 @@ import { GeneratePaymentLinkDto } from './dto/generate-payment-link.dto';
 import { PaymentLinkResponseDto } from './dto/payment-link-response.dto';
 import { RevenueService } from '../../../finance/accountant/revenue/revenue.service';
 import { ProjectsService } from '../../../projects/projects.service';
+import { ArchiveLeadSource, ArchiveLeadOutcome, ArchiveLeadQualityRating } from '@prisma/client';
 
 @Injectable()
 export class PaymentsService {
@@ -454,10 +455,22 @@ export class PaymentsService {
 
             // 3. Update lead status to completed for revenue generation
             if (transaction.invoice?.leadId) {
-                await this.prisma.lead.update({
-                    where: { id: transaction.invoice.leadId },
-                    data: { status: 'completed' }
+                const lead = await this.prisma.lead.findUnique({
+                    where: { id: transaction.invoice.leadId }
                 });
+
+                if (lead) {
+                    // Update lead status to completed and change type to upsell
+                    await this.prisma.lead.update({
+                        where: { id: transaction.invoice.leadId },
+                        data: { 
+                            status: 'completed',
+                            type: 'upsell',
+                            closedAt: new Date(),
+                            closedById: userId
+                        }
+                    });
+                }
             }
 
             // 4. Create project if this is the first phase payment (before phase update)

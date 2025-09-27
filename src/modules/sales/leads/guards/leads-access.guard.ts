@@ -6,10 +6,15 @@ export class LeadsAccessGuard implements CanActivate {
   constructor(private prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    console.log('🔍 LeadsAccessGuard - canActivate called');
     const request = context.switchToHttp().getRequest();
     const user = request.user;
+    
+    console.log('🔍 LeadsAccessGuard - user:', user);
+    console.log('🔍 LeadsAccessGuard - user type:', typeof user);
 
     if (!user) {
+      console.log('🔍 LeadsAccessGuard - User not authenticated');
       throw new ForbiddenException('User not authenticated');
     }
 
