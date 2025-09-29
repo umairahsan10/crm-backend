@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { PrismaService } from '../prisma/prisma.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -32,6 +33,10 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
     transform: true,
   }));
+
+  // Enable Prisma shutdown hooks
+  const prismaService = app.get(PrismaService);
+  await prismaService.enableShutdownHooks(app);
 
   const PORT = process.env.PORT || 3000;
   await app.listen(PORT);
