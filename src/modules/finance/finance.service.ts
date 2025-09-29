@@ -488,12 +488,19 @@ export class FinanceService {
   @Cron('0 17 4 * *', { timeZone: 'Asia/Karachi' })
   async handleMonthlySalaryCalculation() {
     try {
+      // Check database connection first
+      await this.prisma.$queryRaw`SELECT 1`;
+      
       this.logger.log('🕔 5:00 PM PKT reached - Starting monthly auto salary calculation');
       await this.calculateAllEmployees();
       this.logger.log('✅ Monthly auto salary calculation completed successfully');
     } catch (error) {
-      this.logger.error(`❌ Monthly salary cron failed: ${error.message}`);
-      throw error; // Re-throw to let NestJS handle the error
+      if (error.message?.includes("Can't reach database server") || error.code === 'P1001') {
+        this.logger.warn(`❌ Database connection issue in monthly salary cron: ${error.message}`);
+      } else {
+        this.logger.error(`❌ Monthly salary cron failed: ${error.message}`);
+        throw error; // Re-throw to let NestJS handle the error
+      }
     }
   }
 

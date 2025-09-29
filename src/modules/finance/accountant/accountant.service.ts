@@ -624,12 +624,19 @@ export class AccountantService {
   @Cron('0 0 1 * *', { timeZone: 'Asia/Karachi' })
   async handleMonthlyPnLCalculation() {
     try {
+      // Check database connection first
+      await this.prisma.$queryRaw`SELECT 1`;
+      
       this.logger.log('🕔 12:00 AM PKT reached - Starting monthly auto P&L calculation');
       await this.calculateAndSavePnL();
       this.logger.log('✅ Monthly auto P&L calculation completed successfully');
     } catch (error) {
-      this.logger.error(`❌ Monthly P&L cron failed: ${error.message}`);
-      throw error; // Re-throw to let NestJS handle the error
+      if (error.message?.includes("Can't reach database server") || error.code === 'P1001') {
+        this.logger.warn(`❌ Database connection issue in monthly P&L cron: ${error.message}`);
+      } else {
+        this.logger.error(`❌ Monthly P&L cron failed: ${error.message}`);
+        throw error; // Re-throw to let NestJS handle the error
+      }
     }
   }
 
