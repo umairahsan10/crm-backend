@@ -9,15 +9,30 @@ export class WeekendAutoPresentTrigger {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Check database connection and retry if needed
+   */
+  private async checkDatabaseConnection(): Promise<void> {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch (error) {
+      this.logger.warn(`Database connection failed, skipping this execution: ${error.message}`);
+      throw error; // This will be caught by the main try-catch
+    }
+  }
+
+  /**
    * Trigger that runs every minute to check for weekend shifts
    * Automatically marks employees as present on weekends when their shift starts
    */
-  @Cron('* * * * *', {
+  @Cron('*/10 * * * *', {
     name: 'weekend-auto-present',
     timeZone: 'Asia/Karachi' // PKT timezone
   })
   async autoMarkWeekendPresent(): Promise<{ marked_present: number; errors: number }> {
     try {
+      // Check database connection first
+      await this.checkDatabaseConnection();
+      
       this.logger.log('Starting weekend auto-present check...');
 
       // Get current date and time in PKT
@@ -111,8 +126,13 @@ export class WeekendAutoPresentTrigger {
       return { marked_present: markedPresent, errors };
 
     } catch (error) {
-      this.logger.error('Error in weekend auto-present trigger:', error);
-      throw error;
+      // Only log as error if it's not a connection issue
+      if (error.message?.includes("Can't reach database server") || error.code === 'P1001') {
+        this.logger.warn(`Database connection issue in weekend auto-present trigger: ${error.message}`);
+      } else {
+        this.logger.error(`Error in weekend auto-present trigger: ${error.message}`);
+      }
+      return { marked_present: 0, errors: 1 };
     }
   }
 

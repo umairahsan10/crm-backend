@@ -9,12 +9,27 @@ export class FutureHolidayTrigger {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Check database connection and retry if needed
+   */
+  private async checkDatabaseConnection(): Promise<void> {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch (error) {
+      this.logger.warn(`Database connection failed, skipping this execution: ${error.message}`);
+      throw error; // This will be caught by the main try-catch
+    }
+  }
+
+  /**
    * Cron job that runs every minute to check for holidays and mark employees present
    * This trigger activates when a holiday date arrives and it's time for employee shifts to start
    */
-  @Cron(CronExpression.EVERY_MINUTE, { name: 'future-holiday-trigger', timeZone: 'Asia/Karachi' })
+  @Cron('*/5 * * * *', { name: 'future-holiday-trigger', timeZone: 'Asia/Karachi' })
   async checkAndMarkHolidayAttendance(): Promise<void> {
     try {
+      // Check database connection first
+      await this.checkDatabaseConnection();
+      
       const now = new Date();
       const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
@@ -111,7 +126,12 @@ export class FutureHolidayTrigger {
         this.logger.log(`Holiday attendance marked: ${markedPresent} employees marked present, ${skipped} skipped, ${errors} errors for holiday: ${todayHoliday.holidayName}`);
       }
     } catch (error) {
-      this.logger.error(`Error in future holiday trigger: ${error.message}`);
+      // Only log as error if it's not a connection issue
+      if (error.message?.includes("Can't reach database server") || error.code === 'P1001') {
+        this.logger.warn(`Database connection issue in future holiday trigger: ${error.message}`);
+      } else {
+        this.logger.error(`Error in future holiday trigger: ${error.message}`);
+      }
     }
   }
 
