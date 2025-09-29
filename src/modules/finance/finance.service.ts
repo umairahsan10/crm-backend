@@ -489,7 +489,15 @@ export class FinanceService {
   async handleMonthlySalaryCalculation() {
     try {
       // Check database connection first
-      await this.prisma.$queryRaw`SELECT 1`;
+      const isHealthy = await this.prisma.isConnectionHealthy();
+      if (!isHealthy) {
+        this.logger.warn('Database connection is unhealthy, attempting to reconnect...');
+        const reconnected = await this.prisma.reconnectIfNeeded();
+        if (!reconnected) {
+          this.logger.warn('Failed to reconnect to database, skipping monthly salary calculation');
+          return;
+        }
+      }
       
       this.logger.log('🕔 5:00 PM PKT reached - Starting monthly auto salary calculation');
       await this.calculateAllEmployees();

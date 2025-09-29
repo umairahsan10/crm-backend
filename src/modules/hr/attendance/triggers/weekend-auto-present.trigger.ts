@@ -11,27 +11,39 @@ export class WeekendAutoPresentTrigger {
   /**
    * Check database connection and retry if needed
    */
-  private async checkDatabaseConnection(): Promise<void> {
+  private async checkDatabaseConnection(): Promise<boolean> {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      const isHealthy = await this.prisma.isConnectionHealthy();
+      if (!isHealthy) {
+        this.logger.warn('Database connection is unhealthy, attempting to reconnect...');
+        const reconnected = await this.prisma.reconnectIfNeeded();
+        if (!reconnected) {
+          this.logger.warn('Failed to reconnect to database, skipping this execution');
+          return false;
+        }
+      }
+      return true;
     } catch (error) {
-      this.logger.warn(`Database connection failed, skipping this execution: ${error.message}`);
-      throw error; // This will be caught by the main try-catch
+      this.logger.warn(`Database connection check failed, skipping this execution: ${error.message}`);
+      return false;
     }
   }
 
   /**
-   * Trigger that runs every minute to check for weekend shifts
+   * Trigger that runs every 30 minutes to check for weekend shifts
    * Automatically marks employees as present on weekends when their shift starts
    */
-  @Cron('*/10 * * * *', {
+  @Cron('*/30 * * * *', {
     name: 'weekend-auto-present',
     timeZone: 'Asia/Karachi' // PKT timezone
   })
   async autoMarkWeekendPresent(): Promise<{ marked_present: number; errors: number }> {
     try {
       // Check database connection first
-      await this.checkDatabaseConnection();
+      const isConnected = await this.checkDatabaseConnection();
+      if (!isConnected) {
+        return { marked_present: 0, errors: 0 };
+      }
       
       this.logger.log('Starting weekend auto-present check...');
 
