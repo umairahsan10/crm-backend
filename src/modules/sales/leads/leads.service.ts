@@ -388,8 +388,25 @@ export class LeadsService {
         return lead;
     }
 
-    async requestLeads(requestLeadsDto: RequestLeadsDto) {
-        const { employeeId, keptLeadIds = [] } = requestLeadsDto;
+    async requestLeads(requestLeadsDto: RequestLeadsDto, userId: number, userRole: string) {
+        const { keptLeadIds = [], includePushLeads = false } = requestLeadsDto;
+        const employeeId = userId;
+
+        // Validate push leads option based on role using existing role access logic
+        if (includePushLeads) {
+            const roleAccessMap = {
+                'junior': ['warm', 'cold'],
+                'senior': ['warm', 'cold', 'push'],
+                'dep_manager': ['warm', 'cold', 'push', 'upsell'],
+                'team_lead': ['warm', 'cold', 'push', 'upsell'],
+                'unit_head': ['warm', 'cold', 'push', 'upsell'],
+                'admin': ['warm', 'cold', 'push', 'upsell']
+            };
+            
+            if (!roleAccessMap[userRole] || !roleAccessMap[userRole].includes('push')) {
+                throw new BadRequestException('Push leads option is only available for senior and above roles');
+            }
+        }
 
         // Validate employee exists and is active
         const employee = await this.prisma.employee.findFirst({
@@ -457,43 +474,99 @@ export class LeadsService {
                 });
             }
 
-            // Step 2: Always assign exactly 10 new leads
-            const availableLeads = await prisma.lead.findMany({
-                where: {
-                    assignedToId: null,
-                    status: 'new',
-                    salesUnitId,
-                    type: { in: ['warm', 'cold'] }
-                },
-                orderBy: [
-                    { type: 'asc' }, // warm comes before cold
-                    { updatedAt: 'asc' } // oldest first
-                ],
-                take: 10
-            });
+            // Step 2: Assign leads based on includePushLeads option
+            let assignedLeads: any[] = [];
+            
+            if (includePushLeads) {
+                // Assign 8 warm/cold leads + 2 push leads = 10 total
+                const warmColdLeads = await prisma.lead.findMany({
+                    where: {
+                        assignedToId: null,
+                        status: 'new',
+                        salesUnitId,
+                        type: { in: ['warm', 'cold'] }
+                    },
+                    orderBy: [
+                        { type: 'asc' }, // warm comes before cold
+                        { updatedAt: 'asc' } // oldest first
+                    ],
+                    take: 8
+                });
 
-            if (availableLeads.length < 10) {
-                throw new NotFoundException(`Insufficient leads available. Need 10, only ${availableLeads.length} available.`);
+                const pushLeads = await prisma.lead.findMany({
+                    where: {
+                        assignedToId: null,
+                        status: 'new',
+                        salesUnitId,
+                        type: 'push'
+                    },
+                    orderBy: { updatedAt: 'asc' }, // oldest first
+                    take: 2
+                });
+
+                const allAvailableLeads = [...warmColdLeads, ...pushLeads];
+                
+                if (allAvailableLeads.length < 10) {
+                    throw new NotFoundException(`Insufficient leads available. Need 10, only ${allAvailableLeads.length} available (${warmColdLeads.length} warm/cold + ${pushLeads.length} push).`);
+                }
+
+                // Assign all available leads
+                assignedLeads = await Promise.all(
+                    allAvailableLeads.map(lead =>
+                        prisma.lead.update({
+                            where: { id: lead.id },
+                            data: {
+                                assignedToId: employeeId,
+                                startedById: employeeId,
+                                status: 'in_progress',
+                                updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
+                            },
+                            include: {
+                                assignedTo: { select: { firstName: true, lastName: true } },
+                                salesUnit: { select: { name: true } }
+                            }
+                        })
+                    )
+                );
+            } else {
+                // Original logic: Assign exactly 10 warm/cold leads
+                const availableLeads = await prisma.lead.findMany({
+                    where: {
+                        assignedToId: null,
+                        status: 'new',
+                        salesUnitId,
+                        type: { in: ['warm', 'cold'] }
+                    },
+                    orderBy: [
+                        { type: 'asc' }, // warm comes before cold
+                        { updatedAt: 'asc' } // oldest first
+                    ],
+                    take: 10
+                });
+
+                if (availableLeads.length < 10) {
+                    throw new NotFoundException(`Insufficient leads available. Need 10, only ${availableLeads.length} available.`);
+                }
+
+                // Assign exactly 10 new leads
+                assignedLeads = await Promise.all(
+                    availableLeads.map(lead =>
+                        prisma.lead.update({
+                            where: { id: lead.id },
+                            data: {
+                                assignedToId: employeeId,
+                                startedById: employeeId,
+                                status: 'in_progress',
+                                updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
+                            },
+                            include: {
+                                assignedTo: { select: { firstName: true, lastName: true } },
+                                salesUnit: { select: { name: true } }
+                            }
+                        })
+                    )
+                );
             }
-
-            // Assign exactly 10 new leads
-            const assignedLeads = await Promise.all(
-                availableLeads.map(lead =>
-                    prisma.lead.update({
-                        where: { id: lead.id },
-                        data: {
-                            assignedToId: employeeId,
-                            startedById: employeeId,
-                            status: 'in_progress',
-                            updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
-                        },
-                        include: {
-                            assignedTo: { select: { firstName: true, lastName: true } },
-                            salesUnit: { select: { name: true } }
-                        }
-                    })
-                )
-            );
 
             // Get kept leads
             const keptLeads = await prisma.lead.findMany({
@@ -504,11 +577,21 @@ export class LeadsService {
                 }
             });
 
+            // Count lead types in assigned leads
+            const warmColdCount = assignedLeads.filter(lead => ['warm', 'cold'].includes(lead.type)).length;
+            const pushCount = assignedLeads.filter(lead => lead.type === 'push').length;
+
             return {
                 assignedLeads,
                 keptLeads,
                 totalActiveLeads: keptLeads.length + assignedLeads.length,
-                circulatedLeads: leadsToCirculate.length
+                circulatedLeads: leadsToCirculate.length,
+                leadBreakdown: {
+                    warmColdLeads: warmColdCount,
+                    pushLeads: pushCount,
+                    totalAssigned: assignedLeads.length
+                },
+                includePushLeads
             };
         });
     }
@@ -595,6 +678,8 @@ export class LeadsService {
                         console.log('🔍 Lead marked as failed successfully');
 
                         // Move the lead to archived_leads table
+                        // TODO: Future reversibility feature - when implemented, this archived lead can be reversed back to active status
+                        // The original lead record remains in the leads table with status 'failed' for data preservation
                         await prisma.archiveLead.create({
                             data: {
                                 leadId: id,
@@ -857,16 +942,95 @@ export class LeadsService {
         });
     }
 
-    async getCrackedLeads(query: any) {
-        const where: any = {};
+    async getCrackedLeads(query: any, userRole: string, userId: number) {
+        console.log('🔍 ===== GET CRACKED LEADS START =====');
+        console.log('🔍 User ID:', userId, '| Role:', userRole);
+        console.log('🔍 Query params:', query);
 
-        if (query.amount) where.amount = { gte: parseFloat(query.amount) };
-        if (query.employeeId) where.closedBy = parseInt(query.employeeId);
+        // Get user's sales department info for proper access control
+        const userSalesDept = await this.getUserSalesDepartment(userId);
+        console.log('🔍 User sales department info:', JSON.stringify(userSalesDept, null, 2));
+
+        const where: any = {};
+        console.log('🔍 Initial WHERE clause:', where);
+
+        // Apply basic filters
+        if (query.status) {
+            where.lead = { ...where.lead, status: query.status };
+            console.log('🔍 Added status filter:', query.status);
+        }
+        if (query.outcome) {
+            where.lead = { ...where.lead, outcome: query.outcome };
+            console.log('🔍 Added outcome filter:', query.outcome);
+        }
+        if (query.salesUnitId) {
+            where.lead = { ...where.lead, salesUnitId: parseInt(query.salesUnitId) };
+            console.log('🔍 Added salesUnitId filter:', query.salesUnitId);
+        }
+        if (query.assignedTo) {
+            where.lead = { ...where.lead, assignedToId: parseInt(query.assignedTo) };
+            console.log('🔍 Added assignedTo filter:', query.assignedTo);
+        }
+
+        // Search support
+        if (query.search) {
+            where.lead = {
+                ...where.lead,
+                OR: [
+                    { name: { contains: query.search, mode: 'insensitive' } },
+                    { email: { contains: query.search, mode: 'insensitive' } },
+                    { phone: { contains: query.search } }
+                ]
+            };
+            console.log('🔍 Added search filter for:', query.search);
+        }
+
+        // Cracked lead specific filters
+        if (query.industryId) {
+            where.industryId = parseInt(query.industryId);
+            console.log('🔍 Added industryId filter:', query.industryId);
+        }
+        if (query.minAmount) {
+            where.amount = { ...where.amount, gte: parseFloat(query.minAmount) };
+            console.log('🔍 Added minAmount filter:', query.minAmount);
+        }
+        if (query.maxAmount) {
+            where.amount = { ...where.amount, lte: parseFloat(query.maxAmount) };
+            console.log('🔍 Added maxAmount filter:', query.maxAmount);
+        }
+        if (query.closedBy) {
+            where.closedBy = parseInt(query.closedBy);
+            console.log('🔍 Added closedBy filter:', query.closedBy);
+        }
+        if (query.currentPhase) {
+            where.currentPhase = parseInt(query.currentPhase);
+            console.log('🔍 Added currentPhase filter:', query.currentPhase);
+        }
+        if (query.totalPhases) {
+            where.totalPhases = parseInt(query.totalPhases);
+            console.log('🔍 Added totalPhases filter:', query.totalPhases);
+        }
+
+        // Apply hierarchical access control
+        const hierarchicalFilters = await this.getHierarchicalFilters(userRole, userId, userSalesDept);
+        if (Object.keys(hierarchicalFilters).length > 0) {
+            where.lead = { ...where.lead, ...hierarchicalFilters };
+            console.log('🔍 Applied hierarchical filters to lead:', hierarchicalFilters);
+        }
 
         const page = parseInt(query.page) || 1;
         const limit = parseInt(query.limit) || 20;
         const skip = (page - 1) * limit;
 
+        // Flexible sorting
+        const sortBy = query.sortBy || 'crackedAt';
+        const sortOrder = query.sortOrder || 'desc';
+
+        console.log('🔍 Pagination - Page:', page, 'Limit:', limit, 'Skip:', skip);
+        console.log('🔍 Sorting - By:', sortBy, 'Order:', sortOrder);
+        console.log('🔍 Final WHERE clause for cracked leads:', JSON.stringify(where, null, 2));
+
+        console.log('🔍 Executing database query for cracked leads...');
         const [crackedLeads, total] = await Promise.all([
             this.prisma.crackedLead.findMany({
                 where,
@@ -874,19 +1038,37 @@ export class LeadsService {
                     lead: {
                         include: {
                             assignedTo: { select: { firstName: true, lastName: true } },
-                            salesUnit: { select: { name: true } }
+                            startedBy: { select: { firstName: true, lastName: true } },
+                            salesUnit: { select: { name: true } },
                         }
                     },
-                    employee: { select: { firstName: true, lastName: true } }
+                    employee: { 
+                        select: { 
+                            id: true,
+                            firstName: true, 
+                            lastName: true,
+                            email: true
+                        } 
+                    },
+                    industry: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
                 },
                 skip,
                 take: limit,
-                orderBy: { crackedAt: 'desc' }
+                orderBy: { [sortBy]: sortOrder }
             }),
             this.prisma.crackedLead.count({ where })
         ]);
 
-        return {
+        console.log('🔍 ===== CRACKED LEADS QUERY RESULTS =====');
+        console.log('🔍 Total cracked leads found:', total);
+        console.log('🔍 Cracked leads returned:', crackedLeads.length);
+
+        const result = {
             crackedLeads,
             pagination: {
                 page,
@@ -895,6 +1077,12 @@ export class LeadsService {
                 totalPages: Math.ceil(total / limit)
             }
         };
+
+        console.log('🔍 ===== FINAL RESPONSE =====');
+        console.log('🔍 Response pagination:', result.pagination);
+        console.log('🔍 ===== GET CRACKED LEADS END =====');
+
+        return result;
     }
 
     // Additional utility method for bulk operations
@@ -1296,5 +1484,225 @@ export class LeadsService {
             data: formattedEmployees,
             total: formattedEmployees.length
         };
+    }
+
+    // Archived Leads Methods
+    async getArchivedLeads(query: any, userRole: string, userId: number) {
+        console.log('🔍 ===== GET ARCHIVED LEADS START =====');
+        console.log('🔍 User ID:', userId, '| Role:', userRole);
+        console.log('🔍 Query params:', query);
+
+        // Access control: Only admin, dep_manager, unit_head can access archived leads
+        const allowedRoles = ['admin', 'dep_manager', 'unit_head'];
+        if (!allowedRoles.includes(userRole)) {
+            throw new ForbiddenException('Access denied. Only admin, department manager, and unit head can access archived leads.');
+        }
+
+        // Get user's sales department info for proper access control
+        const userSalesDept = await this.getUserSalesDepartment(userId);
+        console.log('🔍 User sales department info for archived leads:', JSON.stringify(userSalesDept, null, 2));
+
+        const where: any = {};
+        console.log('🔍 Initial WHERE clause for archived leads:', where);
+
+        // Apply basic filters
+        if (query.source) {
+            where.source = query.source;
+            console.log('🔍 Added source filter:', query.source);
+        }
+        if (query.outcome) {
+            where.outcome = query.outcome;
+            console.log('🔍 Added outcome filter:', query.outcome);
+        }
+        if (query.qualityRating) {
+            where.qualityRating = query.qualityRating;
+            console.log('🔍 Added qualityRating filter:', query.qualityRating);
+        }
+        if (query.assignedTo) {
+            where.assignedTo = parseInt(query.assignedTo);
+            console.log('🔍 Added assignedTo filter:', query.assignedTo);
+        }
+        if (query.unitId) {
+            where.unitId = parseInt(query.unitId);
+            console.log('🔍 Added unitId filter:', query.unitId);
+        }
+
+        // Search support
+        if (query.search) {
+            where.OR = [
+                { name: { contains: query.search, mode: 'insensitive' } },
+                { email: { contains: query.search, mode: 'insensitive' } },
+                { phone: { contains: query.search } }
+            ];
+            console.log('🔍 Added search filter for:', query.search);
+        }
+
+        // Date range filters
+        if (query.archivedFrom) {
+            where.archivedOn = { ...where.archivedOn, gte: new Date(query.archivedFrom) };
+            console.log('🔍 Added archivedFrom filter:', query.archivedFrom);
+        }
+        if (query.archivedTo) {
+            where.archivedOn = { ...where.archivedOn, lte: new Date(query.archivedTo) };
+            console.log('🔍 Added archivedTo filter:', query.archivedTo);
+        }
+
+        // Apply hierarchical access control
+        const hierarchicalFilters = await this.getHierarchicalFilters(userRole, userId, userSalesDept);
+        if (Object.keys(hierarchicalFilters).length > 0) {
+            // For archived leads, we need to map the hierarchical filters to the archive table structure
+            if (hierarchicalFilters.salesUnitId) {
+                where.unitId = hierarchicalFilters.salesUnitId;
+                console.log('🔍 Applied unit restriction for archived leads:', hierarchicalFilters.salesUnitId);
+            }
+            if (hierarchicalFilters.assignedToId) {
+                where.assignedTo = hierarchicalFilters.assignedToId;
+                console.log('🔍 Applied assignedTo restriction for archived leads:', hierarchicalFilters.assignedToId);
+            }
+        }
+
+        const page = parseInt(query.page) || 1;
+        const limit = parseInt(query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        // Flexible sorting
+        const sortBy = query.sortBy || 'archivedOn';
+        const sortOrder = query.sortOrder || 'desc';
+
+        console.log('🔍 Pagination - Page:', page, 'Limit:', limit, 'Skip:', skip);
+        console.log('🔍 Sorting - By:', sortBy, 'Order:', sortOrder);
+        console.log('🔍 Final WHERE clause for archived leads:', JSON.stringify(where, null, 2));
+
+        console.log('🔍 Executing database query for archived leads...');
+        const [archivedLeads, total] = await Promise.all([
+            this.prisma.archiveLead.findMany({
+                where,
+                select: {
+                    id: true,
+                    leadId: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    source: true,
+                    outcome: true,
+                    qualityRating: true,
+                    createdAt: true,
+                    archivedOn: true,
+                    assignedTo: true,
+                    unitId: true,
+                    employee: { 
+                        select: { 
+                            id: true,
+                            firstName: true, 
+                            lastName: true,
+                            email: true
+                        } 
+                    },
+                    unit: { 
+                        select: { 
+                            id: true,
+                            name: true
+                        } 
+                    }
+                },
+                orderBy: { [sortBy]: sortOrder },
+                skip,
+                take: limit
+            }),
+            this.prisma.archiveLead.count({ where })
+        ]);
+
+        console.log('🔍 ===== ARCHIVED LEADS QUERY RESULTS =====');
+        console.log('🔍 Total archived leads found:', total);
+        console.log('🔍 Archived leads returned:', archivedLeads.length);
+
+        const result = {
+            archivedLeads,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
+
+        console.log('🔍 ===== FINAL RESPONSE =====');
+        console.log('🔍 Response pagination:', result.pagination);
+        console.log('🔍 ===== GET ARCHIVED LEADS END =====');
+
+        return result;
+    }
+
+    async getArchivedLead(id: number, userRole: string, userId: number) {
+        console.log('🔍 ===== GET ARCHIVED LEAD START =====');
+        console.log('🔍 Archived Lead ID:', id, '| User ID:', userId, '| Role:', userRole);
+
+        // Access control: Only admin, dep_manager, unit_head can access archived leads
+        const allowedRoles = ['admin', 'dep_manager', 'unit_head'];
+        if (!allowedRoles.includes(userRole)) {
+            throw new ForbiddenException('Access denied. Only admin, department manager, and unit head can access archived leads.');
+        }
+
+        // Get user's sales department info for proper access control
+        const userSalesDept = await this.getUserSalesDepartment(userId);
+        console.log('🔍 User sales department info:', JSON.stringify(userSalesDept, null, 2));
+
+        const archivedLead = await this.prisma.archiveLead.findUnique({
+            where: { id },
+            include: {
+                employee: { 
+                    select: { 
+                        id: true,
+                        firstName: true, 
+                        lastName: true,
+                        email: true,
+                        phone: true
+                    } 
+                },
+                unit: { 
+                    select: { 
+                        id: true,
+                        name: true,
+                        email: true
+                    } 
+                }
+            }
+        });
+
+        if (!archivedLead) {
+            throw new NotFoundException('Archived lead not found');
+        }
+
+        // Apply hierarchical access control
+        const hierarchicalFilters = await this.getHierarchicalFilters(userRole, userId, userSalesDept);
+        
+        // Check if user has access to this archived lead
+        if (userRole === 'unit_head') {
+            if (archivedLead.unitId !== userSalesDept?.salesUnitId) {
+                throw new ForbiddenException('You can only access archived leads from your own unit');
+            }
+        } else if (userRole === 'dep_manager') {
+            // Department managers can access all archived leads
+            // No additional restrictions needed
+        } else if (userRole === 'admin') {
+            // Admins can access all archived leads
+            // No additional restrictions needed
+        }
+
+        console.log('🔍 ===== GET ARCHIVED LEAD END =====');
+        return archivedLead;
+    }
+
+    // TODO: Future implementation - Reversibility feature
+    // This method will allow reversing archived leads back to active leads
+    // When implemented, it should:
+    // 1. Create a new lead record with the archived lead data
+    // 2. Set the lead status to 'new'
+    // 3. Reset failedCount to 0
+    // 4. Optionally delete the archived lead record or mark it as reversed
+    // 5. Log the reversal action for audit purposes
+    async reverseArchivedLead(archivedLeadId: number, userId: number, userRole: string) {
+        // Implementation placeholder for future reversibility feature
+        throw new BadRequestException('Lead reversibility feature is not yet implemented. This feature will allow reversing archived leads back to active leads.');
     }
 }
