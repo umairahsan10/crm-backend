@@ -11,24 +11,36 @@ export class FutureHolidayTrigger {
   /**
    * Check database connection and retry if needed
    */
-  private async checkDatabaseConnection(): Promise<void> {
+  private async checkDatabaseConnection(): Promise<boolean> {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      const isHealthy = await this.prisma.isConnectionHealthy();
+      if (!isHealthy) {
+        this.logger.warn('Database connection is unhealthy, attempting to reconnect...');
+        const reconnected = await this.prisma.reconnectIfNeeded();
+        if (!reconnected) {
+          this.logger.warn('Failed to reconnect to database, skipping this execution');
+          return false;
+        }
+      }
+      return true;
     } catch (error) {
-      this.logger.warn(`Database connection failed, skipping this execution: ${error.message}`);
-      throw error; // This will be caught by the main try-catch
+      this.logger.warn(`Database connection check failed, skipping this execution: ${error.message}`);
+      return false;
     }
   }
 
   /**
-   * Cron job that runs every minute to check for holidays and mark employees present
+   * Cron job that runs every 30 minutes to check for holidays and mark employees present
    * This trigger activates when a holiday date arrives and it's time for employee shifts to start
    */
-  @Cron('*/5 * * * *', { name: 'future-holiday-trigger', timeZone: 'Asia/Karachi' })
+  @Cron('*/30 * * * *', { name: 'future-holiday-trigger', timeZone: 'Asia/Karachi' })
   async checkAndMarkHolidayAttendance(): Promise<void> {
     try {
       // Check database connection first
-      await this.checkDatabaseConnection();
+      const isConnected = await this.checkDatabaseConnection();
+      if (!isConnected) {
+        return;
+      }
       
       const now = new Date();
       const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
