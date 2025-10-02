@@ -1085,6 +1085,129 @@ export class LeadsService {
         return result;
     }
 
+    async getCrackedLead(id: number, userRole: string, userId: number) {
+        console.log('🔍 ===== GET CRACKED LEAD START =====');
+        console.log('🔍 Cracked Lead ID:', id, '| User ID:', userId, '| Role:', userRole);
+
+        // Get user's sales department info for proper access control
+        const userSalesDept = await this.getUserSalesDepartment(userId);
+        console.log('🔍 User sales department info:', JSON.stringify(userSalesDept, null, 2));
+
+        const crackedLead = await this.prisma.crackedLead.findUnique({
+            where: { id },
+            include: {
+                industry: {
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true
+                    }
+                },
+                employee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true
+                    }
+                },
+                lead: {
+                    include: {
+                        assignedTo: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true,
+                                email: true
+                            }
+                        },
+                        startedBy: {
+                            select: {
+                                id: true,
+                                firstName: true,
+                                lastName: true,
+                                email: true
+                            }
+                        },
+                        salesUnit: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true
+                            }
+                        },
+                        comments: {
+                            include: {
+                                employee: {
+                                    select: {
+                                        id: true,
+                                        firstName: true,
+                                        lastName: true,
+                                        email: true
+                                    }
+                                }
+                            },
+                            orderBy: { createdAt: 'desc' }
+                        },
+                        outcomeHistory: {
+                            include: {
+                                changedByUser: {
+                                    select: {
+                                        id: true,
+                                        firstName: true,
+                                        lastName: true,
+                                        email: true
+                                    }
+                                },
+                                comment: {
+                                    select: {
+                                        id: true,
+                                        commentText: true,
+                                        createdAt: true
+                                    }
+                                }
+                            },
+                            orderBy: { createdAt: 'desc' }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!crackedLead) {
+            throw new NotFoundException('Cracked lead not found');
+        }
+
+        // Apply hierarchical access control
+        const hierarchicalFilters = await this.getHierarchicalFilters(userRole, userId, userSalesDept);
+
+        // Check if user has access to this cracked lead
+        if (userRole === 'unit_head') {
+            if (crackedLead.lead.salesUnitId !== userSalesDept?.salesUnitId) {
+                throw new ForbiddenException('You can only access cracked leads from your own unit');
+            }
+        } else if (userRole === 'team_lead') {
+            // Get team members
+            const teamMembers = await this.prisma.employee.findMany({
+                where: { teamLeadId: userId },
+                select: { id: true }
+            });
+            const teamMemberIds = [...teamMembers.map(m => m.id), userId];
+
+            if (!teamMemberIds.includes(crackedLead.lead.assignedToId || 0)) {
+                throw new ForbiddenException('You can only access cracked leads assigned to you or your team members');
+            }
+        } else if (userRole === 'senior' || userRole === 'junior') {
+            if (crackedLead.lead.assignedToId !== userId) {
+                throw new ForbiddenException('You can only access cracked leads assigned to you');
+            }
+        }
+
+        console.log('🔍 ===== GET CRACKED LEAD END =====');
+        return crackedLead;
+    }
+
     // Additional utility method for bulk operations
     async bulkUpdateLeads(leadIds: number[], updateData: Partial<UpdateLeadDto>, userId: number) {
         const results = await Promise.allSettled(
