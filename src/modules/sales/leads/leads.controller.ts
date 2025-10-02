@@ -80,6 +80,14 @@ export class LeadsController {
     return this.leadsService.getCrackedLeads(query, userRole, userId);
   }
 
+  @Get('cracked/:id')
+  getCrackedLead(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const userRole = req.user.role;
+    const userId = req.user.id;
+    
+    return this.leadsService.getCrackedLead(id, userRole, userId);
+  }
+
   @Get('archived')
   @UseGuards(ArchivedLeadsAccessGuard)
   getArchivedLeads(@Query() query: any, @Request() req: any) {

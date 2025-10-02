@@ -9,19 +9,20 @@ Complete API documentation for the Lead Management System. This system handles t
 
 ### Guards
 - **`JwtAuthGuard`**: Ensures user is authenticated
-- **`LeadsAccessGuard`**: Restricts access to Sales, HR, and Admin users only
+- **`LeadsAccessGuard`**: Restricts access to Sales, HR, Admin, and Marketing users only
 - **`LeadCreationGuard`**: Restricts lead creation to Sales team and Admin users only
+- **`ArchivedLeadsAccessGuard`**: Restricts archived leads access to authorized users
 
 ### Role-Based Access Matrix
 
 | User Type | Create Leads | Access Leads | Lead Types Visible | Scope of Access |
 |-----------|--------------|--------------|-------------------|-----------------|
 | **Sales Team** | ✅ YES | ✅ YES | All types | Based on role hierarchy |
-| **HR** | ❌ NO | ✅ YES | All types | Read-only access |
-| **Admin** | ✅ YES | ✅ YES | All types | All units, all leads |
-| **Marketing** | ❌ NO | ❌ NO | None | No access |
-| **Production** | ❌ NO | ❌ NO | None | No access |
-| **Finance** | ❌ NO | ❌ NO | None | No access |
+| **HR**         | ❌ NO  | ✅ YES | All types | Read-only access     |
+| **Admin**      | ✅ YES | ✅ YES | All types | All units, all leads |
+| **Marketing**  | ❌ NO  | ✅ YES | All types | Limited access       |
+| **Production** | ❌ NO  | ❌ NO  | None      | No access            |
+| **Finance**    | ❌ NO  | ❌ NO  | None      | No access            |
 
 ### 🏗️ Hierarchical Lead Access Control
 
@@ -86,41 +87,10 @@ The hierarchical access control system uses the following database relationships
 - **Indexed Fields**: All filter fields are properly indexed
 - **Pagination**: Built-in pagination to handle large datasets
 
-### Debugging & Monitoring
-The system includes comprehensive console logging for debugging access control issues:
-
-#### Console Log Examples
-```
-🔍 ===== FIND ALL LEADS START =====
-🔍 User ID: 5 | Role: team_lead
- Query params: {}
-🔍 Getting sales department info for user ID: 5
-🔍 Found sales department record:
-   Sales Unit ID: 1
-🔍   Sales Unit Name: 1
-🔍   Unit Head ID: 10
-   Teams in unit: 2
-🔍     Team 1: ID=1, Lead=5
-🔍     Team 2: ID=2, Lead=6
-🔍 ===== HIERARCHICAL FILTERING =====
-🔍 ✅ team_lead - TEAM RESTRICTION
-🔍   → Can see leads from unit ID: 1
-🔍   → Can see leads assigned to team members of user ID: 5
-🔍   → Querying team members for team lead ID: 5
-🔍   → Found team members: 3
-🔍   → Team member details: ["1: John Doe", "2: Jane Smith", "3: Bob Johnson"]
-🔍   → Team member IDs for filtering: [1, 2, 3]
-🔍   → Final member IDs (including team lead): [1, 2, 3, 5]
-🔍 Final WHERE clause after hierarchical filtering: {
-  "salesUnitId": 1,
-  "assignedToId": { "in": [1, 2, 3, 5] }
-}
-🔍 ===== QUERY RESULTS =====
-🔍 Total leads found: 15
-🔍 Leads returned: 15
-```
-
-This logging helps developers understand exactly what data each role can access and troubleshoot any access control issues.
+### Update Permissions
+- **Assignment-Based**: Users can only update leads **assigned to them**
+- **No Hierarchical Override**: Even managers/team leads cannot update subordinates' leads
+- **Exception**: System-level operations (archiving, auto-upsell) bypass this restriction
 
 ---
 
@@ -281,7 +251,7 @@ Creates a new lead with default values. Only sales team and admin users can crea
 ### 2. Get All Leads
 **`GET /leads`**
 
-Retrieves leads with hierarchical role-based filtering and pagination. Access restricted to Sales, HR, and Admin users.
+Retrieves leads with hierarchical role-based filtering and pagination. Access restricted to Sales, HR, Admin, and Marketing users.
 
 #### 🔐 Hierarchical Access Control
 The system automatically applies hierarchical filtering based on the user's role and sales department structure:
@@ -527,26 +497,32 @@ Retrieves a specific lead by ID with full details including comments and history
 
 ---
 
-### 5. Request Leads (Get 10 Leads)
+### 5. Request Leads (Get Leads)
 **`POST /leads/request`**
 
-Allows salespersons to request leads (get 10 total). Implements the "Getting Leads" workflow.
+Allows salespersons to request leads. Implements the "Getting Leads" workflow with support for keeping existing leads and including push leads.
 
 #### Request Body
 ```json
 {
-  "employeeId": 1,
   "keptLeadIds": [1, 2, 3],
-  "circulateLeadIds": [4, 5]
+  "includePushLeads": true
 }
 ```
 
+#### Request Fields
+- `keptLeadIds` (optional): Array of lead IDs to keep from existing assigned leads
+- `includePushLeads` (optional): Boolean to include push leads in assignment (default: false)
+
 #### Workflow
-1. **Circulate Leads**: Non-kept leads are returned to the pool
-2. **Count Current**: Counts currently assigned leads
-3. **Calculate Need**: Determines how many new leads needed
-4. **Assign New**: Assigns new leads prioritizing warm over cold
-5. **Update Status**: New leads get status "in_progress"
+1. **Validate User**: Checks user has sales department record
+2. **Circulate Leads**: Non-kept leads are returned to the pool (status = "new", assignedTo = null)
+3. **Count Current**: Counts currently kept leads
+4. **Calculate Need**: Determines how many new leads needed (total 10)
+5. **Assign New**: Assigns new leads based on `includePushLeads` flag:
+   - If `true`: Gets 8 warm/cold + 2 push leads
+   - If `false`: Gets 10 warm/cold leads only
+6. **Update Status**: New leads get status "in_progress"
 
 #### Response
 ```json
@@ -560,6 +536,9 @@ Allows salespersons to request leads (get 10 total). Implements the "Getting Lea
       "assignedTo": {
         "firstName": "Jane",
         "lastName": "Smith"
+      },
+      "salesUnit": {
+        "name": "North Region"
       }
     }
   ],
@@ -568,10 +547,24 @@ Allows salespersons to request leads (get 10 total). Implements the "Getting Lea
       "id": 1,
       "name": "Existing Lead",
       "type": "warm",
-      "status": "in_progress"
+      "status": "in_progress",
+      "assignedTo": {
+        "firstName": "Jane",
+        "lastName": "Smith"
+      },
+      "salesUnit": {
+        "name": "North Region"
+      }
     }
   ],
-  "totalActiveLeads": 10
+  "totalActiveLeads": 10,
+  "circulatedLeads": 2,
+  "leadBreakdown": {
+    "warmColdLeads": 8,
+    "pushLeads": 2,
+    "totalAssigned": 7
+  },
+  "includePushLeads": true
 }
 ```
 
@@ -581,6 +574,8 @@ Allows salespersons to request leads (get 10 total). Implements the "Getting Lea
 **`PUT /leads/:id`**
 
 Main API for updating leads with complex business logic. Handles all lead modifications including outcome, status, and special actions.
+
+**⚠️ IMPORTANT**: Users can only update leads **assigned to them**. Even managers/team leads cannot update subordinates' leads.
 
 #### Request Body Examples
 
@@ -598,7 +593,6 @@ Main API for updating leads with complex business logic. Handles all lead modifi
   "status": "cracked",
   "comment": "Lead successfully converted! Customer signed contract.",
   "totalAmount": 50000,
-  "commission": 5.0,
   "industryId": 1,
   "description": "Enterprise software solution for manufacturing",
   "totalPhases": 3,
@@ -606,7 +600,9 @@ Main API for updating leads with complex business logic. Handles all lead modifi
 }
 ```
 
-**Important**: `commission` should be a percentage (5.0 = 5%), not an absolute amount.
+**⚠️ IMPORTANT**: 
+- **DO NOT** send `commission` field - it is auto-calculated from sales department
+- Commission rate is automatically fetched from the user's `sales_department` record
 
 ##### C. Update Status to "completed"
 ```json
@@ -643,6 +639,11 @@ Main API for updating leads with complex business logic. Handles all lead modifi
 ##### Status Updates
 - **History Created**: Creates record in `lead_outcome_history`
 - **Cracked Lead Creation**: When status = "cracked" AND outcome = "interested"
+  - Validates: `industryId` is required
+  - Validates: `totalAmount` is required
+  - Auto-fetches: Commission rate from sales department
+  - Creates: `cracked_lead` record
+  - Resets: `failedCount` to 0
 - **Auto-Upsell**: When status = "completed", type becomes "upsell"
 - **Commission Update**: Updates commission rate from sales department
 - **Team Statistics**: Updates team's completed leads count
@@ -650,7 +651,8 @@ Main API for updating leads with complex business logic. Handles all lead modifi
 ##### Push Action
 - **Type Change**: Changes type to "push"
 - **Status Reset**: Resets status to "new"
-- **Unassign**: Removes assignment
+- **Unassign**: Removes assignment (assignedToId = null)
+- **Outcome Clear**: Clears outcome (outcome = null)
 - **History**: Creates audit trail
 
 #### Response
@@ -661,6 +663,15 @@ Main API for updating leads with complex business logic. Handles all lead modifi
   "outcome": "interested",
   "status": "cracked",
   "type": "warm",
+  "assignedTo": {
+    "firstName": "Jane",
+    "lastName": "Smith"
+  },
+  "salesUnit": {
+    "name": "Sales Unit A"
+  },
+  "comments": [...],
+  "outcomeHistory": [...],
   "crackedLead": {
     "id": 1,
     "amount": 50000,
@@ -675,113 +686,7 @@ Main API for updating leads with complex business logic. Handles all lead modifi
 
 ---
 
-### 7. Mark Upsell Lead
-**`PUT /leads/:id/upsell`**
-
-Separate API for marking leads as upsell. Lead must be in "completed" status.
-
-#### Request Body
-```json
-{
-  "comment": "Customer interested in additional services. Upselling opportunity identified."
-}
-```
-
-#### Response
-```json
-{
-  "id": 1,
-  "type": "upsell",
-  "comment": {
-    "id": 1,
-    "commentText": "Customer interested in additional services",
-    "commentBy": 1
-  },
-  "outcomeHistory": {
-    "outcome": "upsell",
-    "changedBy": 1,
-    "commentId": 1
-  }
-}
-```
-
----
-
-### 8. Get Cracked Leads
-**`GET /leads/cracked-leads`**
-
-Retrieves all cracked leads with filtering and pagination.
-
-#### Query Parameters
-- `amount`: Filter by minimum amount
-- `employeeId`: Filter by employee who closed the lead
-- `page`: Page number (default: 1)
-- `limit`: Items per page (default: 20)
-
-#### Response
-```json
-{
-  "crackedLeads": [
-    {
-      "id": 1,
-      "amount": 50000,
-      "commissionRate": 5.0,
-      "description": "Enterprise software solution",
-      "lead": {
-        "name": "John Doe",
-        "assignedTo": {
-          "firstName": "Jane",
-          "lastName": "Smith"
-        }
-      },
-      "employee": {
-        "firstName": "Jane",
-        "lastName": "Smith"
-      }
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 50,
-    "totalPages": 3
-  }
-}
-```
-
----
-
-### 9. Update Cracked Lead
-**`PUT /leads/cracked-leads/:id`**
-
-Updates details of a cracked lead.
-
-#### Request Body
-```json
-{
-  "description": "Updated project description with additional requirements",
-  "amount": 75000,
-  "commissionRate": 8.5,
-  "totalPhases": 4,
-  "currentPhase": 2
-}
-```
-
-#### Response
-```json
-{
-  "id": 1,
-  "amount": 75000,
-  "commissionRate": 8.5,
-  "description": "Updated project description",
-  "totalPhases": 4,
-  "currentPhase": 2
-}
-```
-
----
-
-### 10. Bulk Update Leads
+### 7. Bulk Update Leads
 **`POST /leads/bulk-update`**
 
 Updates multiple leads at once with batch processing and error handling.
@@ -822,7 +727,61 @@ Updates multiple leads at once with batch processing and error handling.
 
 ---
 
-### 11. Lead Statistics
+### 8. Get Cracked Leads
+**`GET /leads/cracked`**
+
+Retrieves all cracked leads with filtering and pagination. Access is role-based.
+
+#### Query Parameters
+- `amount`: Filter by minimum amount
+- `employeeId`: Filter by employee who closed the lead
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 20)
+
+#### Response
+```json
+{
+  "crackedLeads": [
+    {
+      "id": 1,
+      "amount": 50000,
+      "commissionRate": 5.0,
+      "description": "Enterprise software solution",
+      "remainingAmount": 50000,
+      "totalPhases": 3,
+      "currentPhase": 1,
+      "lead": {
+        "id": 1,
+        "name": "John Doe",
+        "email": "john.doe@example.com",
+        "assignedTo": {
+          "firstName": "Jane",
+          "lastName": "Smith"
+        }
+      },
+      "employee": {
+        "id": 2,
+        "firstName": "Jane",
+        "lastName": "Smith"
+      },
+      "industry": {
+        "id": 1,
+        "name": "Technology"
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 50,
+    "totalPages": 3
+  }
+}
+```
+
+---
+
+### 9. Lead Statistics
 **`GET /leads/statistics/overview`**
 
 Returns essential lead analytics with role-based filtering.
@@ -869,6 +828,298 @@ Returns essential lead analytics with role-based filtering.
 
 ---
 
+### 10. Get Archived Leads
+**`GET /leads/archived`**
+
+Retrieves archived leads (leads that failed 4+ times). Requires special `ArchivedLeadsAccessGuard`.
+
+#### Query Parameters
+- `search`: Search by name, email, or phone (case-insensitive)
+- `salesUnitId`: Filter by sales unit
+- `source`: Filter by lead source (PPC, SMM)
+- `outcome`: Filter by outcome
+- `qualityRating`: Filter by quality rating
+- `sortBy`: Sort field (default: "archivedAt")
+- `sortOrder`: Sort direction - "asc" or "desc" (default: "desc")
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 20)
+
+#### Response
+```json
+{
+  "archivedLeads": [
+    {
+      "id": 1,
+      "name": "Failed Lead",
+      "email": "failed@example.com",
+      "phone": "+1234567890",
+      "source": "PPC",
+      "outcome": "denied",
+      "qualityRating": "low",
+      "salesUnitId": 1,
+      "archivedAt": "2025-01-15T10:00:00.000Z",
+      "salesUnit": {
+        "name": "North Region"
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 15,
+    "totalPages": 1
+  }
+}
+```
+
+---
+
+### 11. Get Single Archived Lead
+**`GET /leads/archived/:id`**
+
+Retrieves a specific archived lead by ID with full details.
+
+#### Response
+```json
+{
+  "id": 1,
+  "name": "Failed Lead",
+  "email": "failed@example.com",
+  "phone": "+1234567890",
+  "source": "PPC",
+  "outcome": "denied",
+  "qualityRating": "low",
+  "notes": "Customer not interested after 4 attempts",
+  "salesUnitId": 1,
+  "archivedAt": "2025-01-15T10:00:00.000Z",
+  "salesUnit": {
+    "id": 1,
+    "name": "North Region"
+  }
+}
+```
+
+---
+
+## 💳 Payment Link APIs
+
+These APIs handle payment link generation and management for cracked leads.
+
+### 12. Generate Payment Link
+**`POST /leads/payment-link-generate`**
+
+Generates a payment link for a cracked lead. Creates a transaction, invoice, and optionally a new client.
+
+#### Request Body
+
+##### Option A: Using Existing Client
+```json
+{
+  "leadId": 1,
+  "clientId": 5,
+  "amount": 50000,
+  "type": "payment",
+  "method": "bank"
+}
+```
+
+##### Option B: Creating New Client
+```json
+{
+  "leadId": 1,
+  "clientName": "John Doe",
+  "companyName": "ABC Corp",
+  "email": "john@abccorp.com",
+  "phone": "+1234567890",
+  "country": "USA",
+  "state": "California",
+  "postalCode": "90001",
+  "amount": 50000,
+  "type": "payment",
+  "method": "bank"
+}
+```
+
+#### Required Fields
+- `leadId`: ID of the cracked lead
+- `amount`: Payment amount
+
+**Either:**
+- `clientId`: Existing client ID
+
+**Or (all required if no clientId):**
+- `clientName`: Client's name
+- `email`: Client's email
+- `phone`: Client's phone
+- `country`: Client's country
+- `state`: Client's state
+- `postalCode`: Client's postal code
+
+#### Optional Fields
+- `companyName`: Client's company name
+- `type`: Transaction type (default: "payment")
+- `method`: Payment method (default: "bank")
+
+#### Response
+```json
+{
+  "success": true,
+  "message": "Payment link generated successfully",
+  "data": {
+    "transactionId": 123,
+    "invoiceId": 456,
+    "clientId": 5,
+    "amount": 50000,
+    "status": "pending",
+    "paymentLink": "https://payment.example.com/invoice/456"
+  }
+}
+```
+
+---
+
+### 13. Get Payment Details
+**`GET /leads/transaction/:id`**
+
+Retrieves payment/transaction details for a specific transaction.
+
+#### Response
+```json
+{
+  "id": 123,
+  "amount": 50000,
+  "transactionType": "payment",
+  "paymentMethod": "bank",
+  "status": "pending",
+  "clientId": 5,
+  "employeeId": 2,
+  "client": {
+    "id": 5,
+    "clientName": "John Doe",
+    "companyName": "ABC Corp",
+    "email": "john@abccorp.com",
+    "phone": "+1234567890"
+  },
+  "invoice": {
+    "id": 456,
+    "leadId": 1,
+    "invoiceNumber": "INV-2025-001"
+  },
+  "createdAt": "2025-01-15T10:00:00.000Z"
+}
+```
+
+---
+
+### 14. Update Payment Link Details
+**`PATCH /leads/payment-link-generate/:id`**
+
+Updates payment link details (client info or transaction details). Only the creator can update.
+
+#### Request Body (All fields optional)
+```json
+{
+  "clientName": "John Smith",
+  "companyName": "XYZ Corp",
+  "email": "john@xyzcorp.com",
+  "phone": "+1234567891",
+  "country": "USA",
+  "state": "New York",
+  "postalCode": "10001",
+  "amount": 60000,
+  "type": "payment",
+  "method": "bank"
+}
+```
+
+#### Validation
+- Amount cannot exceed remaining amount in cracked lead
+- Only creator (employeeId) can update the payment link
+
+#### Response
+```json
+{
+  "success": true,
+  "message": "Payment link updated successfully",
+  "transaction": {
+    "id": 123,
+    "amount": 60000,
+    "transactionType": "payment",
+    "paymentMethod": "bank"
+  },
+  "client": {
+    "id": 5,
+    "clientName": "John Smith",
+    "companyName": "XYZ Corp",
+    "email": "john@xyzcorp.com"
+  }
+}
+```
+
+---
+
+### 15. Complete Payment
+**`POST /leads/payment-link-complete/:id`**
+
+Marks a payment as completed. Triggers multiple automated workflows.
+
+#### Request Body (Optional)
+```json
+{
+  "paymentMethod": "bank",
+  "category": "sales"
+}
+```
+
+#### Automated Workflows Triggered
+
+1. **Updates Transaction Status** to "completed"
+2. **Creates Revenue Record** in finance module
+3. **Creates Client Payment Record** 
+4. **Updates Cracked Lead**:
+   - Decrements remaining amount
+   - Increments current phase if needed
+5. **Creates/Updates Project** (if first phase payment)
+6. **Updates Lead Status**:
+   - If all phases paid → Status becomes "completed", type becomes "upsell"
+   - Otherwise → Status remains "cracked"
+
+#### Response
+```json
+{
+  "success": true,
+  "message": "Payment completed successfully",
+  "transaction": {
+    "id": 123,
+    "status": "completed",
+    "amount": 50000
+  },
+  "revenue": {
+    "id": 789,
+    "amount": 50000,
+    "source": "cracked_lead"
+  },
+  "crackedLead": {
+    "id": 1,
+    "remainingAmount": 0,
+    "currentPhase": 3,
+    "totalPhases": 3
+  },
+  "lead": {
+    "id": 1,
+    "status": "completed",
+    "type": "upsell"
+  },
+  "project": {
+    "id": 10,
+    "name": "Project for John Doe",
+    "status": "active"
+  }
+}
+```
+
+---
+
 ## 🚫 DELETE Endpoints
 
 **Note**: There are no DELETE endpoints for leads in this API. Leads are managed through status updates and archiving:
@@ -894,6 +1145,7 @@ Update Outcome to "denied" → Increment failedCount → At threshold 4 → Arch
 ### 3. Cracked Lead Workflow
 ```
 Update Outcome to "interested" → Update Status to "cracked" → Create cracked_lead record
+→ Generate Payment Link → Complete Payment → Update Phase/Status
 ```
 
 ### 4. Completed Lead Workflow
@@ -906,6 +1158,12 @@ Update Status to "completed" → Auto-change type to "upsell" → Update commiss
 Set action to "push" → Change type to "push" → Reset status to "new" → Unassign lead
 ```
 
+### 6. Payment & Project Workflow
+```
+Generate Payment Link → Customer Pays → Complete Payment → Create Revenue
+→ Update Cracked Lead → Create Project (if first phase) → Update Lead Status
+```
+
 ---
 
 ## 📊 Database Tables Affected
@@ -915,11 +1173,16 @@ Set action to "push" → Change type to "push" → Reset status to "new" → Una
 - **`lead_comments`**: Lead comments and notes
 - **`lead_outcome_history`**: Audit trail for all changes
 - **`cracked_leads`**: Converted leads with project details
+- **`archive_leads`**: Failed leads moved to archive
 
 ### Related Tables
 - **`sales_departments`**: Commission rates and sales data
 - **`teams`**: Team statistics updates
-- **`archive_leads`**: Failed leads moved to archive
+- **`transactions`**: Payment transactions
+- **`invoices`**: Payment invoices
+- **`clients`**: Client information
+- **`revenues`**: Revenue records
+- **`projects`**: Project creation from payments
 
 ---
 
@@ -930,21 +1193,42 @@ Set action to "push" → Change type to "push" → Reset status to "new" → Una
 - **Type**: `DECIMAL(5,2)` - Max value: 999.99
 - **Usage**: Stores percentage (5.0 = 5%), not absolute amount
 - **Calculation**: `commission_amount = total_amount × (commission_rate ÷ 100)`
+- **⚠️ CRITICAL**: Commission is **NOT** a field in `UpdateLeadDto` - it's auto-fetched from sales department
 
 ### 2. Required Fields
+
+#### For Cracking Lead:
+- `status`: Must be "cracked"
+- `comment`: Required
+- `totalAmount`: Required
+- `industryId`: Required
+- **❌ DO NOT SEND `commission`** - it's auto-calculated
+
+#### For Other Updates:
 - **Outcome Updates**: Comment is mandatory
-- **Cracked Lead Creation**: `totalAmount`, `commission`, `industryId` required
 - **Push Action**: Comment is mandatory
 
-### 3. Role-Based Restrictions
-- **Lead Creation**: Only Sales team + Admin
-- **Lead Access**: Sales + HR + Admin
-- **Type Visibility**: Based on user role hierarchy
+### 3. Update Permissions
+- **Users can ONLY update leads assigned to them**
+- **Team Leads CANNOT update their team members' leads**
+- **Managers CANNOT update subordinates' leads**
+- **Only Admin has full access, but same assignment rule applies**
 
-### 4. Audit Trail
+### 4. Role-Based Restrictions
+- **Lead Creation**: Only Sales team + Admin
+- **Lead Access**: Sales + HR + Admin + Marketing (limited)
+- **Type Visibility**: Based on user role hierarchy
+- **Archived Leads**: Requires special guard
+
+### 5. Audit Trail
 - **All Changes**: Tracked in `lead_outcome_history`
 - **Comments**: Linked to history records
 - **Timestamps**: All operations include proper timestamps
+
+### 6. Payment Link Validation
+- Amount cannot exceed cracked lead's remaining amount
+- Only creator can update payment link
+- Payment completion triggers multiple automated workflows
 
 ---
 
@@ -953,8 +1237,8 @@ Set action to "push" → Change type to "push" → Reset status to "new" → Una
 ### Test User Roles
 ```bash
 # Sales user - should work for all endpoints
-# HR user - should work for all except POST /leads
-# Marketing user - should be denied for all endpoints
+# HR user - should work for GET endpoints only
+# Marketing user - should have limited access
 # Admin user - should work for all endpoints
 ```
 
@@ -962,8 +1246,9 @@ Set action to "push" → Change type to "push" → Reset status to "new" → Una
 ```bash
 # Create lead → Request leads → Update outcome → Complete → Upsell
 # Test failed lead logic (4 denied attempts → archived)
-# Test cracked lead creation with required fields
+# Test cracked lead creation with auto-commission
 # Test push action and role restrictions
+# Test payment link generation and completion
 ```
 
 ---
@@ -975,6 +1260,7 @@ Set action to "push" → Change type to "push" → Reset status to "new" → Una
 3. **Follow Workflow**: Use APIs in the correct sequence
 4. **Monitor Logs**: Check console for debugging information
 5. **Validate Data**: Ensure required fields are provided
+6. **Assignment Rule**: Remember you can only update your own assigned leads
 
 ---
 
@@ -985,9 +1271,33 @@ For API issues or questions:
 - Verify user permissions and role assignments
 - Ensure database schema matches expectations
 - Review business logic implementation
+- Check if leads are assigned to you before updating
 
 ---
 
-*Last Updated: January 2025*
-*Version: 1.0*
+## 📋 Complete API Endpoint List
 
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| `POST` | `/leads` | Create lead | Sales, Admin |
+| `GET` | `/leads` | Get all leads (hierarchical) | Sales, HR, Admin, Marketing |
+| `GET` | `/leads/my-leads` | Get my assigned leads | Sales, HR, Admin, Marketing |
+| `GET` | `/leads/:id` | Get single lead details | Sales, HR, Admin, Marketing |
+| `POST` | `/leads/request` | Request leads (get 10) | Sales, Admin |
+| `PUT` | `/leads/:id` | Update lead | Sales, Admin (own leads only) |
+| `POST` | `/leads/bulk-update` | Bulk update leads | Sales, Admin |
+| `GET` | `/leads/cracked` | Get cracked leads | Sales, HR, Admin |
+| `GET` | `/leads/statistics/overview` | Get lead statistics | Sales, HR, Admin |
+| `GET` | `/leads/filter-options/sales-units` | Get sales units | Sales, Marketing, Admin |
+| `GET` | `/leads/filter-options/employees` | Get employees | Sales, Marketing, Admin |
+| `GET` | `/leads/archived` | Get archived leads | Special Guard Required |
+| `GET` | `/leads/archived/:id` | Get single archived lead | Special Guard Required |
+| `POST` | `/leads/payment-link-generate` | Generate payment link | Sales, Admin |
+| `GET` | `/leads/transaction/:id` | Get payment details | Sales, Admin |
+| `PATCH` | `/leads/payment-link-generate/:id` | Update payment link | Sales, Admin (creator only) |
+| `POST` | `/leads/payment-link-complete/:id` | Complete payment | Sales, Admin |
+
+---
+
+*Last Updated: October 2025*
+*Version: 2.0 - Completely rewritten to match actual implementation*
