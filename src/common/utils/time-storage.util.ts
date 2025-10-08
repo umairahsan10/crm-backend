@@ -87,4 +87,28 @@ export class TimeStorageUtil {
     storageDate.setUTCHours(hours, minutes, seconds, 0);
     return storageDate;
   }
+
+  /**
+   * Gets current time in PKT (Pakistan Time - UTC+5) for storage
+   */
+  static getCurrentPKTTimeForStorage(): Date {
+    const now = new Date();
+    
+    // Convert to PKT (UTC+5)
+    // Get UTC time in milliseconds and add 5 hours (5 * 60 * 60 * 1000)
+    const pktTime = new Date(now.getTime() + (5 * 60 * 60 * 1000));
+    
+    // Extract PKT time components
+    const hours = pktTime.getUTCHours();
+    const minutes = pktTime.getUTCMinutes();
+    const seconds = pktTime.getUTCSeconds();
+    const date = pktTime.getUTCDate();
+    const month = pktTime.getUTCMonth();
+    const year = pktTime.getUTCFullYear();
+    
+    // Create a new date with PKT time stored in UTC format
+    const storageDate = new Date(Date.UTC(year, month, date, hours, minutes, seconds, 0));
+    
+    return storageDate;
+  }
 }

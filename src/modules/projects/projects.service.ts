@@ -967,9 +967,19 @@ export class ProjectsService {
     return false;
   }
 
-  // Helper method to create project chat with HR and Production managers as owners
+  // Helper method to create project chat with HR, Production, Sales managers and Sales Rep as initial participants
   private async createProjectChatWithDefaultOwners(projectId: number) {
     try {
+      // Get the project to access salesRepId
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { salesRepId: true }
+      });
+
+      if (!project || !project.salesRepId) {
+        throw new BadRequestException('Project or Sales Representative not found. Cannot create project chat.');
+      }
+
       // Find HR manager (dep_manager role in HR department)
       const hrManager = await this.prisma.employee.findFirst({
         where: {
@@ -986,15 +996,28 @@ export class ProjectsService {
         }
       });
 
-      if (!hrManager || !productionManager) {
-        throw new BadRequestException('HR Manager or Production Manager not found. Cannot create project chat.');
+      // Find Sales manager (dep_manager role in Sales department)
+      const salesManager = await this.prisma.employee.findFirst({
+        where: {
+          role: { name: 'dep_manager' },
+          department: { name: 'Sales' }
+        }
+      });
+
+      // Get Sales Representative
+      const salesRep = await this.prisma.employee.findUnique({
+        where: { id: project.salesRepId }
+      });
+
+      if (!hrManager || !productionManager || !salesManager || !salesRep) {
+        throw new BadRequestException('HR Manager, Production Manager, Sales Manager, or Sales Representative not found. Cannot create project chat.');
       }
 
       // Create project chat
       const projectChat = await this.prisma.projectChat.create({
         data: {
           projectId: projectId,
-          participants: 2 // Initially 2 participants (HR and Production managers)
+          participants: 4 // Initially 4 participants (HR, Production, Sales managers + Sales Rep)
         }
       });
 
@@ -1016,7 +1039,25 @@ export class ProjectsService {
         }
       });
 
-      console.log(`Project chat created for project ${projectId} with HR manager (${hrManager.id}) and Production manager (${productionManager.id}) as owners`);
+      // Add Sales manager as owner
+      await this.prisma.chatParticipant.create({
+        data: {
+          chatId: projectChat.id,
+          employeeId: salesManager.id,
+          memberType: 'owner'
+        }
+      });
+
+      // Add Sales Representative as participant
+      await this.prisma.chatParticipant.create({
+        data: {
+          chatId: projectChat.id,
+          employeeId: salesRep.id,
+          memberType: 'participant'
+        }
+      });
+
+      console.log(`Project chat created for project ${projectId} with HR manager (${hrManager.id}), Production manager (${productionManager.id}), Sales manager (${salesManager.id}) as owners and Sales Rep (${salesRep.id}) as participant`);
     } catch (error) {
       console.error(`Failed to create project chat for project ${projectId}:`, error);
       throw new BadRequestException(`Failed to create project chat: ${error.message}`);

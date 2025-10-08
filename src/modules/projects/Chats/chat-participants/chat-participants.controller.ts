@@ -10,23 +10,43 @@ export class ChatParticipantsController {
   constructor(private readonly chatParticipantsService: ChatParticipantsService) {}
 
   @Get()
-  async getAllChatParticipants() {
-    return this.chatParticipantsService.getAllChatParticipants();
+  async getAllChatParticipants(@Request() req) {
+    console.log('🎯 [CONTROLLER] GET /chat-participants - Getting all chat participants');
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    console.log('📧 [CONTROLLER] Requester Email:', req.user.email);
+    const result = await this.chatParticipantsService.getAllChatParticipants(req.user.id);
+    console.log('✅ [CONTROLLER] Successfully retrieved', result.length, 'participants');
+    return result;
   }
 
   @Get(':id')
-  async getChatParticipantById(@Param('id', ParseIntPipe) id: number) {
-    return this.chatParticipantsService.getChatParticipantById(id);
+  async getChatParticipantById(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    console.log('🎯 [CONTROLLER] GET /chat-participants/:id - Getting participant by ID');
+    console.log('🆔 [CONTROLLER] Participant ID:', id);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    const result = await this.chatParticipantsService.getChatParticipantById(id, req.user.id);
+    console.log('✅ [CONTROLLER] Successfully retrieved participant:', result.employee.firstName, result.employee.lastName);
+    return result;
   }
 
   @Get('chat/:chatId')
-  async getChatParticipantsByChatId(@Param('chatId', ParseIntPipe) chatId: number) {
-    return this.chatParticipantsService.getChatParticipantsByChatId(chatId);
+  async getChatParticipantsByChatId(@Param('chatId', ParseIntPipe) chatId: number, @Request() req) {
+    console.log('🎯 [CONTROLLER] GET /chat-participants/chat/:chatId - Getting participants by chat ID');
+    console.log('💬 [CONTROLLER] Chat ID:', chatId);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    const result = await this.chatParticipantsService.getChatParticipantsByChatId(chatId, req.user.id);
+    console.log('✅ [CONTROLLER] Successfully retrieved', result.length, 'participants for chat', chatId);
+    return result;
   }
 
   @Post()
   async createChatParticipant(@Body() createChatParticipantDto: CreateChatParticipantDto, @Request() req) {
-    return this.chatParticipantsService.createChatParticipant(createChatParticipantDto, req.user.id);
+    console.log('🎯 [CONTROLLER] POST /chat-participants - Creating new participant');
+    console.log('📥 [CONTROLLER] Request Body:', createChatParticipantDto);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    const result = await this.chatParticipantsService.createChatParticipant(createChatParticipantDto, req.user.id);
+    console.log('✅ [CONTROLLER] Successfully created participant ID:', result.id);
+    return result;
   }
 
   @Put(':id')
@@ -34,11 +54,21 @@ export class ChatParticipantsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateChatParticipantDto: UpdateChatParticipantDto,
   ) {
-    return this.chatParticipantsService.updateChatParticipant(id, updateChatParticipantDto);
+    console.log('🎯 [CONTROLLER] PUT /chat-participants/:id - Updating participant');
+    console.log('🆔 [CONTROLLER] Participant ID:', id);
+    console.log('📥 [CONTROLLER] Update Data:', updateChatParticipantDto);
+    const result = await this.chatParticipantsService.updateChatParticipant(id, updateChatParticipantDto);
+    console.log('✅ [CONTROLLER] Successfully updated participant ID:', id);
+    return result;
   }
 
   @Delete(':id')
   async deleteChatParticipant(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.chatParticipantsService.deleteChatParticipant(id, req.user.id);
+    console.log('🎯 [CONTROLLER] DELETE /chat-participants/:id - Deleting participant');
+    console.log('🆔 [CONTROLLER] Participant ID:', id);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    const result = await this.chatParticipantsService.deleteChatParticipant(id, req.user.id);
+    console.log('✅ [CONTROLLER] Successfully deleted participant ID:', id);
+    return result;
   }
 }
