@@ -5,6 +5,7 @@ import { TerminateEmployeeDto } from '../dto/terminate-employee.dto';
 import { HrLogResponseDto, HrLogsListResponseDto, GetHrLogsDto, ExportHrLogsDto } from '../../dto/hr-log.dto';
 import { HrLogsStatsResponseDto } from '../../dto/hr-logs-stats.dto';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
+import { CreateCompleteEmployeeDto } from '../dto/create-complete-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { UpdateBonusDto } from '../dto/update-bonus.dto';
 import { UpdateShiftDto } from '../dto/update-shift.dto';
@@ -59,6 +60,25 @@ export class EmployeeController {
   @Permissions(PermissionName.employee_add_permission)
   async createEmployee(@Body() dto: CreateEmployeeDto, @Request() req: AuthenticatedRequest): Promise<EmployeeResponseDto> {
     return await this.hrService.createEmployee(dto, req.user.id);
+  }
+
+  /**
+   * Create a complete employee with department-specific data and bank account in a single transaction
+   * This endpoint handles:
+   * 1. Employee record creation
+   * 2. Department-specific record (HR/Sales/Marketing/Production/Accountant)
+   * 3. Bank account record (optional)
+   * All operations are wrapped in a transaction - either all succeed or all fail
+   */
+  @Post('employees/complete')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @Permissions(PermissionName.employee_add_permission)
+  async createCompleteEmployee(
+    @Body() dto: CreateCompleteEmployeeDto, 
+    @Request() req: AuthenticatedRequest
+  ) {
+    return await this.hrService.createCompleteEmployee(dto, req.user.id);
   }
 
   /**
