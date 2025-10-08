@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { FinanceService } from '../../../finance/finance.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
+import { CreateCompleteEmployeeDto } from '../dto/create-complete-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { GetEmployeesDto } from '../dto/get-employees.dto';
 import { EmployeeStatisticsDto } from '../dto/employee-statistics.dto';
@@ -259,7 +260,369 @@ export class EmployeeService {
   }
 
   /**
-   * Create a new employee
+   * Create a complete employee with all related records in a single transaction
+   * This method handles employee creation, department-specific records, and bank account
+   */
+  async createCompleteEmployee(dto: CreateCompleteEmployeeDto, hrEmployeeId: number) {
+    // Validate email uniqueness
+    const existingEmployee = await this.prisma.employee.findUnique({
+      where: { email: dto.employee.email },
+    });
+
+    if (existingEmployee) {
+      throw new BadRequestException(`Employee with email ${dto.employee.email} already exists`);
+    }
+
+    // Validate department exists
+    const department = await this.prisma.department.findUnique({
+      where: { id: dto.employee.departmentId },
+    });
+
+    if (!department) {
+      throw new NotFoundException(`Department with ID ${dto.employee.departmentId} not found`);
+    }
+
+    // Validate role exists
+    const role = await this.prisma.role.findUnique({
+      where: { id: dto.employee.roleId },
+    });
+
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${dto.employee.roleId} not found`);
+    }
+
+    // Validate manager if provided
+    if (dto.employee.managerId) {
+      const manager = await this.prisma.employee.findUnique({
+        where: { id: dto.employee.managerId },
+      });
+
+      if (!manager) {
+        throw new NotFoundException(`Manager with ID ${dto.employee.managerId} not found`);
+      }
+    }
+
+    // Validate team lead if provided
+    if (dto.employee.teamLeadId) {
+      const teamLead = await this.prisma.employee.findUnique({
+        where: { id: dto.employee.teamLeadId },
+      });
+
+      if (!teamLead) {
+        throw new NotFoundException(`Team Lead with ID ${dto.employee.teamLeadId} not found`);
+      }
+    }
+
+    // Department-specific validation
+    const departmentName = department.name;
+
+    // CRITICAL VALIDATION 1: Ensure only ONE department data is provided
+    const departmentDataKeys = dto.departmentData ? Object.keys(dto.departmentData).filter(key => dto.departmentData![key] !== null && dto.departmentData![key] !== undefined) : [];
+    
+    if (departmentDataKeys.length > 1) {
+      throw new BadRequestException(`Only one department data should be provided. Found: ${departmentDataKeys.join(', ')}`);
+    }
+
+    // CRITICAL VALIDATION 2: Ensure department data matches the selected department
+    const departmentDataMapping = {
+      'HR': 'hr',
+      'Sales': 'sales',
+      'Marketing': 'marketing',
+      'Production': 'production',
+      'Accounts': 'accountant'
+    };
+
+    const expectedKey = departmentDataMapping[departmentName];
+    
+    if (departmentDataKeys.length > 0) {
+      const providedKey = departmentDataKeys[0];
+      if (expectedKey && providedKey !== expectedKey) {
+        throw new BadRequestException(
+          `Department data mismatch. Selected department is '${departmentName}' but provided data for '${providedKey}'. ` +
+          `Please provide '${expectedKey}' data for ${departmentName} department.`
+        );
+      }
+    }
+
+    // CRITICAL VALIDATION 3: For Sales department, ensure data is provided and withholdCommission/withholdFlag are present
+    if (departmentName === 'Sales') {
+      if (!dto.departmentData?.sales) {
+        throw new BadRequestException('Sales department data is required when creating a Sales employee');
+      }
+      
+      if (dto.departmentData.sales.withholdCommission === undefined || dto.departmentData.sales.withholdCommission === null) {
+        throw new BadRequestException('withholdCommission is required for Sales department');
+      }
+      if (dto.departmentData.sales.withholdFlag === undefined || dto.departmentData.sales.withholdFlag === null) {
+        throw new BadRequestException('withholdFlag is required for Sales department');
+      }
+
+      // Validate sales unit if provided
+      if (dto.departmentData.sales.salesUnitId) {
+        const salesUnit = await this.prisma.salesUnit.findUnique({
+          where: { id: dto.departmentData.sales.salesUnitId },
+        });
+        if (!salesUnit) {
+          throw new NotFoundException(`Sales Unit with ID ${dto.departmentData.sales.salesUnitId} not found`);
+        }
+      }
+    }
+
+    // For other departments, validate if data is provided
+    if (departmentName === 'HR' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.hr) {
+      throw new BadRequestException(`Department data mismatch. Selected department is 'HR' but no HR data provided.`);
+    }
+
+    if (departmentName === 'Marketing' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.marketing) {
+      throw new BadRequestException(`Department data mismatch. Selected department is 'Marketing' but no Marketing data provided.`);
+    }
+
+    if (departmentName === 'Production' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.production) {
+      throw new BadRequestException(`Department data mismatch. Selected department is 'Production' but no Production data provided.`);
+    }
+
+    if (departmentName === 'Accounts' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.accountant) {
+      throw new BadRequestException(`Department data mismatch. Selected department is 'Accounts' but no Accountant data provided.`);
+    }
+
+    // Additional validation for Sales department (already done above)
+    // This section is now handled in CRITICAL VALIDATION 3
+
+    // Validate marketing unit if provided
+    if (departmentName === 'Marketing' && dto.departmentData?.marketing?.marketingUnitId) {
+      const marketingUnit = await this.prisma.marketingUnit.findUnique({
+        where: { id: dto.departmentData.marketing.marketingUnitId },
+      });
+      if (!marketingUnit) {
+        throw new NotFoundException(`Marketing Unit with ID ${dto.departmentData.marketing.marketingUnitId} not found`);
+      }
+    }
+
+    // Validate production unit if provided
+    if (departmentName === 'Production' && dto.departmentData?.production?.productionUnitId) {
+      const productionUnit = await this.prisma.productionUnit.findUnique({
+        where: { id: dto.departmentData.production.productionUnitId },
+      });
+      if (!productionUnit) {
+        throw new NotFoundException(`Production Unit with ID ${dto.departmentData.production.productionUnitId} not found`);
+      }
+    }
+
+    // OPTIMIZATION: Fix all sequences BEFORE transaction (reduces transaction time)
+    try {
+      await this.prisma.$executeRaw`SELECT setval('employees_emp_id_seq', (SELECT COALESCE(MAX(emp_id), 0) + 1 FROM employees))`;
+      await this.prisma.$executeRaw`SELECT setval('hr_hr_id_seq', (SELECT COALESCE(MAX(hr_id), 0) + 1 FROM hr))`;
+      await this.prisma.$executeRaw`SELECT setval('sales_departments_sales_department_id_seq', (SELECT COALESCE(MAX(sales_department_id), 0) + 1 FROM sales_departments))`;
+      await this.prisma.$executeRaw`SELECT setval('marketing_marketing_id_seq', (SELECT COALESCE(MAX(marketing_id), 0) + 1 FROM marketing))`;
+      await this.prisma.$executeRaw`SELECT setval('production_production_id_seq', (SELECT COALESCE(MAX(production_id), 0) + 1 FROM production))`;
+      await this.prisma.$executeRaw`SELECT setval('accountants_accountant_id_seq', (SELECT COALESCE(MAX(accountant_id), 0) + 1 FROM accountants))`;
+      await this.prisma.$executeRaw`SELECT setval('accounts_account_id_seq', (SELECT COALESCE(MAX(account_id), 0) + 1 FROM accounts))`;
+    } catch (error) {
+      this.logger.warn('Could not reset all sequences, continuing with creation');
+    }
+
+    try {
+      // Use optimized transaction - only critical operations inside
+      const result = await this.prisma.$transaction(async (tx) => {
+
+        // Step 1: Create Employee
+        const employee = await tx.employee.create({
+          data: {
+            firstName: dto.employee.firstName,
+            lastName: dto.employee.lastName,
+            email: dto.employee.email,
+            phone: dto.employee.phone,
+            gender: dto.employee.gender,
+            cnic: dto.employee.cnic,
+            departmentId: dto.employee.departmentId,
+            roleId: dto.employee.roleId,
+            managerId: dto.employee.managerId,
+            teamLeadId: dto.employee.teamLeadId,
+            address: dto.employee.address,
+            maritalStatus: dto.employee.maritalStatus,
+            status: dto.employee.status || 'active',
+            startDate: dto.employee.startDate ? new Date(dto.employee.startDate) : null,
+            endDate: dto.employee.endDate ? new Date(dto.employee.endDate) : null,
+            modeOfWork: dto.employee.modeOfWork,
+            remoteDaysAllowed: dto.employee.remoteDaysAllowed,
+            dob: dto.employee.dob ? new Date(dto.employee.dob) : null,
+            emergencyContact: dto.employee.emergencyContact,
+            shiftStart: dto.employee.shiftStart,
+            shiftEnd: dto.employee.shiftEnd,
+            employmentType: dto.employee.employmentType,
+            dateOfConfirmation: dto.employee.dateOfConfirmation ? new Date(dto.employee.dateOfConfirmation) : null,
+            periodType: dto.employee.periodType,
+            passwordHash: await bcrypt.hash(dto.employee.passwordHash, 10),
+            bonus: dto.employee.bonus,
+          },
+        });
+
+        this.logger.log(`Employee ${employee.id} created successfully in transaction`);
+
+        // Step 2: Create Department-Specific Record
+        let departmentRecord: any = null;
+
+        if (departmentName === 'HR' && dto.departmentData?.hr) {
+          // Apply defaults for HR permissions (false if not provided)
+          departmentRecord = await tx.hR.create({
+            data: {
+              employeeId: employee.id,
+              attendancePermission: dto.departmentData.hr.attendancePermission ?? false,
+              salaryPermission: dto.departmentData.hr.salaryPermission ?? false,
+              commissionPermission: dto.departmentData.hr.commissionPermission ?? false,
+              employeeAddPermission: dto.departmentData.hr.employeeAddPermission ?? false,
+              terminationsHandle: dto.departmentData.hr.terminationsHandle ?? false,
+              monthlyRequestApprovals: dto.departmentData.hr.monthlyRequestApprovals ?? false,
+              targetsSet: dto.departmentData.hr.targetsSet ?? false,
+              bonusesSet: dto.departmentData.hr.bonusesSet ?? false,
+              shiftTimingSet: dto.departmentData.hr.shiftTimingSet ?? false,
+            },
+          });
+          this.logger.log(`HR record created for employee ${employee.id}`);
+        } else if (departmentName === 'Sales' && dto.departmentData?.sales) {
+          // Apply defaults for Sales department (0 for optional numeric fields)
+          departmentRecord = await tx.salesDepartment.create({
+            data: {
+              employeeId: employee.id,
+              salesUnitId: dto.departmentData.sales.salesUnitId,
+              commissionRate: dto.departmentData.sales.commissionRate,
+              withholdCommission: dto.departmentData.sales.withholdCommission,
+              withholdFlag: dto.departmentData.sales.withholdFlag,
+              targetAmount: dto.departmentData.sales.targetAmount ?? 0,
+              salesBonus: dto.departmentData.sales.salesBonus ?? 0,
+              leadsClosed: dto.departmentData.sales.leadsClosed ?? 0,
+              salesAmount: dto.departmentData.sales.salesAmount ?? 0,
+              commissionAmount: dto.departmentData.sales.commissionAmount ?? 0,
+              chargebackDeductions: dto.departmentData.sales.chargebackDeductions ?? 0,
+              refundDeductions: dto.departmentData.sales.refundDeductions ?? 0,
+            },
+          });
+          this.logger.log(`Sales department record created for employee ${employee.id}`);
+        } else if (departmentName === 'Marketing' && dto.departmentData?.marketing) {
+          // Apply defaults for Marketing department
+          departmentRecord = await tx.marketing.create({
+            data: {
+              employeeId: employee.id,
+              marketingUnitId: dto.departmentData.marketing.marketingUnitId,
+              platformFocus: dto.departmentData.marketing.platformFocus,
+              totalCampaignsRun: dto.departmentData.marketing.totalCampaignsRun ?? 0,
+            },
+          });
+          this.logger.log(`Marketing record created for employee ${employee.id}`);
+        } else if (departmentName === 'Production' && dto.departmentData?.production) {
+          // Apply defaults for Production department
+          departmentRecord = await tx.production.create({
+            data: {
+              employeeId: employee.id,
+              specialization: dto.departmentData.production.specialization,
+              productionUnitId: dto.departmentData.production.productionUnitId,
+              projectsCompleted: dto.departmentData.production.projectsCompleted ?? 0,
+            },
+          });
+          this.logger.log(`Production record created for employee ${employee.id}`);
+        } else if (departmentName === 'Accounts' && dto.departmentData?.accountant) {
+          // Apply defaults for Accountant permissions (false if not provided)
+          departmentRecord = await tx.accountant.create({
+            data: {
+              employeeId: employee.id,
+              liabilitiesPermission: dto.departmentData.accountant.liabilitiesPermission ?? false,
+              salaryPermission: dto.departmentData.accountant.salaryPermission ?? false,
+              salesPermission: dto.departmentData.accountant.salesPermission ?? false,
+              invoicesPermission: dto.departmentData.accountant.invoicesPermission ?? false,
+              expensesPermission: dto.departmentData.accountant.expensesPermission ?? false,
+              assetsPermission: dto.departmentData.accountant.assetsPermission ?? false,
+              revenuesPermission: dto.departmentData.accountant.revenuesPermission ?? false,
+            },
+          });
+          this.logger.log(`Accountant record created for employee ${employee.id}`);
+        }
+
+        // Step 3: Create Bank Account Record (optional)
+        let bankAccountRecord: any = null;
+        if (dto.bankAccount) {
+          bankAccountRecord = await tx.account.create({
+            data: {
+              employeeId: employee.id,
+              accountTitle: dto.bankAccount.accountTitle,
+              bankName: dto.bankAccount.bankName,
+              ibanNumber: dto.bankAccount.ibanNumber,
+              baseSalary: dto.bankAccount.baseSalary,
+            },
+          });
+          this.logger.log(`Bank account record created for employee ${employee.id}`);
+        }
+
+        // Return only essential data from transaction
+        return {
+          employeeId: employee.id,
+          employeeFirstName: employee.firstName,
+          employeeLastName: employee.lastName,
+          employeeEmail: employee.email,
+        };
+      }, {
+        timeout: 10000, // 10 seconds timeout - optimized transaction
+      });
+
+      // OPTIMIZATION: Move HR log creation OUTSIDE transaction (non-critical for atomicity)
+      try {
+        await this.createHrLog(
+          hrEmployeeId, 
+          'employee_created', 
+          result.employeeId, 
+          `Complete employee record created for ${result.employeeFirstName} ${result.employeeLastName} (${result.employeeEmail}) in ${departmentName} department`
+        );
+      } catch (error) {
+        this.logger.warn(`Failed to create HR log: ${error.message}`);
+      }
+
+      // OPTIMIZATION: Fetch complete employee data OUTSIDE transaction (faster)
+      const completeEmployee = await this.prisma.employee.findUnique({
+        where: { id: result.employeeId },
+        include: {
+          department: true,
+          role: true,
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          teamLead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          hr: true,
+          salesDepartment: true,
+          marketingRecords: true,
+          production: true,
+          accountant: true,
+          accounts: true,
+        },
+      });
+
+      this.logger.log(`Complete employee creation successful for ID ${result.employeeId}`);
+
+      return {
+        status: 'success',
+        message: 'Employee created successfully with all related records',
+        data: {
+          employee: completeEmployee,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to create complete employee: ${error.message}`);
+      throw new BadRequestException(`Failed to create employee: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a new employee (original method - kept for backward compatibility)
    */
   async createEmployee(dto: CreateEmployeeDto, hrEmployeeId: number) {
     // Check if email already exists
