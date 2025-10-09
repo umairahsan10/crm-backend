@@ -119,12 +119,45 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     this.logger.log(`✅ User ${userId} authenticated - Socket: ${client.id}`);
     this.logger.log(`👥 Active users: ${this.activeUsers.size}`);
 
-    return { 
-      success: true, 
-      message: 'Authenticated successfully',
-      userId,
-      socketId: client.id,
-    };
+    // Auto-join all chats where the user is a participant
+    try {
+      const userChats = await this.chatMessagesService['prisma'].chatParticipant.findMany({
+        where: { employeeId: userId },
+        select: { chatId: true },
+      });
+
+      const chatIds = userChats.map(chat => chat.chatId);
+      
+      for (const chatId of chatIds) {
+        await client.join(`chat_${chatId}`);
+        this.logger.log(`🔄 Auto-joined user ${userId} to chat_${chatId}`);
+        
+        // Notify other participants that user is now online in this chat
+        client.to(`chat_${chatId}`).emit('userOnline', {
+          chatId,
+          userId,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      this.logger.log(`✅ User ${userId} auto-joined ${chatIds.length} chats`);
+
+      return { 
+        success: true, 
+        message: 'Authenticated successfully',
+        userId,
+        socketId: client.id,
+        autoJoinedChats: chatIds,
+      };
+    } catch (error) {
+      this.logger.error(`❌ Error auto-joining chats: ${error.message}`);
+      return { 
+        success: true, 
+        message: 'Authenticated successfully, but failed to auto-join some chats',
+        userId,
+        socketId: client.id,
+      };
+    }
   }
 
   @UseGuards(WsJwtGuard)
@@ -214,19 +247,33 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       this.logger.log(`📨 User ${userId} sending message to chat ${chatId}`);
 
+      // Verify user is in the chat room, if not, join them first
+      const rooms = Array.from(client.rooms);
+      const chatRoom = `chat_${chatId}`;
+      if (!rooms.includes(chatRoom)) {
+        this.logger.warn(`⚠️ User ${userId} not in room ${chatRoom}, joining now...`);
+        await client.join(chatRoom);
+      }
+
       // Create message in database
       const result = await this.chatMessagesService.createChatMessage(
         { chatId, content },
         userId,
       );
 
-      // Emit to all users in the chat room (including sender)
-      this.server.to(`chat_${chatId}`).emit('newMessage', {
+      const messagePayload = {
         message: result.data,
         chatId,
         senderId: userId,
         timestamp: new Date().toISOString(),
-      });
+      };
+
+      // Emit to all users in the chat room INCLUDING sender
+      // Using .to() broadcasts to everyone in the room, including the sender if they're in the room
+      this.server.to(chatRoom).emit('newMessage', messagePayload);
+
+      // Also emit directly to sender as backup to ensure they ALWAYS see their message
+      client.emit('newMessage', messagePayload);
 
       this.logger.log(`✅ Message sent to chat_${chatId} - Message ID: ${result.data.id}`);
       
@@ -319,6 +366,38 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       timestamp: new Date().toISOString(),
     });
     this.logger.log(`📤 Emitted message deletion to chat_${chatId}`);
+  }
+
+  // Public method to emit participant added
+  emitParticipantAdded(chatId: number, participant: any, participantCount: number) {
+    this.server.to(`chat_${chatId}`).emit('participantAdded', {
+      chatId,
+      participant,
+      participantCount,
+      timestamp: new Date().toISOString(),
+    });
+    this.logger.log(`📤 Emitted participant added to chat_${chatId} - New count: ${participantCount}`);
+  }
+
+  // Public method to emit participant removed
+  emitParticipantRemoved(chatId: number, participantId: number, participantCount: number) {
+    this.server.to(`chat_${chatId}`).emit('participantRemoved', {
+      chatId,
+      participantId,
+      participantCount,
+      timestamp: new Date().toISOString(),
+    });
+    this.logger.log(`📤 Emitted participant removed from chat_${chatId} - New count: ${participantCount}`);
+  }
+
+  // Public method to emit participant count update
+  emitParticipantCountUpdate(chatId: number, participantCount: number) {
+    this.server.to(`chat_${chatId}`).emit('participantCountUpdated', {
+      chatId,
+      participantCount,
+      timestamp: new Date().toISOString(),
+    });
+    this.logger.log(`📤 Emitted participant count update to chat_${chatId} - Count: ${participantCount}`);
   }
 
   // Helper method to extract token from socket
