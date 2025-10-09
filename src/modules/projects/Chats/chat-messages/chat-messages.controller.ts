@@ -26,10 +26,17 @@ export class ChatMessagesController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string
   ) {
+    console.log('🎯 [CONTROLLER] GET /chat-messages/chat/:chatId - Getting messages by chat ID');
+    console.log('💬 [CONTROLLER] Chat ID:', chatId);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    console.log('📊 [CONTROLLER] Pagination - Limit:', limit || 'default(50)', 'Offset:', offset || '0');
+    
     const limitNum = limit ? parseInt(limit, 10) : undefined;
     const offsetNum = offset ? parseInt(offset, 10) : undefined;
     
-    return this.chatMessagesService.getChatMessagesByChatId(chatId, req.user.id, limitNum, offsetNum);
+    const result = await this.chatMessagesService.getChatMessagesByChatId(chatId, req.user.id, limitNum, offsetNum);
+    console.log('✅ [CONTROLLER] Successfully retrieved', result.messages.length, 'messages');
+    return result;
   }
 
   @Get('chat/:chatId/latest')
@@ -40,7 +47,12 @@ export class ChatMessagesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createChatMessage(@Body() createChatMessageDto: CreateChatMessageDto, @Request() req) {
-    return this.chatMessagesService.createChatMessage(createChatMessageDto, req.user.id);
+    console.log('🎯 [CONTROLLER] POST /chat-messages - Creating new message');
+    console.log('📥 [CONTROLLER] Request Body:', createChatMessageDto);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    const result = await this.chatMessagesService.createChatMessage(createChatMessageDto, req.user.id);
+    console.log('✅ [CONTROLLER] Successfully created message ID:', result.data.id);
+    return result;
   }
 
   @Put(':id')
@@ -49,7 +61,13 @@ export class ChatMessagesController {
     @Body() updateChatMessageDto: UpdateChatMessageDto,
     @Request() req
   ) {
-    return this.chatMessagesService.updateChatMessage(id, updateChatMessageDto, req.user.id);
+    console.log('🎯 [CONTROLLER] PUT /chat-messages/:id - Updating message');
+    console.log('🆔 [CONTROLLER] Message ID:', id);
+    console.log('📥 [CONTROLLER] Update Data:', updateChatMessageDto);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    const result = await this.chatMessagesService.updateChatMessage(id, updateChatMessageDto, req.user.id);
+    console.log('✅ [CONTROLLER] Successfully updated message ID:', result.data.id);
+    return result;
   }
 
   @Delete(':id')
@@ -58,6 +76,11 @@ export class ChatMessagesController {
     @Param('id', ParseIntPipe) id: number,
     @Request() req
   ) {
-    return this.chatMessagesService.deleteChatMessage(id, req.user.id);
+    console.log('🎯 [CONTROLLER] DELETE /chat-messages/:id - Deleting message');
+    console.log('🆔 [CONTROLLER] Message ID:', id);
+    console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    const result = await this.chatMessagesService.deleteChatMessage(id, req.user.id);
+    console.log('✅ [CONTROLLER] Successfully deleted message');
+    return result;
   }
 }
