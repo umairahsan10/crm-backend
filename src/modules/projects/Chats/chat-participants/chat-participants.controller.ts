@@ -3,11 +3,15 @@ import { ChatParticipantsService } from './chat-participants.service';
 import { CreateChatParticipantDto } from './dto/create-chat-participant.dto';
 import { UpdateChatParticipantDto } from './dto/update-chat-participant.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { ChatGateway } from '../chat.gateway';
 
 @Controller('chat-participants')
 @UseGuards(JwtAuthGuard)
 export class ChatParticipantsController {
-  constructor(private readonly chatParticipantsService: ChatParticipantsService) {}
+  constructor(
+    private readonly chatParticipantsService: ChatParticipantsService,
+    private readonly chatGateway: ChatGateway,
+  ) {}
 
   @Get()
   async getAllChatParticipants(@Request() req) {
@@ -46,6 +50,24 @@ export class ChatParticipantsController {
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
     const result = await this.chatParticipantsService.createChatParticipant(createChatParticipantDto, req.user.id);
     console.log('✅ [CONTROLLER] Successfully created participant ID:', result.id);
+    
+    // Get the updated participant count
+    const participantCount = result.chat.participants || 0;
+    
+    // Emit real-time event to all participants in the chat
+    this.chatGateway.emitParticipantAdded(
+      createChatParticipantDto.chatId,
+      {
+        id: result.id,
+        employeeId: result.employeeId,
+        employee: result.employee,
+        memberType: result.memberType,
+      },
+      participantCount,
+    );
+    
+    console.log('🔔 [CONTROLLER] Emitted participantAdded event to chat room');
+    
     return result;
   }
 
@@ -69,6 +91,20 @@ export class ChatParticipantsController {
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
     const result = await this.chatParticipantsService.deleteChatParticipant(id, req.user.id);
     console.log('✅ [CONTROLLER] Successfully deleted participant ID:', id);
+    
+    // Get the chat ID and updated count from the result
+    const chatId = result.deletedParticipant.chatId;
+    const participantCount = result.updatedParticipantCount;
+    
+    // Emit real-time event to all participants in the chat
+    this.chatGateway.emitParticipantRemoved(
+      chatId,
+      id,
+      participantCount,
+    );
+    
+    console.log('🔔 [CONTROLLER] Emitted participantRemoved event to chat room');
+    
     return result;
   }
 }
