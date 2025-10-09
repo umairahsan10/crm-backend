@@ -3,11 +3,15 @@ import { ChatMessagesService } from './chat-messages.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
+import { ChatGateway } from '../chat.gateway';
 
 @Controller('chat-messages')
 @UseGuards(JwtAuthGuard)
 export class ChatMessagesController {
-  constructor(private readonly chatMessagesService: ChatMessagesService) {}
+  constructor(
+    private readonly chatMessagesService: ChatMessagesService,
+    private readonly chatGateway: ChatGateway,
+  ) {}
 
   @Get()
   async getAllChatMessages() {
@@ -52,6 +56,11 @@ export class ChatMessagesController {
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
     const result = await this.chatMessagesService.createChatMessage(createChatMessageDto, req.user.id);
     console.log('✅ [CONTROLLER] Successfully created message ID:', result.data.id);
+    
+    // Emit socket event for real-time update
+    this.chatGateway.emitNewMessage(createChatMessageDto.chatId, result.data);
+    console.log('📡 [CONTROLLER] Emitted socket event for new message');
+    
     return result;
   }
 
@@ -67,6 +76,11 @@ export class ChatMessagesController {
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
     const result = await this.chatMessagesService.updateChatMessage(id, updateChatMessageDto, req.user.id);
     console.log('✅ [CONTROLLER] Successfully updated message ID:', result.data.id);
+    
+    // Emit socket event for real-time update
+    this.chatGateway.emitMessageUpdate(result.data.chatId, result.data);
+    console.log('📡 [CONTROLLER] Emitted socket event for message update');
+    
     return result;
   }
 
@@ -79,8 +93,18 @@ export class ChatMessagesController {
     console.log('🎯 [CONTROLLER] DELETE /chat-messages/:id - Deleting message');
     console.log('🆔 [CONTROLLER] Message ID:', id);
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    
+    // Get message details before deletion to get chatId
+    const message = await this.chatMessagesService.getChatMessageById(id);
+    const chatId = message.chatId;
+    
     const result = await this.chatMessagesService.deleteChatMessage(id, req.user.id);
     console.log('✅ [CONTROLLER] Successfully deleted message');
+    
+    // Emit socket event for real-time update
+    this.chatGateway.emitMessageDelete(chatId, id);
+    console.log('📡 [CONTROLLER] Emitted socket event for message deletion');
+    
     return result;
   }
 }
