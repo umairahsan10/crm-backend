@@ -722,4 +722,271 @@ export class EmployeeService {
       throw new InternalServerErrorException(`Failed to delete HR request with ID ${id}: ${error.message}`);
     }
   }
+
+  /**
+   * Admin-specific method to validate and update HR request
+   * Bypasses HR employee validation since admins don't have HR records
+   */
+  private async validateAndUpdateHrRequestAsAdmin(id: number, hrActionDto: HrActionDto, adminId: number) {
+    // Validate if request exists
+    const existingRequest = await this.prisma.hrRequest.findUnique({
+      where: { id },
+    });
+
+    if (!existingRequest) {
+      throw new NotFoundException(`HR request with ID ${id} not found. Please check the ID and try again.`);
+    }
+
+    // Validate if admin exists
+    const admin = await this.prisma.admin.findUnique({
+      where: { id: adminId },
+    });
+
+    if (!admin) {
+      throw new NotFoundException(`Admin with ID ${adminId} not found.`);
+    }
+
+    const { 
+      status, 
+      responseNotes, 
+      assignedTo, 
+      requestType, 
+      subject, 
+      description, 
+      priority, 
+      departmentId 
+    } = hrActionDto;
+
+    // Validate assignedTo if provided
+    if (assignedTo) {
+      const assignedEmployee = await this.prisma.employee.findUnique({
+        where: { id: assignedTo },
+      });
+
+      if (!assignedEmployee) {
+        throw new NotFoundException(`Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`);
+      }
+    }
+
+    // Validate department if provided
+    if (departmentId) {
+      const department = await this.prisma.department.findUnique({
+        where: { id: departmentId },
+      });
+
+      if (!department) {
+        throw new NotFoundException(`Department with ID ${departmentId} not found. Please check the department ID and try again.`);
+      }
+    }
+
+    // Update the request with all provided fields
+    const updateData: any = {
+      updatedAt: TimeStorageUtil.getCurrentTimeForStorage(),
+    };
+
+    // Track changes for logging
+    const changes: string[] = [];
+
+    // Add all provided fields to update data and track changes
+    if (status !== undefined) {
+      updateData.status = status;
+      changes.push(`Status: ${existingRequest.status} → ${status}`);
+    }
+    if (responseNotes !== undefined) {
+      updateData.responseNotes = responseNotes;
+      changes.push(`Response Notes: ${existingRequest.responseNotes || 'None'} → ${responseNotes}`);
+    }
+    if (assignedTo !== undefined) {
+      updateData.assignedTo = assignedTo;
+      changes.push(`Assigned To: ${existingRequest.assignedTo || 'None'} → ${assignedTo}`);
+    }
+    if (requestType !== undefined) {
+      updateData.requestType = requestType;
+      changes.push(`Request Type: ${existingRequest.requestType} → ${requestType}`);
+    }
+    if (subject !== undefined) {
+      updateData.subject = subject;
+      changes.push(`Subject: ${existingRequest.subject} → ${subject}`);
+    }
+    if (description !== undefined) {
+      updateData.description = description;
+      changes.push(`Description: ${existingRequest.description} → ${description}`);
+    }
+    if (priority !== undefined) {
+      updateData.priority = priority;
+      changes.push(`Priority: ${existingRequest.priority} → ${priority}`);
+    }
+    if (departmentId !== undefined) {
+      updateData.departmentId = departmentId;
+      changes.push(`Department: ${existingRequest.departmentId || 'None'} → ${departmentId}`);
+    }
+
+    // Set resolvedOn if status is being updated to Resolved
+    if (status === RequestStatus.Resolved) {
+      updateData.resolvedOn = new Date();
+      changes.push(`Resolved On: ${existingRequest.resolvedOn || 'None'} → ${new Date().toISOString()}`);
+    }
+
+    // Update the request
+    const updatedRequest = await this.prisma.hrRequest.update({
+      where: { id },
+      data: updateData,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            role: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        assignedToEmployee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // TODO: Log admin actions to admin_logs table when it's added to schema
+    // For now, we skip logging for admin actions
+    // Future implementation should create admin_logs table and log:
+    // - adminId, action: 'HR_REQUEST_UPDATE', targetType: 'HR_REQUEST', 
+    // - targetId: id, description, metadata (hrRequestId, affectedEmployeeId, changes)
+    if (changes.length > 0) {
+      console.log(`Admin ${adminId} updated HR Request #${id}: ${changes.join(', ')}`);
+    }
+
+    return updatedRequest;
+  }
+
+  /**
+   * Admin takes action on HR request (creates initial action)
+   */
+  async takeAdminAction(id: number, hrActionDto: HrActionDto, adminId: number) {
+    try {
+      const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(id, hrActionDto, adminId);
+
+      return {
+        message: 'Admin action taken successfully',
+        data: updatedRequest,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      if (error.code === 'P2002') {
+        throw new BadRequestException('Duplicate entry found. Please check your data.');
+      }
+      if (error.code === 'P2003') {
+        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+      }
+      throw new InternalServerErrorException(`Failed to take admin action on request ${id}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Admin updates existing action on HR request
+   */
+  async updateAdminAction(id: number, hrActionDto: HrActionDto, adminId: number) {
+    try {
+      const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(id, hrActionDto, adminId);
+
+      return {
+        message: 'Admin request action updated successfully',
+        data: updatedRequest,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      if (error.code === 'P2002') {
+        throw new BadRequestException('Duplicate entry found. Please check your data.');
+      }
+      if (error.code === 'P2003') {
+        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+      }
+      throw new InternalServerErrorException(`Failed to update admin action for request ${id}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Admin deletes HR request
+   */
+  async deleteHrRequestAsAdmin(id: number, adminId: number) {
+    try {
+      // Validate if request exists
+      const existingRequest = await this.prisma.hrRequest.findUnique({
+        where: { id },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+
+      if (!existingRequest) {
+        throw new NotFoundException(`HR request with ID ${id} not found. Please check the ID and try again.`);
+      }
+
+      // Validate if admin exists
+      const admin = await this.prisma.admin.findUnique({
+        where: { id: adminId },
+      });
+
+      if (!admin) {
+        throw new NotFoundException(`Admin with ID ${adminId} not found.`);
+      }
+
+      // TODO: Log admin deletion to admin_logs table when it's added to schema
+      // For now, we log to console
+      console.log(`Admin ${adminId} deleted HR Request #${id} (Subject: "${existingRequest.subject}", Employee: ${existingRequest.employee.firstName} ${existingRequest.employee.lastName})`);
+
+      // Delete the request
+      await this.prisma.hrRequest.delete({
+        where: { id },
+      });
+
+      return {
+        message: 'HR request deleted successfully by admin',
+        data: { id },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      if (error.code === 'P2002') {
+        throw new BadRequestException('Duplicate entry found. Please check your data.');
+      }
+      if (error.code === 'P2003') {
+        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+      }
+      throw new InternalServerErrorException(`Failed to delete HR request with ID ${id}: ${error.message}`);
+    }
+  }
 }

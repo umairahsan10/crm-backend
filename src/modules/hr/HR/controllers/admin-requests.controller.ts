@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, Put, Delete, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Body, Controller, Post, Get, Put, Delete, Param, UseGuards, Request, ParseIntPipe, Query } from '@nestjs/common';
 import { AdminRequestsService } from '../services/admin-requests.service';
 import { 
   CreateAdminRequestDto, 
@@ -49,6 +49,19 @@ export class AdminRequestsController {
   @Departments('HR')
   async getAllAdminRequests(): Promise<AdminRequestListResponseDto> {
     return await this.adminRequestsService.getAllAdminRequests();
+  }
+
+  /**
+   * Get admin requests by HR ID (HR can view their own requests)
+   */
+  @Get('my-requests')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  async getMyAdminRequests(
+    @Query('hrId', ParseIntPipe) hrId: number,
+    @Request() req: AuthenticatedRequest
+  ): Promise<AdminRequestListResponseDto> {
+    return await this.adminRequestsService.getAdminRequestsByHrId(hrId);
   }
 
   /**

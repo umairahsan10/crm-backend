@@ -51,12 +51,19 @@ export class AdminRequestsService {
         try {
             const adminRequest = await this.prisma.adminRequest.create({
                 data: {
+                    hrId: hrRecord.id,
                     hrLogId: dto.hrLogId,
                     description: dto.description,
                     type: dto.type,
                     status: AdminRequestStatus.pending, // Default status
                 },
                 include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
                     hrLog: {
                         select: {
                             id: true,
@@ -85,6 +92,12 @@ export class AdminRequestsService {
         try {
             const adminRequests = await this.prisma.adminRequest.findMany({
                 include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
                     hrLog: {
                         select: {
                             id: true,
@@ -128,6 +141,12 @@ export class AdminRequestsService {
                     status: status as AdminRequestStatus,
                 },
                 include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
                     hrLog: {
                         select: {
                             id: true,
@@ -171,6 +190,12 @@ export class AdminRequestsService {
             const adminRequest = await this.prisma.adminRequest.findUnique({
                 where: { id },
                 include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
                     hrLog: {
                         select: {
                             id: true,
@@ -195,6 +220,54 @@ export class AdminRequestsService {
             }
             this.logger.error(`Failed to get admin request ${id}: ${error.message}`);
             throw new BadRequestException(`Failed to get admin request: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get admin requests by HR ID (HR can view their own requests)
+     */
+    async getAdminRequestsByHrId(hrId: number): Promise<AdminRequestListResponseDto> {
+        try {
+            const adminRequests = await this.prisma.adminRequest.findMany({
+                where: {
+                    hrId: hrId,
+                },
+                include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
+                    hrLog: {
+                        select: {
+                            id: true,
+                            hrId: true,
+                            actionType: true,
+                            affectedEmployeeId: true,
+                            description: true,
+                            createdAt: true,
+                        },
+                    },
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            });
+
+            const total = await this.prisma.adminRequest.count({
+                where: {
+                    hrId: hrId,
+                },
+            });
+
+            return {
+                adminRequests,
+                total,
+            };
+        } catch (error) {
+            this.logger.error(`Failed to get admin requests for HR ${hrId}: ${error.message}`);
+            throw new BadRequestException(`Failed to get admin requests: ${error.message}`);
         }
     }
 
@@ -253,6 +326,12 @@ export class AdminRequestsService {
                     type: dto.type,
                 },
                 include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
                     hrLog: {
                         select: {
                             id: true,
@@ -375,6 +454,12 @@ export class AdminRequestsService {
                     status: dto.status,
                 },
                 include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
                     hrLog: {
                         select: {
                             id: true,

@@ -390,24 +390,24 @@ model SalesDepartment {
 }
 
 model CrackedLead {
-  leadId         Int             @map("lead_id")
-  closedBy       Int             @map("closed_by")
-  description    String?
-  crackedAt      DateTime        @default(now()) @map("cracked_at") @db.Date
-  amount         Decimal?        @db.Decimal(12, 2)
-  commissionRate Decimal?        @map("commission_rate") @db.Decimal(5, 2)
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  totalPhases    Int?            @map("total_phases")
-  currentPhase   Int?            @map("current_phase")
-  remainingAmount Int?           @map("remaining_amount") @default(0)
-  id             Int             @id @default(autoincrement()) @map("cracked_lead_id")
-  industryId     Int             @map("industry_id")
-  client_payment ClientPayment[]
-  employee       Employee        @relation("CrackedLeadClosedBy", fields: [closedBy], references: [id])
-  industry       Industry        @relation(fields: [industryId], references: [id])
-  lead           Lead            @relation(fields: [leadId], references: [id])
-  projects       Project[]
+  leadId          Int             @map("lead_id")
+  closedBy        Int             @map("closed_by")
+  description     String?
+  crackedAt       DateTime        @default(now()) @map("cracked_at") @db.Date
+  amount          Decimal?        @db.Decimal(12, 2)
+  commissionRate  Decimal?        @map("commission_rate") @db.Decimal(5, 2)
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  totalPhases     Int?            @map("total_phases")
+  currentPhase    Int?            @map("current_phase")
+  remainingAmount Int?            @default(0) @map("remaining_amount")
+  id              Int             @id @default(autoincrement()) @map("cracked_lead_id")
+  industryId      Int             @map("industry_id")
+  client_payment  ClientPayment[]
+  employee        Employee        @relation("CrackedLeadClosedBy", fields: [closedBy], references: [id])
+  industry        Industry        @relation(fields: [industryId], references: [id])
+  lead            Lead            @relation(fields: [leadId], references: [id])
+  projects        Project[]
 
   @@map("cracked_leads")
 }
@@ -706,6 +706,7 @@ model Admin {
 }
 
 model AdminRequest {
+  hrId        Int?                @map("hr_id")
   hrLogId     Int?                @map("hr_log_id")
   description String?
   type        RequestType?
@@ -713,6 +714,7 @@ model AdminRequest {
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   id          Int                 @id @default(autoincrement()) @map("admin_request_id")
+  hr          HR?                 @relation(fields: [hrId], references: [id])
   hrLog       HRLog?              @relation(fields: [hrLogId], references: [id])
 
   @@map("admin_requests")
@@ -772,20 +774,21 @@ model HalfDayLog {
 }
 
 model HR {
-  employeeId              Int      @unique @map("employee_id")
-  attendancePermission    Boolean? @map("attendance_permission")
-  salaryPermission        Boolean? @map("salary_permission")
-  commissionPermission    Boolean? @map("commission_permission")
-  employeeAddPermission   Boolean? @map("employee_add_permission")
-  terminationsHandle      Boolean? @map("terminations_handle")
-  targetsSet              Boolean? @map("targets_set")
-  bonusesSet              Boolean? @map("bonuses_set")
-  shiftTimingSet          Boolean? @map("shift_timing_set")
-  createdAt               DateTime @default(now()) @map("created_at")
-  updatedAt               DateTime @updatedAt @map("updated_at")
-  id                      Int      @id @default(autoincrement()) @map("hr_id")
-  monthlyRequestApprovals Boolean? @map("monthly_request_approvals")
-  employee                Employee @relation("HrEmployee", fields: [employeeId], references: [id])
+  employeeId              Int            @unique @map("employee_id")
+  attendancePermission    Boolean?       @map("attendance_permission")
+  salaryPermission        Boolean?       @map("salary_permission")
+  commissionPermission    Boolean?       @map("commission_permission")
+  employeeAddPermission   Boolean?       @map("employee_add_permission")
+  terminationsHandle      Boolean?       @map("terminations_handle")
+  targetsSet              Boolean?       @map("targets_set")
+  bonusesSet              Boolean?       @map("bonuses_set")
+  shiftTimingSet          Boolean?       @map("shift_timing_set")
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+  id                      Int            @id @default(autoincrement()) @map("hr_id")
+  monthlyRequestApprovals Boolean?       @map("monthly_request_approvals")
+  employee                Employee       @relation("HrEmployee", fields: [employeeId], references: [id])
+  adminRequests           AdminRequest[]
   hrLogs                  HRLog[]
 
   @@map("hr")
