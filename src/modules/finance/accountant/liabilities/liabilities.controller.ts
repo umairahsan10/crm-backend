@@ -23,7 +23,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-@ApiTags('Liabilities')
+@ApiTags('Accountant Liabilities')
 @Controller('accountant/liabilities')
 export class LiabilitiesController {
   constructor(private readonly liabilitiesService: LiabilitiesService) {}
