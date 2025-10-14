@@ -33,7 +33,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-@ApiTags('Expenses')
+@ApiTags('Accountant Expenses')
 @Controller('accountant/expense')
 export class ExpenseController {
   constructor(private readonly expenseService: ExpenseService) {}
