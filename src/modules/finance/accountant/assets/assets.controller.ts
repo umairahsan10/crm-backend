@@ -22,7 +22,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-@ApiTags('Assets')
+@ApiTags('AccountantAssets')
 @ApiBearerAuth()
 @Controller('accountant/assets')
 export class AssetsController {
