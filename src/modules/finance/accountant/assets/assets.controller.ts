@@ -9,6 +9,8 @@ import { PermissionsGuard } from '../../../../common/guards/permissions.guard';
 import { Departments } from '../../../../common/decorators/departments.decorator';
 import { Permissions } from '../../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiParam, getSchemaPath } from '@nestjs/swagger';
+import { AssetCreateResponseDto, AssetUpdateResponseDto, AssetSingleResponseDto, AssetListResponseDto, ErrorResponseDto } from './dto/asset-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -20,6 +22,8 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Assets')
+@ApiBearerAuth()
 @Controller('accountant/assets')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
@@ -43,6 +47,9 @@ export class AssetsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.assets_permission)
+  @ApiOperation({ summary: 'Create a new asset', description: 'Creates a new asset with a linked transaction record.' })
+  @ApiResponse({ status: 201, description: 'Asset created successfully', type: AssetCreateResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input', type: ErrorResponseDto })
   async createAsset(
     @Body() dto: CreateAssetDto,
     @Request() req: AuthenticatedRequest
@@ -79,6 +86,17 @@ export class AssetsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.assets_permission)
+  @ApiOperation({ summary: 'Get all assets', description: 'Retrieve all assets with optional filtering by category, date, employee, or value ranges.' })
+  @ApiQuery({ name: 'category', required: false, type: String, description: 'Filter by asset category' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Filter from purchase date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'Filter to purchase date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'createdBy', required: false, type: String, description: 'Filter by employee ID who created the asset' })
+  @ApiQuery({ name: 'minPurchaseValue', required: false, type: Number, description: 'Minimum purchase value' })
+  @ApiQuery({ name: 'maxPurchaseValue', required: false, type: Number, description: 'Maximum purchase value' })
+  @ApiQuery({ name: 'minCurrentValue', required: false, type: Number, description: 'Minimum current value' })
+  @ApiQuery({ name: 'maxCurrentValue', required: false, type: Number, description: 'Maximum current value' })
+  @ApiResponse({ status: 200, description: 'Assets retrieved successfully', type: AssetListResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters', type: ErrorResponseDto })
   async getAllAssets(
     @Request() req: AuthenticatedRequest,
     @Query('category') category?: string,
@@ -121,6 +139,10 @@ export class AssetsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.assets_permission)
+  @ApiOperation({ summary: 'Get asset by ID', description: 'Retrieve detailed information about a specific asset including transaction and vendor.' })
+  @ApiParam({ name: 'id', type: Number, description: 'Asset ID' })
+  @ApiResponse({ status: 200, description: 'Asset retrieved successfully', type: AssetSingleResponseDto })
+  @ApiResponse({ status: 404, description: 'Asset not found', type: ErrorResponseDto })
   async getAssetById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -145,6 +167,9 @@ export class AssetsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.assets_permission)
+  @ApiOperation({ summary: 'Update an asset', description: 'Update asset details and linked transaction if purchase value changes.' })
+  @ApiResponse({ status: 200, description: 'Asset updated successfully', type: AssetUpdateResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input or asset not found', type: ErrorResponseDto })
   async updateAsset(
     @Body() dto: UpdateAssetDto,
     @Request() req: AuthenticatedRequest
