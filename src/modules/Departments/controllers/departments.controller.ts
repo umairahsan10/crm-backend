@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 import { Departments } from '../../../common/decorators/departments.decorator';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -16,6 +17,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Departments')
 @Controller('departments')
 export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
@@ -26,6 +28,9 @@ export class DepartmentsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('HR', 'Admin')
+  @ApiOperation({ summary: 'Create a new department' })
+  @ApiBody({ type: CreateDepartmentDto })
+  @ApiResponse({ status: 201, description: 'Department created successfully', type: DepartmentResponseDto })
   async createDepartment(@Body() dto: CreateDepartmentDto, @Request() req: AuthenticatedRequest): Promise<DepartmentResponseDto> {
     return await this.departmentsService.createDepartment(dto);
   }
@@ -36,6 +41,12 @@ export class DepartmentsController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('HR', 'Admin')
+  @ApiOperation({ summary: 'Get all departments with optional filters and pagination' })
+  @ApiQuery({ name: 'managerId', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'List of departments', type: DepartmentsListResponseDto })
   async getDepartments(@Query() query: GetDepartmentsDto, @Request() req: AuthenticatedRequest): Promise<DepartmentsListResponseDto> {
     return await this.departmentsService.getDepartments(query);
   }
@@ -46,6 +57,9 @@ export class DepartmentsController {
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('HR', 'Admin')
+  @ApiOperation({ summary: 'Get a specific department by ID' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Department details', type: DepartmentResponseDto })
   async getDepartmentById(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest): Promise<DepartmentResponseDto> {
     return await this.departmentsService.getDepartmentById(id);
   }
@@ -56,6 +70,10 @@ export class DepartmentsController {
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('HR', 'Admin')
+  @ApiOperation({ summary: 'Update a department by ID' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiBody({ type: UpdateDepartmentDto })
+  @ApiResponse({ status: 200, description: 'Updated department details', type: DepartmentResponseDto })
   async updateDepartment(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateDepartmentDto,
@@ -70,6 +88,9 @@ export class DepartmentsController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('HR', 'Admin')
+  @ApiOperation({ summary: 'Delete a department by ID' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Department deleted successfully', schema: { example: { message: 'Department deleted successfully' } } })
   async deleteDepartment(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest): Promise<{ message: string }> {
     return await this.departmentsService.deleteDepartment(id);
   }
