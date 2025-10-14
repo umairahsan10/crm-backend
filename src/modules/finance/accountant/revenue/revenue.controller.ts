@@ -25,7 +25,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-@ApiTags('Revenue Management')
+@ApiTags('Accountant Revenue')
 @Controller('accountant/revenue')
 export class RevenueController {
   constructor(private readonly revenueService: RevenueService) {}
