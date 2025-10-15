@@ -41,16 +41,22 @@ export class ProductionController {
   @Get()
   @ApiOperation({ summary: 'Get all production records or filter by employee ID' })
   @ApiQuery({ name: 'employeeId', required: false, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of records per page (default: 10)' })
   @ApiResponse({ status: 200, description: 'List of production records', type: ProductionsListResponseDto })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
   async getAllProductions(
     @Query('employeeId') employeeId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
     @Request() req?: AuthenticatedRequest
   ): Promise<ProductionsListResponseDto> {
     const parsedEmployeeId = employeeId ? parseInt(employeeId, 10) : undefined;
-    return await this.productionService.getAllProductions(parsedEmployeeId);
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    return await this.productionService.getAllProductions(parsedEmployeeId, parsedPage, parsedLimit);
   }
 
   /**
