@@ -1,4 +1,5 @@
-import { Body, Controller, Post, Get, Put, Delete, Param, UseGuards, Request, ParseIntPipe, Query } from '@nestjs/common';
+import { Body, Controller, Post, Get, Put, Delete, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { AdminRequestsService } from '../services/admin-requests.service';
 import { 
   CreateAdminRequestDto, 
@@ -23,6 +24,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Admin Requests')
 @Controller('hr/admin-requests')
 export class AdminRequestsController {
   constructor(private readonly adminRequestsService: AdminRequestsService) {}
@@ -34,6 +36,9 @@ export class AdminRequestsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Create a new admin request (HR only)' })
+  @ApiBody({ type: CreateAdminRequestDto })
+  @ApiResponse({ status: 201, description: 'Admin request created successfully', type: AdminRequestResponseDto })
   async createAdminRequest(
     @Body() dto: CreateAdminRequestDto, 
     @Request() req: AuthenticatedRequest
@@ -47,6 +52,8 @@ export class AdminRequestsController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
+  @ApiOperation({ summary: 'Get all admin requests' })
+  @ApiResponse({ status: 200, description: 'List of admin requests', type: AdminRequestListResponseDto })
   async getAllAdminRequests(): Promise<AdminRequestListResponseDto> {
     return await this.adminRequestsService.getAllAdminRequests();
   }
@@ -70,6 +77,9 @@ export class AdminRequestsController {
   @Get('status/:status')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Roles('admin' as any)
+  @ApiOperation({ summary: 'Get admin requests filtered by status (Admin only)' })
+  @ApiParam({ name: 'status', description: 'Status to filter admin requests' })
+  @ApiResponse({ status: 200, description: 'Filtered list of admin requests', type: AdminRequestListResponseDto })
   async getAdminRequestsByStatus(
     @Param('status') status: string,
     @Request() req: AuthenticatedRequest
@@ -83,6 +93,9 @@ export class AdminRequestsController {
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
+  @ApiOperation({ summary: 'Get a specific admin request by ID' })
+  @ApiParam({ name: 'id', description: 'Admin request ID' })
+  @ApiResponse({ status: 200, description: 'Admin request details', type: AdminRequestResponseDto })
   async getAdminRequestById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -97,6 +110,10 @@ export class AdminRequestsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Update an admin request (HR only, pending status)' })
+  @ApiParam({ name: 'id', description: 'Admin request ID' })
+  @ApiBody({ type: UpdateAdminRequestDto })
+  @ApiResponse({ status: 200, description: 'Updated admin request', type: AdminRequestResponseDto })
   async updateAdminRequest(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminRequestDto,
@@ -112,6 +129,9 @@ export class AdminRequestsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Delete an admin request (HR only, pending status)' })
+  @ApiParam({ name: 'id', description: 'Admin request ID' })
+  @ApiResponse({ status: 200, description: 'Deletion confirmation message' })
   async deleteAdminRequest(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -126,6 +146,10 @@ export class AdminRequestsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Update the status of an admin request (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Admin request ID' })
+  @ApiBody({ type: UpdateAdminRequestStatusDto })
+  @ApiResponse({ status: 200, description: 'Updated admin request with new status', type: AdminRequestResponseDto })
   async updateAdminRequestStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminRequestStatusDto,
@@ -133,4 +157,4 @@ export class AdminRequestsController {
   ): Promise<AdminRequestResponseDto> {
     return await this.adminRequestsService.updateAdminRequestStatus(id, dto, req.user.id);
   }
-} 
+}

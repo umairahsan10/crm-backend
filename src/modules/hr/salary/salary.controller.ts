@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Patch, UseGuards, Request, Query, BadRequestException, Req } from '@nestjs/common';
+import { Body, Controller, Get, Patch, UseGuards, Request, Query, BadRequestException, Req } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { SalaryService } from './salary.service';
 import { SalaryDeductionDto, SalaryDeductionResponseDto } from './dto/salary-deduction.dto';
 import { UpdateSalaryDto } from './dto/update-salary.dto';
@@ -18,6 +19,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Salary Management')
 @Controller('hr/salary')
 export class SalaryController {
   constructor(private readonly salaryService: SalaryService) {}
@@ -50,6 +52,10 @@ export class SalaryController {
    * Required Department: HR
    */
   @Get('deductions')
+  @ApiOperation({ summary: 'Calculate salary deductions for employees based on attendance' })
+  @ApiQuery({ name: 'employeeId', required: false, description: 'Optional employee ID to calculate for', type: Number })
+  @ApiQuery({ name: 'month', required: false, description: 'Month in YYYY-MM format (defaults to current month)', type: String })
+  @ApiResponse({ status: 200, description: 'Calculated salary deductions', type: SalaryDeductionResponseDto })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.salary_permission)
@@ -107,13 +113,16 @@ export class SalaryController {
    * Required Department: HR
    */
   @Patch('update')
+  @ApiOperation({ summary: 'Update employee base salary' })
+  @ApiBody({ type: UpdateSalaryDto })
+  @ApiResponse({ status: 200, description: 'Updated salary successfully' })
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, DepartmentsGuard)
   @Permissions(PermissionName.salary_permission)
   @Departments('HR')
   async updateSalary(@Body() dto: UpdateSalaryDto, @Req() req: any) {
     const currentUserId = req.user.id;
     const isAdmin = req.user.type === 'admin';
-    
+
     const result = await this.salaryService.updateSalary(
       dto.employee_id,
       dto.amount,
@@ -144,6 +153,9 @@ export class SalaryController {
    * Required Department: HR
    */
   @Patch('mark-paid')
+  @ApiOperation({ summary: 'Mark salary as paid for an employee' })
+  @ApiBody({ type: MarkSalaryPaidDto })
+  @ApiResponse({ status: 200, description: 'Salary marked as paid successfully' })
   @UseGuards(JwtAuthGuard, PermissionsGuard, DepartmentsGuard)
   @Permissions(PermissionName.salary_permission)
   @Departments('HR')

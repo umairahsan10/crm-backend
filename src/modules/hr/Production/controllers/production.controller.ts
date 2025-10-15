@@ -1,4 +1,5 @@
 import { Body, Controller, Post, Get, Put, Delete, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { ProductionService } from '../services/production.service';
 import { CreateProductionDto, UpdateProductionDto, ProductionResponseDto, ProductionsListResponseDto } from '../dto/production.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
@@ -16,6 +17,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Production')
 @Controller('hr/production')
 export class ProductionController {
   constructor(private readonly productionService: ProductionService) {}
@@ -24,6 +26,8 @@ export class ProductionController {
    * Create a new production record
    */
   @Post()
+  @ApiOperation({ summary: 'Create a new production record' })
+  @ApiResponse({ status: 201, description: 'Production record created', type: ProductionResponseDto })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -35,21 +39,33 @@ export class ProductionController {
    * Get all production records or filter by employee ID
    */
   @Get()
+  @ApiOperation({ summary: 'Get all production records or filter by employee ID' })
+  @ApiQuery({ name: 'employeeId', required: false, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of records per page (default: 10)' })
+  @ApiResponse({ status: 200, description: 'List of production records', type: ProductionsListResponseDto })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
   async getAllProductions(
     @Query('employeeId') employeeId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
     @Request() req?: AuthenticatedRequest
   ): Promise<ProductionsListResponseDto> {
     const parsedEmployeeId = employeeId ? parseInt(employeeId, 10) : undefined;
-    return await this.productionService.getAllProductions(parsedEmployeeId);
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 10;
+    return await this.productionService.getAllProductions(parsedEmployeeId, parsedPage, parsedLimit);
   }
 
   /**
    * Get production record by ID
    */
   @Get(':id')
+  @ApiOperation({ summary: 'Get production record by ID' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Production record details', type: ProductionResponseDto })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -64,6 +80,9 @@ export class ProductionController {
    * Update production record
    */
   @Put(':id')
+  @ApiOperation({ summary: 'Update a production record' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Updated production record', type: ProductionResponseDto })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -79,6 +98,9 @@ export class ProductionController {
    * Delete production record
    */
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a production record' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Deletion confirmation message' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)

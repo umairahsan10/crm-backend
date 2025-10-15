@@ -24,6 +24,7 @@ import { BlockProductionGuard } from '../../common/guards/block-production.guard
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Departments } from '../../common/decorators/departments.decorator';
 import { RoleName } from '@prisma/client';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -35,6 +36,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Industries')
 @Controller('industries')
 export class IndustryController {
   constructor(private readonly industryService: IndustryService) {}
@@ -46,6 +48,9 @@ export class IndustryController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('Sales', 'Marketing', 'Admin')
+  @ApiOperation({ summary: 'Create a new industry' })
+  @ApiResponse({ status: 201, description: 'Industry created successfully', type: IndustryResponseDto })
+  @ApiResponse({ status: 409, description: 'Industry already exists' })
   async createIndustry(
     @Body() createIndustryDto: CreateIndustryDto,
     @Request() req: AuthenticatedRequest
@@ -71,7 +76,15 @@ export class IndustryController {
     RoleName.senior,
     RoleName.junior
   )
-  async getIndustries(
+  @ApiOperation({ summary: 'Get all industries with filters and pagination' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or description' })
+  @ApiQuery({ name: 'isActive', required: false, type: Boolean, description: 'Filter by active status' })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Field to sort by' })
+  @ApiQuery({ name: 'sortOrder', required: false, type: String, description: 'Sort order asc or desc' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of items per page' })
+  @ApiResponse({ status: 200, description: 'Industries retrieved successfully', type: IndustryListResponseDto })
+   async getIndustries(
     @Query() query: GetIndustriesDto,
     @Request() req: AuthenticatedRequest
   ): Promise<{ status: string; message: string; data: IndustryListResponseDto }> {
@@ -89,6 +102,8 @@ export class IndustryController {
    */
   @Get('active')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get only active industries' })
+  @ApiResponse({ status: 200, description: 'Active industries retrieved', type: [IndustryResponseDto] })
   async getActiveIndustries(
     @Request() req: AuthenticatedRequest
   ): Promise<{ status: string; message: string; data: { industries: IndustryResponseDto[] } }> {
@@ -111,6 +126,8 @@ export class IndustryController {
     RoleName.unit_head,
     RoleName.team_lead
   )
+  @ApiOperation({ summary: 'Get industry statistics' })
+  @ApiResponse({ status: 200, description: 'Industry statistics retrieved successfully', type: IndustryStatsDto })
   async getIndustryStats(
     @Request() req: AuthenticatedRequest
   ): Promise<{ status: string; message: string; data: IndustryStatsDto }> {
@@ -135,6 +152,10 @@ export class IndustryController {
     RoleName.senior,
     RoleName.junior
   )
+  @ApiOperation({ summary: 'Get single industry by ID' })
+  @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
+  @ApiResponse({ status: 200, description: 'Industry retrieved successfully', type: IndustryResponseDto })
+  @ApiResponse({ status: 404, description: 'Industry not found' })
   async getIndustryById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -155,6 +176,10 @@ export class IndustryController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('Sales', 'Marketing', 'Admin')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update an industry' })
+  @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
+  @ApiResponse({ status: 200, description: 'Industry updated successfully', type: IndustryResponseDto })
+  @ApiResponse({ status: 404, description: 'Industry not found' })
   async updateIndustry(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateIndustryDto: UpdateIndustryDto,
@@ -176,6 +201,10 @@ export class IndustryController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('Sales', 'Marketing', 'Admin')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Soft delete (deactivate) an industry' })
+  @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
+  @ApiResponse({ status: 200, description: 'Industry deactivated successfully' })
+  @ApiResponse({ status: 404, description: 'Industry not found' })
   async softDeleteIndustry(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -195,6 +224,10 @@ export class IndustryController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('Sales', 'Marketing', 'Admin')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reactivate an industry' })
+  @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
+  @ApiResponse({ status: 200, description: 'Industry reactivated successfully', type: IndustryResponseDto })
+  @ApiResponse({ status: 404, description: 'Industry not found' })
   async reactivateIndustry(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -215,6 +248,11 @@ export class IndustryController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('Sales', 'Marketing', 'Admin')
+  @ApiOperation({ summary: 'Hard delete an industry' })
+  @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
+  @ApiResponse({ status: 200, description: 'Industry deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot delete industry due to dependencies' })
+  @ApiResponse({ status: 404, description: 'Industry not found' })
   async deleteIndustry(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -235,4 +273,3 @@ export class IndustryController {
     };
   }
 }
-

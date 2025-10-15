@@ -1,8 +1,10 @@
 import { Body, Controller, Put, Patch, UseGuards, Request, Post, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { LiabilitiesService } from './liabilities.service';
 import { CreateLiabilityDto } from './dto/create-liability.dto';
 import { UpdateLiabilityDto } from './dto/update-liability.dto';
 import { MarkLiabilityPaidDto } from './dto/mark-liability-paid.dto';
+import { LiabilityCreateResponseDto, LiabilityUpdateResponseDto, LiabilityListResponseDto, LiabilityDetailResponseDto, LiabilityMarkPaidResponseDto, ErrorResponseDto } from './dto/liability-response.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -21,6 +23,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Accountant Liabilities')
 @Controller('accountant/liabilities')
 export class LiabilitiesController {
   constructor(private readonly liabilitiesService: LiabilitiesService) {}
@@ -42,6 +45,10 @@ export class LiabilitiesController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Create a new liability' })
+  @ApiResponse({ status: 201, description: 'Created liability with linked transaction', type: LiabilityCreateResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input', type: ErrorResponseDto })
+  @ApiBody({ type: CreateLiabilityDto })
   async createLiability(
     @Body() dto: CreateLiabilityDto,
     @Request() req: AuthenticatedRequest
@@ -76,6 +83,14 @@ export class LiabilitiesController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Get all liabilities with optional filters' })
+  @ApiResponse({ status: 200, description: 'List of liabilities with transaction details', type: LiabilityListResponseDto })
+  @ApiQuery({ name: 'isPaid', required: false, description: 'Filter by payment status', example: 'true' })
+  @ApiQuery({ name: 'relatedVendorId', required: false, description: 'Filter by related vendor ID', example: 5 })
+  @ApiQuery({ name: 'category', required: false, description: 'Filter by category', example: 'Rent' })
+  @ApiQuery({ name: 'fromDate', required: false, description: 'Filter from date (YYYY-MM-DD)', example: '2025-10-01' })
+  @ApiQuery({ name: 'toDate', required: false, description: 'Filter to date (YYYY-MM-DD)', example: '2025-10-31' })
+  @ApiQuery({ name: 'createdBy', required: false, description: 'Filter by employee ID', example: 12 })
   async getAllLiabilities(
     @Request() req: AuthenticatedRequest,
     @Query('isPaid') isPaid?: string,
@@ -114,6 +129,9 @@ export class LiabilitiesController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Get a single liability by ID' })
+  @ApiResponse({ status: 200, description: 'Liability details with transaction and vendor information', type: LiabilityDetailResponseDto })
+  @ApiResponse({ status: 404, description: 'Liability not found', type: ErrorResponseDto })
   async getLiabilityById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -138,6 +156,10 @@ export class LiabilitiesController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Update a liability' })
+  @ApiResponse({ status: 200, description: 'Updated liability details', type: LiabilityUpdateResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input or liability cannot be updated', type: ErrorResponseDto })
+  @ApiBody({ type: UpdateLiabilityDto })
   async updateLiability(
     @Body() dto: UpdateLiabilityDto,
     @Request() req: AuthenticatedRequest
@@ -165,6 +187,10 @@ export class LiabilitiesController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Mark a liability as paid' })
+  @ApiResponse({ status: 200, description: 'Liability, transaction, and expense details after marking as paid', type: LiabilityMarkPaidResponseDto })
+  @ApiResponse({ status: 400, description: 'Cannot mark liability as paid', type: ErrorResponseDto })
+  @ApiBody({ type: MarkLiabilityPaidDto })
   async markLiabilityAsPaid(
     @Body() dto: MarkLiabilityPaidDto,
     @Request() req: AuthenticatedRequest

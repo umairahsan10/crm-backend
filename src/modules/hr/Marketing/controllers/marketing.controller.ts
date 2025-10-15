@@ -8,6 +8,8 @@ import { PermissionsGuard } from '../../../../common/guards/permissions.guard';
 import { Departments } from '../../../../common/decorators/departments.decorator';
 import { Permissions } from '../../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { MarketingRecordResponseDto, MarketingRecordsListResponseDto } from '../dto/marketing-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -16,6 +18,8 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Marketing')
+@ApiBearerAuth()
 @Controller('hr/marketing')
 export class MarketingController {
   constructor(private readonly marketingService: MarketingService) {}
@@ -24,6 +28,8 @@ export class MarketingController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Get all marketing records' })
+  @ApiResponse({ status: 200, description: 'List of marketing records', type: MarketingRecordsListResponseDto })
   async getAllMarketingRecords(@Request() req: AuthenticatedRequest) {
     return await this.marketingService.getAllMarketingRecords();
   }
@@ -32,6 +38,9 @@ export class MarketingController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Get a marketing record by ID' })
+  @ApiParam({ name: 'id', type: Number, description: 'Marketing record ID' })
+  @ApiResponse({ status: 200, description: 'Marketing record details', type: MarketingRecordResponseDto })
   async getMarketingRecordById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -43,6 +52,8 @@ export class MarketingController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Create a new marketing record' })
+  @ApiResponse({ status: 201, description: 'Marketing record created', type: MarketingRecordResponseDto })
   async createMarketingRecord(
     @Body() dto: CreateMarketingDto,
     @Request() req: AuthenticatedRequest
@@ -54,6 +65,9 @@ export class MarketingController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Update a marketing record' })
+  @ApiParam({ name: 'id', type: Number, description: 'Marketing record ID' })
+  @ApiResponse({ status: 200, description: 'Marketing record updated', type: MarketingRecordResponseDto })
   async updateMarketingRecord(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMarketingDto,
@@ -66,10 +80,13 @@ export class MarketingController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Delete a marketing record' })
+  @ApiParam({ name: 'id', type: Number, description: 'Marketing record ID' })
+  @ApiResponse({ status: 200, description: 'Marketing record deleted' })
   async deleteMarketingRecord(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
   ) {
     return await this.marketingService.deleteMarketingRecord(id, req.user.id);
   }
-} 
+}

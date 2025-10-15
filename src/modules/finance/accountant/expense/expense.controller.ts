@@ -10,10 +10,11 @@ import {
   Request,
   ParseIntPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody, getSchemaPath } from '@nestjs/swagger';
 import { ExpenseService } from './expense.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
-import { ErrorResponseDto } from './expense.service';
+import { ExpenseCreateResponseDto, ExpenseUpdateResponseDto, ExpenseListResponseDto, ExpenseSingleResponseDto, ErrorResponseDto } from './dto/expense-response.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -32,6 +33,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Accountant Expenses')
 @Controller('accountant/expense')
 export class ExpenseController {
   constructor(private readonly expenseService: ExpenseService) {}
@@ -46,6 +48,10 @@ export class ExpenseController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Create a new expense' })
+  @ApiBody({ type: CreateExpenseDto })
+  @ApiResponse({ status: 201, description: 'Expense created successfully', type: ExpenseCreateResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation failed', type: ErrorResponseDto })
   async createExpense(
     @Body() dto: CreateExpenseDto,
     @Request() req: AuthenticatedRequest
@@ -62,6 +68,17 @@ export class ExpenseController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Get all expenses with optional filters' })
+  @ApiQuery({ name: 'category', required: false, type: String, description: 'Filter by expense category' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Filter expenses from this date' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'Filter expenses up to this date' })
+  @ApiQuery({ name: 'createdBy', required: false, type: Number, description: 'Filter by employee ID who created' })
+  @ApiQuery({ name: 'minAmount', required: false, type: Number, description: 'Minimum expense amount' })
+  @ApiQuery({ name: 'maxAmount', required: false, type: Number, description: 'Maximum expense amount' })
+  @ApiQuery({ name: 'paymentMethod', required: false, type: String, description: 'Filter by payment method' })
+  @ApiQuery({ name: 'processedByRole', required: false, type: String, description: 'Filter by processed role' })
+  @ApiResponse({ status: 200, description: 'Expenses retrieved successfully', type: ExpenseListResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid filters', type: ErrorResponseDto })
   async getAllExpenses(
     @Request() req: AuthenticatedRequest,
     @Query('category') category?: string,
@@ -94,6 +111,9 @@ export class ExpenseController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Get a single expense by ID' })
+  @ApiResponse({ status: 200, description: 'Expense retrieved successfully', type: ExpenseSingleResponseDto })
+  @ApiResponse({ status: 404, description: 'Expense not found', type: ErrorResponseDto })
   async getExpenseById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -109,6 +129,11 @@ export class ExpenseController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Update an existing expense' })
+  @ApiBody({ type: UpdateExpenseDto })
+  @ApiResponse({ status: 200, description: 'Expense updated successfully', type: ExpenseUpdateResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation failed', type: ErrorResponseDto })
+  @ApiResponse({ status: 404, description: 'Expense not found', type: ErrorResponseDto })
   async updateExpense(
     @Body() dto: UpdateExpenseDto,
     @Request() req: AuthenticatedRequest

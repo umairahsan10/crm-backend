@@ -8,6 +8,7 @@ import { PermissionsGuard } from '../../../../common/guards/permissions.guard';
 import { Departments } from '../../../../common/decorators/departments.decorator';
 import { Permissions } from '../../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -16,11 +17,15 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('HR Sales Department')
+@ApiBearerAuth()
 @Controller('hr/sales')
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get all sales department records' })
+  @ApiResponse({ status: 200, description: 'List of sales department records' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -29,6 +34,9 @@ export class SalesController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get sales department record by ID' })
+  @ApiParam({ name: 'id', description: 'Sales department record ID', type: Number })
+  @ApiResponse({ status: 200, description: 'Sales department record details' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -40,6 +48,9 @@ export class SalesController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new sales department record' })
+  @ApiBody({ type: CreateSalesDepartmentDto })
+  @ApiResponse({ status: 201, description: 'Sales department record created successfully' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -51,6 +62,10 @@ export class SalesController {
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Update a sales department record' })
+  @ApiParam({ name: 'id', description: 'Sales department record ID', type: Number })
+  @ApiBody({ type: UpdateSalesDepartmentDto })
+  @ApiResponse({ status: 200, description: 'Sales department record updated successfully' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -63,6 +78,9 @@ export class SalesController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a sales department record' })
+  @ApiParam({ name: 'id', description: 'Sales department record ID', type: Number })
+  @ApiResponse({ status: 200, description: 'Sales department record deleted successfully' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -78,6 +96,10 @@ export class SalesController {
    * Requires commission permission
    */
   @Patch(':id/commission-rate')
+  @ApiOperation({ summary: 'Update commission rate for a sales department record' })
+  @ApiParam({ name: 'id', description: 'Sales department record ID', type: Number })
+  @ApiBody({ type: UpdateCommissionRateDto })
+  @ApiResponse({ status: 200, description: 'Commission rate updated successfully' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.commission_permission)
@@ -94,6 +116,10 @@ export class SalesController {
    * Requires targets set permission
    */
   @Patch(':id/target-amount')
+  @ApiOperation({ summary: 'Update target amount for a sales department record' })
+  @ApiParam({ name: 'id', description: 'Sales department record ID', type: Number })
+  @ApiBody({ type: UpdateTargetAmountDto })
+  @ApiResponse({ status: 200, description: 'Target amount updated successfully' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.targets_set)

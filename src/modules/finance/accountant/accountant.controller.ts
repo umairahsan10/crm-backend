@@ -1,4 +1,5 @@
 import { Body, Controller, Patch, Post, Get, UseGuards, Request, Param, Query, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { AccountantService } from './accountant.service';
 import { UpdatePermissionsDto } from './dto/update-permission.dto';
 import { PermissionsResponseDto } from './dto/permission-response.dto';
@@ -26,6 +27,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Accountant')
 @Controller('accountant')
 export class AccountantController {
   constructor(private readonly accountantService: AccountantService) {}
@@ -53,6 +55,9 @@ export class AccountantController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.salary_permission) // Using salary_permission as a representative permission
+  @ApiOperation({ summary: 'Update accountant permissions' })
+  @ApiBody({ type: UpdatePermissionsDto })
+  @ApiResponse({ status: 200, description: 'Permissions updated successfully', type: PermissionsResponseDto })
   async updatePermissions(
     @Body() dto: UpdatePermissionsDto,
     @Request() req: AuthenticatedRequest
@@ -92,6 +97,9 @@ export class AccountantController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission) // Using expenses_permission as it's related to vendor management
+  @ApiOperation({ summary: 'Add a new vendor' })
+  @ApiBody({ type: AddVendorDto })
+  @ApiResponse({ status: 200, description: 'Vendor added successfully', type: VendorResponseDto })
   async addVendor(
     @Body() dto: AddVendorDto,
     @Request() req: AuthenticatedRequest
@@ -128,6 +136,8 @@ export class AccountantController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.expenses_permission) // Using expenses_permission as it's related to vendor management
+  @ApiOperation({ summary: 'Get all vendors' })
+  @ApiResponse({ status: 200, description: 'Vendor list retrieved successfully', type: VendorListResponseDto })
   async getAllVendors(
     @Request() req: AuthenticatedRequest
   ): Promise<VendorListResponseDto> {
@@ -159,6 +169,9 @@ export class AccountantController {
    * Note: No authentication required for this endpoint (cron job compatibility)
    */
   @Post('pnl/auto')
+  @ApiOperation({ summary: 'Trigger automatic P&L calculation' })
+  @ApiBody({ type: CalculatePnLDto, required: false })
+  @ApiResponse({ status: 200, description: 'P&L calculated successfully', type: PnLResponseDto })
   async calculatePnLAuto(@Body() dto?: CalculatePnLDto): Promise<PnLResponseDto> {
     const result = await this.accountantService.calculateAndSavePnL(dto?.month, dto?.year);
     return result;
@@ -182,6 +195,10 @@ export class AccountantController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.revenues_permission)
+  @ApiOperation({ summary: 'Preview P&L for a specific month' })
+  @ApiParam({ name: 'month', description: 'Month in numeric format (01-12)', example: '09' })
+  @ApiParam({ name: 'year', description: 'Year in YYYY format', example: '2025' })
+  @ApiResponse({ status: 200, description: 'P&L preview retrieved successfully', type: PnLResponseDto })
   async calculatePnLPreview(
     @Param('month') month: string,
     @Param('year') year: string
@@ -219,6 +236,10 @@ export class AccountantController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.revenues_permission)
+  @ApiOperation({ summary: 'Preview P&L with category breakdown for a specific month' })
+  @ApiParam({ name: 'month', description: 'Month in numeric format (01-12)', example: '09' })
+  @ApiParam({ name: 'year', description: 'Year in YYYY format', example: '2025' })
+  @ApiResponse({ status: 200, description: 'P&L with category breakdown retrieved successfully', type: PnLCategoryResponseDto })
   async calculatePnLWithCategories(
     @Param('month') month: string,
     @Param('year') year: string

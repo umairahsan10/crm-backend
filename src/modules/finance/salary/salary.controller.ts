@@ -6,7 +6,9 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { Departments } from '../../../common/decorators/departments.decorator';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 
+@ApiTags('Finance Salary')
 @Controller('finance/salary')
 export class FinanceSalaryController {
   constructor(private readonly financeSalaryService: FinanceSalaryService) {}
@@ -29,6 +31,8 @@ export class FinanceSalaryController {
   @Post('calculate-all')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Trigger salary calculation for all active employees' })
+  @ApiResponse({ status: 200, description: 'Salary calculation triggered for all employees' })
   async calculateAllSalaries() {
     await this.financeSalaryService.handleMonthlySalaryCalculation();
     return { message: 'Salary calculation triggered for all employees' };
@@ -54,6 +58,10 @@ export class FinanceSalaryController {
   @Get('preview/:employeeId')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Read-only salary preview for an employee' })
+  @ApiParam({ name: 'employeeId', description: 'Employee ID to calculate salary for', type: Number })
+  @ApiQuery({ name: 'endDate', description: 'Optional end date (YYYY-MM-DD)', required: false })
+  @ApiResponse({ status: 200, description: 'Salary preview calculated successfully' })
   async calculateSalaryPreview(
     @Param('employeeId') employeeId: string,
     @Query('endDate') endDate?: string
@@ -88,6 +96,10 @@ export class FinanceSalaryController {
   @Get('display/:employeeId')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Get salary display for a specific employee with deductions' })
+  @ApiParam({ name: 'employeeId', description: 'Employee ID to retrieve salary for', type: Number })
+  @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
+  @ApiResponse({ status: 200, description: 'Salary display returned successfully' })
   async getSalaryDisplay(@Param('employeeId') employeeId: string, @Query('month') month?: string) {
     const result = await this.financeSalaryService.getSalaryDisplay(parseInt(employeeId), month);
     return result;
@@ -113,6 +125,9 @@ export class FinanceSalaryController {
   @Get('display-all')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Get comprehensive salary display for all employees' })
+  @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
+  @ApiResponse({ status: 200, description: 'All salaries display returned successfully' })
   async getAllSalariesDisplay(@Query('month') month?: string) {
     const result = await this.financeSalaryService.getAllSalariesDisplay(month);
     return result;
@@ -140,6 +155,10 @@ export class FinanceSalaryController {
   @Get('breakdown/:employeeId')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Get detailed salary breakdown for a specific employee' })
+  @ApiParam({ name: 'employeeId', description: 'Employee ID to get detailed breakdown for', type: Number })
+  @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
+  @ApiResponse({ status: 200, description: 'Detailed salary breakdown returned successfully' })
   async getDetailedSalaryBreakdown(
     @Param('employeeId') employeeId: string,
     @Query('month') month?: string
@@ -161,6 +180,8 @@ export class FinanceSalaryController {
   @Get('bonus-display')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Get sales employees with sales amount > 3000' })
+  @ApiResponse({ status: 200, description: 'Sales employees bonus display returned successfully' })
   async getSalesEmployeesBonusDisplay() {
     const result = await this.financeSalaryService.getSalesEmployeesBonusDisplay();
     return result;
@@ -182,6 +203,9 @@ export class FinanceSalaryController {
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Departments('Admin', 'NonExistentDepartment')
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Update bonus amount for sales employees with sales >= 3000' })
+  @ApiBody({ description: 'Employee ID and bonus amount', schema: { example: { employee_id: 1, bonusAmount: 5000 } } })
+  @ApiResponse({ status: 200, description: 'Sales employee bonus updated successfully' })
   async updateSalesEmployeeBonus(@Body() body: { employee_id: number; bonusAmount: number }) {
     const result = await this.financeSalaryService.updateSalesEmployeeBonus(body.employee_id, body.bonusAmount);
     return result;

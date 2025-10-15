@@ -109,9 +109,10 @@ export class ProductionService {
   /**
    * Get all production records with optional employee filtering
    */
-  async getAllProductions(employeeId?: number): Promise<ProductionsListResponseDto> {
+  async getAllProductions(employeeId?: number, page: number = 1, limit: number = 10): Promise<ProductionsListResponseDto> {
     try {
       const where = employeeId ? { employeeId } : {};
+      const skip = (page - 1) * limit;
 
       const productions = await this.prisma.production.findMany({
         where,
@@ -134,13 +135,19 @@ export class ProductionService {
         orderBy: {
           createdAt: 'desc',
         },
+        skip,
+        take: limit,
       });
 
       const total = await this.prisma.production.count({ where });
+      const totalPages = Math.ceil(total / limit);
 
       return {
         productions,
         total,
+        page,
+        limit,
+        totalPages,
       };
     } catch (error) {
       this.logger.error(`Failed to get production records: ${error.message}`);

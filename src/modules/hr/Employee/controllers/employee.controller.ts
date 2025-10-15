@@ -21,6 +21,7 @@ import { Permissions } from '../../../../common/decorators/permissions.decorator
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
 import { RoleName } from '@prisma/client';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
 
 
 interface AuthenticatedRequest extends Request {
@@ -30,6 +31,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Employees')
 @Controller('hr')
 export class EmployeeController {
   constructor(private readonly hrService: EmployeeService) {}
@@ -41,6 +43,9 @@ export class EmployeeController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Terminate an employee and process final salary' })
+  @ApiBody({ type: TerminateEmployeeDto })
+  @ApiResponse({ status: 201, description: 'Employee terminated successfully' })
   async terminate(@Body() dto: TerminateEmployeeDto, @Request() req: AuthenticatedRequest) {
     await this.hrService.terminateEmployee(
       dto.employee_id,
@@ -58,6 +63,9 @@ export class EmployeeController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Create a new employee' })
+  @ApiBody({ type: CreateEmployeeDto })
+  @ApiResponse({ status: 201, description: 'Employee created', type: EmployeeResponseDto })
   async createEmployee(@Body() dto: CreateEmployeeDto, @Request() req: AuthenticatedRequest): Promise<EmployeeResponseDto> {
     return await this.hrService.createEmployee(dto, req.user.id);
   }
@@ -74,6 +82,9 @@ export class EmployeeController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Create a complete employee record including department-specific data and bank account' })
+  @ApiBody({ type: CreateCompleteEmployeeDto })
+  @ApiResponse({ status: 201, description: 'Complete employee created successfully' })
   async createCompleteEmployee(
     @Body() dto: CreateCompleteEmployeeDto, 
     @Request() req: AuthenticatedRequest
@@ -87,6 +98,16 @@ export class EmployeeController {
   @Get('employees')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
+  @ApiOperation({ summary: 'Get all employees with optional filters and pagination' })
+  @ApiQuery({ name: 'departmentId', required: false, type: Number })
+  @ApiQuery({ name: 'roleId', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, enum: ['active', 'terminated', 'inactive'] })
+  @ApiQuery({ name: 'employmentType', required: false, enum: ['full_time', 'part_time'] })
+  @ApiQuery({ name: 'modeOfWork', required: false, enum: ['hybrid', 'on_site', 'remote'] })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Employees list retrieved', type: EmployeesListResponseDto })
   async getEmployees(@Query() query: GetEmployeesDto, @Request() req: AuthenticatedRequest): Promise<EmployeesListResponseDto> {
     return await this.hrService.getEmployees(query);
   }
@@ -97,6 +118,8 @@ export class EmployeeController {
   @Get('employees/stats')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
+  @ApiOperation({ summary: 'Get comprehensive employee statistics' })
+  @ApiResponse({ status: 200, description: 'Employee statistics retrieved', type: EmployeeStatisticsResponseDto })
   async getEmployeeStatistics(@Request() req: AuthenticatedRequest): Promise<EmployeeStatisticsResponseDto> {
     const statistics = await this.hrService.getEmployeeStatistics();
     return { statistics };
@@ -108,6 +131,9 @@ export class EmployeeController {
   @Get('employees/:id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
+  @ApiOperation({ summary: 'Get employee by ID' })
+  @ApiParam({ name: 'id', description: 'Employee ID', type: Number })
+  @ApiResponse({ status: 200, description: 'Employee retrieved', type: EmployeeResponseDto })
   async getEmployeeById(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest): Promise<EmployeeResponseDto> {
     return await this.hrService.getEmployeeById(id);
   }
@@ -118,6 +144,10 @@ export class EmployeeController {
   @Put('employees/:id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
+  @ApiOperation({ summary: 'Update an employee record' })
+  @ApiParam({ name: 'id', description: 'Employee ID', type: Number })
+  @ApiBody({ type: UpdateEmployeeDto })
+  @ApiResponse({ status: 200, description: 'Employee updated', type: EmployeeResponseDto })
   async updateEmployee(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateEmployeeDto,
@@ -133,6 +163,10 @@ export class EmployeeController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.bonuses_set)
+  @ApiOperation({ summary: 'Update employee bonus' })
+  @ApiParam({ name: 'id', description: 'Employee ID', type: Number })
+  @ApiBody({ type: UpdateBonusDto })
+  @ApiResponse({ status: 200, description: 'Bonus updated', type: EmployeeResponseDto })
   async updateBonus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBonusDto,
@@ -148,6 +182,10 @@ export class EmployeeController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.shift_timing_set)
+  @ApiOperation({ summary: 'Update employee shift timings' })
+  @ApiParam({ name: 'id', description: 'Employee ID', type: Number })
+  @ApiBody({ type: UpdateShiftDto })
+  @ApiResponse({ status: 200, description: 'Shift updated', type: EmployeeResponseDto })
   async updateShift(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateShiftDto,
@@ -163,6 +201,9 @@ export class EmployeeController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Delete an employee' })
+  @ApiParam({ name: 'id', description: 'Employee ID', type: Number })
+  @ApiResponse({ status: 200, description: 'Employee deleted successfully' })
   async deleteEmployee(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest): Promise<{ message: string }> {
     return await this.hrService.deleteEmployee(id, req.user.id);
   }
@@ -175,6 +216,9 @@ export class EmployeeController {
   @Departments('HR')
   @Roles(RoleName.dep_manager)
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Get HR logs (Manager only)' })
+  @ApiQuery({ type: GetHrLogsDto })
+  @ApiResponse({ status: 200, description: 'HR logs retrieved', type: HrLogsListResponseDto })
   async getHrLogs(@Query() query: GetHrLogsDto, @Request() req: AuthenticatedRequest): Promise<HrLogsListResponseDto> {
     return await this.hrService.getHrLogs(query);
   }
@@ -187,6 +231,8 @@ export class EmployeeController {
   @Departments('HR')
   @Roles(RoleName.dep_manager)
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Get HR logs statistics (Manager only)' })
+  @ApiResponse({ status: 200, description: 'HR logs stats retrieved', type: HrLogsStatsResponseDto })
   async getHrLogsStats(@Request() req: AuthenticatedRequest): Promise<HrLogsStatsResponseDto> {
     return await this.hrService.getHrLogsStats();
   }
@@ -199,6 +245,7 @@ export class EmployeeController {
   @Departments('HR')
   @Roles(RoleName.dep_manager)
   @Permissions(PermissionName.employee_add_permission)
+  @ApiOperation({ summary: 'Export HR logs in CSV or JSON (Manager only)' })
   async exportHrLogs(
     @Res() res: Response,
     @Query() query: ExportHrLogsDto,
@@ -206,7 +253,7 @@ export class EmployeeController {
     const { format = 'csv', ...filterQuery } = query;
     const data = await this.hrService.getHrLogsForExport(filterQuery);
     const filename = `hr-logs-${new Date().toISOString().split('T')[0]}.${format}`;
-    
+
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
