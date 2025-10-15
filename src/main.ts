@@ -8,7 +8,7 @@ async function bootstrap() {
     logger: ['error', 'warn'], // Only show errors and warnings
   });
 
-  // Enable CORS for frontend communication
+  // Enable CORS for frontend communication (HTTP + WebSocket)
   app.enableCors({
     origin: [
       'http://localhost:5173',  // Vite dev server (your frontend)
@@ -22,9 +22,10 @@ async function bootstrap() {
       'Authorization',
       'Accept',
       'Origin',
-      'X-Requested-With'
+      'X-Requested-With',
+      'Socket-Id',  // For WebSocket handshake
     ],
-    credentials: true, // Allow cookies and authorization headers
+    credentials: true, // Allow cookies and authorization headers (important for WebSocket)
   });
 
   // Enable validation pipe for DTOs
