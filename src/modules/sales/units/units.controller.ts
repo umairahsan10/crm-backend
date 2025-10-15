@@ -7,7 +7,10 @@ import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service
 import { Departments } from '../../../common/decorators/departments.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('Sales Units')
+@ApiBearerAuth()
 @Controller('sales/units')
 @UseGuards(JwtAuthGuard, RolesWithServiceGuard, DepartmentsGuard)
 export class UnitsController {
@@ -16,6 +19,9 @@ export class UnitsController {
   @Post('create')
   @Roles('dep_manager')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Create a new sales unit' })
+  @ApiResponse({ status: 201, description: 'Unit successfully created' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
   async createUnit(@Body() createUnitDto: CreateUnitDto) {
     return this.unitsService.createUnit(createUnitDto);
   }
@@ -23,6 +29,8 @@ export class UnitsController {
   @Get('get')
   @Roles('dep_manager')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Get all sales units' })
+  @ApiResponse({ status: 200, description: 'List of all units' })
   async getAllUnits() {
     return this.unitsService.getAllUnits();
   }
@@ -30,6 +38,10 @@ export class UnitsController {
   @Get('get/:id')
   @Roles('dep_manager')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Get details of a specific unit by ID' })
+  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
+  @ApiResponse({ status: 200, description: 'Unit details' })
+  @ApiResponse({ status: 404, description: 'Unit not found' })
   async getUnit(@Param('id', ParseIntPipe) id: number) {
     return this.unitsService.getUnit(id);
   }
@@ -37,6 +49,9 @@ export class UnitsController {
   @Get('available-heads')
   @Roles('dep_manager')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Get available heads for units' })
+  @ApiQuery({ name: 'assigned', required: false, description: 'Filter by assigned heads (true/false)' })
+  @ApiResponse({ status: 200, description: 'List of available heads' })
   async getAvailableUnitHeads(@Query('assigned') assigned?: string) {
     // Convert string query parameter to boolean
     let assignedBoolean: boolean | undefined;
@@ -56,6 +71,8 @@ export class UnitsController {
   @Get(':id/employees')
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Get employees in a specific unit' })
+  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
   async getEmployeesInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.unitsService.getEmployeesInUnit(id, req.user);
   }
@@ -63,6 +80,8 @@ export class UnitsController {
   @Get(':id/leads')
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Get leads in a specific unit' })
+  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
   async getLeadsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.unitsService.getLeadsInUnit(id, req.user);
   }
@@ -70,6 +89,8 @@ export class UnitsController {
   @Get(':id/archive-leads')
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Get archived leads in a specific unit' })
+  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
   async getArchiveLeadsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.unitsService.getArchiveLeadsInUnit(id, req.user);
   }
@@ -77,6 +98,7 @@ export class UnitsController {
   @Get('deleted/archive-leads')
   @Roles('dep_manager')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Get archived leads from deleted units' })
   async getArchiveLeadsFromDeletedUnits(@Request() req) {
     return this.unitsService.getArchiveLeadsFromDeletedUnits(req.user);
   }
@@ -84,6 +106,8 @@ export class UnitsController {
   @Patch('update/:id')
   @Roles('dep_manager')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Update a sales unit' })
+  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
   async updateUnit(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUnitDto: UpdateUnitDto
@@ -94,6 +118,8 @@ export class UnitsController {
   @Delete('delete/:id')
   @Roles('dep_manager')
   @Departments('Sales')
+  @ApiOperation({ summary: 'Delete a sales unit' })
+  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
   async deleteUnit(@Param('id', ParseIntPipe) id: number) {
     return this.unitsService.deleteUnit(id);
   }
