@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Query, Body, UseGuards, HttpCode, HttpStatus, Param, BadRequestException, Logger, Res } from '@nestjs/common';
 import { Response } from 'express';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { GetAttendanceLogsDto } from './dto/get-attendance-logs.dto';
 import { AttendanceLogResponseDto } from './dto/attendance-log-response.dto';
@@ -41,6 +42,8 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
+@ApiTags('HR - Attendance')
+@ApiBearerAuth()
 @Controller('hr/attendance')
 export class AttendanceController {
   private readonly logger = new Logger(AttendanceController.name);
@@ -54,6 +57,11 @@ export class AttendanceController {
   ) { }
 
   @Get('logs')
+  @ApiOperation({ summary: 'Get attendance logs with filtering' })
+  @ApiQuery({ type: GetAttendanceLogsDto })
+  @ApiResponse({ status: 200, description: 'Attendance logs retrieved successfully', type: AttendanceLogResponseDto, isArray: true })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getAttendanceLogs(
@@ -64,6 +72,11 @@ export class AttendanceController {
 
   @Post('checkin')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Employee check-in' })
+  @ApiBody({ type: CheckinDto })
+  @ApiResponse({ status: 201, description: 'Check-in successful', type: CheckinResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   async checkin(
     @Body() checkinData: CheckinDto
@@ -73,6 +86,11 @@ export class AttendanceController {
 
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Employee check-out' })
+  @ApiBody({ type: CheckoutDto })
+  @ApiResponse({ status: 200, description: 'Check-out successful', type: CheckoutResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   async checkout(
     @Body() checkoutData: CheckoutDto
@@ -81,6 +99,9 @@ export class AttendanceController {
   }
 
   @Get('late-logs')
+  @ApiOperation({ summary: 'Get late logs with filtering' })
+  @ApiQuery({ type: GetLateLogsDto })
+  @ApiResponse({ status: 200, description: 'Late logs retrieved successfully', type: LateLogsListResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getLateLogs(
@@ -90,6 +111,9 @@ export class AttendanceController {
   }
 
   @Get('late-logs/employee/:emp_id')
+  @ApiOperation({ summary: 'Get late logs for a specific employee' })
+  @ApiParam({ name: 'emp_id', type: String })
+  @ApiResponse({ status: 200, description: 'Late logs for employee retrieved successfully', type: LateLogsListResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getLateLogsByEmployee(
@@ -103,6 +127,9 @@ export class AttendanceController {
   }
 
   @Put('late-logs')
+  @ApiOperation({ summary: 'Submit late reason' })
+  @ApiBody({ type: SubmitLateReasonDto })
+  @ApiResponse({ status: 200, description: 'Late reason submitted successfully', type: LateLogResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   async submitLateReason(
@@ -112,6 +139,10 @@ export class AttendanceController {
   }
 
   @Put('late-logs/:id/action')
+  @ApiOperation({ summary: 'Process late log action' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiBody({ schema: { type: 'object', properties: { action: { type: 'string', enum: ['Pending', 'Completed'] }, reviewer_id: { type: 'number' }, late_type: { type: 'string', enum: ['paid', 'unpaid'], required: false } } } })
+  @ApiResponse({ status: 200, description: 'Late log action processed successfully', type: LateLogResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.monthly_request_approvals)
@@ -132,6 +163,9 @@ export class AttendanceController {
   }
 
   @Get('half-day-logs')
+  @ApiOperation({ summary: 'Get half-day logs with filtering' })
+  @ApiQuery({ type: GetHalfDayLogsDto })
+  @ApiResponse({ status: 200, description: 'Half-day logs retrieved successfully', type: HalfDayLogsListResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getHalfDayLogs(
@@ -141,6 +175,9 @@ export class AttendanceController {
   }
 
   @Get('half-day-logs/employee/:emp_id')
+  @ApiOperation({ summary: 'Get half-day logs for a specific employee' })
+  @ApiParam({ name: 'emp_id', type: String })
+  @ApiResponse({ status: 200, description: 'Half-day logs for employee retrieved successfully', type: HalfDayLogsListResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getHalfDayLogsByEmployee(
@@ -154,6 +191,9 @@ export class AttendanceController {
   }
 
   @Put('half-day-logs')
+  @ApiOperation({ summary: 'Submit half-day reason' })
+  @ApiBody({ type: SubmitHalfDayReasonDto })
+  @ApiResponse({ status: 200, description: 'Half-day reason submitted successfully', type: HalfDayLogResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   async submitHalfDayReason(
@@ -163,6 +203,10 @@ export class AttendanceController {
   }
 
   @Put('half-day-logs/:id/action')
+  @ApiOperation({ summary: 'Process half-day log action' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiBody({ schema: { type: 'object', properties: { action: { type: 'string', enum: ['Pending', 'Completed'] }, reviewer_id: { type: 'number' }, half_day_type: { type: 'string', enum: ['paid', 'unpaid'], required: false } } } })
+  @ApiResponse({ status: 200, description: 'Half-day log action processed successfully', type: HalfDayLogResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.monthly_request_approvals)
@@ -183,6 +227,9 @@ export class AttendanceController {
   }
 
   @Get('leave-logs')
+  @ApiOperation({ summary: 'Get leave logs with filtering' })
+  @ApiQuery({ type: GetLeaveLogsDto })
+  @ApiResponse({ status: 200, description: 'Leave logs retrieved successfully', type: LeaveLogsListResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getLeaveLogs(
@@ -192,6 +239,9 @@ export class AttendanceController {
   }
 
   @Get('leave-logs/employee/:emp_id')
+  @ApiOperation({ summary: 'Get leave logs for a specific employee' })
+  @ApiParam({ name: 'emp_id', type: String })
+  @ApiResponse({ status: 200, description: 'Leave logs for employee retrieved successfully', type: LeaveLogsListResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getLeaveLogsByEmployee(
@@ -205,6 +255,9 @@ export class AttendanceController {
   }
 
   @Post('leave-logs')
+  @ApiOperation({ summary: 'Create leave log' })
+  @ApiBody({ type: CreateLeaveLogDto })
+  @ApiResponse({ status: 201, description: 'Leave log created successfully', type: LeaveLogResponseDto })
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard)
   async createLeaveLog(
@@ -214,6 +267,10 @@ export class AttendanceController {
   }
 
   @Put('leave-logs/:id/action')
+  @ApiOperation({ summary: 'Process leave log action' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiBody({ type: ProcessLeaveActionDto })
+  @ApiResponse({ status: 200, description: 'Leave log action processed successfully', type: LeaveLogResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.monthly_request_approvals)
@@ -234,6 +291,8 @@ export class AttendanceController {
   }
 
   @Get('list')
+  @ApiOperation({ summary: 'Get attendance list' })
+  @ApiResponse({ status: 200, description: 'Attendance list retrieved successfully', type: AttendanceListResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getAttendanceList(): Promise<AttendanceListResponseDto[]> {
@@ -241,6 +300,9 @@ export class AttendanceController {
   }
 
   @Get('list/:id')
+  @ApiOperation({ summary: 'Get attendance by employee ID' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Attendance for employee retrieved successfully', type: AttendanceListResponseDto })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getAttendanceById(@Param('id') id: string): Promise<AttendanceListResponseDto | null> {
@@ -252,6 +314,9 @@ export class AttendanceController {
   }
 
   @Get('month')
+  @ApiOperation({ summary: 'Get monthly attendance list' })
+  @ApiQuery({ name: 'month', type: String, required: false })
+  @ApiResponse({ status: 200, description: 'Monthly attendance list retrieved successfully', type: MonthlyAttendanceResponseDto, isArray: true })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getMonthlyAttendanceList(@Query('month') month?: string): Promise<MonthlyAttendanceResponseDto[]> {
@@ -259,6 +324,10 @@ export class AttendanceController {
   }
 
   @Get('month/:emp_id')
+  @ApiOperation({ summary: 'Get monthly attendance for a specific employee' })
+  @ApiParam({ name: 'emp_id', type: String })
+  @ApiQuery({ name: 'month', type: String, required: false })
+  @ApiResponse({ status: 200, description: 'Monthly attendance for employee retrieved successfully', type: MonthlyAttendanceResponseDto })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getMonthlyAttendanceByEmployee(
@@ -273,6 +342,9 @@ export class AttendanceController {
   }
 
   @Put('update')
+  @ApiOperation({ summary: 'Update attendance' })
+  @ApiBody({ type: UpdateAttendanceDto })
+  @ApiResponse({ status: 200, description: 'Attendance updated successfully', type: AttendanceListResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -281,6 +353,10 @@ export class AttendanceController {
   }
 
   @Put('logs/:id/status')
+  @ApiOperation({ summary: 'Update attendance log status' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiBody({ type: UpdateAttendanceLogStatusDto })
+  @ApiResponse({ status: 200, description: 'Attendance log status updated successfully', type: AttendanceLogResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -303,6 +379,9 @@ export class AttendanceController {
   }
 
   @Put('monthly/update')
+  @ApiOperation({ summary: 'Update monthly attendance' })
+  @ApiBody({ type: UpdateMonthlyAttendanceDto })
+  @ApiResponse({ status: 200, description: 'Monthly attendance updated successfully', type: MonthlyAttendanceResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -311,6 +390,8 @@ export class AttendanceController {
   }
 
   @Post('triggers/monthly-lates-reset')
+  @ApiOperation({ summary: 'Trigger monthly lates reset' })
+  @ApiResponse({ status: 200, description: 'Monthly lates reset triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, updated_count: { type: 'number' } } } })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -323,6 +404,8 @@ export class AttendanceController {
   }
 
   @Post('triggers/quarterly-leaves-add')
+  @ApiOperation({ summary: 'Trigger quarterly leaves add' })
+  @ApiResponse({ status: 200, description: 'Quarterly leaves add triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, updated_count: { type: 'number' } } } })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -335,6 +418,8 @@ export class AttendanceController {
   }
 
   @Post('triggers/quarterly-leaves-reset')
+  @ApiOperation({ summary: 'Trigger quarterly leaves reset' })
+  @ApiResponse({ status: 200, description: 'Quarterly leaves reset triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, updated_count: { type: 'number' } } } })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -347,6 +432,8 @@ export class AttendanceController {
   }
 
   @Post('triggers/auto-mark-absent')
+  @ApiOperation({ summary: 'Trigger auto mark absent' })
+  @ApiResponse({ status: 200, description: 'Auto mark absent triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, absent_marked: { type: 'number' }, leave_applied: { type: 'number' } } } })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -355,6 +442,8 @@ export class AttendanceController {
   }
 
   @Post('triggers/weekend-auto-present/override')
+  @ApiOperation({ summary: 'Trigger weekend auto-present override' })
+  @ApiResponse({ status: 200, description: 'Weekend auto-present override activated successfully', schema: { type: 'object', properties: { message: { type: 'string' }, marked_present: { type: 'number' }, errors: { type: 'number' } } } })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -368,6 +457,8 @@ export class AttendanceController {
   }
 
   @Get('triggers/weekend-status')
+  @ApiOperation({ summary: 'Get weekend status' })
+  @ApiResponse({ status: 200, description: 'Weekend status retrieved successfully', schema: { type: 'object', properties: { isWeekend: { type: 'boolean' }, dayOfWeek: { type: 'number' }, dayName: { type: 'string' }, currentTime: { type: 'string' }, activeEmployees: { type: 'number' } } } })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getWeekendStatus(): Promise<{
@@ -387,6 +478,8 @@ export class AttendanceController {
    * Shows if trigger is active, next check time, and today's holiday status
    */
   @Get('triggers/future-holiday-status')
+  @ApiOperation({ summary: 'Get future holiday trigger status' })
+  @ApiResponse({ status: 200, description: 'Future holiday trigger status retrieved successfully', schema: { type: 'object', properties: { isActive: { type: 'boolean' }, nextCheck: { type: 'string' }, todayHoliday: { type: 'string' }, activeEmployees: { type: 'number' } } } })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getFutureHolidayTriggerStatus(): Promise<{
@@ -403,6 +496,9 @@ export class AttendanceController {
    * Useful for testing or immediate processing
    */
   @Post('triggers/future-holiday-manual/:date')
+  @ApiOperation({ summary: 'Manually trigger future holiday attendance marking for a specific date' })
+  @ApiParam({ name: 'date', type: String })
+  @ApiResponse({ status: 200, description: 'Manual future holiday trigger processed', schema: { type: 'object', properties: { marked_present: { type: 'number' }, errors: { type: 'number' }, message: { type: 'string' } } } })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -426,6 +522,9 @@ export class AttendanceController {
   }
 
   @Post('bulk-mark-present')
+  @ApiOperation({ summary: 'Bulk mark all employees present' })
+  @ApiBody({ type: BulkMarkPresentDto })
+  @ApiResponse({ status: 200, description: 'Bulk mark present processed', schema: { type: 'object', properties: { message: { type: 'string' }, marked_present: { type: 'number' }, errors: { type: 'number' }, skipped: { type: 'number' } } } })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
@@ -438,6 +537,9 @@ export class AttendanceController {
    * GET /hr/attendance/leave-logs/export
    */
   @Get('leave-logs/export')
+  @ApiOperation({ summary: 'Export leave logs' })
+  @ApiQuery({ type: ExportLeaveLogsDto })
+  @ApiResponse({ status: 200, description: 'Leave logs exported successfully' })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async exportLeaveLogs(
@@ -466,6 +568,9 @@ export class AttendanceController {
    * GET /hr/attendance/leave-logs/stats
    */
   @Get('leave-logs/stats')
+  @ApiOperation({ summary: 'Get leave logs statistics' })
+  @ApiQuery({ type: LeaveLogsStatsDto })
+  @ApiResponse({ status: 200, description: 'Leave logs statistics retrieved successfully', type: LeaveLogsStatsResponseDto })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getLeaveLogsStats(
@@ -479,6 +584,9 @@ export class AttendanceController {
    * GET /hr/attendance/late-logs/export
    */
   @Get('late-logs/export')
+  @ApiOperation({ summary: 'Export late logs' })
+  @ApiQuery({ type: ExportLateLogsDto })
+  @ApiResponse({ status: 200, description: 'Late logs exported successfully' })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async exportLateLogs(
@@ -507,6 +615,9 @@ export class AttendanceController {
    * GET /hr/attendance/late-logs/stats
    */
   @Get('late-logs/stats')
+  @ApiOperation({ summary: 'Get late logs statistics' })
+  @ApiQuery({ type: LateLogsStatsDto })
+  @ApiResponse({ status: 200, description: 'Late logs statistics retrieved successfully', type: LateLogsStatsResponseDto })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getLateLogsStats(
@@ -520,6 +631,9 @@ export class AttendanceController {
    * GET /hr/attendance/half-day-logs/export
    */
   @Get('half-day-logs/export')
+  @ApiOperation({ summary: 'Export half-day logs' })
+  @ApiQuery({ type: ExportHalfDayLogsDto })
+  @ApiResponse({ status: 200, description: 'Half-day logs exported successfully' })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async exportHalfDayLogs(
@@ -548,6 +662,9 @@ export class AttendanceController {
    * GET /hr/attendance/half-day-logs/stats
    */
   @Get('half-day-logs/stats')
+  @ApiOperation({ summary: 'Get half-day logs statistics' })
+  @ApiQuery({ type: HalfDayLogsStatsDto })
+  @ApiResponse({ status: 200, description: 'Half-day logs statistics retrieved successfully', type: HalfDayLogsStatsResponseDto })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async getHalfDayLogsStats(

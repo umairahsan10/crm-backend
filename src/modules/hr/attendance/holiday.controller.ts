@@ -14,10 +14,13 @@ import {
   Logger,
   Request
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { HolidayService } from './holiday.service';
 import { CreateHolidayDto } from './dto/create-holiday.dto';
 import { HolidayResponseDto } from './dto/holiday-response.dto';
 import { HolidayCreationResponseDto } from './dto/holiday-creation-response.dto';
+import { HolidayDeleteResponseDto } from './dto/holiday-delete-response.dto';
+import { HolidayStatsResponseDto } from './dto/holiday-stats-response.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -32,6 +35,8 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('HR - Holidays')
+@ApiBearerAuth()
 @Controller('hr/attendance/holidays')
 export class HolidayController {
   private readonly logger = new Logger(HolidayController.name);
@@ -45,6 +50,12 @@ export class HolidayController {
    * All employees can view holidays
    */
   @Get()
+  @ApiOperation({ summary: 'Get all holidays with optional filtering' })
+  @ApiQuery({ name: 'year', required: false, type: String, description: 'Filter by year' })
+  @ApiQuery({ name: 'month', required: false, type: String, description: 'Filter by month (requires year)' })
+  @ApiResponse({ status: 200, description: 'Holidays retrieved successfully', type: [HolidayResponseDto] })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   async getAllHolidays(
     @Query('year') year?: string,
@@ -84,6 +95,11 @@ export class HolidayController {
    * All employees can view upcoming holidays
    */
   @Get('upcoming')
+  @ApiOperation({ summary: 'Get upcoming holidays' })
+  @ApiQuery({ name: 'limit', required: false, type: String, description: 'Number of upcoming holidays to return (1-100)' })
+  @ApiResponse({ status: 200, description: 'Upcoming holidays retrieved successfully', type: [HolidayResponseDto] })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   async getUpcomingHolidays(@Query('limit') limit?: string): Promise<HolidayResponseDto[]> {
     try {
@@ -107,6 +123,11 @@ export class HolidayController {
    * All employees can view holiday statistics
    */
   @Get('stats')
+  @ApiOperation({ summary: 'Get holiday statistics' })
+  @ApiQuery({ name: 'year', required: false, type: String, description: 'Year for statistics (defaults to current year)' })
+  @ApiResponse({ status: 200, description: 'Holiday statistics retrieved successfully', type: HolidayStatsResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   async getHolidayStats(@Query('year') year?: string): Promise<{
     totalHolidays: number;
@@ -133,6 +154,12 @@ export class HolidayController {
    * All employees can view individual holidays
    */
   @Get(':id')
+  @ApiOperation({ summary: 'Get holiday by ID' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Holiday ID' })
+  @ApiResponse({ status: 200, description: 'Holiday retrieved successfully', type: HolidayResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Holiday not found' })
   @UseGuards(JwtAuthGuard)
   async getHolidayById(@Param('id') id: string): Promise<HolidayResponseDto> {
     try {
@@ -156,6 +183,12 @@ export class HolidayController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new holiday (HR/Admin only)' })
+  @ApiBody({ type: CreateHolidayDto })
+  @ApiResponse({ status: 201, description: 'Holiday created successfully', type: HolidayCreationResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async createHoliday(@Body() createHolidayDto: CreateHolidayDto, @Request() req: AuthenticatedRequest): Promise<HolidayCreationResponseDto> {
@@ -180,6 +213,13 @@ export class HolidayController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a holiday (HR/Admin only)' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Holiday ID' })
+  @ApiResponse({ status: 200, description: 'Holiday deleted successfully', type: HolidayDeleteResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Holiday not found' })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
   async deleteHoliday(@Param('id') id: string, @Request() req: AuthenticatedRequest): Promise<{ message: string }> {
