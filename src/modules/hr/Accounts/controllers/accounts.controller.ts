@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AccountsService } from '../services/accounts.service';
 import { CreateAccountDto, UpdateAccountDto } from '../dto/accounts.dto';
 import { UpdateBaseSalaryDto } from '../dto/update-base-salary.dto';
@@ -17,11 +18,17 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('HR - Accounts')
+@ApiBearerAuth()
 @Controller('hr/accounts')
 export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get all account records' })
+  @ApiResponse({ status: 200, description: 'Account records retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -30,6 +37,12 @@ export class AccountsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get account record by ID' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Account record ID' })
+  @ApiResponse({ status: 200, description: 'Account record retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Account record not found' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -38,6 +51,12 @@ export class AccountsController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new account record' })
+  @ApiBody({ type: CreateAccountDto })
+  @ApiResponse({ status: 201, description: 'Account record created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -46,6 +65,14 @@ export class AccountsController {
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Update account record' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Account record ID' })
+  @ApiBody({ type: UpdateAccountDto })
+  @ApiResponse({ status: 200, description: 'Account record updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Account record not found' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
@@ -57,6 +84,14 @@ export class AccountsController {
    * Update account base salary
    */
   @Patch(':id/base-salary')
+  @ApiOperation({ summary: 'Update account base salary' })
+  @ApiParam({ name: 'id', type: 'number', description: 'Account record ID' })
+  @ApiBody({ type: UpdateBaseSalaryDto })
+  @ApiResponse({ status: 200, description: 'Base salary updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Account record not found' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.salary_permission)
@@ -69,6 +104,12 @@ export class AccountsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete account record' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Account record ID' })
+  @ApiResponse({ status: 200, description: 'Account record deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Account record not found' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
