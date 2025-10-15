@@ -32,12 +32,17 @@ export class UpdateAdminRequestStatusDto {
 
 export class AdminRequestResponseDto {
   id: number;
+  hrId: number | null;
   hrLogId: number | null;
   description: string | null;
   type: RequestType | null;
   status: AdminRequestStatus | null;
   createdAt: Date;
   updatedAt: Date;
+  hr: {
+    id: number;
+    employeeId: number;
+  } | null;
   hrLog: {
     id: number;
     hrId: number;

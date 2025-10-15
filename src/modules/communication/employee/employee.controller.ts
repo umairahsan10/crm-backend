@@ -12,7 +12,8 @@ import {
   HttpStatus,
   UseGuards,
   BadRequestException,
-  ParseIntPipe as QueryParseIntPipe
+  ParseIntPipe as QueryParseIntPipe,
+  Request
 } from '@nestjs/common';
 import { EmployeeService } from './employee.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
@@ -21,6 +22,17 @@ import { RequestPriority, RequestStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 import { Departments } from '../../../common/decorators/departments.decorator';
+
+interface AuthenticatedRequest {
+  user: {
+    id: number;
+    type: 'admin' | 'employee';
+    role?: string;
+    email?: string;
+    department?: string;
+    departmentId?: number;
+  };
+}
 
 @Controller('communication/employee')
 @UseGuards(JwtAuthGuard, DepartmentsGuard)
@@ -34,7 +46,7 @@ export class EmployeeController {
   }
 
   @Get('hr-requests/my-requests')
-  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production')
+  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production', 'Accounts')
   async getMyHrRequests(@Query('employeeId', QueryParseIntPipe) employeeId: number) {
     return this.employeeService.getHrRequestsByEmployee(employeeId);
   }
@@ -59,7 +71,7 @@ export class EmployeeController {
 
   @Post('hr-requests')
   @HttpCode(HttpStatus.CREATED)
-  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production')
+  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production', 'Accounts')
   async createHrRequest(@Body() createHrRequestDto: CreateHrRequestDto) {
     return this.employeeService.createHrRequest(createHrRequestDto);
   }
@@ -68,12 +80,19 @@ export class EmployeeController {
 
   @Post('hr-requests/:id/action')
   @HttpCode(HttpStatus.OK)
-  @Departments('HR')
+  @Departments('HR', 'Admin')
   async takeHrAction(
     @Param('id', ParseIntPipe) id: number,
     @Body() hrActionDto: HrActionDto,
     @Query('hrEmployeeId', QueryParseIntPipe) hrEmployeeId: number,
+    @Request() req: AuthenticatedRequest,
   ) {
+    // If admin user, use admin-specific action handler
+    if (req.user.type === 'admin') {
+      return this.employeeService.takeAdminAction(id, hrActionDto, req.user.id);
+    }
+    
+    // For HR employees, require hrEmployeeId
     if (!hrEmployeeId) {
       throw new BadRequestException('HR Employee ID is required for taking actions');
     }
@@ -82,12 +101,19 @@ export class EmployeeController {
   }
 
   @Put('hr-requests/:id/action')
-  @Departments('HR')
+  @Departments('HR', 'Admin')
   async updateHrRequestAction(
     @Param('id', ParseIntPipe) id: number,
     @Body() hrActionDto: HrActionDto,
     @Query('hrEmployeeId', QueryParseIntPipe) hrEmployeeId: number,
+    @Request() req: AuthenticatedRequest,
   ) {
+    // If admin user, use admin-specific update handler
+    if (req.user.type === 'admin') {
+      return this.employeeService.updateAdminAction(id, hrActionDto, req.user.id);
+    }
+    
+    // For HR employees, require hrEmployeeId
     if (!hrEmployeeId) {
       throw new BadRequestException('HR Employee ID is required for updating actions');
     }
@@ -96,11 +122,18 @@ export class EmployeeController {
   }
 
   @Delete('hr-requests/:id')
-  @Departments('HR')
+  @Departments('HR', 'Admin')
   async deleteHrRequest(
     @Param('id', ParseIntPipe) id: number,
     @Query('hrEmployeeId', QueryParseIntPipe) hrEmployeeId: number,
+    @Request() req: AuthenticatedRequest,
   ) {
+    // If admin user, use admin-specific delete handler
+    if (req.user.type === 'admin') {
+      return this.employeeService.deleteHrRequestAsAdmin(id, req.user.id);
+    }
+    
+    // For HR employees, require hrEmployeeId
     if (!hrEmployeeId) {
       throw new BadRequestException('HR Employee ID is required for deleting requests');
     }
