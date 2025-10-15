@@ -37,6 +37,7 @@ export class MeetingResponseDto {
   // Related data
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Employee details related to the meeting',
     example: {
       id: 25,
@@ -58,6 +59,7 @@ export class MeetingResponseDto {
   };
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Client details related to the meeting',
     example: {
       id: 42,
@@ -76,6 +78,7 @@ export class MeetingResponseDto {
   };
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Project details associated with the meeting',
     example: {
       id: 7,

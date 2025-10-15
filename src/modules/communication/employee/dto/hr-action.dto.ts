@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 import { RequestStatus, RequestPriority } from '@prisma/client';
 
-export class HrActionDto {
+export class EmployeeHrActionDto {
   @ApiPropertyOptional({
     description: 'Updated status of the HR request',
     enum: RequestStatus,

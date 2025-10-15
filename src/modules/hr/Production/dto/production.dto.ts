@@ -62,14 +62,15 @@ export class ProductionResponseDto {
   updatedAt: Date;
 
   @ApiProperty({
+    type: () => Object,
     description: 'Employee details',
     required: false,
-    type: () => ({
+    example: {
       id: 101,
       firstName: 'John',
       lastName: 'Doe',
       email: 'john.doe@example.com',
-    }),
+    },
   })
   employee?: {
     id: number;
@@ -79,13 +80,14 @@ export class ProductionResponseDto {
   };
 
   @ApiProperty({
+    type: () => Object,
     description: 'Production unit details',
     required: false,
     nullable: true,
-    type: () => ({
+    example: {
       id: 5,
       name: 'Assembly Unit',
-    }),
+    },
   })
   productionUnit?: {
     id: number;

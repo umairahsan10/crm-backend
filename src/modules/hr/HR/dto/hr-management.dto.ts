@@ -140,8 +140,8 @@ export class HrResponseDto {
   updatedAt: Date;
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Employee details associated with this HR record',
-    type: Object,
     example: {
       id: 1,
       firstName: 'John',

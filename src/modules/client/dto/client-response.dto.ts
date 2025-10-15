@@ -60,6 +60,7 @@ export class ClientResponseDto {
   updatedAt: Date;
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Industry details associated with the client',
     example: {
       id: 3,
@@ -74,6 +75,7 @@ export class ClientResponseDto {
   };
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Employee assigned to manage this client',
     example: {
       id: 7,

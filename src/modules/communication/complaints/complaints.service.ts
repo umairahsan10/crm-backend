@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateComplaintDto } from './dto/create-complaint.dto';
-import { HrActionDto } from './dto/hr-action.dto';
+import { ComplaintHrActionDto } from './dto/hr-action.dto';
 import { ComplaintStatus, ComplaintPriority } from '@prisma/client';
 import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
@@ -407,7 +407,7 @@ export class ComplaintsService {
     }
   }
 
-  private async validateAndUpdateComplaint(id: number, hrActionDto: HrActionDto, hrEmployeeId: number) {
+  private async validateAndUpdateComplaint(id: number, hrActionDto: ComplaintHrActionDto, hrEmployeeId: number) {
     // Validate if complaint exists
     const existingComplaint = await this.prisma.complaint.findUnique({
       where: { id },
@@ -596,7 +596,7 @@ export class ComplaintsService {
     return updatedComplaint;
   }
 
-  async updateComplaintAction(id: number, hrActionDto: HrActionDto, hrEmployeeId: number) {
+  async updateComplaintAction(id: number, hrActionDto: ComplaintHrActionDto, hrEmployeeId: number) {
     try {
       const updatedComplaint = await this.validateAndUpdateComplaint(id, hrActionDto, hrEmployeeId);
 

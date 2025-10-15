@@ -20,8 +20,8 @@ export class DepartmentResponseDto {
   updatedAt: Date;
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Manager details',
-    type: Object,
     example: {
       id: 5,
       firstName: 'John',

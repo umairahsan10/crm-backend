@@ -125,7 +125,7 @@ export class ExpenseResponseDto {
   @ApiPropertyOptional({ type: () => VendorResponseDto, description: 'Linked vendor details' })
   vendor: VendorResponseDto | null;
 
-  @ApiPropertyOptional({ example: { id: 12 }, description: 'Employee who created the expense' })
+  @ApiPropertyOptional({ type: () => Object, example: { id: 12 }, description: 'Employee who created the expense' })
   employee: {
     id: number;
   } | null;
@@ -173,16 +173,16 @@ export class ExpenseUpdateResponseDto {
   };
 }
 
-export class ErrorResponseDto {
+export class ExpenseErrorResponseDto {
   @ApiProperty({ example: 'error', description: 'Status of the response' })
   status: string;
   @ApiProperty({
-    example: 'Asset not found',
+    example: 'Expense not found',
     description: 'Error message describing the issue',
   })
   message: string;
   @ApiProperty({
-    example: 'ASSET_NOT_FOUND',
+    example: 'EXPENSE_NOT_FOUND',
     description: 'Application-specific error code',
   })
   error_code: string;

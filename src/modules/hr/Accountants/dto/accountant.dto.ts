@@ -114,6 +114,7 @@ export class AccountantResponseDto {
   updatedAt: Date;
 
   @ApiPropertyOptional({ 
+    type: () => Object,
     description: 'Employee information',
     example: {
       id: 1,

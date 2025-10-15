@@ -22,12 +22,17 @@ export class MarketingRecordResponseDto {
   @ApiProperty({ description: 'Record last updated timestamp', example: '2025-10-16T12:30:00.000Z' })
   updatedAt: Date;
 
-  @ApiProperty({ description: 'Employee details', type: () => ({
-    id: 101,
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com'
-  }), required: false })
+  @ApiProperty({ 
+    type: () => Object,
+    description: 'Employee details', 
+    example: {
+      id: 101,
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john.doe@example.com'
+    }, 
+    required: false 
+  })
   employee?: {
     id: number;
     firstName: string;

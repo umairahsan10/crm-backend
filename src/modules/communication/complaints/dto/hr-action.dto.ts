@@ -2,7 +2,7 @@ import { IsOptional, IsString, IsEnum, IsNumber } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ComplaintStatus, ComplaintPriority } from '@prisma/client';
 
-export class HrActionDto {
+export class ComplaintHrActionDto {
   @ApiPropertyOptional({
     enum: ComplaintStatus,
     description: 'Status of the complaint (e.g., OPEN, IN_PROGRESS, RESOLVED)',

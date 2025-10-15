@@ -42,6 +42,7 @@ export class CampaignResponseDto {
   productionUnitId?: number;
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Details of the associated marketing unit',
     example: { id: 3, name: 'Marketing Unit A' },
   })
@@ -51,6 +52,7 @@ export class CampaignResponseDto {
   };
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Details of the associated production unit',
     example: { id: 7, name: 'Production Unit X' },
   })

@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNumber, IsPositive, IsOptional, ValidateIf } from 'class-validator';
 
-export class UpdateUnitDto {
+export class UpdateProductionUnitDto {
   @ApiPropertyOptional({ description: 'Updated name of the unit', example: 'Sales' })
   @IsOptional()
   @IsString()

@@ -10,7 +10,7 @@ import { Departments } from '../../../../common/decorators/departments.decorator
 import { Permissions } from '../../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiParam, getSchemaPath } from '@nestjs/swagger';
-import { AssetCreateResponseDto, AssetUpdateResponseDto, AssetSingleResponseDto, AssetListResponseDto, ErrorResponseDto } from './dto/asset-response.dto';
+import { AssetCreateResponseDto, AssetUpdateResponseDto, AssetSingleResponseDto, AssetListResponseDto, AssetErrorResponseDto } from './dto/asset-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -49,7 +49,7 @@ export class AssetsController {
   @Permissions(PermissionName.assets_permission)
   @ApiOperation({ summary: 'Create a new asset', description: 'Creates a new asset with a linked transaction record.' })
   @ApiResponse({ status: 201, description: 'Asset created successfully', type: AssetCreateResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input', type: AssetErrorResponseDto })
   async createAsset(
     @Body() dto: CreateAssetDto,
     @Request() req: AuthenticatedRequest
@@ -96,7 +96,7 @@ export class AssetsController {
   @ApiQuery({ name: 'minCurrentValue', required: false, type: Number, description: 'Minimum current value' })
   @ApiQuery({ name: 'maxCurrentValue', required: false, type: Number, description: 'Maximum current value' })
   @ApiResponse({ status: 200, description: 'Assets retrieved successfully', type: AssetListResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid query parameters', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters', type: AssetErrorResponseDto })
   async getAllAssets(
     @Request() req: AuthenticatedRequest,
     @Query('category') category?: string,
@@ -142,7 +142,7 @@ export class AssetsController {
   @ApiOperation({ summary: 'Get asset by ID', description: 'Retrieve detailed information about a specific asset including transaction and vendor.' })
   @ApiParam({ name: 'id', type: Number, description: 'Asset ID' })
   @ApiResponse({ status: 200, description: 'Asset retrieved successfully', type: AssetSingleResponseDto })
-  @ApiResponse({ status: 404, description: 'Asset not found', type: ErrorResponseDto })
+  @ApiResponse({ status: 404, description: 'Asset not found', type: AssetErrorResponseDto })
   async getAssetById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -169,7 +169,7 @@ export class AssetsController {
   @Permissions(PermissionName.assets_permission)
   @ApiOperation({ summary: 'Update an asset', description: 'Update asset details and linked transaction if purchase value changes.' })
   @ApiResponse({ status: 200, description: 'Asset updated successfully', type: AssetUpdateResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input or asset not found', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input or asset not found', type: AssetErrorResponseDto })
   async updateAsset(
     @Body() dto: UpdateAssetDto,
     @Request() req: AuthenticatedRequest

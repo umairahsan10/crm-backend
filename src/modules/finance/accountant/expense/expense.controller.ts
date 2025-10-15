@@ -14,7 +14,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody, getSchemaPath } 
 import { ExpenseService } from './expense.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
-import { ExpenseCreateResponseDto, ExpenseUpdateResponseDto, ExpenseListResponseDto, ExpenseSingleResponseDto, ErrorResponseDto } from './dto/expense-response.dto';
+import { ExpenseCreateResponseDto, ExpenseUpdateResponseDto, ExpenseListResponseDto, ExpenseSingleResponseDto, ExpenseErrorResponseDto } from './dto/expense-response.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -51,7 +51,7 @@ export class ExpenseController {
   @ApiOperation({ summary: 'Create a new expense' })
   @ApiBody({ type: CreateExpenseDto })
   @ApiResponse({ status: 201, description: 'Expense created successfully', type: ExpenseCreateResponseDto })
-  @ApiResponse({ status: 400, description: 'Validation failed', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation failed', type: ExpenseErrorResponseDto })
   async createExpense(
     @Body() dto: CreateExpenseDto,
     @Request() req: AuthenticatedRequest
@@ -78,7 +78,7 @@ export class ExpenseController {
   @ApiQuery({ name: 'paymentMethod', required: false, type: String, description: 'Filter by payment method' })
   @ApiQuery({ name: 'processedByRole', required: false, type: String, description: 'Filter by processed role' })
   @ApiResponse({ status: 200, description: 'Expenses retrieved successfully', type: ExpenseListResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid filters', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid filters', type: ExpenseErrorResponseDto })
   async getAllExpenses(
     @Request() req: AuthenticatedRequest,
     @Query('category') category?: string,
@@ -113,7 +113,7 @@ export class ExpenseController {
   @Permissions(PermissionName.expenses_permission)
   @ApiOperation({ summary: 'Get a single expense by ID' })
   @ApiResponse({ status: 200, description: 'Expense retrieved successfully', type: ExpenseSingleResponseDto })
-  @ApiResponse({ status: 404, description: 'Expense not found', type: ErrorResponseDto })
+  @ApiResponse({ status: 404, description: 'Expense not found', type: ExpenseErrorResponseDto })
   async getExpenseById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -132,8 +132,8 @@ export class ExpenseController {
   @ApiOperation({ summary: 'Update an existing expense' })
   @ApiBody({ type: UpdateExpenseDto })
   @ApiResponse({ status: 200, description: 'Expense updated successfully', type: ExpenseUpdateResponseDto })
-  @ApiResponse({ status: 400, description: 'Validation failed', type: ErrorResponseDto })
-  @ApiResponse({ status: 404, description: 'Expense not found', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation failed', type: ExpenseErrorResponseDto })
+  @ApiResponse({ status: 404, description: 'Expense not found', type: ExpenseErrorResponseDto })
   async updateExpense(
     @Body() dto: UpdateExpenseDto,
     @Request() req: AuthenticatedRequest

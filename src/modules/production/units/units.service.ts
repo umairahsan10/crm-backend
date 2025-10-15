@@ -1,13 +1,13 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { CreateUnitDto } from './dto/create-unit.dto';
-import { UpdateUnitDto } from './dto/update-unit.dto';
+import { CreateProductionUnitDto } from './dto/create-unit.dto';
+import { UpdateProductionUnitDto } from './dto/update-unit.dto';
 
 @Injectable()
 export class UnitsService {
   constructor(private prisma: PrismaService) {}
 
-  async createUnit(createUnitDto: CreateUnitDto) {
+  async createUnit(createUnitDto: CreateProductionUnitDto) {
     const { name, headId } = createUnitDto;
 
     // Validate headId if provided
@@ -272,7 +272,7 @@ export class UnitsService {
     };
   }
 
-  async updateUnit(id: number, updateUnitDto: UpdateUnitDto) {
+  async updateUnit(id: number, updateUnitDto: UpdateProductionUnitDto) {
     // Validate that updateUnitDto is provided
     if (!updateUnitDto) {
       throw new BadRequestException('Request body is required for update operation');

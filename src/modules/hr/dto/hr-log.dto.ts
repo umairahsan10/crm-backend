@@ -97,7 +97,7 @@ export class HrLogResponseDto {
   @ApiPropertyOptional({ description: 'Updated timestamp' })
   updatedAt: string;
 
-  @ApiPropertyOptional({ description: 'Affected employee details', type: Object, nullable: true })
+  @ApiPropertyOptional({ type: () => Object, description: 'Affected employee details', nullable: true })
   affectedEmployee: {
     id: number;
     firstName: string;

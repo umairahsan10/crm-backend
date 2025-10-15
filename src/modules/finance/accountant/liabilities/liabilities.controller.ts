@@ -4,7 +4,7 @@ import { LiabilitiesService } from './liabilities.service';
 import { CreateLiabilityDto } from './dto/create-liability.dto';
 import { UpdateLiabilityDto } from './dto/update-liability.dto';
 import { MarkLiabilityPaidDto } from './dto/mark-liability-paid.dto';
-import { LiabilityCreateResponseDto, LiabilityUpdateResponseDto, LiabilityListResponseDto, LiabilityDetailResponseDto, LiabilityMarkPaidResponseDto, ErrorResponseDto } from './dto/liability-response.dto';
+import { LiabilityCreateResponseDto, LiabilityUpdateResponseDto, LiabilityListResponseDto, LiabilityDetailResponseDto, LiabilityMarkPaidResponseDto, LiabilityErrorResponseDto } from './dto/liability-response.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -47,7 +47,7 @@ export class LiabilitiesController {
   @Permissions(PermissionName.expenses_permission)
   @ApiOperation({ summary: 'Create a new liability' })
   @ApiResponse({ status: 201, description: 'Created liability with linked transaction', type: LiabilityCreateResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input', type: LiabilityErrorResponseDto })
   @ApiBody({ type: CreateLiabilityDto })
   async createLiability(
     @Body() dto: CreateLiabilityDto,
@@ -131,7 +131,7 @@ export class LiabilitiesController {
   @Permissions(PermissionName.expenses_permission)
   @ApiOperation({ summary: 'Get a single liability by ID' })
   @ApiResponse({ status: 200, description: 'Liability details with transaction and vendor information', type: LiabilityDetailResponseDto })
-  @ApiResponse({ status: 404, description: 'Liability not found', type: ErrorResponseDto })
+  @ApiResponse({ status: 404, description: 'Liability not found', type: LiabilityErrorResponseDto })
   async getLiabilityById(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest
@@ -158,7 +158,7 @@ export class LiabilitiesController {
   @Permissions(PermissionName.expenses_permission)
   @ApiOperation({ summary: 'Update a liability' })
   @ApiResponse({ status: 200, description: 'Updated liability details', type: LiabilityUpdateResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid input or liability cannot be updated', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid input or liability cannot be updated', type: LiabilityErrorResponseDto })
   @ApiBody({ type: UpdateLiabilityDto })
   async updateLiability(
     @Body() dto: UpdateLiabilityDto,
@@ -189,7 +189,7 @@ export class LiabilitiesController {
   @Permissions(PermissionName.expenses_permission)
   @ApiOperation({ summary: 'Mark a liability as paid' })
   @ApiResponse({ status: 200, description: 'Liability, transaction, and expense details after marking as paid', type: LiabilityMarkPaidResponseDto })
-  @ApiResponse({ status: 400, description: 'Cannot mark liability as paid', type: ErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Cannot mark liability as paid', type: LiabilityErrorResponseDto })
   @ApiBody({ type: MarkLiabilityPaidDto })
   async markLiabilityAsPaid(
     @Body() dto: MarkLiabilityPaidDto,

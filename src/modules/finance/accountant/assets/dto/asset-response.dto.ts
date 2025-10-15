@@ -153,16 +153,17 @@ export class TransactionResponseDto {
     })
     updatedAt: string;
     @ApiProperty({
-      type: TransactionResponseDto,
+      type: () => TransactionResponseDto,
       description: 'Associated transaction details',
     })
     transaction: TransactionResponseDto;
     @ApiProperty({
-      type: VendorResponseDto,
+      type: () => VendorResponseDto,
       description: 'Vendor details associated with the asset',
     })
     vendor: VendorResponseDto;
     @ApiProperty({
+      type: () => Object,
       description: 'Employee details associated with the asset',
       example: { id: 12, firstName: 'Alice', lastName: 'Smith' },
     })
@@ -243,7 +244,7 @@ export class TransactionResponseDto {
   data: AssetResponseDto;
 }
 
-export class ErrorResponseDto {
+export class AssetErrorResponseDto {
   @ApiProperty({ example: 'error', description: 'Status of the response' })
   status: string;
   @ApiProperty({

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
-import { HrActionDto } from './dto/hr-action.dto';
+import { EmployeeHrActionDto } from './dto/hr-action.dto';
 import { RequestPriority, RequestStatus } from '@prisma/client';
 import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
@@ -436,7 +436,7 @@ export class EmployeeService {
 
 
 
-  private async validateAndUpdateHrRequest(id: number, hrActionDto: HrActionDto, hrEmployeeId: number) {
+  private async validateAndUpdateHrRequest(id: number, hrActionDto: EmployeeHrActionDto, hrEmployeeId: number) {
     // Validate if request exists
     const existingRequest = await this.prisma.hrRequest.findUnique({
       where: { id },
@@ -602,7 +602,7 @@ export class EmployeeService {
     return updatedRequest;
   }
 
-  async takeHrAction(id: number, hrActionDto: HrActionDto, hrEmployeeId: number) {
+  async takeHrAction(id: number, hrActionDto: EmployeeHrActionDto, hrEmployeeId: number) {
     try {
       const updatedRequest = await this.validateAndUpdateHrRequest(id, hrActionDto, hrEmployeeId);
 
@@ -626,7 +626,7 @@ export class EmployeeService {
 
 
 
-  async updateHrRequestAction(id: number, hrActionDto: HrActionDto, hrEmployeeId: number) {
+  async updateHrRequestAction(id: number, hrActionDto: EmployeeHrActionDto, hrEmployeeId: number) {
     try {
       const updatedRequest = await this.validateAndUpdateHrRequest(id, hrActionDto, hrEmployeeId);
 
@@ -727,7 +727,7 @@ export class EmployeeService {
    * Admin-specific method to validate and update HR request
    * Bypasses HR employee validation since admins don't have HR records
    */
-  private async validateAndUpdateHrRequestAsAdmin(id: number, hrActionDto: HrActionDto, adminId: number) {
+  private async validateAndUpdateHrRequestAsAdmin(id: number, hrActionDto: EmployeeHrActionDto, adminId: number) {
     // Validate if request exists
     const existingRequest = await this.prisma.hrRequest.findUnique({
       where: { id },
@@ -884,7 +884,7 @@ export class EmployeeService {
   /**
    * Admin takes action on HR request (creates initial action)
    */
-  async takeAdminAction(id: number, hrActionDto: HrActionDto, adminId: number) {
+  async takeAdminAction(id: number, hrActionDto: EmployeeHrActionDto, adminId: number) {
     try {
       const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(id, hrActionDto, adminId);
 
@@ -909,7 +909,7 @@ export class EmployeeService {
   /**
    * Admin updates existing action on HR request
    */
-  async updateAdminAction(id: number, hrActionDto: HrActionDto, adminId: number) {
+  async updateAdminAction(id: number, hrActionDto: EmployeeHrActionDto, adminId: number) {
     try {
       const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(id, hrActionDto, adminId);
 

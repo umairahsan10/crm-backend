@@ -1,13 +1,13 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { CreateUnitDto } from './dto/create-unit.dto';
-import { UpdateUnitDto } from './dto/update-unit.dto';
+import { CreateSalesUnitDto } from './dto/create-unit.dto';
+import { UpdateSalesUnitDto } from './dto/update-unit.dto';
 
 @Injectable()
 export class UnitsService {
   constructor(private prisma: PrismaService) {}
 
-  async createUnit(createUnitDto: CreateUnitDto) {
+  async createUnit(createUnitDto: CreateSalesUnitDto) {
     const { name, email, phone, address, headId, logoUrl, website } = createUnitDto;
 
     // Validate headId only if provided
@@ -470,7 +470,7 @@ export class UnitsService {
     };
   }
 
-  async updateUnit(id: number, updateUnitDto: UpdateUnitDto) {
+  async updateUnit(id: number, updateUnitDto: UpdateSalesUnitDto) {
     // Check if unit exists
     const existingUnit = await this.prisma.salesUnit.findUnique({
       where: { id }

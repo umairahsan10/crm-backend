@@ -133,7 +133,7 @@ export class RevenueResponseDto {
   @ApiPropertyOptional({ type: () => InvoiceResponseDto, description: 'Linked invoice details' })
   invoice: InvoiceResponseDto | null;
 
-  @ApiPropertyOptional({ example: { id: 12 }, description: 'Employee who created the revenue' })
+  @ApiPropertyOptional({ type: () => Object, example: { id: 12 }, description: 'Employee who created the revenue' })
   employee: {
     id: number;
   } | null;

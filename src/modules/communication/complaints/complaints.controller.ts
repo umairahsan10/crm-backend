@@ -16,7 +16,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ComplaintsService } from './complaints.service';
 import { CreateComplaintDto } from './dto/create-complaint.dto';
-import { HrActionDto } from './dto/hr-action.dto';
+import { ComplaintHrActionDto } from './dto/hr-action.dto';
 import { ComplaintPriority, ComplaintStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
@@ -81,7 +81,7 @@ export class ComplaintsController {
   @ApiResponse({ status: 200, description: 'Complaint action updated successfully' })
   async updateComplaintAction(
     @Param('id', ParseIntPipe) id: number,
-    @Body() hrActionDto: HrActionDto,
+    @Body() hrActionDto: ComplaintHrActionDto,
     @Query('hrEmployeeId', ParseIntPipe) hrEmployeeId: number,
   ) {
     if (!hrEmployeeId) {

@@ -41,6 +41,7 @@ export class LateLogResponseDto {
   updated_at: string;
 
   @ApiProperty({
+    type: () => Object,
     required: false,
     description: 'Attendance table updates applied when the action is marked as Completed',
     example: { late_days: 5, monthly_lates: 2 },

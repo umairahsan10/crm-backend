@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request, Query } from '@nestjs/common';
 import { UnitsService } from './units.service';
-import { CreateUnitDto } from './dto/create-unit.dto';
-import { UpdateUnitDto } from './dto/update-unit.dto';
+import { CreateProductionUnitDto } from './dto/create-unit.dto';
+import { UpdateProductionUnitDto } from './dto/update-unit.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
@@ -19,9 +19,9 @@ export class UnitsController {
   @Roles('dep_manager')
   @Departments('Production')
   @ApiOperation({ summary: 'Create a new production unit' })
-  @ApiBody({ type: CreateUnitDto })
+  @ApiBody({ type: CreateProductionUnitDto })
   @ApiResponse({ status: 201, description: 'Unit created successfully' })
-  async createUnit(@Body() createUnitDto: CreateUnitDto) {
+  async createUnit(@Body() createUnitDto: CreateProductionUnitDto) {
     return this.unitsService.createUnit(createUnitDto);
   }
 
@@ -39,11 +39,11 @@ export class UnitsController {
   @Departments('Production')
   @ApiOperation({ summary: 'Update a production unit by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
-  @ApiBody({ type: UpdateUnitDto })
+  @ApiBody({ type: UpdateProductionUnitDto })
   @ApiResponse({ status: 200, description: 'Unit updated successfully' })
   async updateUnit(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateUnitDto: UpdateUnitDto
+    @Body() updateUnitDto: UpdateProductionUnitDto
   ) {
     return this.unitsService.updateUnit(id, updateUnitDto);
   }

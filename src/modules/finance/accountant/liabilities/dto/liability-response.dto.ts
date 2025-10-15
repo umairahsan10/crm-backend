@@ -284,7 +284,7 @@ export class LiabilityMarkPaidResponseDto {
   };
 }
 
-export class ErrorResponseDto {
+export class LiabilityErrorResponseDto {
   @ApiProperty({ example: 'error', description: 'Response status' })
   status: string;
 

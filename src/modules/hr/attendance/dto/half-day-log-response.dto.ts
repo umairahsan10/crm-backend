@@ -42,7 +42,7 @@ export class HalfDayLogResponseDto {
   // Attendance table updates (only included when action is 'Completed')
 
   @ApiProperty({
-    type: 'object',
+    type: () => Object,
     description: 'Attendance table updates (included only when action_taken is "Completed")',
     example: { half_days: 3, monthly_half_days: 1 },
     additionalProperties: false,

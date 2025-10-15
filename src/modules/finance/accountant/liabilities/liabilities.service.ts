@@ -11,7 +11,7 @@ import {
   LiabilityCreateResponseDto,
   LiabilityUpdateResponseDto,
   LiabilityMarkPaidResponseDto,
-  ErrorResponseDto 
+  LiabilityErrorResponseDto 
 } from './dto/liability-response.dto';
 
 @Injectable()
@@ -33,7 +33,7 @@ export class LiabilitiesService {
   async createLiability(
     dto: CreateLiabilityDto,
     currentUserId: number
-  ): Promise<LiabilityCreateResponseDto | ErrorResponseDto> {
+  ): Promise<LiabilityCreateResponseDto | LiabilityErrorResponseDto> {
     try {
       // Validate vendor if provided
       if (dto.relatedVendorId) {
@@ -155,7 +155,7 @@ export class LiabilitiesService {
       toDate?: string;
       createdBy?: number;
     }
-  ): Promise<LiabilityListResponseDto | ErrorResponseDto> {
+  ): Promise<LiabilityListResponseDto | LiabilityErrorResponseDto> {
     try {
       const whereClause: any = {};
 
@@ -228,7 +228,7 @@ export class LiabilitiesService {
   /**
    * Gets a single liability by ID
    */
-  async getLiabilityById(id: number): Promise<LiabilityDetailResponseDto | ErrorResponseDto> {
+  async getLiabilityById(id: number): Promise<LiabilityDetailResponseDto | LiabilityErrorResponseDto> {
     try {
       const liability = await this.prisma.liability.findUnique({
         where: { id },
@@ -278,7 +278,7 @@ export class LiabilitiesService {
   async updateLiability(
     dto: UpdateLiabilityDto,
     currentUserId: number
-  ): Promise<LiabilityUpdateResponseDto | ErrorResponseDto> {
+  ): Promise<LiabilityUpdateResponseDto | LiabilityErrorResponseDto> {
     const { liability_id, ...updateData } = dto;
     
     // Validate that ID exists
@@ -428,7 +428,7 @@ export class LiabilitiesService {
   async markLiabilityAsPaid(
     dto: MarkLiabilityPaidDto,
     currentUserId: number
-  ): Promise<LiabilityMarkPaidResponseDto | ErrorResponseDto> {
+  ): Promise<LiabilityMarkPaidResponseDto | LiabilityErrorResponseDto> {
     const { liability_id, ...markPaidData } = dto;
     
     // Validate that ID exists

@@ -87,6 +87,7 @@ export class EmployeeResponseDto {
 
   // Related data
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Department details associated with the employee',
     example: { id: 3, name: 'Marketing', description: 'Marketing & communications team' },
   })
@@ -97,6 +98,7 @@ export class EmployeeResponseDto {
   };
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Role details associated with the employee',
     example: { id: 7, name: 'Team Lead', description: 'Leads a small development team' },
   })
@@ -107,6 +109,7 @@ export class EmployeeResponseDto {
   };
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Manager details if assigned',
     example: { id: 2, firstName: 'Sarah', lastName: 'Ali', email: 'sarah@company.com' },
   })
@@ -118,6 +121,7 @@ export class EmployeeResponseDto {
   } | null;
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Team lead details if assigned',
     example: { id: 5, firstName: 'Ahmed', lastName: 'Raza', email: 'ahmed@company.com' },
   })

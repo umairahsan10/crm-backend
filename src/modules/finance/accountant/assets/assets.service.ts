@@ -9,7 +9,7 @@ import {
   AssetCreateResponseDto,
   AssetUpdateResponseDto,
   AssetSingleResponseDto,
-  ErrorResponseDto
+  AssetErrorResponseDto
 } from './dto/asset-response.dto';
 
 @Injectable()
@@ -33,7 +33,7 @@ export class AssetsService {
   async createAsset(
     dto: CreateAssetDto,
     currentUserId: number
-  ): Promise<AssetCreateResponseDto | ErrorResponseDto> {
+  ): Promise<AssetCreateResponseDto | AssetErrorResponseDto> {
     try {
       // Validate vendor exists
       const vendor = await this.prisma.vendor.findUnique({
@@ -150,7 +150,7 @@ export class AssetsService {
       minCurrentValue?: number;
       maxCurrentValue?: number;
     }
-  ): Promise<AssetListResponseDto | ErrorResponseDto> {
+  ): Promise<AssetListResponseDto | AssetErrorResponseDto> {
     try {
       const whereClause: any = {};
 
@@ -240,7 +240,7 @@ export class AssetsService {
   /**
    * Gets a single asset by ID
    */
-  async getAssetById(id: number): Promise<AssetSingleResponseDto | ErrorResponseDto> {
+  async getAssetById(id: number): Promise<AssetSingleResponseDto | AssetErrorResponseDto> {
     try {
       const asset = await this.prisma.asset.findUnique({
         where: { id },
@@ -293,7 +293,7 @@ export class AssetsService {
   async updateAsset(
     dto: UpdateAssetDto,
     currentUserId: number
-  ): Promise<AssetUpdateResponseDto | ErrorResponseDto> {
+  ): Promise<AssetUpdateResponseDto | AssetErrorResponseDto> {
     const { asset_id, ...updateData } = dto;
     
     // Validate that ID exists

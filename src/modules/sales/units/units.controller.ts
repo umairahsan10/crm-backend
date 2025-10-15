@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request, Query, BadRequestException } from '@nestjs/common';
 import { UnitsService } from './units.service';
-import { CreateUnitDto } from './dto/create-unit.dto';
-import { UpdateUnitDto } from './dto/update-unit.dto';
+import { CreateSalesUnitDto } from './dto/create-unit.dto';
+import { UpdateSalesUnitDto } from './dto/update-unit.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
 import { Departments } from '../../../common/decorators/departments.decorator';
@@ -22,7 +22,7 @@ export class UnitsController {
   @ApiOperation({ summary: 'Create a new sales unit' })
   @ApiResponse({ status: 201, description: 'Unit successfully created' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  async createUnit(@Body() createUnitDto: CreateUnitDto) {
+  async createUnit(@Body() createUnitDto: CreateSalesUnitDto) {
     return this.unitsService.createUnit(createUnitDto);
   }
 
@@ -110,7 +110,7 @@ export class UnitsController {
   @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
   async updateUnit(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateUnitDto: UpdateUnitDto
+    @Body() updateUnitDto: UpdateSalesUnitDto
   ) {
     return this.unitsService.updateUnit(id, updateUnitDto);
   }

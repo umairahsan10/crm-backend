@@ -18,7 +18,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { EmployeeService } from './employee.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
-import { HrActionDto } from './dto/hr-action.dto';
+import { EmployeeHrActionDto } from './dto/hr-action.dto';
 import { RequestPriority, RequestStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
@@ -114,11 +114,11 @@ export class EmployeeController {
   @ApiOperation({ summary: 'Take HR action on a request', description: 'HR personnel can take an action on a specific HR request.' })
   @ApiParam({ name: 'id', type: Number, description: 'HR request ID' })
   @ApiQuery({ name: 'hrEmployeeId', type: Number, required: true, description: 'ID of the HR employee taking action' })
-  @ApiBody({ type: HrActionDto })
+  @ApiBody({ type: EmployeeHrActionDto })
   @ApiResponse({ status: 200, description: 'HR action successfully taken on the request.' })
   async takeHrAction(
     @Param('id', ParseIntPipe) id: number,
-    @Body() hrActionDto: HrActionDto,
+    @Body() hrActionDto: EmployeeHrActionDto,
     @Query('hrEmployeeId', QueryParseIntPipe) hrEmployeeId: number,
     @Request() req: AuthenticatedRequest,
   ) {
@@ -140,11 +140,11 @@ export class EmployeeController {
   @ApiOperation({ summary: 'Update HR action on a request', description: 'HR can update the status or details of an existing HR request.' })
   @ApiParam({ name: 'id', type: Number, description: 'HR request ID' })
   @ApiQuery({ name: 'hrEmployeeId', type: Number, required: true, description: 'ID of the HR employee updating the request' })
-  @ApiBody({ type: HrActionDto })
+  @ApiBody({ type: EmployeeHrActionDto })
   @ApiResponse({ status: 200, description: 'HR action updated successfully.' })
   async updateHrRequestAction(
     @Param('id', ParseIntPipe) id: number,
-    @Body() hrActionDto: HrActionDto,
+    @Body() hrActionDto: EmployeeHrActionDto,
     @Query('hrEmployeeId', QueryParseIntPipe) hrEmployeeId: number,
     @Request() req: AuthenticatedRequest,
   ) {

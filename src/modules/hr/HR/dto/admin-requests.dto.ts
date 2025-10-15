@@ -62,8 +62,8 @@ export class AdminRequestResponseDto {
   updatedAt: Date;
 
   @ApiPropertyOptional({
+    type: () => Object,
     description: 'Related HR log details',
-    type: Object,
     example: {
       id: 1,
       employeeId: 2
