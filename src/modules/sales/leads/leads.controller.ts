@@ -17,7 +17,10 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { RequestLeadsDto } from './dto/request-leads.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { LeadsAccessGuard, LeadCreationGuard, ArchivedLeadsAccessGuard } from './guards';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
 
+@ApiTags('Leads')
+@ApiBearerAuth()
 @Controller('leads')
 @UseGuards(JwtAuthGuard, LeadsAccessGuard)
 export class LeadsController {
@@ -25,11 +28,19 @@ export class LeadsController {
 
   @Post()
   @UseGuards(LeadCreationGuard)
+  @ApiOperation({ summary: 'Create a new lead' })
+  @ApiResponse({ status: 201, description: 'Lead created successfully.' })
+  @ApiResponse({ status: 400, description: 'Invalid input.' })
+  @ApiBody({ type: CreateLeadDto })
   create(@Body() createLeadDto: CreateLeadDto) {
     return this.leadsService.create(createLeadDto);
   }
 
   @Get()
+  @ApiOperation({ summary: 'Get all leads' })
+  @ApiResponse({ status: 200, description: 'Returns all leads.' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
   findAll(@Query() query: any, @Request() req: any) {
     // Extract user role and ID from JWT payload
     const userRole = req.user.role;
@@ -42,6 +53,8 @@ export class LeadsController {
   }
 
   @Get('my-leads')
+  @ApiOperation({ summary: 'Get leads assigned to current user' })
+  @ApiResponse({ status: 200, description: 'Returns leads for the authenticated user.' })
   getMyLeads(@Query() query: any, @Request() req: any) {
     const userId = req.user.id;
     const userRole = req.user.role;
@@ -50,6 +63,8 @@ export class LeadsController {
 
 
   @Get('statistics/overview')
+  @ApiOperation({ summary: 'Get lead statistics overview' })
+  @ApiResponse({ status: 200, description: 'Returns overview statistics for leads.' })
   getLeadStatistics(@Request() req: any) {
     const userRole = req.user.role;
     const userUnitId = req.user.salesUnitId;
@@ -57,12 +72,15 @@ export class LeadsController {
   }
 
   @Get('filter-options/sales-units')
+  @ApiOperation({ summary: 'Get sales units for filter dropdown' })
   getSalesUnitsForFilter(@Request() req: any) {
     const userRole = req.user.role;
     return this.leadsService.getSalesUnitsForFilter(userRole);
   }
 
   @Get('filter-options/employees')
+  @ApiOperation({ summary: 'Get employees for filter dropdown' })
+  @ApiQuery({ name: 'salesUnitId', required: false })
   getEmployeesForFilter(@Query('salesUnitId') salesUnitId?: string, @Request() req?: any) {
     const unitId = salesUnitId ? parseInt(salesUnitId) : undefined;
     const userRole = req?.user?.role;
@@ -70,6 +88,8 @@ export class LeadsController {
   }
 
   @Get('cracked')
+  @ApiOperation({ summary: 'Get cracked leads' })
+  @ApiResponse({ status: 200, description: 'Returns all cracked leads.' })
   getCrackedLeads(@Query() query: any, @Request() req: any) {
     const userRole = req.user.role;
     const userId = req.user.id;
@@ -81,6 +101,8 @@ export class LeadsController {
   }
 
   @Get('cracked/:id')
+  @ApiOperation({ summary: 'Get a single cracked lead by ID' })
+  @ApiParam({ name: 'id', type: Number })
   getCrackedLead(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const userRole = req.user.role;
     const userId = req.user.id;
@@ -90,6 +112,7 @@ export class LeadsController {
 
   @Get('archived')
   @UseGuards(ArchivedLeadsAccessGuard)
+  @ApiOperation({ summary: 'Get archived leads' })
   getArchivedLeads(@Query() query: any, @Request() req: any) {
     const userRole = req.user.role;
     const userId = req.user.id;
@@ -102,6 +125,8 @@ export class LeadsController {
 
   @Get('archived/:id')
   @UseGuards(ArchivedLeadsAccessGuard)
+  @ApiOperation({ summary: 'Get archived lead by ID' })
+  @ApiParam({ name: 'id', type: Number })
   getArchivedLead(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const userRole = req.user.role;
     const userId = req.user.id;
@@ -110,11 +135,15 @@ export class LeadsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a lead by ID' })
+  @ApiParam({ name: 'id', type: Number })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.leadsService.findOne(id);
   }
 
   @Post('request')
+  @ApiOperation({ summary: 'Request leads (bulk keep/release)' })
+  @ApiBody({ type: RequestLeadsDto })
   requestLeads(@Body() requestLeadsDto: RequestLeadsDto, @Request() req: any) {
     console.log('🔍 ===== REQUEST LEADS DEBUG =====');
     console.log('🔍 Raw request body:', JSON.stringify(requestLeadsDto, null, 2));
@@ -141,6 +170,9 @@ export class LeadsController {
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Update a lead by ID' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiBody({ type: UpdateLeadDto })
   update(
     @Param('id', ParseIntPipe) id: number, 
     @Body() updateLeadDto: UpdateLeadDto,
@@ -151,6 +183,8 @@ export class LeadsController {
   }
 
   @Post('bulk-update')
+  @ApiOperation({ summary: 'Bulk update multiple leads' })
+  @ApiBody({ schema: { example: { leadIds: [1,2], updateData: { status: 'new' } } } })
   bulkUpdateLeads(
     @Body() body: { leadIds: number[]; updateData: UpdateLeadDto },
     @Request() req: any
