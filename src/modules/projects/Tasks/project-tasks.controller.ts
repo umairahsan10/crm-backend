@@ -13,6 +13,7 @@ import {
   HttpCode,
   HttpStatus
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectTasksService } from './project-tasks.service';
 import { CreateProjectTaskDto } from './dto/create-project-task.dto';
 import { UpdateProjectTaskDto } from './dto/update-project-task.dto';
@@ -24,6 +25,8 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { Departments } from '../../../common/decorators/departments.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
+@ApiTags('Project Tasks')
+@ApiBearerAuth()
 @Controller('projects/:projectId/tasks')
 @UseGuards(JwtAuthGuard, DepartmentsGuard)
 @Departments('Production')

@@ -15,7 +15,7 @@ import {
   ParseIntPipe as QueryParseIntPipe,
   Request
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { EmployeeService } from './employee.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
 import { EmployeeHrActionDto } from './dto/hr-action.dto';
@@ -47,6 +47,7 @@ interface AuthenticatedRequest {
 }
 
 @ApiTags('Communication Employee')
+@ApiBearerAuth()
 @Controller('communication/employee')
 @UseGuards(JwtAuthGuard, DepartmentsGuard)
 export class EmployeeController {

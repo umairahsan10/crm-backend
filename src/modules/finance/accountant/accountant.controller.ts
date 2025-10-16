@@ -1,5 +1,5 @@
 import { Body, Controller, Patch, Post, Get, UseGuards, Request, Param, Query, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { AccountantService } from './accountant.service';
 import { UpdatePermissionsDto } from './dto/update-permission.dto';
 import { PermissionsResponseDto } from './dto/permission-response.dto';
@@ -28,6 +28,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Accountant')
+@ApiBearerAuth()
 @Controller('accountant')
 export class AccountantController {
   constructor(private readonly accountantService: AccountantService) {}

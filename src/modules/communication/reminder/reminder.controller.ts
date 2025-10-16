@@ -18,7 +18,7 @@ import { CreateReminderDto } from './dto/create-reminder.dto';
 import { UpdateReminderDto } from './dto/update-reminder.dto';
 import { FilterRemindersDto } from './dto/filter-reminders.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -31,6 +31,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Coomunication Reminders')
+@ApiBearerAuth()
 @Controller('communication/reminders')
 @UseGuards(JwtAuthGuard)
 export class ReminderController {

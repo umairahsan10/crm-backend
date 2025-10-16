@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Patch, UseGuards, Request, Query, BadRequestException, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SalaryService } from './salary.service';
 import { SalaryDeductionDto, SalaryDeductionResponseDto } from './dto/salary-deduction.dto';
 import { UpdateSalaryDto } from './dto/update-salary.dto';
@@ -20,6 +20,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Salary Management')
+@ApiBearerAuth()
 @Controller('hr/salary')
 export class SalaryController {
   constructor(private readonly salaryService: SalaryService) {}

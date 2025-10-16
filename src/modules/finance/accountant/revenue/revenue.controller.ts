@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -26,6 +26,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Accountant Revenue')
+@ApiBearerAuth()
 @Controller('accountant/revenue')
 export class RevenueController {
   constructor(private readonly revenueService: RevenueService) {}

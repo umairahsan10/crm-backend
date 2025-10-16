@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Get, Put, Delete, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductionService } from '../services/production.service';
 import { CreateProductionDto, UpdateProductionDto, ProductionResponseDto, ProductionsListResponseDto } from '../dto/production.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
@@ -18,6 +18,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Production')
+@ApiBearerAuth()
 @Controller('hr/production')
 export class ProductionController {
   constructor(private readonly productionService: ProductionService) {}

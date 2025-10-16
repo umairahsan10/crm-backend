@@ -13,6 +13,7 @@ import {
   HttpCode,
   HttpStatus
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectLogsService } from './project-logs.service';
 import { CreateProjectLogDto } from './dto/create-project-log.dto';
 import { UpdateProjectLogDto } from './dto/update-project-log.dto';
@@ -23,6 +24,8 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { Departments } from '../../../common/decorators/departments.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
+@ApiTags('Project Logs')
+@ApiBearerAuth()
 @Controller('projects/:projectId/logs')
 @UseGuards(JwtAuthGuard, DepartmentsGuard)
 @Departments('Production')

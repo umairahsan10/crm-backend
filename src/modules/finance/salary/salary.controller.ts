@@ -6,9 +6,10 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { Departments } from '../../../common/decorators/departments.decorator';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Finance Salary')
+@ApiBearerAuth()
 @Controller('finance/salary')
 export class FinanceSalaryController {
   constructor(private readonly financeSalaryService: FinanceSalaryService) {}

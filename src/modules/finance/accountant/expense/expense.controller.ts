@@ -10,7 +10,7 @@ import {
   Request,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody, getSchemaPath } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
 import { ExpenseService } from './expense.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
@@ -34,6 +34,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Accountant Expenses')
+@ApiBearerAuth()
 @Controller('accountant/expense')
 export class ExpenseController {
   constructor(private readonly expenseService: ExpenseService) {}

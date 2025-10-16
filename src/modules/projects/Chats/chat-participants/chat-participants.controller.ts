@@ -1,10 +1,13 @@
 import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, Body, Request, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ChatParticipantsService } from './chat-participants.service';
 import { CreateChatParticipantDto } from './dto/create-chat-participant.dto';
 import { UpdateChatParticipantDto } from './dto/update-chat-participant.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { ChatGateway } from '../chat.gateway';
 
+@ApiTags('Chat Participants')
+@ApiBearerAuth()
 @Controller('chat-participants')
 @UseGuards(JwtAuthGuard)
 export class ChatParticipantsController {

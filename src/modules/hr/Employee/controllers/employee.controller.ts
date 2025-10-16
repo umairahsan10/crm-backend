@@ -21,7 +21,7 @@ import { Permissions } from '../../../../common/decorators/permissions.decorator
 import { Roles } from '../../../../common/decorators/roles.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
 import { RoleName } from '@prisma/client';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 
 
 interface AuthenticatedRequest extends Request {
@@ -32,6 +32,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Employees')
+@ApiBearerAuth()
 @Controller('hr')
 export class EmployeeController {
   constructor(private readonly hrService: EmployeeService) {}

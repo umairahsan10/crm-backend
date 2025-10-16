@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Get, Put, Delete, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { HrManagementService } from '../services/hr-management.service';
 import { CreateHrDto, UpdateHrDto, HrResponseDto, HrListResponseDto } from '../dto/hr-management.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
@@ -18,6 +18,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('HR Management')
+@ApiBearerAuth()
 @Controller('hr/management')
 export class HrManagementController {
   constructor(private readonly hrManagementService: HrManagementService) {}
