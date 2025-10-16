@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Delete, Param, ParseIntPipe, Body, UseGuards, Query, Request } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ProjectChatsService } from './project-chats.service';
 import { CreateProjectChatDto } from './dto/create-project-chat.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
@@ -12,6 +12,12 @@ export class ProjectChatsController {
   constructor(private readonly projectChatsService: ProjectChatsService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get all project chats with optional filters' })
+  @ApiQuery({ name: 'projectId', required: false, type: Number, description: 'Filter by project ID' })
+  @ApiQuery({ name: 'participants', required: false, type: Number, description: 'Filter by participant user ID' })
+  @ApiQuery({ name: 'transferredFrom', required: false, type: Number, description: 'Filter by transfer origin user ID (nullable)' })
+  @ApiQuery({ name: 'transferredTo', required: false, type: Number, description: 'Filter by transfer destination user ID (nullable)' })
+  @ApiResponse({ status: 200, description: 'Project chats retrieved successfully' })
   async getAllProjectChats(
     @Request() req,
     @Query('projectId') projectId?: string,
