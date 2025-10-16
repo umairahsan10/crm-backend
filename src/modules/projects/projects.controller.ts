@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectFromPaymentDto } from './dto/create-project-from-payment.dto';
 import { AssignUnitHeadDto } from './dto/assign-unit-head.dto';
@@ -27,6 +28,8 @@ import { ProjectAccessGuard } from './guards/project-access.guard';
 import { ProjectAssignmentGuard } from './guards/project-assignment.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+@ApiTags('Projects')
+@ApiBearerAuth()
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}

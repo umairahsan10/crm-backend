@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Delete, Put, Param, Body, UseGuards, ParseIntPipe, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { TeamsService } from './teams.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
@@ -6,6 +7,8 @@ import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Departments } from '../../../common/decorators/departments.decorator';
 
+@ApiTags('Production Teams')
+@ApiBearerAuth()
 @Controller('production/teams')
 @UseGuards(JwtAuthGuard, RolesWithServiceGuard, DepartmentsGuard)
 export class TeamsController {

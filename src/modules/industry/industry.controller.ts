@@ -24,7 +24,7 @@ import { BlockProductionGuard } from '../../common/guards/block-production.guard
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Departments } from '../../common/decorators/departments.decorator';
 import { RoleName } from '@prisma/client';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -37,6 +37,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Industries')
+@ApiBearerAuth()
 @Controller('industries')
 export class IndustryController {
   constructor(private readonly industryService: IndustryService) {}

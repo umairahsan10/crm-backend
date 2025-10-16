@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Get, Put, Delete, Param, UseGuards, Request, ParseIntPipe, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminRequestsService } from '../services/admin-requests.service';
 import { 
   CreateAdminRequestDto, 
@@ -25,6 +25,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Admin Requests')
+@ApiBearerAuth()
 @Controller('hr/admin-requests')
 export class AdminRequestsController {
   constructor(private readonly adminRequestsService: AdminRequestsService) {}

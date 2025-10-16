@@ -7,9 +7,10 @@ import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Departments } from '../../../common/decorators/departments.decorator';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Production Units')
+@ApiBearerAuth()
 @Controller('production/units')
 @UseGuards(JwtAuthGuard, RolesWithServiceGuard, DepartmentsGuard)
 export class UnitsController {

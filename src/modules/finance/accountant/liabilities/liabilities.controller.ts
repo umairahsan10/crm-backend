@@ -1,5 +1,5 @@
 import { Body, Controller, Put, Patch, UseGuards, Request, Post, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { LiabilitiesService } from './liabilities.service';
 import { CreateLiabilityDto } from './dto/create-liability.dto';
 import { UpdateLiabilityDto } from './dto/update-liability.dto';
@@ -24,6 +24,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags('Accountant Liabilities')
+@ApiBearerAuth()
 @Controller('accountant/liabilities')
 export class LiabilitiesController {
   constructor(private readonly liabilitiesService: LiabilitiesService) {}

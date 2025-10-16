@@ -9,7 +9,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../common/constants/permission.enum';
 import { EmployeeService } from './employee.service';
-import { ApiTags, ApiOperation, ApiResponse, getSchemaPath, ApiExtraModels } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, getSchemaPath, ApiExtraModels, ApiBearerAuth } from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -23,6 +23,7 @@ interface AuthenticatedRequest extends Request {
 
 @ApiTags('Employees')
 @ApiExtraModels() // You can define and pass DTO classes here if you create EmployeeResponseDto
+@ApiBearerAuth()
 @Controller('employee')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class EmployeeController {

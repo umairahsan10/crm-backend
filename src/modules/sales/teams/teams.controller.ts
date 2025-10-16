@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Delete, Put, Param, Body, UseGuards, ParseIntPipe, Request, BadRequestException, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { TeamsService } from './teams.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
@@ -12,6 +12,7 @@ import { AddEmployeeDto } from './dto/add-employee.dto';
 import { AssignTeamDto } from './dto/assign-team.dto';
 
 @ApiTags('Teams')
+@ApiBearerAuth()
 @Controller('sales/teams')
 @UseGuards(JwtAuthGuard, RolesWithServiceGuard, DepartmentsGuard)
 export class TeamsController {

@@ -12,11 +12,10 @@ import { UpdateWithholdFlagDto } from './dto/update-withhold-flag.dto';
 import { TransferCommissionDto } from './dto/transfer-commission.dto';
 import { RoleName } from '@prisma/client';
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiTags('Salary')
-
-
+@ApiBearerAuth()
 @Controller('salary')
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
