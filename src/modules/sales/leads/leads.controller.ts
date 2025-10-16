@@ -41,6 +41,7 @@ export class LeadsController {
   @ApiResponse({ status: 200, description: 'Returns all leads.' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false, description: 'Search term to filter leads by name, email, or company' })
   findAll(@Query() query: any, @Request() req: any) {
     // Extract user role and ID from JWT payload
     const userRole = req.user.role;

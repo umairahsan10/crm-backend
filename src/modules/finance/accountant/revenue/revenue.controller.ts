@@ -63,6 +63,7 @@ export class RevenueController {
   @ApiQuery({ name: 'toDate', required: false, description: 'Filter revenues to date (YYYY-MM-DD)' })
   @ApiQuery({ name: 'page', required: false, description: 'Pagination page number', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Number of records per page', example: 10 })
+  @ApiQuery({ name: 'search', required: false, description: 'Search term to filter revenues by source or category' })
   @ApiResponse({ status: 200, description: 'List of revenues', type: RevenueListResponseDto })
   async getAllRevenues(@Query() query: any): Promise<any> {
     return await this.revenueService.getAllRevenues(query);

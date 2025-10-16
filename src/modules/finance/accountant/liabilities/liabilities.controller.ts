@@ -92,25 +92,23 @@ export class LiabilitiesController {
   @ApiQuery({ name: 'fromDate', required: false, description: 'Filter from date (YYYY-MM-DD)', example: '2025-10-01' })
   @ApiQuery({ name: 'toDate', required: false, description: 'Filter to date (YYYY-MM-DD)', example: '2025-10-31' })
   @ApiQuery({ name: 'createdBy', required: false, description: 'Filter by employee ID', example: 12 })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number for pagination' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of records per page' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search term to filter liabilities by name or category' })
   async getAllLiabilities(
     @Request() req: AuthenticatedRequest,
-    @Query('isPaid') isPaid?: string,
-    @Query('relatedVendorId') relatedVendorId?: string,
-    @Query('category') category?: string,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-    @Query('createdBy') createdBy?: string,
+    @Query() query: any,
   ) {
     const filters = {
-      isPaid: isPaid === 'true' ? true : isPaid === 'false' ? false : undefined,
-      relatedVendorId: relatedVendorId ? parseInt(relatedVendorId) : undefined,
-      category,
-      fromDate,
-      toDate,
-      createdBy: createdBy ? parseInt(createdBy) : undefined,
+      isPaid: query.isPaid === 'true' ? true : query.isPaid === 'false' ? false : undefined,
+      relatedVendorId: query.relatedVendorId ? parseInt(query.relatedVendorId) : undefined,
+      category: query.category,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      createdBy: query.createdBy ? parseInt(query.createdBy) : undefined,
     };
 
-    return await this.liabilitiesService.getAllLiabilities(filters);
+    return await this.liabilitiesService.getAllLiabilities(filters, query);
   }
 
   /**

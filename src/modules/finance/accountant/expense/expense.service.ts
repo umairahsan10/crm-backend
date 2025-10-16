@@ -214,7 +214,7 @@ export class ExpenseService {
     }
   }
 
-  async getAllExpenses(filters: ExpenseFilters): Promise<ExpenseListResponseDto | ErrorResponseDto> {
+  async getAllExpenses(filters: ExpenseFilters, query?: any): Promise<ExpenseListResponseDto | ErrorResponseDto> {
     try {
       const whereClause: any = {};
 
@@ -255,34 +255,56 @@ export class ExpenseService {
         whereClause.processedByRole = filters.processedByRole;
       }
 
-      const expenses = await this.prisma.expense.findMany({
-        where: whereClause,
-        include: {
-          transaction: {
-            include: {
-              vendor: true,
-            },
-          },
-          employee: {
-            select: {
-              id: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      });
+      // Search support
+      if (query?.search) {
+        whereClause.OR = [
+          { title: { contains: query.search, mode: 'insensitive' } },
+          { category: { contains: query.search, mode: 'insensitive' } }
+        ];
+      }
 
-      const total = await this.prisma.expense.count({
-        where: whereClause,
-      });
+      // Pagination parameters
+      const page = parseInt(query?.page) || 1;
+      const limit = parseInt(query?.limit) || 20;
+      const skip = (page - 1) * limit;
+
+      const [expenses, total] = await Promise.all([
+        this.prisma.expense.findMany({
+          where: whereClause,
+          include: {
+            transaction: {
+              include: {
+                vendor: true,
+              },
+            },
+            employee: {
+              select: {
+                id: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip,
+          take: limit,
+        }),
+        this.prisma.expense.count({
+          where: whereClause,
+        })
+      ]);
 
       return {
         status: 'success',
         message: 'Expenses retrieved successfully',
         data: expenses.map(expense => this.mapExpenseToResponse(expense)),
-        total,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          retrieved: expenses.length
+        }
       };
     } catch (error) {
       this.logger.error(`Failed to retrieve expenses: ${error.message}`);

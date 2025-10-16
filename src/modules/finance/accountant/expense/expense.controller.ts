@@ -78,30 +78,26 @@ export class ExpenseController {
   @ApiQuery({ name: 'maxAmount', required: false, type: Number, description: 'Maximum expense amount' })
   @ApiQuery({ name: 'paymentMethod', required: false, type: String, description: 'Filter by payment method' })
   @ApiQuery({ name: 'processedByRole', required: false, type: String, description: 'Filter by processed role' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number for pagination' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of records per page' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search term to filter expenses by title or category' })
   @ApiResponse({ status: 200, description: 'Expenses retrieved successfully', type: ExpenseListResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid filters', type: ExpenseErrorResponseDto })
   async getAllExpenses(
     @Request() req: AuthenticatedRequest,
-    @Query('category') category?: string,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-    @Query('createdBy') createdBy?: string,
-    @Query('minAmount') minAmount?: string,
-    @Query('maxAmount') maxAmount?: string,
-    @Query('paymentMethod') paymentMethod?: string,
-    @Query('processedByRole') processedByRole?: string,
+    @Query() query: any,
   ): Promise<any> {
     const filters = {
-      category,
-      fromDate,
-      toDate,
-      createdBy: createdBy ? parseInt(createdBy) : undefined,
-      minAmount: minAmount ? parseFloat(minAmount) : undefined,
-      maxAmount: maxAmount ? parseFloat(maxAmount) : undefined,
-      paymentMethod,
-      processedByRole,
+      category: query.category,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      createdBy: query.createdBy ? parseInt(query.createdBy) : undefined,
+      minAmount: query.minAmount ? parseFloat(query.minAmount) : undefined,
+      maxAmount: query.maxAmount ? parseFloat(query.maxAmount) : undefined,
+      paymentMethod: query.paymentMethod,
+      processedByRole: query.processedByRole,
     };
-    return await this.expenseService.getAllExpenses(filters);
+    return await this.expenseService.getAllExpenses(filters, query);
   }
 
   /**
