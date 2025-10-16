@@ -16,7 +16,7 @@
     "render-start": "npm run build && npm run start:prod",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate": "DATABASE_URL=$DIRECT_DATABASE_URL prisma migrate dev",
     "install:prisma": "npm install prisma --save-dev && npm install @prisma/client",
     "test": "jest",
     "test:unit": "jest --config ./jest-unit.json",
