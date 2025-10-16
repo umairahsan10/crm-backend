@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaginationDto } from '../../../../../common/dto/pagination.dto';
 
 export class TransactionResponseDto {
   @ApiProperty({ example: 101, description: 'Unique ID of the transaction' })
@@ -141,8 +142,8 @@ export class ExpenseListResponseDto {
   @ApiProperty({ type: [ExpenseResponseDto], description: 'Array of expenses' })
   data: ExpenseResponseDto[];
 
-  @ApiProperty({ example: 25, description: 'Total number of expenses available' })
-  total: number;
+  @ApiProperty({ type: PaginationDto, description: 'Pagination information' })
+  pagination: PaginationDto;
 }
 
 export class ExpenseCreateResponseDto {

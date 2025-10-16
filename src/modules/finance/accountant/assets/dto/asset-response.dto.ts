@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationDto } from '../../../../../common/dto/pagination.dto';
 
 export class TransactionResponseDto {
     @ApiProperty({ example: 101, description: 'Unique ID of the transaction' })
@@ -174,22 +175,22 @@ export class TransactionResponseDto {
     };
   }
   
-  export class AssetListResponseDto {
-    @ApiProperty({ example: 'success', description: 'Status of the response' })
-    status: string;
-    @ApiProperty({
-      example: 'Assets retrieved successfully',
-      description: 'Message describing the response',
-    })
-    message: string;
-    @ApiProperty({
-      type: [AssetResponseDto],
-      description: 'List of assets returned',
-    })
-    data: AssetResponseDto[];
-    @ApiProperty({ example: 15, description: 'Total number of assets available' })
-    total: number;
-  }
+export class AssetListResponseDto {
+  @ApiProperty({ example: 'success', description: 'Status of the response' })
+  status: string;
+  @ApiProperty({
+    example: 'Assets retrieved successfully',
+    description: 'Message describing the response',
+  })
+  message: string;
+  @ApiProperty({
+    type: [AssetResponseDto],
+    description: 'List of assets returned',
+  })
+  data: AssetResponseDto[];
+  @ApiProperty({ type: PaginationDto, description: 'Pagination information' })
+  pagination: PaginationDto;
+}
   
   export class AssetCreateResponseDto {
     @ApiProperty({ example: 'success', description: 'Status of the response' })

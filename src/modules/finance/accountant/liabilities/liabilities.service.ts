@@ -154,7 +154,8 @@ export class LiabilitiesService {
       fromDate?: string;
       toDate?: string;
       createdBy?: number;
-    }
+    },
+    query?: any
   ): Promise<LiabilityListResponseDto | LiabilityErrorResponseDto> {
     try {
       const whereClause: any = {};
@@ -187,29 +188,51 @@ export class LiabilitiesService {
         }
       }
 
-      const liabilities = await this.prisma.liability.findMany({
-        where: whereClause,
-        include: {
-          transaction: true,
-          vendor: true,
-          employee: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
+      // Search support
+      if (query?.search) {
+        whereClause.OR = [
+          { name: { contains: query.search, mode: 'insensitive' } },
+          { category: { contains: query.search, mode: 'insensitive' } }
+        ];
+      }
+
+      // Pagination parameters
+      const page = parseInt(query?.page) || 1;
+      const limit = parseInt(query?.limit) || 20;
+      const skip = (page - 1) * limit;
+
+      const [liabilities, total] = await Promise.all([
+        this.prisma.liability.findMany({
+          where: whereClause,
+          include: {
+            transaction: true,
+            vendor: true,
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
             },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      const total = await this.prisma.liability.count({ where: whereClause });
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        this.prisma.liability.count({ where: whereClause })
+      ]);
 
       return {
         status: 'success',
         message: 'Liabilities retrieved successfully',
         data: liabilities.map(liability => this.mapLiabilityToResponse(liability)),
-        total,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          retrieved: liabilities.length
+        }
       };
 
     } catch (error) {

@@ -12,7 +12,7 @@ async function bootstrap() {
   logger.log(`Starting application in ${NODE_ENV.toUpperCase()} mode...`);
 
   const app = await NestFactory.create(AppModule, {
-    logger: isProduction ? ['error', 'warn'] : ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger: isProduction ? ['error', 'warn'] : ['error', 'warn', 'debug', 'verbose'],
   });
 
   // Configure allowed origins based on environment
@@ -67,7 +67,6 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
 
-    logger.log('Swagger docs available at http://localhost:3000/api/docs');
   } else {
     logger.log('Swagger disabled in production');
   }
@@ -75,6 +74,7 @@ async function bootstrap() {
   const PORT = process.env.PORT || 3000;
   await app.listen(PORT);
 
+  logger.log("Swagger Documentation for API is available at: http://localhost:3000/api/docs");
   logger.log(`Server listening on http://localhost:${PORT}`);
   logger.log(`Environment: ${NODE_ENV.toUpperCase()}`);
 }

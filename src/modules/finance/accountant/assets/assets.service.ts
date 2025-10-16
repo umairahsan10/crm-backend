@@ -149,7 +149,8 @@ export class AssetsService {
       maxPurchaseValue?: number;
       minCurrentValue?: number;
       maxCurrentValue?: number;
-    }
+    },
+    query?: any
   ): Promise<AssetListResponseDto | AssetErrorResponseDto> {
     try {
       const whereClause: any = {};
@@ -196,32 +197,54 @@ export class AssetsService {
         }
       }
 
-      const assets = await this.prisma.asset.findMany({
-        where: whereClause,
-        include: {
-          transaction: {
-            include: {
-              vendor: true,
-            },
-          },
-          employee: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      // Search support
+      if (query?.search) {
+        whereClause.OR = [
+          { title: { contains: query.search, mode: 'insensitive' } },
+          { category: { contains: query.search, mode: 'insensitive' } }
+        ];
+      }
 
-      const total = await this.prisma.asset.count({ where: whereClause });
+      // Pagination parameters
+      const page = parseInt(query?.page) || 1;
+      const limit = parseInt(query?.limit) || 20;
+      const skip = (page - 1) * limit;
+
+      const [assets, total] = await Promise.all([
+        this.prisma.asset.findMany({
+          where: whereClause,
+          include: {
+            transaction: {
+              include: {
+                vendor: true,
+              },
+            },
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        this.prisma.asset.count({ where: whereClause })
+      ]);
 
       return {
         status: 'success',
         message: 'Assets retrieved successfully',
         data: assets.map(asset => this.mapAssetToResponse(asset)),
-        total,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          retrieved: assets.length
+        }
       };
 
     } catch (error) {

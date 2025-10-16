@@ -245,6 +245,14 @@ export class RevenueService {
         }
       }
 
+      // Search support
+      if (query?.search) {
+        whereClause.OR = [
+          { source: { contains: query.search, mode: 'insensitive' } },
+          { category: { contains: query.search, mode: 'insensitive' } }
+        ];
+      }
+
       console.log('Revenue filters:', query);
       console.log('Generated where clause:', JSON.stringify(whereClause, null, 2));
 
@@ -278,7 +286,13 @@ export class RevenueService {
         status: 'success',
         message: 'Revenues retrieved successfully',
         data: revenues.map(revenue => this.mapRevenueToResponse(revenue)),
-        total,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / parseInt(limit)),
+          retrieved: revenues.length
+        }
       };
     } catch (error) {
       this.logger.error(`Error retrieving revenues: ${error.message}`);

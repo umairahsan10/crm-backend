@@ -95,31 +95,27 @@ export class AssetsController {
   @ApiQuery({ name: 'maxPurchaseValue', required: false, type: Number, description: 'Maximum purchase value' })
   @ApiQuery({ name: 'minCurrentValue', required: false, type: Number, description: 'Minimum current value' })
   @ApiQuery({ name: 'maxCurrentValue', required: false, type: Number, description: 'Maximum current value' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number for pagination' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of records per page' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search term to filter assets by title or category' })
   @ApiResponse({ status: 200, description: 'Assets retrieved successfully', type: AssetListResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid query parameters', type: AssetErrorResponseDto })
   async getAllAssets(
     @Request() req: AuthenticatedRequest,
-    @Query('category') category?: string,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-    @Query('createdBy') createdBy?: string,
-    @Query('minPurchaseValue') minPurchaseValue?: string,
-    @Query('maxPurchaseValue') maxPurchaseValue?: string,
-    @Query('minCurrentValue') minCurrentValue?: string,
-    @Query('maxCurrentValue') maxCurrentValue?: string,
+    @Query() query: any,
   ) {
     const filters = {
-      category,
-      fromDate,
-      toDate,
-      createdBy: createdBy ? parseInt(createdBy) : undefined,
-      minPurchaseValue: minPurchaseValue ? parseFloat(minPurchaseValue) : undefined,
-      maxPurchaseValue: maxPurchaseValue ? parseFloat(maxPurchaseValue) : undefined,
-      minCurrentValue: minCurrentValue ? parseFloat(minCurrentValue) : undefined,
-      maxCurrentValue: maxCurrentValue ? parseFloat(maxCurrentValue) : undefined,
+      category: query.category,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      createdBy: query.createdBy ? parseInt(query.createdBy) : undefined,
+      minPurchaseValue: query.minPurchaseValue ? parseFloat(query.minPurchaseValue) : undefined,
+      maxPurchaseValue: query.maxPurchaseValue ? parseFloat(query.maxPurchaseValue) : undefined,
+      minCurrentValue: query.minCurrentValue ? parseFloat(query.minCurrentValue) : undefined,
+      maxCurrentValue: query.maxCurrentValue ? parseFloat(query.maxCurrentValue) : undefined,
     };
 
-    return await this.assetsService.getAllAssets(filters);
+    return await this.assetsService.getAllAssets(filters, query);
   }
 
   /**
