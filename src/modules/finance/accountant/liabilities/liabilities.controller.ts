@@ -112,6 +112,28 @@ export class LiabilitiesController {
   }
 
   /**
+   * Get liability statistics
+   * 
+   * This endpoint retrieves comprehensive statistics about all liabilities
+   * including paid/unpaid breakdown, overdue, upcoming, and category analysis.
+   * 
+   * @param req - Authenticated request
+   * @returns Liability statistics overview
+   * 
+   * Required Permissions: expenses_permission
+   * Required Department: Accounts
+   */
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('Accounts')
+  @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Get liability statistics overview' })
+  @ApiResponse({ status: 200, description: 'Liability statistics retrieved successfully' })
+  async getLiabilityStats() {
+    return await this.liabilitiesService.getLiabilityStats();
+  }
+
+  /**
    * Get a single liability by ID
    * 
    * This endpoint retrieves detailed information about a specific liability

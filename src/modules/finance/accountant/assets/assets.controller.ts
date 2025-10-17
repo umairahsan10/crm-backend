@@ -119,6 +119,28 @@ export class AssetsController {
   }
 
   /**
+   * Get asset statistics
+   * 
+   * This endpoint retrieves comprehensive statistics about all assets
+   * including totals, depreciation, category breakdown, and more.
+   * 
+   * @param req - Authenticated request
+   * @returns Asset statistics overview
+   * 
+   * Required Permissions: assets_permission
+   * Required Department: Accounts
+   */
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('Accounts')
+  @Permissions(PermissionName.assets_permission)
+  @ApiOperation({ summary: 'Get asset statistics overview', description: 'Retrieve comprehensive asset statistics including depreciation and category breakdown.' })
+  @ApiResponse({ status: 200, description: 'Asset statistics retrieved successfully' })
+  async getAssetStats() {
+    return await this.assetsService.getAssetStats();
+  }
+
+  /**
    * Get a single asset by ID
    * 
    * This endpoint retrieves detailed information about a specific asset

@@ -486,4 +486,94 @@ export class ExpenseService {
       };
     }
   }
+
+  async getExpenseStats(): Promise<any> {
+    try {
+      const currentDate = this.getCurrentDateInPKT();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+      // Get all expenses
+      const allExpenses = await this.prisma.expense.findMany({});
+
+      // Total count and sum
+      const totalExpenses = allExpenses.length;
+      const totalAmount = allExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+      const averageExpense = totalExpenses > 0 ? totalAmount / totalExpenses : 0;
+
+      // Breakdown by category
+      const categoryBreakdown: Record<string, { count: number; amount: number }> = {};
+      allExpenses.forEach((exp) => {
+        const category = exp.category || 'Uncategorized';
+        if (!categoryBreakdown[category]) {
+          categoryBreakdown[category] = { count: 0, amount: 0 };
+        }
+        categoryBreakdown[category].count++;
+        categoryBreakdown[category].amount += Number(exp.amount);
+      });
+
+      // Top 3 expense categories by total amount
+      const topCategories = Object.entries(categoryBreakdown)
+        .map(([category, data]) => ({
+          category,
+          totalAmount: data.amount,
+          count: data.count,
+        }))
+        .sort((a, b) => b.totalAmount - a.totalAmount)
+        .slice(0, 3);
+
+      // Breakdown by payment method
+      const paymentMethodBreakdown: Record<string, { count: number; amount: number }> = {};
+      allExpenses.forEach((exp) => {
+        const method = exp.paymentMethod || 'unknown';
+        if (!paymentMethodBreakdown[method]) {
+          paymentMethodBreakdown[method] = { count: 0, amount: 0 };
+        }
+        paymentMethodBreakdown[method].count++;
+        paymentMethodBreakdown[method].amount += Number(exp.amount);
+      });
+
+      // Breakdown by processedByRole
+      const roleBreakdown: Record<string, { count: number; amount: number }> = {};
+      allExpenses.forEach((exp) => {
+        const role = exp.processedByRole || 'Unknown';
+        if (!roleBreakdown[role]) {
+          roleBreakdown[role] = { count: 0, amount: 0 };
+        }
+        roleBreakdown[role].count++;
+        roleBreakdown[role].amount += Number(exp.amount);
+      });
+
+      // This month's stats
+      const thisMonthExpenses = allExpenses.filter(
+        (exp) => exp.createdAt >= firstDayOfMonth
+      );
+      const thisMonthCount = thisMonthExpenses.length;
+      const thisMonthAmount = thisMonthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+
+      return {
+        status: 'success',
+        message: 'Expense statistics retrieved successfully',
+        data: {
+          totalExpenses,
+          totalAmount: Math.round(totalAmount * 100) / 100,
+          averageExpense: Math.round(averageExpense * 100) / 100,
+          byCategory: categoryBreakdown,
+          topCategories,
+          byPaymentMethod: paymentMethodBreakdown,
+          byProcessedByRole: roleBreakdown,
+          thisMonth: {
+            count: thisMonthCount,
+            amount: Math.round(thisMonthAmount * 100) / 100,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving expense statistics: ${error.message}`);
+      return {
+        status: 'error',
+        message: 'An error occurred while retrieving expense statistics',
+        error_code: error.message,
+      };
+    }
+  }
 } 

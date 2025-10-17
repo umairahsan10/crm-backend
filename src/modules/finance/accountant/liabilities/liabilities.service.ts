@@ -666,4 +666,112 @@ export class LiabilitiesService {
         return 'An error occurred while processing the request';
     }
   }
+
+  /**
+   * Get liability statistics
+   */
+  async getLiabilityStats(): Promise<any> {
+    try {
+      const currentDate = this.getCurrentDateInPKT();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const thirtyDaysFromNow = new Date(currentDate);
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+      // Get all liabilities
+      const allLiabilities = await this.prisma.liability.findMany({});
+
+      // Total count and sum
+      const totalLiabilities = allLiabilities.length;
+      const totalAmount = allLiabilities.reduce((sum, liability) => sum + Number(liability.amount), 0);
+      const averageLiability = totalLiabilities > 0 ? totalAmount / totalLiabilities : 0;
+
+      // Paid vs Unpaid breakdown
+      const paidLiabilities = allLiabilities.filter((l) => l.isPaid === true);
+      const unpaidLiabilities = allLiabilities.filter((l) => l.isPaid === false);
+
+      const paidCount = paidLiabilities.length;
+      const unpaidCount = unpaidLiabilities.length;
+      const paidAmount = paidLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+      const unpaidAmount = unpaidLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+
+      // Breakdown by category
+      const categoryBreakdown: Record<string, { count: number; amount: number; paid: number; unpaid: number }> = {};
+      allLiabilities.forEach((liability) => {
+        const category = liability.category || 'Uncategorized';
+        if (!categoryBreakdown[category]) {
+          categoryBreakdown[category] = { count: 0, amount: 0, paid: 0, unpaid: 0 };
+        }
+        categoryBreakdown[category].count++;
+        categoryBreakdown[category].amount += Number(liability.amount);
+        if (liability.isPaid) {
+          categoryBreakdown[category].paid++;
+        } else {
+          categoryBreakdown[category].unpaid++;
+        }
+      });
+
+      // Overdue liabilities (unpaid and past due date)
+      const overdueLiabilities = unpaidLiabilities.filter(
+        (l) => l.dueDate && new Date(l.dueDate) < currentDate
+      );
+      const overdueCount = overdueLiabilities.length;
+      const overdueAmount = overdueLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+
+      // Upcoming due liabilities (unpaid and due within 30 days)
+      const upcomingLiabilities = unpaidLiabilities.filter(
+        (l) => l.dueDate && new Date(l.dueDate) >= currentDate && new Date(l.dueDate) <= thirtyDaysFromNow
+      );
+      const upcomingCount = upcomingLiabilities.length;
+      const upcomingAmount = upcomingLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+
+      // This month's stats
+      const thisMonthLiabilities = allLiabilities.filter(
+        (l) => l.createdAt >= firstDayOfMonth
+      );
+      const thisMonthCount = thisMonthLiabilities.length;
+      const thisMonthAmount = thisMonthLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+      const thisMonthPaid = thisMonthLiabilities.filter((l) => l.isPaid === true).length;
+
+      return {
+        status: 'success',
+        message: 'Liability statistics retrieved successfully',
+        data: {
+          totalLiabilities,
+          totalAmount: Math.round(totalAmount * 100) / 100,
+          averageLiability: Math.round(averageLiability * 100) / 100,
+          paid: {
+            count: paidCount,
+            amount: Math.round(paidAmount * 100) / 100,
+            percentage: totalLiabilities > 0 ? Math.round((paidCount / totalLiabilities) * 100 * 100) / 100 : 0,
+          },
+          unpaid: {
+            count: unpaidCount,
+            amount: Math.round(unpaidAmount * 100) / 100,
+            percentage: totalLiabilities > 0 ? Math.round((unpaidCount / totalLiabilities) * 100 * 100) / 100 : 0,
+          },
+          byCategory: categoryBreakdown,
+          overdue: {
+            count: overdueCount,
+            amount: Math.round(overdueAmount * 100) / 100,
+          },
+          upcoming: {
+            count: upcomingCount,
+            amount: Math.round(upcomingAmount * 100) / 100,
+          },
+          thisMonth: {
+            count: thisMonthCount,
+            amount: Math.round(thisMonthAmount * 100) / 100,
+            paidCount: thisMonthPaid,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving liability statistics: ${error.message}`);
+      return {
+        status: 'error',
+        message: 'An error occurred while retrieving liability statistics',
+        error_code: error.message,
+      };
+    }
+  }
 }
