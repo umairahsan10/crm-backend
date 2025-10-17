@@ -69,6 +69,16 @@ export class RevenueController {
     return await this.revenueService.getAllRevenues(query);
   }
 
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('Accounts')
+  @Permissions(PermissionName.revenues_permission)
+  @ApiOperation({ summary: 'Get revenue statistics overview' })
+  @ApiResponse({ status: 200, description: 'Revenue statistics retrieved successfully' })
+  async getRevenueStats(): Promise<any> {
+    return await this.revenueService.getRevenueStats();
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')

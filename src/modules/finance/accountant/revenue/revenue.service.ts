@@ -675,4 +675,119 @@ export class RevenueService {
       error_code: error.code || 'UNKNOWN_ERROR',
     };
   }
+
+  async getRevenueStats(): Promise<any> {
+    try {
+      const currentDate = this.getCurrentDateInPKT();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+      // Get all revenues
+      const allRevenues = await this.prisma.revenue.findMany({
+        include: {
+          lead: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Total count and sum
+      const totalRevenue = allRevenues.length;
+      const totalAmount = allRevenues.reduce((sum, rev) => sum + Number(rev.amount), 0);
+      const averageRevenue = totalRevenue > 0 ? totalAmount / totalRevenue : 0;
+
+      // Breakdown by category
+      const categoryBreakdown: Record<string, { count: number; amount: number }> = {};
+      allRevenues.forEach((rev) => {
+        const category = rev.category || 'Uncategorized';
+        if (!categoryBreakdown[category]) {
+          categoryBreakdown[category] = { count: 0, amount: 0 };
+        }
+        categoryBreakdown[category].count++;
+        categoryBreakdown[category].amount += Number(rev.amount);
+      });
+
+      // Breakdown by source
+      const sourceBreakdown: Record<string, { count: number; amount: number }> = {};
+      allRevenues.forEach((rev) => {
+        const source = rev.source || 'Unknown';
+        if (!sourceBreakdown[source]) {
+          sourceBreakdown[source] = { count: 0, amount: 0 };
+        }
+        sourceBreakdown[source].count++;
+        sourceBreakdown[source].amount += Number(rev.amount);
+      });
+
+      // Breakdown by payment method
+      const paymentMethodBreakdown: Record<string, { count: number; amount: number }> = {};
+      allRevenues.forEach((rev) => {
+        const method = rev.paymentMethod || 'unknown';
+        if (!paymentMethodBreakdown[method]) {
+          paymentMethodBreakdown[method] = { count: 0, amount: 0 };
+        }
+        paymentMethodBreakdown[method].count++;
+        paymentMethodBreakdown[method].amount += Number(rev.amount);
+      });
+
+      // This month's stats
+      const thisMonthRevenues = allRevenues.filter(
+        (rev) => rev.createdAt >= firstDayOfMonth
+      );
+      const thisMonthCount = thisMonthRevenues.length;
+      const thisMonthAmount = thisMonthRevenues.reduce((sum, rev) => sum + Number(rev.amount), 0);
+
+      // Top revenue generators
+      const leadRevenues: Record<number, { name: string; amount: number; count: number }> = {};
+      allRevenues.forEach((rev) => {
+        if (rev.receivedFrom && rev.lead) {
+          if (!leadRevenues[rev.receivedFrom]) {
+            leadRevenues[rev.receivedFrom] = {
+              name: rev.lead.name || 'Unknown',
+              amount: 0,
+              count: 0,
+            };
+          }
+          leadRevenues[rev.receivedFrom].amount += Number(rev.amount);
+          leadRevenues[rev.receivedFrom].count++;
+        }
+      });
+
+      const topGenerators = Object.entries(leadRevenues)
+        .map(([id, data]) => ({
+          leadId: parseInt(id),
+          leadName: data.name,
+          totalAmount: data.amount,
+          transactionCount: data.count,
+        }))
+        .sort((a, b) => b.totalAmount - a.totalAmount)
+        .slice(0, 3);
+
+      return {
+        status: 'success',
+        message: 'Revenue statistics retrieved successfully',
+        data: {
+          totalRevenue,
+          totalAmount: Math.round(totalAmount * 100) / 100,
+          averageRevenue: Math.round(averageRevenue * 100) / 100,
+          byCategory: categoryBreakdown,
+          bySource: sourceBreakdown,
+          byPaymentMethod: paymentMethodBreakdown,
+          thisMonth: {
+            count: thisMonthCount,
+            amount: Math.round(thisMonthAmount * 100) / 100,
+          },
+          topGenerators,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving revenue statistics: ${error.message}`);
+      return {
+        status: 'error',
+        message: 'An error occurred while retrieving revenue statistics',
+        error_code: error.code || 'UNKNOWN_ERROR',
+      };
+    }
+  }
 }

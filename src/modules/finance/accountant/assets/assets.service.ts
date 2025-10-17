@@ -525,4 +525,94 @@ export class AssetsService {
         return 'An error occurred while processing the request';
     }
   }
+
+  /**
+   * Get asset statistics
+   */
+  async getAssetStats(): Promise<any> {
+    try {
+      const currentDate = this.getCurrentDateInPKT();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+      // Get all assets
+      const allAssets = await this.prisma.asset.findMany({});
+
+      // Total count
+      const totalAssets = allAssets.length;
+
+      // Total purchase value and current value
+      const totalPurchaseValue = allAssets.reduce((sum, asset) => sum + Number(asset.purchaseValue), 0);
+      const totalCurrentValue = allAssets.reduce((sum, asset) => sum + Number(asset.currentValue), 0);
+
+      // Total depreciation
+      const totalDepreciation = totalPurchaseValue - totalCurrentValue;
+
+      // Average depreciation rate
+      const averageDepreciationRate = totalPurchaseValue > 0 
+        ? ((totalDepreciation / totalPurchaseValue) * 100) 
+        : 0;
+
+      // Breakdown by category
+      const categoryBreakdown: Record<string, { count: number; totalPurchaseValue: number; totalCurrentValue: number }> = {};
+      allAssets.forEach((asset) => {
+        const category = asset.category || 'Uncategorized';
+        if (!categoryBreakdown[category]) {
+          categoryBreakdown[category] = { count: 0, totalPurchaseValue: 0, totalCurrentValue: 0 };
+        }
+        categoryBreakdown[category].count++;
+        categoryBreakdown[category].totalPurchaseValue += Number(asset.purchaseValue);
+        categoryBreakdown[category].totalCurrentValue += Number(asset.currentValue);
+      });
+
+      // This month's stats
+      const thisMonthAssets = allAssets.filter(
+        (asset) => asset.createdAt >= firstDayOfMonth
+      );
+      const thisMonthCount = thisMonthAssets.length;
+      const thisMonthValue = thisMonthAssets.reduce((sum, asset) => sum + Number(asset.purchaseValue), 0);
+
+      // Assets with significant depreciation (more than 50% depreciation)
+      const assetsNeedingAttention = allAssets
+        .filter((asset) => {
+          const depreciationRate = Number(asset.purchaseValue) > 0 
+            ? ((Number(asset.purchaseValue) - Number(asset.currentValue)) / Number(asset.purchaseValue)) * 100
+            : 0;
+          return depreciationRate > 50;
+        })
+        .map((asset) => ({
+          id: asset.id,
+          title: asset.title,
+          category: asset.category,
+          purchaseValue: Number(asset.purchaseValue),
+          currentValue: Number(asset.currentValue),
+          depreciationRate: Math.round(((Number(asset.purchaseValue) - Number(asset.currentValue)) / Number(asset.purchaseValue)) * 100 * 100) / 100,
+        }))
+        .slice(0, 5);
+
+      return {
+        status: 'success',
+        message: 'Asset statistics retrieved successfully',
+        data: {
+          totalAssets,
+          totalPurchaseValue: Math.round(totalPurchaseValue * 100) / 100,
+          totalCurrentValue: Math.round(totalCurrentValue * 100) / 100,
+          totalDepreciation: Math.round(totalDepreciation * 100) / 100,
+          averageDepreciationRate: Math.round(averageDepreciationRate * 100) / 100,
+          byCategory: categoryBreakdown,
+          thisMonth: {
+            count: thisMonthCount,
+            totalValue: Math.round(thisMonthValue * 100) / 100,
+          },
+          assetsNeedingAttention,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving asset statistics: ${error.message}`);
+      return {
+        status: 'error',
+        message: 'An error occurred while retrieving asset statistics',
+        error_code: error.message,
+      };
+    }
+  }
 }

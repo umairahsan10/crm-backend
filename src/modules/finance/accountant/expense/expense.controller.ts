@@ -101,6 +101,20 @@ export class ExpenseController {
   }
 
   /**
+   * Get expense statistics
+   * Required Permissions: expenses_permission
+   */
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('Accounts')
+  @Permissions(PermissionName.expenses_permission)
+  @ApiOperation({ summary: 'Get expense statistics overview' })
+  @ApiResponse({ status: 200, description: 'Expense statistics retrieved successfully' })
+  async getExpenseStats(): Promise<any> {
+    return await this.expenseService.getExpenseStats();
+  }
+
+  /**
    * Get a single expense by ID
    * Required Permissions: expenses_permission
    */
