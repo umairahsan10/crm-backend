@@ -54,6 +54,40 @@ export class CompanyController {
   }
 
   /**
+   * Get company statistics
+   * Only Admin, HR department, or department managers can access
+   */
+  @Get('statistics')
+  @Roles(RoleName.dep_manager, RoleName.unit_head)
+  @Departments('HR')
+  @ApiOperation({ summary: 'Get company statistics' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Company statistics including total, active, inactive, byCountry, and byStatus',
+    schema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number', description: 'Total number of companies' },
+        active: { type: 'number', description: 'Number of active companies' },
+        inactive: { type: 'number', description: 'Number of inactive companies' },
+        byCountry: { 
+          type: 'object', 
+          description: 'Companies grouped by country',
+          additionalProperties: { type: 'number' }
+        },
+        byStatus: { 
+          type: 'object', 
+          description: 'Companies grouped by status',
+          additionalProperties: { type: 'number' }
+        }
+      }
+    }
+  })
+  async getCompanyStatistics(): Promise<any> {
+    return this.companyService.getCompanyStatistics();
+  }
+
+  /**
    * Get company by ID
    * Only Admin, HR department, or department managers can access
    */
