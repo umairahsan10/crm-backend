@@ -103,6 +103,46 @@ export class CompanyService {
     return this.mapToResponseDto(company);
   }
 
+  async getCompanyStatistics(): Promise<any> {
+    // Get all companies for statistics
+    const companies = await this.prisma.company.findMany({
+      select: {
+        id: true,
+        status: true,
+        country: true,
+      },
+    });
+
+    // Calculate total companies
+    const total = companies.length;
+
+    // Calculate active and inactive counts
+    const active = companies.filter(company => company.status === 'active').length;
+    const inactive = companies.filter(company => company.status === 'inactive').length;
+
+    // Calculate byCountry statistics
+    const byCountry: { [key: string]: number } = {};
+    companies.forEach(company => {
+      const country = company.country || 'Unknown';
+      byCountry[country] = (byCountry[country] || 0) + 1;
+    });
+
+    // Calculate byStatus statistics
+    const byStatus: { [key: string]: number } = {};
+    companies.forEach(company => {
+      const status = company.status || 'Unknown';
+      byStatus[status] = (byStatus[status] || 0) + 1;
+    });
+
+    return {
+      total,
+      active,
+      inactive,
+      byCountry,
+      byStatus,
+    };
+  }
+
   async updateCompany(id: number, updateCompanyDto: UpdateCompanyDto): Promise<CompanyResponseDto> {
     // Check if company exists
     const existingCompany = await this.prisma.company.findUnique({
