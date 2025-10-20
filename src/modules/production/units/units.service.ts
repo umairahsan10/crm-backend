@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateProductionUnitDto } from './dto/create-unit.dto';
 import { UpdateProductionUnitDto } from './dto/update-unit.dto';
+import { UnitsQueryDto } from './dto/units-query.dto';
 
 @Injectable()
 export class UnitsService {
@@ -66,21 +67,73 @@ export class UnitsService {
     };
   }
 
-  async getAllUnits() {
-    const units = await this.prisma.productionUnit.findMany({
-      include: {
-        head: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true
-          }
-        }
-      },
-      orderBy: {
-        name: 'asc'
+  async getAllUnits(user: any, query: UnitsQueryDto) {
+    const whereClause: any = this.buildRoleBasedWhereClause(user);
+    
+    // Apply all filters from query
+    if (query.unitId) {
+      whereClause.id = query.unitId;
+    }
+    
+    if (query.hasHead !== undefined) {
+      whereClause.headId = query.hasHead ? { not: null } : null;
+    }
+    
+    if (query.hasTeams !== undefined) {
+      if (query.hasTeams) {
+        whereClause.teams = { some: {} };
+      } else {
+        whereClause.teams = { none: {} };
       }
-    });
+    }
+    
+    if (query.hasProjects !== undefined) {
+      if (query.hasProjects) {
+        whereClause.teams = {
+          some: {
+            projects: { some: {} }
+          }
+        };
+      } else {
+        whereClause.teams = {
+          none: {
+            projects: { some: {} }
+          }
+        };
+      }
+    }
+
+    const include = this.buildIncludeClause(query.include);
+
+    const orderBy = {};
+    if (query.sortBy) {
+      orderBy[query.sortBy] = query.sortOrder || 'asc';
+    } else {
+      orderBy['name'] = 'asc';
+    }
+
+    const skip = query.page ? (query.page - 1) * (query.limit || 10) : 0;
+    const take = query.limit || 10;
+
+    const [units, total] = await Promise.all([
+      this.prisma.productionUnit.findMany({
+        where: whereClause,
+        include: {
+          head: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          },
+          ...include
+        },
+        orderBy,
+        skip,
+        take
+      }),
+      this.prisma.productionUnit.count({ where: whereClause })
+    ]);
 
     // Get counts for each unit
     const unitsWithCounts = await Promise.all(
@@ -104,7 +157,12 @@ export class UnitsService {
     return {
       success: true,
       data: unitsWithCounts,
-      total: unitsWithCounts.length,
+      total,
+      pagination: {
+        page: query.page || 1,
+        limit: query.limit || 10,
+        totalPages: Math.ceil(total / (query.limit || 10))
+      },
       message: unitsWithCounts.length > 0 ? 'Units retrieved successfully' : 'No units found'
     };
   }
@@ -147,132 +205,79 @@ export class UnitsService {
     };
   }
 
-  async getEmployeesInUnit(id: number, currentUser: any) {
-    // Check if unit exists
-    const unit = await this.prisma.productionUnit.findUnique({
-      where: { id }
-    });
 
-    if (!unit) {
-      throw new NotFoundException(`Unit with ID ${id} does not exist`);
-    }
 
-    // Security check for unit_head - can only access their own unit
-    if (currentUser.role === 'unit_head' && currentUser.id !== unit.headId) {
-      return {
-        success: false,
-        message: 'You can only access your own unit'
-      };
-    }
-
-    const employees = await this.prisma.production.findMany({
-      where: { productionUnitId: id },
-      include: {
-        employee: {
-          include: {
-            role: true
+  private buildRoleBasedWhereClause(user: any): any {
+    switch (user.role) {
+      case 'dep_manager':
+        return {}; // Can see all units
+      case 'unit_head':
+        return { headId: user.id }; // Only their unit
+      case 'team_lead':
+        return {
+          teams: {
+            some: {
+              teamLeadId: user.id
+            }
           }
-        }
-      },
-      orderBy: [
-        { employee: { firstName: 'asc' } },
-        { employee: { lastName: 'asc' } }
-      ]
-    });
-
-    // Format the response
-    const formattedEmployees = employees.map(prod => ({
-      id: prod.employee.id,
-      firstName: prod.employee.firstName,
-      lastName: prod.employee.lastName,
-      email: prod.employee.email,
-      phone: prod.employee.phone,
-      role: {
-        id: prod.employee.role.id,
-        name: prod.employee.role.name
-      },
-      specialization: prod.specialization,
-      projectsCompleted: prod.projectsCompleted,
-      startDate: prod.createdAt
-    }));
-
-    return {
-      success: true,
-      data: formattedEmployees,
-      total: formattedEmployees.length,
-      message: formattedEmployees.length > 0 ? 'Employees retrieved successfully' : 'No employees found in this unit'
-    };
-  }
-
-  async getProjectsInUnit(id: number, currentUser: any) {
-    // Check if unit exists
-    const unit = await this.prisma.productionUnit.findUnique({
-      where: { id }
-    });
-
-    if (!unit) {
-      throw new NotFoundException(`Unit with ID ${id} does not exist`);
-    }
-
-    // Security check for unit_head - can only access their own unit
-    if (currentUser.role === 'unit_head' && currentUser.id !== unit.headId) {
-      return {
-        success: false,
-        message: 'You can only access your own unit'
-      };
-    }
-
-    // Get projects through teams in this unit
-    const teams = await this.prisma.team.findMany({
-      where: { productionUnitId: id },
-      select: { id: true }
-    });
-
-    const teamIds = teams.map(team => team.id);
-
-    const projects = await this.prisma.project.findMany({
-      where: {
-        teams: {
-          some: {
-            id: { in: teamIds }
-          }
-        }
-      },
-      include: {
-        teams: {
-          select: {
-            id: true,
-            teamLead: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true
+        }; // Units where they lead teams
+      case 'senior':
+      case 'junior':
+        return {
+          teams: {
+            some: {
+              teamMembers: {
+                some: {
+                  id: user.id
+                }
               }
             }
           }
-        },
-        client: {
-          select: {
-            id: true,
-            companyName: true,
-            email: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    return {
-      success: true,
-      data: projects,
-      total: projects.length,
-      message: projects.length > 0 ? 'Projects retrieved successfully' : 'No projects found in this unit'
-    };
+        }; // Units where they are team members
+      default:
+        throw new ForbiddenException('Insufficient permissions');
+    }
   }
 
-  async updateUnit(id: number, updateUnitDto: UpdateProductionUnitDto) {
+  private buildIncludeClause(include?: string): any {
+    const includeClause: any = {};
+    
+    if (include?.includes('employees')) {
+      includeClause.productionEmployees = {
+        include: {
+          employee: {
+            include: {
+              role: true
+            }
+          }
+        }
+      };
+    }
+    
+    if (include?.includes('projects')) {
+      includeClause.teams = {
+        include: {
+          projects: {
+            include: {
+              client: true
+            }
+          }
+        }
+      };
+    }
+    
+    if (include?.includes('teams')) {
+      includeClause.teams = {
+        include: {
+          teamLead: true
+        }
+      };
+    }
+    
+    return includeClause;
+  }
+
+  async updateUnit(id: number, updateUnitDto: UpdateProductionUnitDto, user?: any) {
     // Validate that updateUnitDto is provided
     if (!updateUnitDto) {
       throw new BadRequestException('Request body is required for update operation');
@@ -285,6 +290,11 @@ export class UnitsService {
 
     if (!existingUnit) {
       throw new NotFoundException(`Unit with ID ${id} does not exist`);
+    }
+
+    // Role-based access control
+    if (user && user.role === 'unit_head' && existingUnit.headId !== user.id) {
+      throw new ForbiddenException('You can only update your own unit');
     }
 
     const { name, headId } = updateUnitDto;
@@ -474,53 +484,6 @@ export class UnitsService {
     };
   }
 
-  async getCompletedProjectsFromDeletedUnits() {
-    // Get all completed projects that are not associated with any existing unit
-    const completedProjects = await this.prisma.project.findMany({
-      where: {
-        status: 'completed',
-        teams: {
-          some: {
-            productionUnitId: null  // Teams not assigned to any unit
-          }
-        }
-      },
-      include: {
-        teams: {
-          select: {
-            id: true,
-            name: true,
-            teamLead: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true
-              }
-            }
-          }
-        },
-        client: {
-          select: {
-            id: true,
-            companyName: true,
-            email: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    return {
-      success: true,
-      data: completedProjects,
-      total: completedProjects.length,
-      message: completedProjects.length > 0 
-        ? 'Completed projects from deleted units retrieved successfully' 
-        : 'No completed projects found from deleted units'
-    };
-  }
 
   async getAvailableHeads(assigned?: boolean) {
     let whereClause: any = {

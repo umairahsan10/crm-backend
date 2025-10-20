@@ -2,6 +2,7 @@ import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntP
 import { UnitsService } from './units.service';
 import { CreateProductionUnitDto } from './dto/create-unit.dto';
 import { UpdateProductionUnitDto } from './dto/update-unit.dto';
+import { UnitsQueryDto } from './dto/units-query.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
@@ -16,7 +17,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody, ApiBea
 export class UnitsController {
   constructor(private readonly unitsService: UnitsService) {}
 
-  @Post('create')
+  @Post()
   @Roles('dep_manager')
   @Departments('Production')
   @ApiOperation({ summary: 'Create a new production unit' })
@@ -27,16 +28,16 @@ export class UnitsController {
   }
 
   @Get()
-  @Roles('dep_manager')
+  @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
   @Departments('Production')
-  @ApiOperation({ summary: 'Get all production units' })
-  @ApiResponse({ status: 200, description: 'List of all units' })
-  async getAllUnits() {
-    return this.unitsService.getAllUnits();
+  @ApiOperation({ summary: 'Get production units with role-based access and filtering' })
+  @ApiResponse({ status: 200, description: 'List of units based on user role and permissions' })
+  async getAllUnits(@Request() req, @Query() query: UnitsQueryDto) {
+    return this.unitsService.getAllUnits(req.user, query);
   }
 
-  @Patch('update/:id')
-  @Roles('dep_manager')
+  @Patch(':id')
+  @Roles('dep_manager', 'unit_head')
   @Departments('Production')
   @ApiOperation({ summary: 'Update a production unit by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
@@ -44,42 +45,15 @@ export class UnitsController {
   @ApiResponse({ status: 200, description: 'Unit updated successfully' })
   async updateUnit(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateUnitDto: UpdateProductionUnitDto
+    @Body() updateUnitDto: UpdateProductionUnitDto,
+    @Request() req
   ) {
-    return this.unitsService.updateUnit(id, updateUnitDto);
+    return this.unitsService.updateUnit(id, updateUnitDto, req.user);
   }
 
-  @Get('get/:id')
-  @Roles('dep_manager')
-  @Departments('Production')
-  @ApiOperation({ summary: 'Get a production unit by ID' })
-  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
-  @ApiResponse({ status: 200, description: 'Unit details' })
-  async getUnit(@Param('id', ParseIntPipe) id: number) {
-    return this.unitsService.getUnit(id);
-  }
 
-  @Get(':id/employees')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Production')
-  @ApiOperation({ summary: 'Get employees in a production unit' })
-  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
-  @ApiResponse({ status: 200, description: 'List of employees in unit' })
-  async getEmployeesInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.unitsService.getEmployeesInUnit(id, req.user);
-  }
 
-  @Get(':id/projects')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Production')
-  @ApiOperation({ summary: 'Get projects in a production unit' })
-  @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
-  @ApiResponse({ status: 200, description: 'List of projects in unit' })
-  async getProjectsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.unitsService.getProjectsInUnit(id, req.user);
-  }
-
-  @Delete('delete/:id')
+  @Delete(':id')
   @Roles('dep_manager')
   @Departments('Production')
   @ApiOperation({ summary: 'Delete a production unit by ID' })
@@ -89,14 +63,6 @@ export class UnitsController {
     return this.unitsService.deleteUnit(id);
   }
 
-  @Get('deleted/completed-projects')
-  @Roles('dep_manager')
-  @Departments('Production')
-  @ApiOperation({ summary: 'Get completed projects from deleted units' })
-  @ApiResponse({ status: 200, description: 'List of completed projects from deleted units' })
-  async getCompletedProjectsFromDeletedUnits() {
-    return this.unitsService.getCompletedProjectsFromDeletedUnits();
-  }
 
   @Get('available-heads')
   @Roles('dep_manager')
