@@ -90,4 +90,9 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsNumber()
   absentTime?: number;
+
+  @ApiPropertyOptional({ description: 'Company status', example: 'active', enum: ['active', 'inactive'] })
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

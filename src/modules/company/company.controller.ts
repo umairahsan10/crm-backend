@@ -1,15 +1,16 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompanyResponseDto } from './dto/company-response.dto';
+import { GetCompaniesDto } from './dto/get-companies.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../common/guards/departments.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Departments } from '../../common/decorators/departments.decorator';
 import { RoleName } from '@prisma/client';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
 
 @ApiTags('Company')
 @ApiBearerAuth()
@@ -33,16 +34,24 @@ export class CompanyController {
   }
 
   /**
-   * Get all companies (usually only one)
+   * Get all companies with search and filtering capabilities
    * Only Admin, HR department, or department managers can access
    */
   @Get()
   @Roles(RoleName.dep_manager, RoleName.unit_head)
   @Departments('HR')
-  @ApiOperation({ summary: 'Get all companies (usually only one)' })
+  @ApiOperation({ summary: 'Get all companies with search and filtering' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search term to filter companies by name, country, or status' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Field to sort by' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order: asc or desc' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by company status (active/inactive)' })
+  @ApiQuery({ name: 'country', required: false, description: 'Filter by country' })
+  @ApiQuery({ name: 'name', required: false, description: 'Filter by company name' })
   @ApiResponse({ status: 200, description: 'List of companies', type: [CompanyResponseDto] })
-  async getAllCompanies(): Promise<CompanyResponseDto[]> {
-    return this.companyService.getAllCompanies();
+  async getAllCompanies(@Query() query: GetCompaniesDto): Promise<CompanyResponseDto[]> {
+    return this.companyService.getAllCompanies(query);
   }
 
   /**

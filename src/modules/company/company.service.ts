@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompanyResponseDto } from './dto/company-response.dto';
+import { GetCompaniesDto } from './dto/get-companies.dto';
 
 @Injectable()
 export class CompanyService {
@@ -30,9 +31,48 @@ export class CompanyService {
     return this.mapToResponseDto(company);
   }
 
-  async getAllCompanies(): Promise<CompanyResponseDto[]> {
+  async getAllCompanies(query?: GetCompaniesDto): Promise<CompanyResponseDto[]> {
+    const where: any = {};
+
+    // Apply search filters
+    if (query?.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { country: { contains: query.search, mode: 'insensitive' } },
+        { status: { contains: query.search, mode: 'insensitive' } }
+      ];
+    }
+
+    // Apply specific filters
+    if (query?.status) {
+      where.status = query.status;
+    }
+
+    if (query?.country) {
+      where.country = { contains: query.country, mode: 'insensitive' };
+    }
+
+    if (query?.name) {
+      where.name = { contains: query.name, mode: 'insensitive' };
+    }
+
+    // Apply sorting
+    const orderBy: any = {};
+    if (query?.sortBy) {
+      orderBy[query.sortBy] = query.sortOrder || 'asc';
+    } else {
+      orderBy.createdAt = 'desc';
+    }
+
+    // Apply pagination
+    const skip = query?.page && query?.limit ? (query.page - 1) * query.limit : undefined;
+    const take = query?.limit;
+
     const companies = await this.prisma.company.findMany({
-      orderBy: { createdAt: 'desc' },
+      where,
+      orderBy,
+      skip,
+      take,
     });
 
     return companies.map(company => this.mapToResponseDto(company));
@@ -138,6 +178,7 @@ export class CompanyService {
       lateTime: company.lateTime,
       halfTime: company.halfTime,
       absentTime: company.absentTime,
+      status: company.status,
     };
   }
 }

@@ -63,4 +63,7 @@ export class CompanyResponseDto {
 
   @ApiProperty({ description: 'Absent time threshold in hours', example: 8 })
   absentTime: number;
+
+  @ApiProperty({ description: 'Company status', example: 'active' })
+  status: string;
 }
