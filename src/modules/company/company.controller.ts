@@ -3,7 +3,6 @@ import { CompanyService } from './company.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompanyResponseDto } from './dto/company-response.dto';
-import { GetCompaniesDto } from './dto/get-companies.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../common/guards/departments.guard';
@@ -49,8 +48,8 @@ export class CompanyController {
   @ApiQuery({ name: 'status', required: false, description: 'Filter by company status (active/inactive)' })
   @ApiQuery({ name: 'country', required: false, description: 'Filter by country' })
   @ApiQuery({ name: 'name', required: false, description: 'Filter by company name' })
-  @ApiResponse({ status: 200, description: 'List of companies', type: [CompanyResponseDto] })
-  async getAllCompanies(@Query() query: GetCompaniesDto): Promise<CompanyResponseDto[]> {
+  @ApiResponse({ status: 200, description: 'List of companies with pagination metadata' })
+  async getAllCompanies(@Query() query: any): Promise<any> {
     return this.companyService.getAllCompanies(query);
   }
 

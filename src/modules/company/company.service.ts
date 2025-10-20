@@ -3,7 +3,6 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompanyResponseDto } from './dto/company-response.dto';
-import { GetCompaniesDto } from './dto/get-companies.dto';
 
 @Injectable()
 export class CompanyService {
@@ -31,7 +30,7 @@ export class CompanyService {
     return this.mapToResponseDto(company);
   }
 
-  async getAllCompanies(query?: GetCompaniesDto): Promise<CompanyResponseDto[]> {
+  async getAllCompanies(query: any): Promise<any> {
     const where: any = {};
 
     // Apply search filters
@@ -64,18 +63,32 @@ export class CompanyService {
       orderBy.createdAt = 'desc';
     }
 
-    // Apply pagination
-    const skip = query?.page && query?.limit ? (query.page - 1) * query.limit : undefined;
-    const take = query?.limit;
+    // Apply pagination - following leads convention
+    const page = parseInt(query.page) || 1;
+    const limit = parseInt(query.limit) || 20;
+    const skip = (page - 1) * limit;
 
-    const companies = await this.prisma.company.findMany({
-      where,
-      orderBy,
-      skip,
-      take,
-    });
+    // Execute query with pagination
+    const [companies, total] = await Promise.all([
+      this.prisma.company.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      this.prisma.company.count({ where })
+    ]);
 
-    return companies.map(company => this.mapToResponseDto(company));
+    // Return structured response with pagination metadata like leads
+    return {
+      companies: companies.map(company => this.mapToResponseDto(company)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 
   async getCompanyById(id: number): Promise<CompanyResponseDto> {
