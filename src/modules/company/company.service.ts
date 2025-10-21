@@ -9,12 +9,6 @@ export class CompanyService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createCompany(createCompanyDto: CreateCompanyDto): Promise<CompanyResponseDto> {
-    // Check if company already exists
-    const existingCompany = await this.prisma.company.findFirst();
-    if (existingCompany) {
-      throw new ConflictException('A company already exists. Only one company can be created.');
-    }
-
     // Set default values for time fields if not provided
     const companyData = {
       ...createCompanyDto,
