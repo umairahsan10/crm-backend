@@ -21,7 +21,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload) {
-    console.log('🔍 JWT Strategy - validate called with payload:', JSON.stringify(payload, null, 2));
+    const isDebugMode = process.env.JWT_DEBUG === 'true';
+    
+    if (isDebugMode) {
+      console.log('🔍 JWT Strategy - validate called with payload:', JSON.stringify(payload, null, 2));
+    }
     
     const user = {
       id: payload.sub,
@@ -31,7 +35,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...(payload.permissions && { permissions: payload.permissions }),
     };
     
-    console.log('🔍 JWT Strategy - returning user:', JSON.stringify(user, null, 2));
+    if (isDebugMode) {
+      console.log('🔍 JWT Strategy - returning user:', JSON.stringify(user, null, 2));
+    }
     
     return user;
   }

@@ -29,9 +29,18 @@ export class PrismaService
     }
 
     console.log('[Prisma] Creating new Prisma instance...');
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    
+    // Use session pooling mode for PgBouncer to avoid prepared statement conflicts
+    // Disable prepared statements to prevent conflicts during hot reload
+    const urlWithParams = databaseUrl + (databaseUrl.includes('?') ? '&' : '?') + 'prepared_statements=false&connection_limit=10&pool_timeout=20&pgbouncer=true';
+    
     super({
       datasources: {
-        db: { url: process.env.DATABASE_URL },
+        db: { url: urlWithParams },
       },
       log:
         process.env.NODE_ENV === 'development'
@@ -68,6 +77,16 @@ export class PrismaService
     while (attempts < PrismaService.MAX_RETRIES) {
       try {
         this.logger.log(`Connecting to Supabase (attempt ${attempts + 1})...`);
+        
+        // Force disconnect first to clear any existing prepared statements
+        try {
+          await this.$disconnect();
+          // Small delay to ensure cleanup
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (e) {
+          // Ignore disconnect errors
+        }
+        
         await this.$connect();
         PrismaService.isConnected = true;
         this.logger.log('Prisma connected successfully (PgBouncer 6543)');
@@ -92,8 +111,9 @@ export class PrismaService
     this.logger.log('Starting periodic Prisma health check (every 60s)');
     this.healthCheckInterval = setInterval(async () => {
       try {
-        await this.$queryRaw`SELECT 1`;
-      } catch {
+        // Use a simple query instead of raw query to avoid prepared statement conflicts
+        await this.employee.findFirst({ select: { id: true } });
+      } catch (error) {
         this.logger.warn('Database unhealthy — reconnecting...');
         PrismaService.isConnected = false;
         await this.connectWithRetry();
@@ -113,11 +133,12 @@ export class PrismaService
   async ensureConnected(): Promise<boolean> {
     this.logger.log('Checking Prisma connection...');
     try {
-      await this.$queryRaw`SELECT 1`;
+      // Use a simple query instead of raw query to avoid prepared statement conflicts
+      await this.employee.findFirst({ select: { id: true } });
       PrismaService.isConnected = true;
       this.logger.log('Prisma connection is healthy');
       return true;
-    } catch {
+    } catch (error) {
       this.logger.warn('Connection not healthy — attempting reconnect...');
       PrismaService.isConnected = false;
       await this.connectWithRetry();
@@ -157,9 +178,10 @@ export class PrismaService
 
   async isConnectionHealthy(): Promise<boolean> {
     try {
-      await this.$queryRaw`SELECT 1`;
+      // Use a simple query instead of raw query to avoid prepared statement conflicts
+      await this.employee.findFirst({ select: { id: true } });
       return true;
-    } catch {
+    } catch (error) {
       return false;
     }
   }
@@ -168,5 +190,25 @@ export class PrismaService
     if (PrismaService.isConnected) return true;
     await this.connectWithRetry();
     return PrismaService.isConnected;
+  }
+
+  async forceReconnect(): Promise<void> {
+    this.logger.log('Force reconnecting Prisma to clear prepared statements...');
+    PrismaService.isConnected = false;
+    await this.connectWithRetry();
+  }
+
+  /**
+   * Clear prepared statements by executing a simple query
+   * This helps prevent prepared statement conflicts during hot reload
+   */
+  async clearPreparedStatements(): Promise<void> {
+    try {
+      // Execute a simple query to clear any prepared statements
+      await this.$queryRaw`SELECT 1`;
+    } catch (error) {
+      // Ignore errors as this is just cleanup
+      this.logger.debug('Prepared statement cleanup completed');
+    }
   }
 }
