@@ -3,22 +3,30 @@ import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private readonly isDebugMode = process.env.JWT_DEBUG === 'true';
+
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
     
-    console.log('🔍 JWT Guard - canActivate called');
-    console.log('🔍 JWT Guard - Authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'MISSING');
+    if (this.isDebugMode) {
+      console.log('🔍 JWT Guard - canActivate called');
+      console.log('🔍 JWT Guard - Authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'MISSING');
+    }
     
     // Check if authorization header exists
     if (!authHeader) {
-      console.log('❌ JWT Guard - No authorization header found');
+      if (this.isDebugMode) {
+        console.log('❌ JWT Guard - No authorization header found');
+      }
       throw new UnauthorizedException('No authorization token provided');
     }
     
     // Check if it starts with 'Bearer '
     if (!authHeader.startsWith('Bearer ')) {
-      console.log('❌ JWT Guard - Authorization header does not start with "Bearer "');
+      if (this.isDebugMode) {
+        console.log('❌ JWT Guard - Authorization header does not start with "Bearer "');
+      }
       throw new UnauthorizedException('Invalid authorization header format. Expected "Bearer <token>"');
     }
     
@@ -26,16 +34,20 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     
     // Check if token exists after 'Bearer '
     if (!token || token.trim() === '') {
-      console.log('❌ JWT Guard - Token is empty after "Bearer " prefix');
+      if (this.isDebugMode) {
+        console.log('❌ JWT Guard - Token is empty after "Bearer " prefix');
+      }
       throw new UnauthorizedException('Token is empty');
     }
     
     // Check if token has the correct JWT format (3 parts separated by dots)
     const tokenParts = token.split('.');
     if (tokenParts.length !== 3) {
-      console.log('❌ JWT Guard - Token does not have 3 parts (malformed JWT)');
-      console.log('🔍 JWT Guard - Token parts count:', tokenParts.length);
-      console.log('🔍 JWT Guard - Token preview:', token.substring(0, 50) + '...');
+      if (this.isDebugMode) {
+        console.log('❌ JWT Guard - Token does not have 3 parts (malformed JWT)');
+        console.log('🔍 JWT Guard - Token parts count:', tokenParts.length);
+        console.log('🔍 JWT Guard - Token preview:', token.substring(0, 50) + '...');
+      }
       throw new UnauthorizedException('Malformed JWT token. Expected format: header.payload.signature');
     }
     
@@ -43,13 +55,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest(err: any, user: any, info: any) {
-    console.log('🔍 JWT Guard - handleRequest called');
-    console.log('🔍 JWT Guard - err:', err);
-    console.log('🔍 JWT Guard - user:', user);
-    console.log('🔍 JWT Guard - info:', info);
+    if (this.isDebugMode) {
+      console.log('🔍 JWT Guard - handleRequest called');
+      console.log('🔍 JWT Guard - err:', err);
+      console.log('🔍 JWT Guard - user:', user);
+      console.log('🔍 JWT Guard - info:', info);
+    }
     
     if (err || !user) {
-      console.log('🔍 JWT Guard - Authentication failed');
+      if (this.isDebugMode) {
+        console.log('🔍 JWT Guard - Authentication failed');
+      }
       
       // Provide more specific error messages
       if (info?.name === 'JsonWebTokenError') {
@@ -62,7 +78,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       throw err || new UnauthorizedException('Authentication failed');
     }
     
-    console.log('🔍 JWT Guard - Authentication successful, user:', user);
+    if (this.isDebugMode) {
+      console.log('🔍 JWT Guard - Authentication successful, user:', user);
+    }
     return user;
   }
 }

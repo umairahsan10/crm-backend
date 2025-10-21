@@ -1,4 +1,5 @@
 import { Module, Global, OnModuleInit } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +24,11 @@ import { setPrismaService } from './common/constants/department-name.enum';
 @Global() // Make this module global so PrismaService is available everywhere
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+      expandVariables: true,
+    }),
     ScheduleModule.forRoot(),
     AuthModule,
     EmployeeModule,
