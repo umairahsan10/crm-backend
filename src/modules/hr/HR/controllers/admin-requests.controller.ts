@@ -73,6 +73,18 @@ export class AdminRequestsController {
   }
 
   /**
+   * Get admin request statistics
+   */
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @ApiOperation({ summary: 'Get admin request statistics overview' })
+  @ApiResponse({ status: 200, description: 'Admin request statistics retrieved successfully' })
+  async getAdminRequestStats(): Promise<any> {
+    return await this.adminRequestsService.getAdminRequestStats();
+  }
+
+  /**
    * Get admin requests by status (Admin only)
    */
   @Get('status/:status')
