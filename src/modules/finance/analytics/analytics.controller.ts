@@ -38,8 +38,6 @@ export class AnalyticsController {
    * @param month - Optional month for filtering (1-12)
    * @param year - Optional year for filtering (YYYY)
    * @param quarter - Optional quarter for filtering (1-4)
-   * @param category - Optional category filter (applies to all modules)
-   * @param paymentMethod - Optional payment method filter
    * @param status - Optional status filter (active, inactive, paid, unpaid, etc.)
    * @param employeeId - Optional employee ID filter
    * @param vendorId - Optional vendor ID filter
@@ -89,18 +87,6 @@ export class AnalyticsController {
     description: 'Quarter for filtering (1-4)', 
     required: false, 
     example: 4 
-  })
-  @ApiQuery({ 
-    name: 'category', 
-    description: 'Category filter (applies to all modules)', 
-    required: false, 
-    example: 'Office Supplies' 
-  })
-  @ApiQuery({ 
-    name: 'paymentMethod', 
-    description: 'Payment method filter (cash, bank, online)', 
-    required: false, 
-    example: 'bank' 
   })
   @ApiQuery({ 
     name: 'status', 
@@ -240,8 +226,6 @@ export class AnalyticsController {
     @Query('month') month?: string,
     @Query('year') year?: string,
     @Query('quarter') quarter?: string,
-    @Query('category') category?: string,
-    @Query('paymentMethod') paymentMethod?: string,
     @Query('status') status?: string,
     @Query('employeeId') employeeId?: string,
     @Query('vendorId') vendorId?: string,
@@ -256,6 +240,7 @@ export class AnalyticsController {
       month,
       year,
       quarter,
+      status,
       employeeId,
       vendorId,
       clientId,
@@ -270,8 +255,6 @@ export class AnalyticsController {
         month: month ? parseInt(month) : undefined,
         year: year ? parseInt(year) : undefined,
         quarter: quarter ? parseInt(quarter) : undefined,
-        category,
-        paymentMethod,
         status,
         employeeId: employeeId ? parseInt(employeeId) : undefined,
         vendorId: vendorId ? parseInt(vendorId) : undefined,
@@ -294,6 +277,7 @@ export class AnalyticsController {
     month?: string;
     year?: string;
     quarter?: string;
+    status?: string;
     employeeId?: string;
     vendorId?: string;
     clientId?: string;

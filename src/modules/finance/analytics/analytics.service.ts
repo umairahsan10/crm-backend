@@ -20,8 +20,6 @@ export interface AnalyticsFilters {
   month?: number;
   year?: number;
   quarter?: number;
-  category?: string;
-  paymentMethod?: string;
   status?: string;
   employeeId?: number;
   vendorId?: number;

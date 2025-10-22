@@ -11,9 +11,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * - year: Year filtering (YYYY)
  * - quarter: Quarter filtering (1-4)
  * 
- * Category & Status Filters:
- * - category: Category filter (applies to all modules)
- * - paymentMethod: Payment method filter (cash, bank, online)
+ * Status Filters:
  * - status: Status filter (active, inactive, paid, unpaid, etc.)
  * 
  * Entity Filters:
@@ -27,8 +25,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * 
  * Example API calls:
  * - GET /accountant/analytics?year=2024&month=10
- * - GET /accountant/analytics?fromDate=2024-01-01&toDate=2024-12-31&category=Office Supplies
- * - GET /accountant/analytics?minAmount=1000&maxAmount=10000&paymentMethod=bank
+ * - GET /accountant/analytics?fromDate=2024-01-01&toDate=2024-12-31&status=active
+ * - GET /accountant/analytics?minAmount=1000&maxAmount=10000&employeeId=123
  * - GET /accountant/analytics?employeeId=123&quarter=4&status=active
  */
 
