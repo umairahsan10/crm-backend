@@ -25,6 +25,82 @@ export class EmployeeService {
     return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Karachi"}));
   }
 
+  /**
+   * Validate role-based hierarchy constraints
+   * 
+   * Rules:
+   * - team_lead: Can't have team_lead, only unit_head and dep_manager
+   * - unit_head: Can't have team_lead or unit_head, only dep_manager  
+   * - dep_manager: Can't have anyone above (no team_lead, unit_head, dep_manager)
+   */
+  private async validateRoleHierarchy(roleId: number, managerId?: number, teamLeadId?: number): Promise<void> {
+    // Get the role information
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+    });
+
+    if (!role) {
+      throw new NotFoundException(`Role with ID ${roleId} not found`);
+    }
+
+    const roleName = role.name;
+
+    // Validate based on role hierarchy
+    switch (roleName) {
+      case 'team_lead':
+        // Team lead can't have a team lead
+        if (teamLeadId) {
+          throw new BadRequestException('Team Lead cannot have a Team Lead. Only Unit Head and Department Manager are allowed.');
+        }
+        // Validate manager is unit_head or dep_manager
+        if (managerId) {
+          const manager = await this.prisma.employee.findUnique({
+            where: { id: managerId },
+            include: { role: true },
+          });
+          if (manager && !['unit_head', 'dep_manager'].includes(manager.role.name)) {
+            throw new BadRequestException('Team Lead can only report to Unit Head or Department Manager.');
+          }
+        }
+        break;
+
+      case 'unit_head':
+        // Unit head can't have team lead or unit head
+        if (teamLeadId) {
+          throw new BadRequestException('Unit Head cannot have a Team Lead.');
+        }
+        if (managerId) {
+          const manager = await this.prisma.employee.findUnique({
+            where: { id: managerId },
+            include: { role: true },
+          });
+          if (manager && !['dep_manager'].includes(manager.role.name)) {
+            throw new BadRequestException('Unit Head can only report to Department Manager.');
+          }
+        }
+        break;
+
+      case 'dep_manager':
+        // Department manager can't have anyone above
+        if (teamLeadId) {
+          throw new BadRequestException('Department Manager cannot have a Team Lead.');
+        }
+        if (managerId) {
+          throw new BadRequestException('Department Manager cannot have a manager.');
+        }
+        break;
+
+      case 'senior':
+      case 'junior':
+        // Senior and Junior can have any manager/team lead (no restrictions)
+        break;
+
+      default:
+        this.logger.warn(`Unknown role: ${roleName}. Skipping hierarchy validation.`);
+        break;
+    }
+  }
+
   async terminateEmployee(employeeId: number, terminationDate: string, hrEmployeeId: number, description?: string) {
     // Validate date format
     const parsedDate = new Date(terminationDate);
@@ -312,6 +388,13 @@ export class EmployeeService {
         throw new NotFoundException(`Team Lead with ID ${dto.employee.teamLeadId} not found`);
       }
     }
+
+    // Validate role hierarchy constraints
+    await this.validateRoleHierarchy(
+      dto.employee.roleId,
+      dto.employee.managerId,
+      dto.employee.teamLeadId
+    );
 
     // Department-specific validation
     const departmentName = department.name;
@@ -681,6 +764,13 @@ export class EmployeeService {
       }
     }
 
+    // Validate role hierarchy constraints
+    await this.validateRoleHierarchy(
+      dto.roleId,
+      dto.managerId,
+      dto.teamLeadId
+    );
+
     try {
       const employee = await this.prisma.employee.create({
         data: {
@@ -698,7 +788,6 @@ export class EmployeeService {
           maritalStatus: dto.maritalStatus,
           status: dto.status || 'active',
           startDate: dto.startDate ? new Date(dto.startDate) : null,
-          endDate: dto.endDate ? new Date(dto.endDate) : null,
           modeOfWork: dto.modeOfWork,
           remoteDaysAllowed: dto.remoteDaysAllowed,
           dob: dto.dob ? new Date(dto.dob) : null,
@@ -748,7 +837,7 @@ export class EmployeeService {
    * Get all employees with filters and pagination
    */
   async getEmployees(filters: GetEmployeesDto) {
-    const { departmentId, roleId, status, employmentType, modeOfWork, search, page = 1, limit = 10 } = filters;
+    const { departmentId, roleId, status, gender, employmentType, modeOfWork, search, page = 1, limit = 10 } = filters;
     const skip = (page - 1) * limit;
 
     // Build where clause
@@ -764,6 +853,10 @@ export class EmployeeService {
 
     if (status) {
       where.status = status;
+    }
+
+    if (gender) {
+      where.gender = gender;
     }
 
     if (employmentType) {
@@ -929,6 +1022,15 @@ export class EmployeeService {
       if (!teamLead) {
         throw new NotFoundException(`Team Lead with ID ${dto.teamLeadId} not found`);
       }
+    }
+
+    // Validate role hierarchy constraints if role is being updated
+    if (dto.roleId) {
+      await this.validateRoleHierarchy(
+        dto.roleId,
+        dto.managerId,
+        dto.teamLeadId
+      );
     }
 
     try {
@@ -1530,6 +1632,7 @@ export class EmployeeService {
           total: 0,
           active: 0,
           inactive: 0,
+          terminated: 0,
           byDepartment: {},
           byRole: {},
           byGender: {},
@@ -1553,9 +1656,10 @@ export class EmployeeService {
 
       // Basic counts
       const activeEmployees = employees.filter(emp => emp.status === 'active');
-      const inactiveEmployees = employees.filter(emp => emp.status !== 'active');
+      const terminatedEmployees = employees.filter(emp => emp.status === 'terminated');
+      const inactiveEmployees = employees.filter(emp => emp.status === 'inactive');
 
-      // New employees this month
+      // New employees this month (employees that have start date of this month)
       const newThisMonth = employees.filter(emp => {
         if (!emp.startDate) return false;
         const startDate = new Date(emp.startDate);
@@ -1630,7 +1734,8 @@ export class EmployeeService {
       const statistics: EmployeeStatisticsDto = {
         total: employees.length,
         active: activeEmployees.length,
-        inactive: inactiveEmployees.length,
+        inactive: inactiveEmployees.length, // Changed to specifically count terminated employees
+        terminated: terminatedEmployees.length,
         byDepartment,
         byRole,
         byGender,
@@ -1642,7 +1747,7 @@ export class EmployeeService {
         thisMonth: {
           new: newThisMonth.length,
           active: newThisMonth.filter(emp => emp.status === 'active').length,
-          inactive: newThisMonth.filter(emp => emp.status !== 'active').length,
+          inactive: newThisMonth.filter(emp => emp.status === 'terminated').length, // Changed to specifically count terminated employees
         },
       };
 
