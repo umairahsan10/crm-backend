@@ -10,6 +10,9 @@ export class EmployeeStatisticsDto {
   @ApiProperty({ description: 'Number of inactive employees' })
   inactive: number;
 
+  @ApiProperty({ description: 'Number of terminated employees' })
+  terminated: number;
+
   @ApiProperty({ description: 'Distribution of employees by department (e.g. HR: 10, IT: 25)' })
   byDepartment: Record<string, number>;
 
