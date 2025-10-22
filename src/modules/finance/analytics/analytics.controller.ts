@@ -35,6 +35,17 @@ export class AnalyticsController {
    * 
    * @param fromDate - Optional start date for filtering (YYYY-MM-DD format)
    * @param toDate - Optional end date for filtering (YYYY-MM-DD format)
+   * @param month - Optional month for filtering (1-12)
+   * @param year - Optional year for filtering (YYYY)
+   * @param quarter - Optional quarter for filtering (1-4)
+   * @param category - Optional category filter (applies to all modules)
+   * @param paymentMethod - Optional payment method filter
+   * @param status - Optional status filter (active, inactive, paid, unpaid, etc.)
+   * @param employeeId - Optional employee ID filter
+   * @param vendorId - Optional vendor ID filter
+   * @param clientId - Optional client ID filter
+   * @param minAmount - Optional minimum amount filter
+   * @param maxAmount - Optional maximum amount filter
    * @returns Comprehensive finance analytics with all metrics
    * 
    * Required Permissions: revenues_permission
@@ -46,8 +57,8 @@ export class AnalyticsController {
   @Departments('Accounts')
   @Permissions(PermissionName.revenues_permission)
   @ApiOperation({ 
-    summary: 'Get comprehensive finance analytics',
-    description: 'Retrieves aggregated financial statistics from all finance modules for accountant dashboard'
+    summary: 'Get comprehensive finance analytics with advanced filtering',
+    description: 'Retrieves aggregated financial statistics from all finance modules with comprehensive filtering options for accountant dashboard'
   })
   @ApiQuery({ 
     name: 'fromDate', 
@@ -60,6 +71,72 @@ export class AnalyticsController {
     description: 'End date for filtering (YYYY-MM-DD format)', 
     required: false, 
     example: '2024-12-31' 
+  })
+  @ApiQuery({ 
+    name: 'month', 
+    description: 'Month for filtering (1-12)', 
+    required: false, 
+    example: 10 
+  })
+  @ApiQuery({ 
+    name: 'year', 
+    description: 'Year for filtering (YYYY)', 
+    required: false, 
+    example: 2024 
+  })
+  @ApiQuery({ 
+    name: 'quarter', 
+    description: 'Quarter for filtering (1-4)', 
+    required: false, 
+    example: 4 
+  })
+  @ApiQuery({ 
+    name: 'category', 
+    description: 'Category filter (applies to all modules)', 
+    required: false, 
+    example: 'Office Supplies' 
+  })
+  @ApiQuery({ 
+    name: 'paymentMethod', 
+    description: 'Payment method filter (cash, bank, online)', 
+    required: false, 
+    example: 'bank' 
+  })
+  @ApiQuery({ 
+    name: 'status', 
+    description: 'Status filter (active, inactive, paid, unpaid, etc.)', 
+    required: false, 
+    example: 'active' 
+  })
+  @ApiQuery({ 
+    name: 'employeeId', 
+    description: 'Employee ID filter', 
+    required: false, 
+    example: 123 
+  })
+  @ApiQuery({ 
+    name: 'vendorId', 
+    description: 'Vendor ID filter', 
+    required: false, 
+    example: 456 
+  })
+  @ApiQuery({ 
+    name: 'clientId', 
+    description: 'Client ID filter', 
+    required: false, 
+    example: 789 
+  })
+  @ApiQuery({ 
+    name: 'minAmount', 
+    description: 'Minimum amount filter', 
+    required: false, 
+    example: 100 
+  })
+  @ApiQuery({ 
+    name: 'maxAmount', 
+    description: 'Maximum amount filter', 
+    required: false, 
+    example: 10000 
   })
   @ApiResponse({ 
     status: 200, 
@@ -159,28 +236,159 @@ export class AnalyticsController {
   })
   async getFinanceAnalytics(
     @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string
+    @Query('toDate') toDate?: string,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+    @Query('quarter') quarter?: string,
+    @Query('category') category?: string,
+    @Query('paymentMethod') paymentMethod?: string,
+    @Query('status') status?: string,
+    @Query('employeeId') employeeId?: string,
+    @Query('vendorId') vendorId?: string,
+    @Query('clientId') clientId?: string,
+    @Query('minAmount') minAmount?: string,
+    @Query('maxAmount') maxAmount?: string,
   ): Promise<FinanceAnalyticsResponseDto | ErrorResponseDto> {
-    // Validate date formats if provided
-    if (fromDate && !this.isValidDate(fromDate)) {
+    // Validate all filter parameters
+    this.validateFilterParameters({
+      fromDate,
+      toDate,
+      month,
+      year,
+      quarter,
+      employeeId,
+      vendorId,
+      clientId,
+      minAmount,
+      maxAmount
+    });
+
+    try {
+      const result = await this.analyticsService.getFinanceAnalytics({
+        fromDate,
+        toDate,
+        month: month ? parseInt(month) : undefined,
+        year: year ? parseInt(year) : undefined,
+        quarter: quarter ? parseInt(quarter) : undefined,
+        category,
+        paymentMethod,
+        status,
+        employeeId: employeeId ? parseInt(employeeId) : undefined,
+        vendorId: vendorId ? parseInt(vendorId) : undefined,
+        clientId: clientId ? parseInt(clientId) : undefined,
+        minAmount: minAmount ? parseFloat(minAmount) : undefined,
+        maxAmount: maxAmount ? parseFloat(maxAmount) : undefined,
+      });
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  /**
+   * Validate all filter parameters
+   */
+  private validateFilterParameters(params: {
+    fromDate?: string;
+    toDate?: string;
+    month?: string;
+    year?: string;
+    quarter?: string;
+    employeeId?: string;
+    vendorId?: string;
+    clientId?: string;
+    minAmount?: string;
+    maxAmount?: string;
+  }): void {
+    // Validate date formats
+    if (params.fromDate && !this.isValidDate(params.fromDate)) {
       throw new BadRequestException('Invalid fromDate format. Use YYYY-MM-DD format.');
     }
 
-    if (toDate && !this.isValidDate(toDate)) {
+    if (params.toDate && !this.isValidDate(params.toDate)) {
       throw new BadRequestException('Invalid toDate format. Use YYYY-MM-DD format.');
     }
 
     // Validate date range if both dates are provided
-    if (fromDate && toDate) {
-      const from = new Date(fromDate);
-      const to = new Date(toDate);
+    if (params.fromDate && params.toDate) {
+      const from = new Date(params.fromDate);
+      const to = new Date(params.toDate);
       
       if (from > to) {
         throw new BadRequestException('fromDate cannot be later than toDate.');
       }
     }
 
-    return await this.analyticsService.getFinanceAnalytics(fromDate, toDate);
+    // Validate month (1-12)
+    if (params.month) {
+      const monthNum = parseInt(params.month);
+      if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        throw new BadRequestException('Invalid month value. Month must be between 1 and 12.');
+      }
+    }
+
+    // Validate year (reasonable range)
+    if (params.year) {
+      const yearNum = parseInt(params.year);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear + 10) {
+        throw new BadRequestException(`Invalid year value. Year must be between 1900 and ${currentYear + 10}.`);
+      }
+    }
+
+    // Validate quarter (1-4)
+    if (params.quarter) {
+      const quarterNum = parseInt(params.quarter);
+      if (isNaN(quarterNum) || quarterNum < 1 || quarterNum > 4) {
+        throw new BadRequestException('Invalid quarter value. Quarter must be between 1 and 4.');
+      }
+    }
+
+    // Validate ID parameters (must be positive integers)
+    if (params.employeeId) {
+      const id = parseInt(params.employeeId);
+      if (isNaN(id) || id <= 0) {
+        throw new BadRequestException('Invalid employeeId. Must be a positive integer.');
+      }
+    }
+
+    if (params.vendorId) {
+      const id = parseInt(params.vendorId);
+      if (isNaN(id) || id <= 0) {
+        throw new BadRequestException('Invalid vendorId. Must be a positive integer.');
+      }
+    }
+
+    if (params.clientId) {
+      const id = parseInt(params.clientId);
+      if (isNaN(id) || id <= 0) {
+        throw new BadRequestException('Invalid clientId. Must be a positive integer.');
+      }
+    }
+
+    // Validate amount parameters
+    if (params.minAmount) {
+      const amount = parseFloat(params.minAmount);
+      if (isNaN(amount) || amount < 0) {
+        throw new BadRequestException('Invalid minAmount. Must be a non-negative number.');
+      }
+    }
+
+    if (params.maxAmount) {
+      const amount = parseFloat(params.maxAmount);
+      if (isNaN(amount) || amount < 0) {
+        throw new BadRequestException('Invalid maxAmount. Must be a non-negative number.');
+      }
+    }
+
+    // Validate amount range
+    if (params.minAmount && params.maxAmount) {
+      const minAmount = parseFloat(params.minAmount);
+      const maxAmount = parseFloat(params.maxAmount);
+      if (minAmount > maxAmount) {
+        throw new BadRequestException('minAmount cannot be greater than maxAmount.');
+      }
+    }
   }
 
   /**

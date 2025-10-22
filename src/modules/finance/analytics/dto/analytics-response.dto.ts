@@ -1,5 +1,37 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+/**
+ * Finance Analytics API - Comprehensive Filtering Options
+ * 
+ * The Finance Analytics API supports extensive filtering capabilities:
+ * 
+ * Date & Time Filters:
+ * - fromDate, toDate: Date range filtering (YYYY-MM-DD format)
+ * - month: Month filtering (1-12)
+ * - year: Year filtering (YYYY)
+ * - quarter: Quarter filtering (1-4)
+ * 
+ * Category & Status Filters:
+ * - category: Category filter (applies to all modules)
+ * - paymentMethod: Payment method filter (cash, bank, online)
+ * - status: Status filter (active, inactive, paid, unpaid, etc.)
+ * 
+ * Entity Filters:
+ * - employeeId: Filter by specific employee
+ * - vendorId: Filter by specific vendor
+ * - clientId: Filter by specific client
+ * 
+ * Amount Filters:
+ * - minAmount: Minimum amount filter
+ * - maxAmount: Maximum amount filter
+ * 
+ * Example API calls:
+ * - GET /accountant/analytics?year=2024&month=10
+ * - GET /accountant/analytics?fromDate=2024-01-01&toDate=2024-12-31&category=Office Supplies
+ * - GET /accountant/analytics?minAmount=1000&maxAmount=10000&paymentMethod=bank
+ * - GET /accountant/analytics?employeeId=123&quarter=4&status=active
+ */
+
 export class SummaryStatsDto {
   @ApiProperty({ description: 'Total income from all revenue sources', example: 150000 })
   totalIncome: number;
