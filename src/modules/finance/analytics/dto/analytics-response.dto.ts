@@ -70,23 +70,13 @@ export class AssetStatsDto {
   averageDepreciationRate: number;
 
   @ApiProperty({ description: 'Assets added this month', example: { count: 3, totalValue: 25000 } })
-  thisMonth: {
-    count: number;
-    totalValue: number;
-  };
+  thisMonth: { count: number; totalValue: number };
 
-  @ApiProperty({ description: 'Breakdown by category', example: { 'Equipment': { count: 10, totalPurchaseValue: 100000, totalCurrentValue: 110000 } } })
-  byCategory: Record<string, { count: number; totalPurchaseValue: number; totalCurrentValue: number }>;
+  @ApiProperty({ description: 'Assets breakdown by category', example: { 'Equipment': { count: 10, totalPurchaseValue: 100000, totalCurrentValue: 110000 } } })
+  byCategory: { [key: string]: { count: number; totalPurchaseValue: number; totalCurrentValue: number } };
 
-  @ApiProperty({ description: 'Assets needing attention (high depreciation)', example: [] })
-  assetsNeedingAttention: Array<{
-    id: number;
-    title: string;
-    category: string;
-    purchaseValue: number;
-    currentValue: number;
-    depreciationRate: number;
-  }>;
+  @ApiProperty({ description: 'Assets needing attention', example: [] })
+  assetsNeedingAttention: any[];
 }
 
 export class ExpenseStatsDto {
@@ -100,26 +90,19 @@ export class ExpenseStatsDto {
   averageExpense: number;
 
   @ApiProperty({ description: 'Expenses this month', example: { count: 12, amount: 8000 } })
-  thisMonth: {
-    count: number;
-    amount: number;
-  };
+  thisMonth: { count: number; amount: number };
 
-  @ApiProperty({ description: 'Breakdown by category', example: { 'Office Supplies': { count: 20, amount: 5000 } } })
-  byCategory: Record<string, { count: number; amount: number }>;
+  @ApiProperty({ description: 'Expenses breakdown by category', example: { 'Office Supplies': { count: 20, amount: 5000 } } })
+  byCategory: { [key: string]: { count: number; amount: number } };
 
-  @ApiProperty({ description: 'Top expense categories by amount', example: [] })
-  topCategories: Array<{
-    category: string;
-    totalAmount: number;
-    count: number;
-  }>;
+  @ApiProperty({ description: 'Top expense categories', example: [] })
+  topCategories: any[];
 
-  @ApiProperty({ description: 'Breakdown by payment method', example: { 'cash': { count: 50, amount: 25000 } } })
-  byPaymentMethod: Record<string, { count: number; amount: number }>;
+  @ApiProperty({ description: 'Expenses breakdown by payment method', example: { 'cash': { count: 50, amount: 25000 } } })
+  byPaymentMethod: { [key: string]: { count: number; amount: number } };
 
-  @ApiProperty({ description: 'Breakdown by processed by role', example: { 'Employee': { count: 100, amount: 50000 } } })
-  byProcessedByRole: Record<string, { count: number; amount: number }>;
+  @ApiProperty({ description: 'Expenses breakdown by processed role', example: { 'Employee': { count: 100, amount: 50000 } } })
+  byProcessedByRole: { [key: string]: { count: number; amount: number } };
 }
 
 export class RevenueStatsDto {
@@ -133,27 +116,19 @@ export class RevenueStatsDto {
   averageRevenue: number;
 
   @ApiProperty({ description: 'Revenue this month', example: { count: 8, amount: 15000 } })
-  thisMonth: {
-    count: number;
-    amount: number;
-  };
+  thisMonth: { count: number; amount: number };
 
-  @ApiProperty({ description: 'Breakdown by category', example: { 'Project Revenue': { count: 50, amount: 100000 } } })
-  byCategory: Record<string, { count: number; amount: number }>;
+  @ApiProperty({ description: 'Revenue breakdown by category', example: { 'Project Revenue': { count: 50, amount: 100000 } } })
+  byCategory: { [key: string]: { count: number; amount: number } };
 
-  @ApiProperty({ description: 'Breakdown by source', example: { 'Lead Revenue': { count: 40, amount: 80000 } } })
-  bySource: Record<string, { count: number; amount: number }>;
+  @ApiProperty({ description: 'Revenue breakdown by source', example: { 'Lead Revenue': { count: 40, amount: 80000 } } })
+  bySource: { [key: string]: { count: number; amount: number } };
 
-  @ApiProperty({ description: 'Breakdown by payment method', example: { 'bank': { count: 60, amount: 120000 } } })
-  byPaymentMethod: Record<string, { count: number; amount: number }>;
+  @ApiProperty({ description: 'Revenue breakdown by payment method', example: { 'bank': { count: 60, amount: 120000 } } })
+  byPaymentMethod: { [key: string]: { count: number; amount: number } };
 
   @ApiProperty({ description: 'Top revenue generators', example: [] })
-  topGenerators: Array<{
-    leadId: number;
-    leadName: string;
-    totalAmount: number;
-    transactionCount: number;
-  }>;
+  topGenerators: any[];
 }
 
 export class LiabilityStatsDto {
@@ -169,40 +144,33 @@ export class LiabilityStatsDto {
   @ApiProperty({ description: 'Number of unpaid liabilities', example: 12 })
   unpaidCount: number;
 
-  @ApiProperty({ description: 'Amount of paid liabilities', example: 30000 })
+  @ApiProperty({ description: 'Total amount of paid liabilities', example: 30000 })
   paidAmount: number;
 
-  @ApiProperty({ description: 'Amount of unpaid liabilities', example: 20000 })
+  @ApiProperty({ description: 'Total amount of unpaid liabilities', example: 20000 })
   unpaidAmount: number;
 
-  @ApiProperty({ description: 'Breakdown by category', example: { 'Vendor Payments': { count: 15, amount: 25000 } } })
-  byCategory: Record<string, { count: number; amount: number; paidCount: number; unpaidCount: number; paidAmount: number; unpaidAmount: number }>;
+  @ApiProperty({ description: 'Liabilities breakdown by category', example: { 'Vendor Payments': { count: 15, amount: 25000, paidCount: 10, unpaidCount: 5, paidAmount: 15000, unpaidAmount: 10000 } } })
+  byCategory: { [key: string]: { count: number; amount: number; paidCount: number; unpaidCount: number; paidAmount: number; unpaidAmount: number } };
 
   @ApiProperty({ description: 'Overdue liabilities', example: [] })
-  overdueLiabilities: Array<{
-    id: number;
-    name: string;
-    category: string;
-    amount: number;
-    dueDate: string;
-    daysOverdue: number;
-  }>;
+  overdueLiabilities: any[];
 }
 
 export class FinanceAnalyticsDataDto {
   @ApiProperty({ description: 'Financial summary metrics', type: SummaryStatsDto })
   summary: SummaryStatsDto;
 
-  @ApiProperty({ description: 'Assets analytics', type: AssetStatsDto })
+  @ApiProperty({ description: 'Asset statistics', type: AssetStatsDto })
   assets: AssetStatsDto;
 
-  @ApiProperty({ description: 'Expenses analytics', type: ExpenseStatsDto })
+  @ApiProperty({ description: 'Expense statistics', type: ExpenseStatsDto })
   expenses: ExpenseStatsDto;
 
-  @ApiProperty({ description: 'Revenues analytics', type: RevenueStatsDto })
+  @ApiProperty({ description: 'Revenue statistics', type: RevenueStatsDto })
   revenues: RevenueStatsDto;
 
-  @ApiProperty({ description: 'Liabilities analytics', type: LiabilityStatsDto })
+  @ApiProperty({ description: 'Liability statistics', type: LiabilityStatsDto })
   liabilities: LiabilityStatsDto;
 }
 
@@ -218,10 +186,10 @@ export class FinanceAnalyticsResponseDto {
 }
 
 export class ErrorResponseDto {
-  @ApiProperty({ description: 'Response status', example: 'error' })
+  @ApiProperty({ description: 'Error status', example: 'error' })
   status: string;
 
-  @ApiProperty({ description: 'Error message', example: 'An error occurred while retrieving finance analytics' })
+  @ApiProperty({ description: 'Error message', example: 'Failed to retrieve finance analytics' })
   message: string;
 
   @ApiProperty({ description: 'Error code', example: 'ANALYTICS_ERROR' })
