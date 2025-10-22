@@ -483,4 +483,137 @@ export class AdminRequestsService {
             throw new BadRequestException(`Failed to update admin request status: ${error.message}`);
         }
     }
+
+    /**
+     * Get admin request statistics
+     */
+    async getAdminRequestStats(): Promise<any> {
+        try {
+            const currentDate = new Date();
+            const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+            // Get all admin requests with HR relationships
+            const allRequests = await this.prisma.adminRequest.findMany({
+                include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
+                },
+            });
+
+            // Total counts
+            const total = allRequests.length;
+            const active = allRequests.filter(req => req.status === AdminRequestStatus.pending).length;
+            const completed = allRequests.filter(req => 
+                req.status === AdminRequestStatus.approved || req.status === AdminRequestStatus.declined
+            ).length;
+
+            // Status breakdown
+            const pendingCount = allRequests.filter(req => req.status === AdminRequestStatus.pending).length;
+            const approvedCount = allRequests.filter(req => req.status === AdminRequestStatus.approved).length;
+            const declinedCount = allRequests.filter(req => req.status === AdminRequestStatus.declined).length;
+
+            const byStatus = {
+                pending: {
+                    count: pendingCount,
+                    percentage: total > 0 ? Math.round((pendingCount / total) * 100 * 100) / 100 : 0,
+                },
+                approved: {
+                    count: approvedCount,
+                    percentage: total > 0 ? Math.round((approvedCount / total) * 100 * 100) / 100 : 0,
+                },
+                declined: {
+                    count: declinedCount,
+                    percentage: total > 0 ? Math.round((declinedCount / total) * 100 * 100) / 100 : 0,
+                },
+            };
+
+            // Type breakdown
+            const salaryIncreaseCount = allRequests.filter(req => req.type === 'salary_increase').length;
+            const lateApprovalCount = allRequests.filter(req => req.type === 'late_approval').length;
+            const othersCount = allRequests.filter(req => req.type === 'others').length;
+
+            const byType = {
+                salary_increase: {
+                    count: salaryIncreaseCount,
+                    percentage: total > 0 ? Math.round((salaryIncreaseCount / total) * 100 * 100) / 100 : 0,
+                },
+                late_approval: {
+                    count: lateApprovalCount,
+                    percentage: total > 0 ? Math.round((lateApprovalCount / total) * 100 * 100) / 100 : 0,
+                },
+                others: {
+                    count: othersCount,
+                    percentage: total > 0 ? Math.round((othersCount / total) * 100 * 100) / 100 : 0,
+                },
+            };
+
+            // Approval rate
+            const completedRequests = approvedCount + declinedCount;
+            const approvalRate = {
+                approved: approvedCount,
+                declined: declinedCount,
+                approvalPercentage: completedRequests > 0 ? Math.round((approvedCount / completedRequests) * 100 * 100) / 100 : 0,
+                declinePercentage: completedRequests > 0 ? Math.round((declinedCount / completedRequests) * 100 * 100) / 100 : 0,
+            };
+
+            // This month's stats
+            const thisMonthRequests = allRequests.filter(req => req.createdAt >= firstDayOfMonth);
+            const thisMonthNew = thisMonthRequests.length;
+            const thisMonthApproved = thisMonthRequests.filter(req => req.status === AdminRequestStatus.approved).length;
+            const thisMonthDeclined = thisMonthRequests.filter(req => req.status === AdminRequestStatus.declined).length;
+            const thisMonthPending = thisMonthRequests.filter(req => req.status === AdminRequestStatus.pending).length;
+
+            const thisMonth = {
+                new: thisMonthNew,
+                approved: thisMonthApproved,
+                declined: thisMonthDeclined,
+                pending: thisMonthPending,
+            };
+
+            // Top HR contributors
+            const hrContributions: Record<number, { hrEmployeeId: number; count: number }> = {};
+            allRequests.forEach(req => {
+                if (req.hrId && req.hr) {
+                    if (!hrContributions[req.hrId]) {
+                        hrContributions[req.hrId] = {
+                            hrEmployeeId: req.hr.employeeId,
+                            count: 0,
+                        };
+                    }
+                    hrContributions[req.hrId].count++;
+                }
+            });
+
+            const topContributors = Object.entries(hrContributions)
+                .map(([hrId, data]) => ({
+                    hrId: parseInt(hrId),
+                    hrEmployeeId: data.hrEmployeeId,
+                    requestCount: data.count,
+                }))
+                .sort((a, b) => b.requestCount - a.requestCount)
+                .slice(0, 5);
+
+            return {
+                status: 'success',
+                message: 'Admin request statistics retrieved successfully',
+                data: {
+                    total,
+                    active,
+                    completed,
+                    byStatus,
+                    byType,
+                    approvalRate,
+                    thisMonth,
+                    topContributors,
+                },
+            };
+        } catch (error) {
+            this.logger.error(`Failed to retrieve admin request statistics: ${error.message}`);
+            throw new BadRequestException(`Failed to retrieve admin request statistics: ${error.message}`);
+        }
+    }
 } 
