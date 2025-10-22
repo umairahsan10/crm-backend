@@ -1,7 +1,6 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateProductionUnitDto } from './dto/create-unit.dto';
-import { UpdateProductionUnitDto } from './dto/update-unit.dto';
 import { UnitsQueryDto } from './dto/units-query.dto';
 
 @Injectable()
@@ -9,72 +8,283 @@ export class UnitsService {
   constructor(private prisma: PrismaService) {}
 
   async createUnit(createUnitDto: CreateProductionUnitDto) {
-    const { name, headId } = createUnitDto;
+    const { name, headId, newTeamLeadId } = createUnitDto;
 
-    // Validate headId if provided
-    if (headId !== undefined && headId !== null) {
-      if (isNaN(headId) || headId <= 0) {
-        throw new BadRequestException('Head ID must be a valid positive number');
-      }
-
-      // Check if employee exists
-      const employee = await this.prisma.employee.findUnique({
-        where: { id: headId },
-        include: { role: true }
-      });
-
-      if (!employee) {
-        throw new BadRequestException(`Employee with ID ${headId} does not exist`);
-      }
-
-      // Check if employee has unit_head role
-      if (employee.role.name !== 'unit_head') {
-        throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
-      }
-
-      // Check if employee is already head of another production unit
-      const existingUnitWithHead = await this.prisma.productionUnit.findFirst({
-        where: { headId: headId }
-      });
-
-      if (existingUnitWithHead) {
-        throw new ConflictException(
-          `Each employee can only be the head of one production unit at a time. `
-        );
-      }
-    }
-
-    // Check if name already exists
-    const existingName = await this.prisma.productionUnit.findUnique({
+    // Check if unit name already exists
+    const existingUnit = await this.prisma.productionUnit.findUnique({
       where: { name }
     });
 
-    if (existingName) {
+    if (existingUnit) {
       throw new ConflictException('Unit name already exists');
     }
 
-    // Create the production unit
-    const newUnit = await this.prisma.productionUnit.create({
-      data: {
-        name,
-        headId
+    // Validate headId employee exists
+    const headEmployee = await this.prisma.employee.findUnique({
+      where: { id: headId },
+      include: { 
+        role: true,
+        department: true,
+        teamLead: true,
+        teamMembers: true
       }
     });
 
-    return {
-      success: true,
-      message: 'New Production Unit Created Successfully'
-    };
+    if (!headEmployee) {
+      throw new BadRequestException(`Employee with ID ${headId} does not exist`);
+    }
+
+    // Check if employee belongs to Production department
+    if (headEmployee.department.name !== 'Production') {
+      throw new BadRequestException('Employee must belong to Production department');
+    }
+
+    // Check if employee is active
+    if (headEmployee.status !== 'active') {
+      throw new BadRequestException('Employee must be active to be promoted');
+    }
+
+    // Determine scenario based on newTeamLeadId presence
+    if (newTeamLeadId) {
+      // Scenario 1: Team Lead Promotion
+      return await this.handleTeamLeadPromotion(name, headId, newTeamLeadId, headEmployee);
+    } else {
+      // Scenario 2: Direct Promotion (Senior/Junior to Unit Head)
+      return await this.handleDirectPromotion(name, headId, headEmployee);
+    }
+  }
+
+  private async handleTeamLeadPromotion(
+    unitName: string, 
+    headId: number, 
+    newTeamLeadId: number, 
+    headEmployee: any
+  ) {
+    // Validate that headId is actually a team lead
+    if (headEmployee.role.name !== 'team_lead') {
+      throw new BadRequestException('Head employee must be a team lead for team lead promotion scenario');
+    }
+
+    // Check if team lead is actually leading a team
+    if (!headEmployee.teamMembers || headEmployee.teamMembers.length === 0) {
+      throw new BadRequestException('Employee is not currently leading any team');
+    }
+
+    // Validate new team lead employee
+    const newTeamLeadEmployee = await this.prisma.employee.findUnique({
+      where: { id: newTeamLeadId },
+      include: { 
+        role: true,
+        department: true,
+        teamLead: true
+      }
+    });
+
+    if (!newTeamLeadEmployee) {
+      throw new BadRequestException(`New team lead employee with ID ${newTeamLeadId} does not exist`);
+    }
+
+    // Check if new team lead is senior or junior
+    if (!['senior', 'junior'].includes(newTeamLeadEmployee.role.name)) {
+      throw new BadRequestException('New team lead must be a senior or junior employee');
+    }
+
+    // Check if new team lead belongs to Production department
+    if (newTeamLeadEmployee.department.name !== 'Production') {
+      throw new BadRequestException('New team lead must belong to Production department');
+    }
+
+    // Check if new team lead is active
+    if (newTeamLeadEmployee.status !== 'active') {
+      throw new BadRequestException('New team lead must be active');
+    }
+
+    // Check if new team lead is already a team lead
+    if (newTeamLeadEmployee.role.name === 'team_lead') {
+      throw new BadRequestException('New team lead cannot already be a team lead');
+    }
+
+    // Get the team that the current team lead is leading
+    const currentTeam = await this.prisma.team.findFirst({
+      where: { teamLeadId: headId }
+    });
+
+    if (!currentTeam) {
+      throw new BadRequestException('Current team lead is not assigned to any team');
+    }
+
+    // Start transaction for all role changes and unit creation
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Get unit_head role ID
+      const unitHeadRole = await tx.role.findUnique({
+        where: { name: 'unit_head' }
+      });
+
+      if (!unitHeadRole) {
+        throw new BadRequestException('Unit head role not found in system');
+      }
+
+      // 2. Get team_lead role ID  
+      const teamLeadRole = await tx.role.findUnique({
+        where: { name: 'team_lead' }
+      });
+
+      if (!teamLeadRole) {
+        throw new BadRequestException('Team lead role not found in system');
+      }
+
+      // 3. Promote current team lead to unit head
+      await tx.employee.update({
+        where: { id: headId },
+        data: { 
+          roleId: unitHeadRole.id,
+          
+        }
+      });
+
+      // 4. Promote new team lead (role only, keep teamLeadId for now)
+      await tx.employee.update({
+        where: { id: newTeamLeadId },
+        data: { 
+          roleId: teamLeadRole.id
+        }
+      });
+
+      // 5. Update team with new team lead
+      await tx.team.update({
+        where: { id: currentTeam.id },
+        data: { teamLeadId: newTeamLeadId }
+      });
+
+      // 6. Update all team members to point to new team lead
+      console.log(`🔍 Step 6: Updating all employees with teamLeadId ${headId} to ${newTeamLeadId}`);
+      
+      // First, let's see which employees will be affected
+      const employeesToUpdate = await tx.employee.findMany({
+        where: { teamLeadId: headId },
+        select: { id: true, firstName: true, lastName: true, teamLeadId: true }
+      });
+      console.log(`🔍 Employees that will be updated:`, employeesToUpdate);
+      
+      const updateResult = await tx.employee.updateMany({
+        where: { teamLeadId: headId },
+        data: { teamLeadId: newTeamLeadId }
+      });
+      console.log(`🔍 Updated ${updateResult.count} employees`);
+
+      // Check new team lead's teamLeadId after the updateMany
+      const newTeamLeadAfter = await tx.employee.findUnique({
+        where: { id: newTeamLeadId },
+        select: { id: true, teamLeadId: true, role: { select: { name: true } } }
+      });
+      console.log(`🔍 New team lead ${newTeamLeadId} after team member updates:`, newTeamLeadAfter);
+
+      // 7. Ensure new team lead has teamLeadId as null (they are the team lead)
+      await tx.employee.update({
+        where: { id: newTeamLeadId },
+        data: { 
+          teamLeadId: null
+        }
+      });
+
+      // 8. Create new production unit with promoted employee as head
+      const newUnit = await tx.productionUnit.create({
+        data: {
+          name: unitName,
+          headId: headId
+        }
+      });
+
+      return {
+        success: true,
+        message: `Production unit "${unitName}" created successfully with team lead promotion`,
+        data: {
+          unitId: newUnit.id,
+          unitName: newUnit.name,
+          promotedEmployee: {
+            id: headId,
+            name: `${headEmployee.firstName} ${headEmployee.lastName}`,
+            newRole: 'unit_head'
+          },
+          newTeamLead: {
+            id: newTeamLeadId,
+            name: `${newTeamLeadEmployee.firstName} ${newTeamLeadEmployee.lastName}`,
+            newRole: 'team_lead'
+          },
+          originalTeam: {
+            id: currentTeam.id,
+            name: currentTeam.name,
+            newTeamLeadId: newTeamLeadId
+          }
+        }
+      };
+    });
+  }
+
+  private async handleDirectPromotion(
+    unitName: string, 
+    headId: number, 
+    headEmployee: any
+  ) {
+    // Validate that headId is senior or junior
+    if (!['senior', 'junior'].includes(headEmployee.role.name)) {
+      throw new BadRequestException('Employee must be a senior or junior for direct promotion to unit head');
+    }
+
+    // Start transaction for role change and unit creation
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Get unit_head role ID
+      const unitHeadRole = await tx.role.findUnique({
+        where: { name: 'unit_head' }
+      });
+
+      if (!unitHeadRole) {
+        throw new BadRequestException('Unit head role not found in system');
+      }
+
+      // 2. Promote employee to unit head
+      await tx.employee.update({
+        where: { id: headId },
+        data: { 
+          roleId: unitHeadRole.id,
+          teamLeadId: null // Remove from any team
+        }
+      });
+
+      // 3. Create new production unit with promoted employee as head
+      const newUnit = await tx.productionUnit.create({
+        data: {
+          name: unitName,
+          headId: headId
+        }
+      });
+
+      return {
+        success: true,
+        message: `Production unit "${unitName}" created successfully with direct promotion`,
+        data: {
+          unitId: newUnit.id,
+          unitName: newUnit.name,
+          promotedEmployee: {
+            id: headId,
+            name: `${headEmployee.firstName} ${headEmployee.lastName}`,
+            previousRole: headEmployee.role.name,
+            newRole: 'unit_head'
+          }
+        }
+      };
+    });
   }
 
   async getAllUnits(user: any, query: UnitsQueryDto) {
+    // Check if single unit request (by ID)
+    if (query.unitId) {
+      return await this.getSingleUnitWithDetails(query.unitId, user);
+    }
+
     const whereClause: any = this.buildRoleBasedWhereClause(user);
     
-    // Apply all filters from query
-    if (query.unitId) {
-      whereClause.id = query.unitId;
-    }
-    
+    // Apply filters from query
     if (query.hasHead !== undefined) {
       whereClause.headId = query.hasHead ? { not: null } : null;
     }
@@ -103,8 +313,6 @@ export class UnitsService {
       }
     }
 
-    const include = this.buildIncludeClause(query.include);
-
     const orderBy = {};
     if (query.sortBy) {
       orderBy[query.sortBy] = query.sortOrder || 'asc';
@@ -126,7 +334,12 @@ export class UnitsService {
               lastName: true
             }
           },
-          ...include
+          _count: {
+            select: {
+              teams: true,
+              productionEmployees: true
+            }
+          }
         },
         orderBy,
         skip,
@@ -135,21 +348,27 @@ export class UnitsService {
       this.prisma.productionUnit.count({ where: whereClause })
     ]);
 
-    // Get counts for each unit
+    // Get project counts for each unit
     const unitsWithCounts = await Promise.all(
       units.map(async (unit) => {
-        const teamsCount = await this.prisma.team.count({
-          where: { productionUnitId: unit.id }
-        });
-
-        const employeesCount = await this.prisma.production.count({
-          where: { productionUnitId: unit.id }
+        const projectsCount = await this.prisma.project.count({
+          where: {
+            teams: {
+              some: {
+                productionUnitId: unit.id
+              }
+            },
+            status: {
+              in: ['in_progress', 'onhold'] // Only active projects
+            }
+          }
         });
 
         return {
           ...unit,
-          teamsCount,
-          employeesCount
+          teamsCount: (unit as any)._count?.teams || 0,
+          employeesCount: (unit as any)._count?.productionEmployees || 0,
+          projectsCount
         };
       })
     );
@@ -167,43 +386,126 @@ export class UnitsService {
     };
   }
 
-  async getUnit(id: number) {
-    const unit = await this.prisma.productionUnit.findUnique({
-      where: { id },
+  async getSingleUnitWithDetails(unitId: number, user: any) {
+    // Check if user has access to this unit
+    const whereClause = this.buildRoleBasedWhereClause(user);
+    whereClause.id = unitId;
+
+    const unit = await this.prisma.productionUnit.findFirst({
+      where: whereClause,
       include: {
         head: {
           select: {
             id: true,
             firstName: true,
-            lastName: true
+            lastName: true,
+            email: true
+          }
+        },
+        _count: {
+          select: {
+            teams: true,
+            productionEmployees: true
           }
         }
       }
     });
 
     if (!unit) {
-      throw new NotFoundException(`Unit with ID ${id} does not exist`);
+      throw new NotFoundException(`Unit with ID ${unitId} does not exist or you don't have access to it`);
     }
 
-    // Get counts
-    const teamsCount = await this.prisma.team.count({
-      where: { productionUnitId: unit.id }
+    // Get teams with limited details
+    const teams = await this.prisma.team.findMany({
+      where: { productionUnitId: unitId },
+      include: {
+        teamLead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        _count: {
+          select: {
+            projects: true
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
     });
 
-    const employeesCount = await this.prisma.production.count({
-      where: { productionUnitId: unit.id }
+    // Get projects with limited details (only active projects)
+    const projects = await this.prisma.project.findMany({
+      where: {
+        teams: {
+          some: {
+            productionUnitId: unitId
+          }
+        },
+        status: {
+          in: ['in_progress', 'onhold'] // Only active projects
+        }
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            clientName: true,
+            companyName: true
+          }
+        },
+        team: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
+
+    // Get employee count for each team
+    const teamsWithMemberCount = await Promise.all(
+      teams.map(async (team) => {
+        const memberCount = await this.prisma.employee.count({
+          where: { teamLeadId: team.teamLeadId }
+        });
+
+        return {
+          ...team,
+          employeeCount: memberCount + (team.teamLeadId ? 1 : 0), // +1 for team lead
+          projectsCount: (team as any)._count?.projects || 0
+        };
+      })
+    );
 
     return {
       success: true,
       data: {
         ...unit,
-        teamsCount,
-        employeesCount
+        teamsCount: (unit as any)._count?.teams || 0,
+        employeesCount: (unit as any)._count?.productionEmployees || 0,
+        projectsCount: projects.length,
+        teams: teamsWithMemberCount,
+        projects: projects.map(project => ({
+          id: project.id,
+          description: project.description,
+          status: project.status,
+          deadline: project.deadline,
+          liveProgress: project.liveProgress,
+          difficultyLevel: project.difficultyLevel,
+          paymentStage: project.paymentStage,
+          client: project.client,
+          team: project.team,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt
+        }))
       },
       message: 'Unit details retrieved successfully'
     };
   }
+
 
 
 
@@ -277,110 +579,6 @@ export class UnitsService {
     return includeClause;
   }
 
-  async updateUnit(id: number, updateUnitDto: UpdateProductionUnitDto, user?: any) {
-    // Validate that updateUnitDto is provided
-    if (!updateUnitDto) {
-      throw new BadRequestException('Request body is required for update operation');
-    }
-
-    // Check if unit exists
-    const existingUnit = await this.prisma.productionUnit.findUnique({
-      where: { id }
-    });
-
-    if (!existingUnit) {
-      throw new NotFoundException(`Unit with ID ${id} does not exist`);
-    }
-
-    // Role-based access control
-    if (user && user.role === 'unit_head' && existingUnit.headId !== user.id) {
-      throw new ForbiddenException('You can only update your own unit');
-    }
-
-    const { name, headId } = updateUnitDto;
-
-    // Check if at least one field is provided for update
-    if (name === undefined && headId === undefined) {
-      throw new BadRequestException('At least one field (name or headId) must be provided for update');
-    }
-
-    // Validate headId if provided
-    if (headId !== undefined) {
-      if (headId === null) {
-        // Setting headId to NULL - check if all teams have team leads
-        const teamsWithoutTeamLead = await this.prisma.team.findMany({
-          where: {
-            productionUnitId: id,
-            teamLeadId: null
-          },
-          select: { id: true, name: true }
-        });
-
-        if (teamsWithoutTeamLead.length > 0) {
-          throw new BadRequestException(
-            `Cannot remove unit head. ${teamsWithoutTeamLead.length} team(s) do not have team leads assigned. ` +
-            `Please assign team leads to all teams before removing the unit head to avoid workflow disruption. ` +
-            `Affected teams: ${teamsWithoutTeamLead.map(t => `ID ${t.id}`).join(', ')}`
-          );
-        }
-      } else {
-        // Assigning a new head
-        const employee = await this.prisma.employee.findUnique({
-          where: { id: headId },
-          include: { role: true }
-        });
-
-        if (!employee) {
-          throw new BadRequestException(`Employee with ID ${headId} does not exist`);
-        }
-
-        if (employee.role.name !== 'unit_head') {
-          throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
-        }
-
-        // Check if employee is already head of another production unit (excluding current unit)
-        const existingUnitWithHead = await this.prisma.productionUnit.findFirst({
-          where: { 
-            headId: headId,
-            id: { not: id } // Exclude current unit from check
-          }
-        });
-
-        if (existingUnitWithHead) {
-          throw new ConflictException(
-            `Employee ${employee.firstName} ${employee.lastName} (ID: ${headId}) is already the head of production unit "${existingUnitWithHead.name}" (ID: ${existingUnitWithHead.id}). ` +
-            `Each employee can only be the head of one production unit at a time. ` +
-            `Please either assign a different employee as head or remove this employee from their current unit first.`
-          );
-        }
-      }
-    }
-
-    // Check name uniqueness if provided
-    if (name) {
-      const existingName = await this.prisma.productionUnit.findFirst({
-        where: {
-          name,
-          id: { not: id }
-        }
-      });
-
-      if (existingName) {
-        throw new ConflictException('Unit name already exists');
-      }
-    }
-
-    // Update the unit
-    await this.prisma.productionUnit.update({
-      where: { id },
-      data: updateUnitDto
-    });
-
-    return {
-      success: true,
-      message: 'Unit updated successfully'
-    };
-  }
 
   async deleteUnit(id: number) {
     // Check if unit exists
@@ -485,52 +683,4 @@ export class UnitsService {
   }
 
 
-  async getAvailableHeads(assigned?: boolean) {
-    let whereClause: any = {
-      role: { name: 'unit_head' },
-      department: { name: 'Production' },
-      status: 'active'
-    };
-
-    if (assigned === true) {
-      // Only heads assigned to Production units
-      whereClause.productionUnitHead = { some: {} };
-    } else if (assigned === false) {
-      // Only heads NOT assigned to any Production unit
-      whereClause.productionUnitHead = { none: {} };
-    }
-    // If assigned is undefined, show all (no additional filter)
-
-    const heads = await this.prisma.employee.findMany({
-      where: whereClause,
-      include: {
-        productionUnitHead: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      },
-      orderBy: [
-        { firstName: 'asc' },
-        { lastName: 'asc' }
-      ]
-    });
-
-    return {
-      success: true,
-      data: heads.map(head => ({
-        id: head.id,
-        firstName: head.firstName,
-        lastName: head.lastName,
-        email: head.email,
-        isAssigned: head.productionUnitHead.length > 0,
-        currentUnit: head.productionUnitHead.length > 0 ? head.productionUnitHead[0] : null
-      })),
-      total: heads.length,
-      message: heads.length > 0 
-        ? 'Available heads retrieved successfully' 
-        : 'No available heads found'
-    };
-  }
 }
