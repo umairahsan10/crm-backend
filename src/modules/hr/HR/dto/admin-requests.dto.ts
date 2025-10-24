@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsInt, Min, Max, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RequestType, AdminRequestStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
@@ -106,6 +106,31 @@ export class PaginationDto {
   @Min(1)
   @Max(100)
   limit?: number = 10;
+
+  @ApiPropertyOptional({ 
+    description: 'Filter requests from this date (ISO format)', 
+    example: '2025-10-01' 
+  })
+  @IsOptional()
+  @IsDateString()
+  fromDate?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Filter requests to this date (ISO format)', 
+    example: '2025-10-31' 
+  })
+  @IsOptional()
+  @IsDateString()
+  toDate?: string;
+
+  @ApiPropertyOptional({ 
+    enum: AdminRequestStatus,
+    description: 'Filter requests by status', 
+    example: 'pending' 
+  })
+  @IsOptional()
+  @IsEnum(AdminRequestStatus)
+  status?: AdminRequestStatus;
 }
 
 export class PaginationMetaDto {

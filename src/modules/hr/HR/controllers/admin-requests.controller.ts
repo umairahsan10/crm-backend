@@ -66,20 +66,29 @@ export class AdminRequestsController {
   @Get('my-requests')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
-  @ApiOperation({ summary: 'Get admin requests by HR ID with pagination' })
+  @ApiOperation({ summary: 'Get admin requests by HR ID with pagination, date filtering, and status filtering' })
   @ApiQuery({ name: 'hrId', description: 'HR ID to filter requests', type: 'number' })
   @ApiQuery({ name: 'page', description: 'Page number (1-based)', required: false, type: 'number' })
   @ApiQuery({ name: 'limit', description: 'Number of items per page', required: false, type: 'number' })
+  @ApiQuery({ name: 'fromDate', description: 'Filter requests from this date (ISO format)', required: false, type: 'string' })
+  @ApiQuery({ name: 'toDate', description: 'Filter requests to this date (ISO format)', required: false, type: 'string' })
+  @ApiQuery({ name: 'status', description: 'Filter requests by status (pending, approved, declined)', required: false, type: 'string' })
   @ApiResponse({ status: 200, description: 'Paginated list of admin requests', type: AdminRequestListResponseDto })
   async getMyAdminRequests(
     @Query('hrId', ParseIntPipe) hrId: number,
     @Request() req: AuthenticatedRequest,
     @Query('page') page?: number,
-    @Query('limit') limit?: number
+    @Query('limit') limit?: number,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('status') status?: string
   ): Promise<AdminRequestListResponseDto> {
     const paginationDto: PaginationDto = {
       page: page || 1,
       limit: limit || 10,
+      fromDate,
+      toDate,
+      status: status as any,
     };
     return await this.adminRequestsService.getAdminRequestsByHrId(hrId, paginationDto);
   }
