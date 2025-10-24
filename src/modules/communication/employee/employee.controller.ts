@@ -19,6 +19,8 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBea
 import { EmployeeService } from './employee.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
 import { EmployeeHrActionDto } from './dto/hr-action.dto';
+import { HrRequestsFilterDto } from './dto/hr-requests-filter.dto';
+import { PaginatedResponse } from './dto/paginated-response.dto';
 import { RequestPriority, RequestStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
@@ -55,10 +57,17 @@ export class EmployeeController {
 
   @Get('hr-requests')
   @Departments('HR', 'Admin')
-  @ApiOperation({ summary: 'Get all HR requests', description: 'Accessible by HR and Admin departments.' })
-  @ApiResponse({ status: 200, description: 'List of all HR requests retrieved successfully.' })
-  async getAllHrRequests() {
-    return this.employeeService.getAllHrRequests();
+  @ApiOperation({ 
+    summary: 'Get HR requests with filtering and pagination', 
+    description: 'Retrieve HR requests with optional filtering by status, priority, request type, date range, and search. Supports pagination.' 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of HR requests retrieved successfully. Returns paginated response when filters are applied.',
+    type: PaginatedResponse
+  })
+  async getAllHrRequests(@Query() filterDto: HrRequestsFilterDto) {
+    return this.employeeService.getAllHrRequests(filterDto);
   }
 
   @Get('hr-requests/my-requests')
