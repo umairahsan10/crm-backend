@@ -252,14 +252,36 @@ export class AdminRequestsService {
      */
     async getAdminRequestsByHrId(hrId: number, paginationDto?: PaginationDto): Promise<AdminRequestListResponseDto> {
         try {
-            const { page = 1, limit = 10 } = paginationDto || {};
+            const { page = 1, limit = 10, fromDate, toDate, status } = paginationDto || {};
             const skip = (page - 1) * limit;
+
+            // Build date filter conditions
+            const dateFilter: any = {};
+            if (fromDate) {
+                dateFilter.gte = new Date(fromDate);
+            }
+            if (toDate) {
+                dateFilter.lte = new Date(toDate);
+            }
+
+            // Build the where clause
+            const whereClause: any = {
+                hrId: hrId,
+            };
+
+            // Add date filter if any date parameters are provided
+            if (fromDate || toDate) {
+                whereClause.createdAt = dateFilter;
+            }
+
+            // Add status filter if provided
+            if (status) {
+                whereClause.status = status;
+            }
 
             const [adminRequests, total] = await Promise.all([
                 this.prisma.adminRequest.findMany({
-                    where: {
-                        hrId: hrId,
-                    },
+                    where: whereClause,
                     include: {
                         hr: {
                             select: {
@@ -285,9 +307,7 @@ export class AdminRequestsService {
                     take: limit,
                 }),
                 this.prisma.adminRequest.count({
-                    where: {
-                        hrId: hrId,
-                    },
+                    where: whereClause,
                 }),
             ]);
 
