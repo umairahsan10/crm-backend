@@ -25,6 +25,15 @@ export class GetEmployeesDto {
   status?: 'active' | 'terminated' | 'inactive';
 
   @ApiPropertyOptional({
+    description: 'Filter by gender',
+    enum: ['male', 'female'],
+    example: 'male',
+  })
+  @IsOptional()
+  @IsEnum(['male', 'female'])
+  gender?: 'male' | 'female';
+
+  @ApiPropertyOptional({
     description: 'Filter by employment type',
     enum: ['full_time', 'part_time'],
     example: 'full_time',

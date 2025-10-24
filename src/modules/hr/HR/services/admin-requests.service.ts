@@ -6,7 +6,9 @@ import {
     UpdateAdminRequestStatusDto,
     AdminRequestResponseDto,
     AdminRequestListResponseDto,
-    AdminRequestStatus
+    AdminRequestStatus,
+    PaginationDto,
+    PaginationMetaDto
 } from '../dto/admin-requests.dto';
 
 @Injectable()
@@ -116,9 +118,20 @@ export class AdminRequestsService {
 
             const total = await this.prisma.adminRequest.count();
 
+            // Create pagination metadata for backward compatibility
+            const pagination: PaginationMetaDto = {
+                page: 1,
+                limit: total,
+                total,
+                totalPages: 1,
+                hasNextPage: false,
+                hasPreviousPage: false,
+            };
+
             return {
                 adminRequests,
                 total,
+                pagination,
             };
         } catch (error) {
             this.logger.error(`Failed to get admin requests: ${error.message}`);
@@ -169,9 +182,20 @@ export class AdminRequestsService {
                 },
             });
 
+            // Create pagination metadata for backward compatibility
+            const pagination: PaginationMetaDto = {
+                page: 1,
+                limit: total,
+                total,
+                totalPages: 1,
+                hasNextPage: false,
+                hasPreviousPage: false,
+            };
+
             return {
                 adminRequests,
                 total,
+                pagination,
             };
         } catch (error) {
             if (error instanceof BadRequestException) {
@@ -226,44 +250,84 @@ export class AdminRequestsService {
     /**
      * Get admin requests by HR ID (HR can view their own requests)
      */
-    async getAdminRequestsByHrId(hrId: number): Promise<AdminRequestListResponseDto> {
+    async getAdminRequestsByHrId(hrId: number, paginationDto?: PaginationDto): Promise<AdminRequestListResponseDto> {
         try {
-            const adminRequests = await this.prisma.adminRequest.findMany({
-                where: {
-                    hrId: hrId,
-                },
-                include: {
-                    hr: {
-                        select: {
-                            id: true,
-                            employeeId: true,
-                        },
-                    },
-                    hrLog: {
-                        select: {
-                            id: true,
-                            hrId: true,
-                            actionType: true,
-                            affectedEmployeeId: true,
-                            description: true,
-                            createdAt: true,
-                        },
-                    },
-                },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-            });
+            const { page = 1, limit = 10, fromDate, toDate, status } = paginationDto || {};
+            const skip = (page - 1) * limit;
 
-            const total = await this.prisma.adminRequest.count({
-                where: {
-                    hrId: hrId,
-                },
-            });
+            // Build date filter conditions
+            const dateFilter: any = {};
+            if (fromDate) {
+                dateFilter.gte = new Date(fromDate);
+            }
+            if (toDate) {
+                dateFilter.lte = new Date(toDate);
+            }
+
+            // Build the where clause
+            const whereClause: any = {
+                hrId: hrId,
+            };
+
+            // Add date filter if any date parameters are provided
+            if (fromDate || toDate) {
+                whereClause.createdAt = dateFilter;
+            }
+
+            // Add status filter if provided
+            if (status) {
+                whereClause.status = status;
+            }
+
+            const [adminRequests, total] = await Promise.all([
+                this.prisma.adminRequest.findMany({
+                    where: whereClause,
+                    include: {
+                        hr: {
+                            select: {
+                                id: true,
+                                employeeId: true,
+                            },
+                        },
+                        hrLog: {
+                            select: {
+                                id: true,
+                                hrId: true,
+                                actionType: true,
+                                affectedEmployeeId: true,
+                                description: true,
+                                createdAt: true,
+                            },
+                        },
+                    },
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                    skip,
+                    take: limit,
+                }),
+                this.prisma.adminRequest.count({
+                    where: whereClause,
+                }),
+            ]);
+
+            const totalPages = Math.ceil(total / limit);
+            const hasNextPage = page < totalPages;
+            const hasPreviousPage = page > 1;
+
+            const pagination: PaginationMetaDto = {
+                page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage,
+                hasPreviousPage,
+            };
 
             return {
                 adminRequests,
                 total,
+                pagination,
             };
         } catch (error) {
             this.logger.error(`Failed to get admin requests for HR ${hrId}: ${error.message}`);
@@ -481,6 +545,139 @@ export class AdminRequestsService {
             }
             this.logger.error(`Failed to update admin request status ${id}: ${error.message}`);
             throw new BadRequestException(`Failed to update admin request status: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get admin request statistics
+     */
+    async getAdminRequestStats(): Promise<any> {
+        try {
+            const currentDate = new Date();
+            const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+            // Get all admin requests with HR relationships
+            const allRequests = await this.prisma.adminRequest.findMany({
+                include: {
+                    hr: {
+                        select: {
+                            id: true,
+                            employeeId: true,
+                        },
+                    },
+                },
+            });
+
+            // Total counts
+            const total = allRequests.length;
+            const active = allRequests.filter(req => req.status === AdminRequestStatus.pending).length;
+            const completed = allRequests.filter(req => 
+                req.status === AdminRequestStatus.approved || req.status === AdminRequestStatus.declined
+            ).length;
+
+            // Status breakdown
+            const pendingCount = allRequests.filter(req => req.status === AdminRequestStatus.pending).length;
+            const approvedCount = allRequests.filter(req => req.status === AdminRequestStatus.approved).length;
+            const declinedCount = allRequests.filter(req => req.status === AdminRequestStatus.declined).length;
+
+            const byStatus = {
+                pending: {
+                    count: pendingCount,
+                    percentage: total > 0 ? Math.round((pendingCount / total) * 100 * 100) / 100 : 0,
+                },
+                approved: {
+                    count: approvedCount,
+                    percentage: total > 0 ? Math.round((approvedCount / total) * 100 * 100) / 100 : 0,
+                },
+                declined: {
+                    count: declinedCount,
+                    percentage: total > 0 ? Math.round((declinedCount / total) * 100 * 100) / 100 : 0,
+                },
+            };
+
+            // Type breakdown
+            const salaryIncreaseCount = allRequests.filter(req => req.type === 'salary_increase').length;
+            const lateApprovalCount = allRequests.filter(req => req.type === 'late_approval').length;
+            const othersCount = allRequests.filter(req => req.type === 'others').length;
+
+            const byType = {
+                salary_increase: {
+                    count: salaryIncreaseCount,
+                    percentage: total > 0 ? Math.round((salaryIncreaseCount / total) * 100 * 100) / 100 : 0,
+                },
+                late_approval: {
+                    count: lateApprovalCount,
+                    percentage: total > 0 ? Math.round((lateApprovalCount / total) * 100 * 100) / 100 : 0,
+                },
+                others: {
+                    count: othersCount,
+                    percentage: total > 0 ? Math.round((othersCount / total) * 100 * 100) / 100 : 0,
+                },
+            };
+
+            // Approval rate
+            const completedRequests = approvedCount + declinedCount;
+            const approvalRate = {
+                approved: approvedCount,
+                declined: declinedCount,
+                approvalPercentage: completedRequests > 0 ? Math.round((approvedCount / completedRequests) * 100 * 100) / 100 : 0,
+                declinePercentage: completedRequests > 0 ? Math.round((declinedCount / completedRequests) * 100 * 100) / 100 : 0,
+            };
+
+            // This month's stats
+            const thisMonthRequests = allRequests.filter(req => req.createdAt >= firstDayOfMonth);
+            const thisMonthNew = thisMonthRequests.length;
+            const thisMonthApproved = thisMonthRequests.filter(req => req.status === AdminRequestStatus.approved).length;
+            const thisMonthDeclined = thisMonthRequests.filter(req => req.status === AdminRequestStatus.declined).length;
+            const thisMonthPending = thisMonthRequests.filter(req => req.status === AdminRequestStatus.pending).length;
+
+            const thisMonth = {
+                new: thisMonthNew,
+                approved: thisMonthApproved,
+                declined: thisMonthDeclined,
+                pending: thisMonthPending,
+            };
+
+            // Top HR contributors
+            const hrContributions: Record<number, { hrEmployeeId: number; count: number }> = {};
+            allRequests.forEach(req => {
+                if (req.hrId && req.hr) {
+                    if (!hrContributions[req.hrId]) {
+                        hrContributions[req.hrId] = {
+                            hrEmployeeId: req.hr.employeeId,
+                            count: 0,
+                        };
+                    }
+                    hrContributions[req.hrId].count++;
+                }
+            });
+
+            const topContributors = Object.entries(hrContributions)
+                .map(([hrId, data]) => ({
+                    hrId: parseInt(hrId),
+                    hrEmployeeId: data.hrEmployeeId,
+                    requestCount: data.count,
+                }))
+                .sort((a, b) => b.requestCount - a.requestCount)
+                .slice(0, 5);
+
+            return {
+                status: 'success',
+                message: 'Admin request statistics retrieved successfully',
+                data: {
+                    total,
+                    active,
+                    completed,
+                    byStatus,
+                    byType,
+                    approvalRate,
+                    thisMonth,
+                    topContributors,
+                },
+            };
+        } catch (error) {
+            this.logger.error(`Failed to retrieve admin request statistics: ${error.message}`);
+            throw new BadRequestException(`Failed to retrieve admin request statistics: ${error.message}`);
         }
     }
 } 

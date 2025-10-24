@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsValidRoleHierarchy } from '../../../../common/validators/role-hierarchy.validator';
 
 // Employee Base DTO
 export class EmployeeDataDto {
@@ -52,11 +53,13 @@ export class EmployeeDataDto {
   @ApiPropertyOptional({ description: 'Manager ID (if applicable)' })
   @IsOptional()
   @IsInt()
+  @IsValidRoleHierarchy({ message: 'Invalid role hierarchy: Manager assignment not allowed for this role' })
   managerId?: number;
 
   @ApiPropertyOptional({ description: 'Team lead ID (if applicable)' })
   @IsOptional()
   @IsInt()
+  @IsValidRoleHierarchy({ message: 'Invalid role hierarchy: Team Lead assignment not allowed for this role' })
   teamLeadId?: number;
 
   @ApiPropertyOptional({ description: 'Residential address' })

@@ -99,20 +99,14 @@ export class CompanyService {
 
   async getCompanyStatistics(): Promise<any> {
     // Get all companies for statistics
-    const companies = await this.prisma.company.findMany({
-      select: {
-        id: true,
-        status: true,
-        country: true,
-      },
-    });
+    const companies = await this.prisma.company.findMany();
 
     // Calculate total companies
     const total = companies.length;
 
     // Calculate active and inactive counts
-    const active = companies.filter(company => company.status === 'active').length;
-    const inactive = companies.filter(company => company.status === 'inactive').length;
+    const active = companies.filter(company => (company as any).status === 'active').length;
+    const inactive = companies.filter(company => (company as any).status === 'inactive').length;
 
     // Calculate byCountry statistics
     const byCountry: { [key: string]: number } = {};
@@ -124,7 +118,7 @@ export class CompanyService {
     // Calculate byStatus statistics
     const byStatus: { [key: string]: number } = {};
     companies.forEach(company => {
-      const status = company.status || 'Unknown';
+      const status = (company as any).status || 'Unknown';
       byStatus[status] = (byStatus[status] || 0) + 1;
     });
 

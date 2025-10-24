@@ -32,8 +32,15 @@ export class ClientService {
         }
       }
 
+      // Get the next available ID (largest ID + 1)
+      const maxClientId = await this.prisma.client.aggregate({
+        _max: { id: true }
+      });
+      const nextClientId = (maxClientId._max.id || 0) + 1;
+
       const client = await this.prisma.client.create({
         data: {
+          id: nextClientId, // Use explicit ID to avoid sequence conflicts
           ...createClientDto,
           createdBy,
           accountStatus: createClientDto.accountStatus || 'prospect'
