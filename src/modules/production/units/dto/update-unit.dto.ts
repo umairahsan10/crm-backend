@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNumber, IsPositive, IsOptional, ValidateIf } from 'class-validator';
 
 export class UpdateProductionUnitDto {
@@ -7,10 +7,8 @@ export class UpdateProductionUnitDto {
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ description: 'Updated employee ID of the unit head', example: 5 })
-  @IsOptional()
-  @ValidateIf((o) => o.headId !== null && o.headId !== undefined)
+  @ApiProperty({ description: 'Employee ID of the unit head (required)', example: 5 })
   @IsNumber()
   @IsPositive({ message: 'Head ID must be a positive number' })
-  headId?: number;
+  headId: number;
 } 

@@ -92,4 +92,64 @@ export class UnitsQueryDto {
   @IsOptional()
   @IsEnum(['asc', 'desc'])
   sortOrder?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Filter by unit head email', 
+    example: 'john.doe@company.com' 
+  })
+  @IsOptional()
+  @IsString()
+  headEmail?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Filter by unit head name (firstName or lastName)', 
+    example: 'John' 
+  })
+  @IsOptional()
+  @IsString()
+  headName?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Filter by unit name (partial match)', 
+    example: 'Marketing' 
+  })
+  @IsOptional()
+  @IsString()
+  unitName?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'Minimum number of teams', 
+    example: 2 
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minTeams?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Maximum number of teams', 
+    example: 5 
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxTeams?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Minimum number of projects', 
+    example: 1 
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minProjects?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Maximum number of projects', 
+    example: 10 
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxProjects?: number;
 }
