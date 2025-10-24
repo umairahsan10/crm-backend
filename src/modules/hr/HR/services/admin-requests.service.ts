@@ -6,7 +6,9 @@ import {
     UpdateAdminRequestStatusDto,
     AdminRequestResponseDto,
     AdminRequestListResponseDto,
-    AdminRequestStatus
+    AdminRequestStatus,
+    PaginationDto,
+    PaginationMetaDto
 } from '../dto/admin-requests.dto';
 
 @Injectable()
@@ -116,9 +118,20 @@ export class AdminRequestsService {
 
             const total = await this.prisma.adminRequest.count();
 
+            // Create pagination metadata for backward compatibility
+            const pagination: PaginationMetaDto = {
+                page: 1,
+                limit: total,
+                total,
+                totalPages: 1,
+                hasNextPage: false,
+                hasPreviousPage: false,
+            };
+
             return {
                 adminRequests,
                 total,
+                pagination,
             };
         } catch (error) {
             this.logger.error(`Failed to get admin requests: ${error.message}`);
@@ -169,9 +182,20 @@ export class AdminRequestsService {
                 },
             });
 
+            // Create pagination metadata for backward compatibility
+            const pagination: PaginationMetaDto = {
+                page: 1,
+                limit: total,
+                total,
+                totalPages: 1,
+                hasNextPage: false,
+                hasPreviousPage: false,
+            };
+
             return {
                 adminRequests,
                 total,
+                pagination,
             };
         } catch (error) {
             if (error instanceof BadRequestException) {
@@ -226,44 +250,64 @@ export class AdminRequestsService {
     /**
      * Get admin requests by HR ID (HR can view their own requests)
      */
-    async getAdminRequestsByHrId(hrId: number): Promise<AdminRequestListResponseDto> {
+    async getAdminRequestsByHrId(hrId: number, paginationDto?: PaginationDto): Promise<AdminRequestListResponseDto> {
         try {
-            const adminRequests = await this.prisma.adminRequest.findMany({
-                where: {
-                    hrId: hrId,
-                },
-                include: {
-                    hr: {
-                        select: {
-                            id: true,
-                            employeeId: true,
-                        },
-                    },
-                    hrLog: {
-                        select: {
-                            id: true,
-                            hrId: true,
-                            actionType: true,
-                            affectedEmployeeId: true,
-                            description: true,
-                            createdAt: true,
-                        },
-                    },
-                },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-            });
+            const { page = 1, limit = 10 } = paginationDto || {};
+            const skip = (page - 1) * limit;
 
-            const total = await this.prisma.adminRequest.count({
-                where: {
-                    hrId: hrId,
-                },
-            });
+            const [adminRequests, total] = await Promise.all([
+                this.prisma.adminRequest.findMany({
+                    where: {
+                        hrId: hrId,
+                    },
+                    include: {
+                        hr: {
+                            select: {
+                                id: true,
+                                employeeId: true,
+                            },
+                        },
+                        hrLog: {
+                            select: {
+                                id: true,
+                                hrId: true,
+                                actionType: true,
+                                affectedEmployeeId: true,
+                                description: true,
+                                createdAt: true,
+                            },
+                        },
+                    },
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
+                    skip,
+                    take: limit,
+                }),
+                this.prisma.adminRequest.count({
+                    where: {
+                        hrId: hrId,
+                    },
+                }),
+            ]);
+
+            const totalPages = Math.ceil(total / limit);
+            const hasNextPage = page < totalPages;
+            const hasPreviousPage = page > 1;
+
+            const pagination: PaginationMetaDto = {
+                page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage,
+                hasPreviousPage,
+            };
 
             return {
                 adminRequests,
                 total,
+                pagination,
             };
         } catch (error) {
             this.logger.error(`Failed to get admin requests for HR ${hrId}: ${error.message}`);
