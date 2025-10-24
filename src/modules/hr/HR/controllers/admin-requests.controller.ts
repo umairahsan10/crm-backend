@@ -6,7 +6,8 @@ import {
   UpdateAdminRequestDto, 
   UpdateAdminRequestStatusDto,
   AdminRequestResponseDto, 
-  AdminRequestListResponseDto 
+  AdminRequestListResponseDto,
+  PaginationDto
 } from '../dto/admin-requests.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
@@ -65,11 +66,22 @@ export class AdminRequestsController {
   @Get('my-requests')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
+  @ApiOperation({ summary: 'Get admin requests by HR ID with pagination' })
+  @ApiQuery({ name: 'hrId', description: 'HR ID to filter requests', type: 'number' })
+  @ApiQuery({ name: 'page', description: 'Page number (1-based)', required: false, type: 'number' })
+  @ApiQuery({ name: 'limit', description: 'Number of items per page', required: false, type: 'number' })
+  @ApiResponse({ status: 200, description: 'Paginated list of admin requests', type: AdminRequestListResponseDto })
   async getMyAdminRequests(
     @Query('hrId', ParseIntPipe) hrId: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
   ): Promise<AdminRequestListResponseDto> {
-    return await this.adminRequestsService.getAdminRequestsByHrId(hrId);
+    const paginationDto: PaginationDto = {
+      page: page || 1,
+      limit: limit || 10,
+    };
+    return await this.adminRequestsService.getAdminRequestsByHrId(hrId, paginationDto);
   }
 
   /**
