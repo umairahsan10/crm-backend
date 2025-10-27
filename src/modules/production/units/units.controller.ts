@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request, Query, BadRequestException } from '@nestjs/common';
 import { UnitsService } from './units.service';
 import { CreateProductionUnitDto } from './dto/create-unit.dto';
+import { UpdateProductionUnitDto } from './dto/update-unit.dto';
 import { UnitsQueryDto } from './dto/units-query.dto';
 import { AddTeamDto } from './dto/add-team.dto';
 import { RemoveTeamDto } from './dto/remove-team.dto';
@@ -21,14 +22,7 @@ export class UnitsController {
   @Post()
   @Roles('dep_manager')
   @Departments('Production')
-  @ApiOperation({ 
-    summary: 'Create a new production unit with promotion scenarios',
-    description: `
-    Creates a new production unit with two possible scenarios:
-    1. Team Lead Promotion: Provide name, headId (team lead), and newTeamLeadId (senior/junior)
-    2. Direct Promotion: Provide name and headId (senior/junior) - newTeamLeadId is optional
-    `
-  })
+  @ApiOperation({ summary: 'Create a new production unit' })
   @ApiBody({ type: CreateProductionUnitDto })
   @ApiResponse({ status: 201, description: 'Unit created successfully' })
   async createUnit(
