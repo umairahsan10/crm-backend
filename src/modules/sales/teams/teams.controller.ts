@@ -6,10 +6,10 @@ import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service
 import { Departments } from '../../../common/decorators/departments.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
-import { CreateTeamDto } from './dto/create-team.dto';
+import { CreateSalesTeamDto } from './dto/create-team.dto';
 import { ReplaceTeamLeadDto } from './dto/replace-team-lead.dto';
 import { AddEmployeeDto } from './dto/add-employee.dto';
-import { AssignTeamDto } from './dto/assign-team.dto';
+import { AssignSalesTeamDto } from './dto/assign-team.dto';
 
 @ApiTags('Teams')
 @ApiBearerAuth()
@@ -23,9 +23,9 @@ export class TeamsController {
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
   @ApiOperation({ summary: 'Create a new sales team' })
-  @ApiBody({ type: CreateTeamDto })
+  @ApiBody({ type: CreateSalesTeamDto })
   @ApiResponse({ status: 201, description: 'Team created successfully' })
-  async createTeam(@Body() createTeamDto: CreateTeamDto) {
+  async createTeam(@Body() createTeamDto: CreateSalesTeamDto) {
     return this.teamsService.createTeam(
       createTeamDto.name,
       createTeamDto.salesUnitId,
@@ -145,8 +145,8 @@ export class TeamsController {
   @Roles('dep_manager')
   @Departments('Sales')
   @ApiOperation({ summary: 'Assign a team to a sales unit' })
-  @ApiBody({ type: AssignTeamDto })
-  async assignTeamToUnit(@Body() assignTeamDto: AssignTeamDto) {
+  @ApiBody({ type: AssignSalesTeamDto })
+  async assignTeamToUnit(@Body() assignTeamDto: AssignSalesTeamDto) {
     if (!assignTeamDto || !assignTeamDto.teamId || !assignTeamDto.salesUnitId) {
       throw new BadRequestException('Request body must contain teamId and salesUnitId');
     }
