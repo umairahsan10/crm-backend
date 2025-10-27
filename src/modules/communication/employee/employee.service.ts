@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException, InternalServerError
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
 import { EmployeeHrActionDto } from './dto/hr-action.dto';
+import { HrRequestsFilterDto } from './dto/hr-requests-filter.dto';
+import { PaginatedResponse, PaginationMeta } from './dto/paginated-response.dto';
 import { RequestPriority, RequestStatus } from '@prisma/client';
 import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
@@ -9,9 +11,118 @@ import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 export class EmployeeService {
   constructor(private prisma: PrismaService) {}
 
-  async getAllHrRequests() {
+  async getAllHrRequests(filterDto?: HrRequestsFilterDto) {
     try {
-      return await this.prisma.hrRequest.findMany({
+      // If no filter is provided, return all requests (backward compatibility)
+      if (!filterDto) {
+        return await this.prisma.hrRequest.findMany({
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                department: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+                role: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            assignedToEmployee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            requestedOn: 'desc',
+          },
+        });
+      }
+
+      const {
+        status,
+        priority,
+        requestType,
+        fromDate,
+        toDate,
+        page = 1,
+        limit = 10,
+        search
+      } = filterDto;
+
+      // Build where clause
+      const where: any = {};
+
+      if (status) {
+        where.status = status;
+      }
+
+      if (priority) {
+        where.priority = priority;
+      }
+
+      if (requestType) {
+        where.requestType = {
+          contains: requestType,
+          mode: 'insensitive'
+        };
+      }
+
+      if (fromDate || toDate) {
+        where.requestedOn = {};
+        if (fromDate) {
+          where.requestedOn.gte = new Date(fromDate);
+        }
+        if (toDate) {
+          where.requestedOn.lte = new Date(toDate);
+        }
+      }
+
+      if (search) {
+        where.OR = [
+          {
+            subject: {
+              contains: search,
+              mode: 'insensitive'
+            }
+          },
+          {
+            description: {
+              contains: search,
+              mode: 'insensitive'
+            }
+          }
+        ];
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Get total count for pagination
+      const total = await this.prisma.hrRequest.count({ where });
+
+      // Get paginated results
+      const data = await this.prisma.hrRequest.findMany({
+        where,
         include: {
           employee: {
             select: {
@@ -51,7 +162,30 @@ export class EmployeeService {
         orderBy: {
           requestedOn: 'desc',
         },
+        skip,
+        take: limit,
       });
+
+      // If filtering/pagination is used, return paginated response
+      if (filterDto && (status || priority || requestType || fromDate || toDate || search || page !== 1 || limit !== 10)) {
+        const totalPages = Math.ceil(total / limit);
+        const meta: PaginationMeta = {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        };
+
+        return {
+          data,
+          meta,
+        };
+      }
+
+      // Return simple array for backward compatibility
+      return data;
     } catch (error) {
       if (error.code === 'P2002') {
         throw new BadRequestException('Duplicate entry found. Please check your data.');
@@ -62,6 +196,7 @@ export class EmployeeService {
       throw new InternalServerErrorException(`Failed to fetch HR requests: ${error.message}`);
     }
   }
+
 
   async getHrRequestById(id: number) {
     try {
