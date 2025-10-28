@@ -145,7 +145,7 @@ export class TeamsService {
       return await this.getSingleTeamWithDetails(query.teamId, user);
     }
 
-    const whereClause: any = this.buildRoleBasedWhereClause(user);
+    const whereClause: any = await this.buildRoleBasedWhereClause(user);
     
     // Apply filters from query
     if (query.unitId) {
@@ -443,7 +443,16 @@ export class TeamsService {
 
       case 'senior':
       case 'junior':
-        // Check if user is a member of this team (teamLeadId matches team's teamLeadId)
+        // Check if user is a member of this team
+        // First get the user's teamLeadId from database
+        const userEmployee = await this.prisma.employee.findUnique({
+          where: { id: user.id },
+          select: { teamLeadId: true }
+        });
+        
+        if (!userEmployee || !userEmployee.teamLeadId) return false;
+        
+        // Then check if the team's teamLeadId matches user's teamLeadId
         const teamWithLead = await this.prisma.team.findUnique({
           where: { id: teamId },
           select: { teamLeadId: true }
@@ -451,27 +460,64 @@ export class TeamsService {
         
         if (!teamWithLead || !teamWithLead.teamLeadId) return false;
         
-        return user.teamLeadId === teamWithLead.teamLeadId;
+        return userEmployee.teamLeadId === teamWithLead.teamLeadId;
 
       default:
         return false;
     }
   }
 
-  private buildRoleBasedWhereClause(user: any): any {
+  private async buildRoleBasedWhereClause(user: any): Promise<any> {
     switch (user.role) {
       case 'dep_manager':
-        return {}; // Can see all teams
+        // Department manager can see all teams in Production department
+        return {
+          productionUnit: {
+            isNot: null // Only teams assigned to production units
+          }
+        };
+        
       case 'unit_head':
-        return { productionUnit: { headId: user.id } }; // Teams in their unit
+        // Unit head can only see teams in their production unit
+        return { 
+          productionUnitId: { 
+            in: await this.getUserProductionUnits(user.id) 
+          } 
+        };
+        
       case 'team_lead':
-        return { teamLeadId: user.id }; // Only teams they lead
+        // Team lead can only see teams they lead
+        return { teamLeadId: user.id };
+        
       case 'senior':
       case 'junior':
-        return { teamLeadId: user.teamLeadId }; // Teams they belong to
+        // Senior/junior can only see teams they belong to
+        // Get their team lead ID and find teams with that team lead
+        const userTeamLeadId = await this.getUserTeamLeadId(user.id);
+        if (!userTeamLeadId) {
+          return { id: -1 }; // Return no teams if user has no team lead
+        }
+        return { teamLeadId: userTeamLeadId };
+        
       default:
         throw new ForbiddenException('Insufficient permissions');
     }
+  }
+
+  private async getUserProductionUnits(userId: number): Promise<number[]> {
+    const productionUnits = await this.prisma.productionUnit.findMany({
+      where: { headId: userId },
+      select: { id: true }
+    });
+    return productionUnits.map(unit => unit.id);
+  }
+
+  private async getUserTeamLeadId(userId: number): Promise<number | null> {
+    const user = await this.prisma.employee.findUnique({
+      where: { id: userId },
+      select: { teamLeadId: true }
+    });
+    return user?.teamLeadId || null;
   }
 
   async updateTeam(id: number, updateTeamDto: UpdateTeamDto, user?: any) {

@@ -1,70 +1,67 @@
 # Production Teams API Documentation
 
-## Overview
-The Production Teams API provides comprehensive management of production teams within the CRM system. Teams are organizational units that contain employees and work on projects, managed by team leads within production units.
+This document contains all the APIs for the Production Teams module with comprehensive filtering, member management, and role-based access control.
 
-## Authentication & Authorization
-- **Authentication**: JWT Bearer token required
-- **Department**: All endpoints require Production department access
-- **Roles**: Different endpoints have different role requirements
+---
 
-## API Endpoints
+## 🔐 Authentication & Authorization
+- **Authentication**: JWT Bearer Token required
+- **Guards**: `JwtAuthGuard`, `RolesWithServiceGuard`, `DepartmentsGuard`
+- **Department**: Production department access required
 
-| Method | Endpoint | Roles | Description |
-|--------|----------|-------|-------------|
-| POST | `/production/teams` | dep_manager, unit_head | Create a new production team |
-| GET | `/production/teams` | dep_manager, unit_head, team_lead, senior, junior | Get teams with role-based filtering |
-| GET | `/production/teams/:id` | dep_manager, unit_head, team_lead, senior, junior | Get specific team details |
-| PATCH | `/production/teams/:id` | dep_manager, unit_head, team_lead | Update team information |
-| DELETE | `/production/teams/:id` | dep_manager | Delete a team |
-| GET | `/production/teams/available-leads` | dep_manager, unit_head | Get available team leads |
-| GET | `/production/teams/available-employees` | dep_manager, unit_head, team_lead | Get available employees |
-| POST | `/production/teams/:id/members` | dep_manager, unit_head, team_lead | Add members to team |
-| DELETE | `/production/teams/:id/members/:employeeId` | dep_manager, unit_head, team_lead | Remove member from team |
+---
 
-## Role-Based Access Control
+## 📋 API Endpoints Overview
 
-### Department Manager (dep_manager)
-- **Teams List**: Can see all teams in the system
-- **Team Details**: Can see all members and projects in any team
-- **Team Management**: Can create, update, and delete any team
-- **Member Management**: Can add/remove members from any team
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `POST` | `/production/teams` | Create production team | `dep_manager`, `unit_head` |
+| `GET` | `/production/teams` | Get all teams with filters | `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior` |
+| `GET` | `/production/teams/:id` | Get team by ID with full details | `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior` |
+| `PATCH` | `/production/teams/:id` | Update production team | `dep_manager`, `unit_head`, `team_lead` |
+| `DELETE` | `/production/teams/:id` | Delete production team | `dep_manager` |
+| `GET` | `/production/teams/available-leads` | Get available team leads | `dep_manager`, `unit_head` |
+| `GET` | `/production/teams/available-employees` | Get available employees to assign | `dep_manager`, `unit_head`, `team_lead` |
+| `POST` | `/production/teams/:id/members` | Add members to team | `dep_manager`, `unit_head`, `team_lead` |
+| `DELETE` | `/production/teams/:id/members/:employeeId` | Remove member from team | `dep_manager`, `unit_head`, `team_lead` |
 
-### Unit Head (unit_head)
-- **Teams List**: Can see only teams in their production unit
-- **Team Details**: Can see all members and projects in teams within their unit
-- **Team Management**: Can create and update teams in their unit only
-- **Member Management**: Can add/remove members from teams in their unit
+---
 
-### Team Lead (team_lead)
-- **Teams List**: Can see only teams they lead
-- **Team Details**: Can see all members and projects in their team
-- **Team Management**: Can update their own team only
-- **Member Management**: Can add/remove members from their team
+## 1. Create Production Team
 
-### Senior/Junior (senior, junior)
-- **Teams List**: Can see only teams they belong to
-- **Team Details**: Can see all members and projects in their team
-- **Team Management**: No management permissions
-- **Member Management**: No member management permissions
+### Method and Endpoint
+- **Method**: `POST`
+- **Endpoint**: `/production/teams`
 
-## API Endpoints Details
+### API Description and Flow
+This API creates a new production team in the system. The flow includes:
+1. Validates all required fields using DTO validation
+2. Checks if the team name is unique (not already exists)
+3. Validates that the team lead exists and has the `team_lead` role
+4. Verifies that the team lead belongs to Production department
+5. Ensures the team lead is active
+6. Checks if the team lead is already leading another team
+7. Validates that the production unit exists
+8. Creates the team and assigns the team lead
+9. Returns success response with team details
 
-### 1. Create Team
-**POST** `/production/teams`
-
-Creates a new production team with team lead assignment.
-
-**Request Body:**
+### Request Body
 ```json
 {
-  "name": "Development Team A",
-  "teamLeadId": 123,
-  "productionUnitId": 1
+  "name": "string (required)",
+  "teamLeadId": "number (required)",
+  "productionUnitId": "number (required)"
 }
 ```
 
-**Response:**
+**Required Fields:**
+- `name`: Team name (must be unique)
+- `teamLeadId`: Employee ID who will be the team lead
+- `productionUnitId`: Production unit ID where team belongs
+
+### Response Format
+
+**Success Response (201):**
 ```json
 {
   "success": true,
@@ -86,39 +83,118 @@ Creates a new production team with team lead assignment.
 }
 ```
 
-**Validation Rules:**
-- Team name must be unique
-- Team lead must exist and have 'team_lead' role
-- Team lead must be in Production department
-- Team lead must be active
-- Team lead cannot already be leading another team
+**Error Responses:**
+
+**Validation Errors (400):**
+```json
+{
+  "statusCode": 400,
+  "message": [
+    "Team name is required",
+    "Team lead ID must be a positive number",
+    "Production unit ID must be a positive number"
+  ],
+  "error": "Bad Request"
+}
+```
+
+**Business Logic Errors (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "Employee with ID 123 does not exist",
+  "error": "Bad Request"
+}
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "Employee must have team_lead role to be assigned as team lead",
+  "error": "Bad Request"
+}
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "Employee must belong to Production department",
+  "error": "Bad Request"
+}
+```
+
+**Conflict Errors (409):**
+```json
+{
+  "statusCode": 409,
+  "message": "Team name already exists",
+  "error": "Conflict"
+}
+```
+
+```json
+{
+  "statusCode": 409,
+  "message": "Employee John Doe (ID: 123) is already leading team \"Other Team\" (ID: 2). Each employee can only lead one team at a time.",
+  "error": "Conflict"
+}
+```
+
+### Validations
+- `name`: Required string, not empty, must be unique
+- `teamLeadId`: Required positive number
+- `productionUnitId`: Required positive number
+- Employee with `teamLeadId` must exist and have `team_lead` role
+- Employee must belong to Production department
+- Employee must be active
+- Employee cannot be leading another team
 - Production unit must exist
 
-### 2. Get Teams
-**GET** `/production/teams`
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head` role required
+- **Departments**: `Production` department required
 
-Retrieves teams based on user role with filtering, pagination, and sorting.
+---
 
-**Query Parameters:**
-- `teamId` (number): Get specific team by ID
-- `unitId` (number): Filter by production unit ID
-- `hasLead` (boolean): Filter teams with/without leads
-- `hasMembers` (boolean): Filter teams with/without members
-- `hasProjects` (boolean): Filter teams with/without projects
-- `teamName` (string): Filter by team name (partial match)
-- `leadEmail` (string): Filter by team lead email
-- `leadName` (string): Filter by team lead name
-- `unitName` (string): Filter by production unit name
-- `minMembers` (number): Minimum number of members
-- `maxMembers` (number): Maximum number of members
-- `minProjects` (number): Minimum number of projects
-- `maxProjects` (number): Maximum number of projects
-- `page` (number): Page number for pagination
-- `limit` (number): Items per page
-- `sortBy` (string): Sort field (name, createdAt, updatedAt, employeeCount)
-- `sortOrder` (string): Sort order (asc, desc)
+## 2. Get All Production Teams
 
-**Response:**
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/production/teams`
+
+### API Description and Flow
+This API retrieves all production teams with comprehensive filtering and role-based access. The flow includes:
+1. Applies role-based filtering (users see only teams they have access to)
+2. Applies all query filters (name, lead, unit, members, projects)
+3. Fetches teams with lead information and counts
+4. Returns paginated results with comprehensive data
+
+### Query Parameters
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `teamId` | number | Get specific team by ID | `?teamId=1` |
+| `unitId` | number | Filter by production unit ID | `?unitId=1` |
+| `hasLead` | boolean | Filter teams that have leads assigned | `?hasLead=true` |
+| `hasMembers` | boolean | Filter teams that have members | `?hasMembers=true` |
+| `hasProjects` | boolean | Filter teams that have projects | `?hasProjects=true` |
+| `page` | number | Page number for pagination | `?page=1` |
+| `limit` | number | Number of items per page | `?limit=10` |
+| `sortBy` | string | Sort by field (name, createdAt, updatedAt, employeeCount) | `?sortBy=name` |
+| `sortOrder` | string | Sort order (asc, desc) | `?sortOrder=asc` |
+| `leadEmail` | string | Filter by team lead email | `?leadEmail=john@company.com` |
+| `leadName` | string | Filter by team lead name (firstName or lastName) | `?leadName=John` |
+| `teamName` | string | Filter by team name (partial match) | `?teamName=Development` |
+| `unitName` | string | Filter by production unit name | `?unitName=Frontend` |
+| `minMembers` | number | Minimum number of members | `?minMembers=2` |
+| `maxMembers` | number | Maximum number of members | `?maxMembers=5` |
+| `minProjects` | number | Minimum number of projects | `?minProjects=1` |
+| `maxProjects` | number | Maximum number of projects | `?maxProjects=10` |
+
+### Response Format
+
+**Success Response (200):**
 ```json
 {
   "success": true,
@@ -132,8 +208,8 @@ Retrieves teams based on user role with filtering, pagination, and sorting.
       "createdAt": "2024-01-15T10:30:00Z",
       "updatedAt": "2024-01-15T10:30:00Z",
       "teamLead": {
-      "id": 123,
-      "firstName": "John",
+        "id": 123,
+        "firstName": "John",
         "lastName": "Doe",
         "email": "john.doe@company.com",
         "role": {
@@ -149,7 +225,7 @@ Retrieves teams based on user role with filtering, pagination, and sorting.
       "projectsCount": 3
     }
   ],
-  "total": 10,
+  "total": 1,
   "pagination": {
     "page": 1,
     "limit": 10,
@@ -159,12 +235,40 @@ Retrieves teams based on user role with filtering, pagination, and sorting.
 }
 ```
 
-### 3. Get Team Details
-**GET** `/production/teams/:id`
+### Role-Based Access Control
+- **`dep_manager`**: Can see all teams in Production department (teams with production units)
+- **`unit_head`**: Can only see teams in their production unit (using productionUnitId)
+- **`team_lead`**: Can only see teams they lead (team.teamLeadId = user.id)
+- **`senior`/`junior`**: Can only see teams they belong to (team.teamLeadId = user.teamLeadId)
 
-Retrieves detailed information about a specific team including members and projects.
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior`
+- **Departments**: `Production` department required
 
-**Response:**
+---
+
+## 3. Get Team by ID
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/production/teams/:id`
+
+### API Description and Flow
+This API retrieves detailed information about a specific production team with role-based filtering and team membership validation:
+- **`dep_manager`**: Can access any team (no membership check required)
+- **`unit_head`**: Can only access teams in their production unit
+- **`team_lead`**: Can only access teams they lead
+- **`senior`** and **`junior`**: Can only access teams they belong to
+
+**Security Check**: All users (except `dep_manager`) must be members of the requested team to access its details.
+
+### Path Parameters
+- `id` (number): Team ID to retrieve
+
+### Response Format
+
+**Success Response (200):**
 ```json
 {
   "success": true,
@@ -191,9 +295,9 @@ Retrieves detailed information about a specific team including members and proje
       "id": 1,
       "name": "Frontend Development Unit",
       "head": {
-      "id": 456,
+        "id": 456,
         "firstName": "Alice",
-      "lastName": "Smith"
+        "lastName": "Smith"
       }
     },
     "membersCount": 5,
@@ -237,20 +341,59 @@ Retrieves detailed information about a specific team including members and proje
 }
 ```
 
-### 4. Update Team
-**PATCH** `/production/teams/:id`
+**Error Responses:**
 
-Updates team information (name and/or team lead).
-
-**Request Body:**
+**Not Found Error (404):**
 ```json
 {
-  "name": "Advanced Development Team",
-  "teamLeadId": 125
+  "statusCode": 404,
+  "message": "Team with ID 123 does not exist",
+  "error": "Not Found"
 }
 ```
 
-**Response:**
+**Forbidden Error (403) - Team Membership:**
+```json
+{
+  "statusCode": 403,
+  "message": "You do not have access to this team. You must be a member of this team to view its details.",
+  "error": "Forbidden"
+}
+```
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior`
+- **Departments**: `Production` department required
+
+---
+
+## 4. Update Production Team
+
+### Method and Endpoint
+- **Method**: `PATCH`
+- **Endpoint**: `/production/teams/:id`
+
+### API Description and Flow
+This API updates a production team. Team leads can only update their own team.
+
+### Path Parameters
+- `id` (number): Team ID to update
+
+### Request Body
+```json
+{
+  "name": "string (optional)",
+  "teamLeadId": "number (optional)"
+}
+```
+
+**Required Fields:**
+- At least one field must be provided for update
+
+### Response Format
+
+**Success Response (200):**
 ```json
 {
   "success": true,
@@ -258,20 +401,66 @@ Updates team information (name and/or team lead).
 }
 ```
 
-**Validation Rules:**
+**Error Responses:**
+
+**Validation Errors (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "At least one field must be provided for update",
+  "error": "Bad Request"
+}
+```
+
+**Business Logic Errors (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "Employee with ID 123 does not exist",
+  "error": "Bad Request"
+}
+```
+
+**Conflict Errors (409):**
+```json
+{
+  "statusCode": 409,
+  "message": "Employee John Doe (ID: 123) is already leading team \"Other Team\" (ID: 2). Each employee can only lead one team at a time.",
+  "error": "Conflict"
+}
+```
+
+### Validations
 - At least one field must be provided
 - Team name must be unique (if provided)
-- New team lead must exist and have 'team_lead' role
-- New team lead must be in Production department
-- New team lead cannot already be leading another team
-- Cannot remove team lead if team has active projects
+- New team lead must exist and have `team_lead` role
+- New team lead must belong to Production department
+- New team lead cannot be leading another team
+- Team lead can only update their own team
 
-### 5. Delete Team
-**DELETE** `/production/teams/:id`
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`
+- **Departments**: `Production` department required
+- **Team Lead Access**: Team leads can only update their own team
 
-Deletes a team if it has no members and no projects.
+---
 
-**Success Response:**
+## 5. Delete Production Team
+
+### Method and Endpoint
+- **Method**: `DELETE`
+- **Endpoint**: `/production/teams/:id`
+
+### API Description and Flow
+This API deletes a production team. **Team can only be deleted if it has NO members and NO projects.** If the team has any members or projects, deletion will be blocked.
+
+### Path Parameters
+- `id` (number): Team ID to delete
+
+### Response Format
+
+**Success Response (200):**
 ```json
 {
   "success": true,
@@ -279,7 +468,7 @@ Deletes a team if it has no members and no projects.
 }
 ```
 
-**Error Response (with dependencies):**
+**Error Response - Team Has Dependencies (200):**
 ```json
 {
   "success": false,
@@ -328,42 +517,101 @@ Deletes a team if it has no members and no projects.
 }
 ```
 
-### 6. Get Available Team Leads
-**GET** `/production/teams/available-leads`
+**Error Responses:**
 
-Retrieves employees who can be assigned as team leads.
+**Not Found Error (404):**
+```json
+{
+  "statusCode": 404,
+  "message": "Team with ID 123 does not exist",
+  "error": "Not Found"
+}
+```
 
-**Query Parameters:**
-- `assigned` (boolean): Filter by assignment status (true/false)
+### Business Logic
+- **Team can only be deleted if it has NO members and NO projects**
+- Members and projects must be removed before team can be deleted
+- Clear error message shows which dependencies need to be removed
 
-**Response:**
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager` role required
+- **Departments**: `Production` department required
+
+---
+
+## 6. Get Available Team Leads
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/production/teams/available-leads`
+
+### API Description and Flow
+This API retrieves available employees to assign as team leads. **By default, only returns leads who are NOT currently assigned to any team** (available for assignment).
+
+### Query Parameters
+- `assigned` (string, optional): Filter by assignment status
+  - `assigned=true` → Show leads assigned to teams
+  - `assigned=false` → Show leads NOT assigned to any team
+  - **No parameter (default)** → Show only leads NOT assigned to any team (available for assignment)
+
+### Response Format
+
+**Success Response (200):**
 ```json
 {
   "success": true,
   "data": [
-      {
-        "id": 123,
-        "firstName": "John",
-        "lastName": "Doe",
+    {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe",
       "email": "john.doe@company.com",
       "isAssigned": false,
       "currentTeam": null
+    },
+    {
+      "id": 456,
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "email": "jane.smith@company.com",
+      "isAssigned": true,
+      "currentTeam": {
+        "id": 1,
+        "name": "Development Team A"
+      }
     }
   ],
-  "total": 5,
+  "total": 2,
   "message": "Available team leads retrieved successfully"
 }
 ```
 
-### 7. Get Available Employees
-**GET** `/production/teams/available-employees`
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head` role required
+- **Departments**: `Production` department required
 
-Retrieves employees who can be added to teams.
+---
 
-**Query Parameters:**
-- `assigned` (boolean): Filter by assignment status (true/false)
+## 7. Get Available Employees
 
-**Response:**
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/production/teams/available-employees`
+
+### API Description and Flow
+This API retrieves available employees to assign to teams with flexible filtering.
+
+### Query Parameters
+- `assigned` (string, optional): Filter by assignment status
+  - `assigned=true` → Show employees assigned to teams
+  - `assigned=false` → Show employees NOT assigned to any team
+  - No parameter → Show ALL employees (both assigned and unassigned)
+
+### Response Format
+
+**Success Response (200):**
 ```json
 {
   "success": true,
@@ -376,26 +624,66 @@ Retrieves employees who can be added to teams.
       "role": "senior",
       "isAssigned": false,
       "currentTeamLead": null
+    },
+    {
+      "id": 125,
+      "firstName": "Bob",
+      "lastName": "Johnson",
+      "email": "bob.johnson@company.com",
+      "role": "junior",
+      "isAssigned": true,
+      "currentTeamLead": {
+        "id": 123,
+        "firstName": "John",
+        "lastName": "Doe"
+      }
     }
   ],
-  "total": 10,
+  "total": 2,
   "message": "Available employees retrieved successfully"
 }
 ```
 
-### 8. Add Members to Team
-**POST** `/production/teams/:id/members`
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`
+- **Departments**: `Production` department required
 
-Adds multiple employees to a team and integrates them with team projects.
+---
 
-**Request Body:**
+## 8. Add Members to Team
+
+### Method and Endpoint
+- **Method**: `POST`
+- **Endpoint**: `/production/teams/:id/members`
+
+### API Description and Flow
+This API adds multiple employees to a team and integrates them with team projects. The flow includes:
+1. Validates team exists
+2. Validates all employees exist and are active
+3. Checks if employees are already team members
+4. Adds employees to the team
+5. Automatically adds employees to all team project chats
+6. Automatically adds employees to all team project logs
+7. Updates team employee count
+8. Returns success response with details
+
+### Path Parameters
+- `id` (number): Team ID
+
+### Request Body
 ```json
 {
-  "employeeIds": [124, 125, 126]
+  "employeeIds": "array of numbers (required)"
 }
 ```
 
-**Response:**
+**Required Fields:**
+- `employeeIds`: Array of employee IDs to add to the team
+
+### Response Format
+
+**Success Response (201):**
 ```json
 {
   "success": true,
@@ -416,18 +704,80 @@ Adds multiple employees to a team and integrates them with team projects.
 }
 ```
 
-**Integration Features:**
-- Automatically adds employees to all team project chats
-- Automatically adds employees to all team project logs
-- Updates team employee count
-- Updates project chat participant counts
+**Error Responses:**
 
-### 9. Remove Member from Team
-**DELETE** `/production/teams/:id/members/:employeeId`
+**Validation Errors (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "Employee IDs must be provided as an array",
+  "error": "Bad Request"
+}
+```
 
-Removes an employee from a team and all team projects.
+**Business Logic Errors (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "Employee with ID 999 does not exist",
+  "error": "Bad Request"
+}
+```
 
-**Response:**
+```json
+{
+  "statusCode": 400,
+  "message": "Employee Jane Wilson (ID: 124) is already a member of team \"Development Team A\"",
+  "error": "Bad Request"
+}
+```
+
+**Not Found Errors (404):**
+```json
+{
+  "statusCode": 404,
+  "message": "Team with ID 123 does not exist",
+  "error": "Not Found"
+}
+```
+
+### Validations
+- Team must exist
+- All employees must exist and be active
+- Employees cannot already be team members
+- Employee IDs must be provided as array
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`
+- **Departments**: `Production` department required
+
+---
+
+## 9. Remove Member from Team
+
+### Method and Endpoint
+- **Method**: `DELETE`
+- **Endpoint**: `/production/teams/:id/members/:employeeId`
+
+### API Description and Flow
+This API removes an employee from a team and all team projects. The flow includes:
+1. Validates team exists
+2. Validates employee exists
+3. Checks if employee is a team member
+4. Removes employee from the team
+5. Automatically removes employee from all team project chats
+6. Automatically removes employee from all team project logs
+7. Updates team employee count
+8. Returns success response with details
+
+### Path Parameters
+- `id` (number): Team ID
+- `employeeId` (number): Employee ID to remove
+
+### Response Format
+
+**Success Response (200):**
 ```json
 {
   "success": true,
@@ -446,150 +796,195 @@ Removes an employee from a team and all team projects.
 }
 ```
 
-**Integration Features:**
-- Automatically removes employee from all team project chats
-- Automatically removes employee from all team project logs
-- Updates team employee count
-- Updates project chat participant counts
-- Prevents removal if employee has active tasks
+**Error Responses:**
 
-## Error Handling
-
-### Common Error Responses
-
-**400 Bad Request:**
-```json
-{
-  "statusCode": 400,
-  "message": "Team name already exists",
-  "error": "Bad Request"
-}
-```
-
-**403 Forbidden:**
-```json
-{
-  "statusCode": 403,
-  "message": "You do not have access to this team. You must be a member of this team to view its details.",
-  "error": "Forbidden"
-}
-```
-
-**404 Not Found:**
+**Not Found Errors (404):**
 ```json
 {
   "statusCode": 404,
-  "message": "Team with ID 999 does not exist",
+  "message": "Team with ID 123 does not exist",
   "error": "Not Found"
 }
 ```
 
-**409 Conflict:**
 ```json
 {
-  "statusCode": 409,
-  "message": "Employee John Doe (ID: 123) is already leading team \"Other Team\" (ID: 2). Each employee can only lead one team at a time.",
-  "error": "Conflict"
+  "statusCode": 404,
+  "message": "Employee with ID 999 does not exist",
+  "error": "Not Found"
 }
 ```
 
-## Team Member Management Logic
+**Business Logic Errors (400):**
+```json
+{
+  "statusCode": 400,
+  "message": "Employee Jane Wilson (ID: 124) is not a member of team \"Development Team A\"",
+  "error": "Bad Request"
+}
+```
 
-### Team Membership
-- **Team Members**: Employees where `teamLeadId` matches the team's `teamLeadId`
-- **Team Lead**: Employee assigned as `teamLeadId` in the team record
-- **Member Count**: Count of employees with matching `teamLeadId`
+### Validations
+- Team must exist
+- Employee must exist
+- Employee must be a team member
+- Cannot remove team lead from their own team
 
-### Project Integration
-- **Adding Members**: Automatically adds to all team project chats and logs
-- **Removing Members**: Automatically removes from all team project chats and logs
-- **Chat Participants**: Updates `ChatParticipant` table and chat participant counts
-- **Project Logs**: Updates `ProjectLog` table for team projects
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`
+- **Departments**: `Production` department required
 
-### Role-Based Data Access
-- **Department Manager**: Sees all teams, members, and projects
-- **Unit Head**: Sees teams in their unit, all members and projects
-- **Team Lead**: Sees their team, all members and projects
-- **Senior/Junior**: Sees their team, all members and projects
+---
 
-## Frontend Integration Examples
+## 🔒 Role-Based Access Control Summary
 
-### Team Management Dashboard
-```javascript
-// Get teams for current user
-const teams = await fetch('/api/production/teams', {
-  headers: { 'Authorization': `Bearer ${token}` }
-});
+### **Department Manager (`dep_manager`)**
+- ✅ Create teams
+- ✅ View all teams
+- ✅ Update any team
+- ✅ Delete teams
+- ✅ Get available leads and employees
+- ✅ Add/remove members from any team
 
-// Create new team
-const newTeam = await fetch('/api/production/teams', {
-  method: 'POST',
-  headers: { 
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
+### **Unit Head (`unit_head`)**
+- ✅ Create teams in their unit
+- ✅ View teams in their unit
+- ✅ Update teams in their unit
+- ✅ Add/remove members from teams in their unit
+- ✅ Get available leads and employees
+
+### **Team Lead (`team_lead`)**
+- ✅ View only teams they lead
+- ✅ Update only their own team
+- ✅ Add/remove members from their team
+- ✅ Get available employees
+
+### **Senior/Junior (`senior`, `junior`)**
+- ✅ View only teams they belong to
+- ❌ No management permissions
+
+---
+
+## 📊 Response Data Structures
+
+### **Team Object**
+```json
+{
+  "id": 1,
+  "name": "Team Name",
+  "teamLeadId": 5,
+  "productionUnitId": 1,
+  "employeeCount": 8,
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "teamLead": {
+    "id": 5,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@company.com"
   },
-  body: JSON.stringify({
-    name: 'New Development Team',
-    teamLeadId: 123,
-    productionUnitId: 1
-  })
-});
-
-// Add members to team
-const addMembers = await fetch('/api/production/teams/1/members', {
-  method: 'POST',
-  headers: { 
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
+  "productionUnit": {
+    "id": 1,
+    "name": "Frontend Development Unit"
   },
-  body: JSON.stringify({
-    employeeIds: [124, 125, 126]
-  })
-});
+  "membersCount": 8,
+  "projectsCount": 5
+}
 ```
 
-### Available Resources Dropdown
-```javascript
-// Get available team leads
-const availableLeads = await fetch('/api/production/teams/available-leads', {
-  headers: { 'Authorization': `Bearer ${token}` }
-});
-
-// Get available employees
-const availableEmployees = await fetch('/api/production/teams/available-employees', {
-  headers: { 'Authorization': `Bearer ${token}` }
-});
+### **Pagination Response**
+```json
+{
+  "success": true,
+  "data": [...],
+  "total": 10,
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1
+  },
+  "message": "Teams retrieved successfully"
+}
 ```
 
-## Testing Examples
-
-### Test Team Creation
-```bash
-curl -X POST http://localhost:3000/api/production/teams \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Test Development Team",
-    "teamLeadId": 123,
-    "productionUnitId": 1
-  }'
+### **Team Member Object**
+```json
+{
+  "id": 124,
+  "firstName": "Jane",
+  "lastName": "Wilson",
+  "email": "jane.wilson@company.com",
+  "role": {
+    "id": 4,
+    "name": "senior"
+  }
+}
 ```
 
-### Test Team Listing with Filters
-```bash
-curl -X GET "http://localhost:3000/api/production/teams?hasMembers=true&page=1&limit=5" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+### **Project Object (in team details)**
+```json
+{
+  "id": 789,
+  "description": "E-commerce website development",
+  "status": "in_progress",
+  "liveProgress": 65.50,
+  "deadline": "2024-03-15T00:00:00.000Z",
+  "client": {
+    "id": 101,
+    "companyName": "Tech Corp",
+    "clientName": "Bob Johnson",
+    "email": "bob@techcorp.com",
+    "phone": "+1234567890"
+  },
+  "salesRep": {
+    "id": 202,
+    "firstName": "Sarah",
+    "lastName": "Davis",
+    "email": "sarah.davis@company.com"
+  }
+}
 ```
 
-### Test Member Management
-```bash
-# Add members
-curl -X POST http://localhost:3000/api/production/teams/1/members \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"employeeIds": [124, 125]}'
+---
 
-# Remove member
-curl -X DELETE http://localhost:3000/api/production/teams/1/members/124 \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
+## 🚀 Key Features
+
+### **Comprehensive Filtering**
+- Filter by team name, lead name, unit name
+- Filter by minimum/maximum number of members and projects
+- Case-insensitive partial matching for text filters
+
+### **Member Management**
+- Add multiple members to teams
+- Remove members from teams
+- Automatic project integration (chats and logs)
+- Real-time team member count updates
+
+### **Role-Based Security**
+- Different access levels based on user roles
+- Team leads can only manage their own teams
+- Unit heads see teams in their unit
+- Senior/junior employees see teams they belong to
+
+### **Data Integrity**
+- Proper validation for all operations
+- Prevents duplicate assignments
+- Safe deletion with dependency checks
+- Comprehensive error handling
+
+### **Project Integration**
+- Automatic member addition to team project chats
+- Automatic member addition to team project logs
+- Automatic member removal from team projects
+- Real-time project participant count updates
+
+### **Team Lead Management**
+- One team lead per team rule
+- Available team leads filtering
+- Team lead assignment validation
+- Production department requirement
+
+---
+
+*This documentation covers all Production Teams API endpoints with comprehensive examples and validation rules.*
