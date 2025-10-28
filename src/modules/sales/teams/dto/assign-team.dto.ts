@@ -1,7 +1,7 @@
 import { IsNumber, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class AssignTeamDto {
+export class AssignSalesTeamDto {
   @ApiProperty({
     description: 'ID of the team to assign',
     example: 5,

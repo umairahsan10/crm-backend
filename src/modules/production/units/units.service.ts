@@ -68,7 +68,7 @@ export class UnitsService {
   }
 
   async getAllUnits(user: any, query: UnitsQueryDto) {
-    const whereClause: any = this.buildRoleBasedWhereClause(user);
+    const whereClause: any = await this.buildRoleBasedWhereClause(user);
     
     // Apply all filters from query
     if (query.unitId) {
@@ -438,21 +438,30 @@ export class UnitsService {
 
       case 'senior':
       case 'junior':
-        // Check if user is a production employee in this unit
-        const productionEmployeeCheck = await this.prisma.production.findFirst({
+        // Check if user belongs to any team in this unit
+        // First get the user's teamLeadId from database
+        const userEmployee = await this.prisma.employee.findUnique({
+          where: { id: user.id },
+          select: { teamLeadId: true }
+        });
+        
+        if (!userEmployee || !userEmployee.teamLeadId) return false;
+        
+        // Then check if there's a team in this unit with that teamLeadId
+        const teamCheck = await this.prisma.team.findFirst({
           where: {
             productionUnitId: unitId,
-            employeeId: user.id
+            teamLeadId: userEmployee.teamLeadId
           }
         });
-        return !!productionEmployeeCheck;
+        return !!teamCheck;
 
       default:
         return false;
     }
   }
 
-  private buildRoleBasedWhereClause(user: any): any {
+  private async buildRoleBasedWhereClause(user: any): Promise<any> {
     switch (user.role) {
       case 'dep_manager':
         return {}; // Can see all units
@@ -468,13 +477,23 @@ export class UnitsService {
         }; // Units where they lead teams
       case 'senior':
       case 'junior':
+        // Get user's teamLeadId from database and find units through teams
+        const userEmployee = await this.prisma.employee.findUnique({
+          where: { id: user.id },
+          select: { teamLeadId: true }
+        });
+        
+        if (!userEmployee || !userEmployee.teamLeadId) {
+          return { id: -1 }; // Return no units if user has no team lead
+        }
+        
         return {
-          productionEmployees: {
+          teams: {
             some: {
-              employeeId: user.id
+              teamLeadId: userEmployee.teamLeadId
             }
           }
-        }; // Units where they are production employees
+        }; // Units where they belong to teams
       default:
         throw new ForbiddenException('Insufficient permissions');
     }

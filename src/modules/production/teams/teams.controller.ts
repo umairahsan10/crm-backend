@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, ParseIntPipe, Request, Query, BadRequestException } from '@nestjs/common';
 import { TeamsService } from './teams.service';
-import { CreateTeamDto } from './dto/create-team.dto';
+import { CreateProductionTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { TeamsQueryDto } from './dto/teams-query.dto';
 import { AddMembersDto } from './dto/add-members.dto';
@@ -21,11 +21,14 @@ export class TeamsController {
   @Post()
   @Roles('dep_manager', 'unit_head')
   @Departments('Production')
-  @ApiOperation({ summary: 'Create a new production team' })
-  @ApiBody({ type: CreateTeamDto })
+  @ApiOperation({ 
+    summary: 'Create a new production team',
+    description: 'Creates a new production team with team lead assignment'
+  })
+  @ApiBody({ type: CreateProductionTeamDto })
   @ApiResponse({ status: 201, description: 'Team created successfully' })
   async createTeam(
-    @Body() createTeamDto: CreateTeamDto,
+    @Body() createTeamDto: CreateProductionTeamDto,
     @Request() req,
     @Query() query: any
   ) {
@@ -63,6 +66,36 @@ export class TeamsController {
   @ApiResponse({ status: 200, description: 'List of teams based on user role and permissions' })
   async getAllTeams(@Request() req, @Query() query: TeamsQueryDto) {
     return this.teamsService.getAllTeams(req.user, query);
+  }
+
+  @Get('available-leads')
+  @Roles('dep_manager', 'unit_head')
+  @Departments('Production')
+  @ApiOperation({ summary: 'Get available employees to assign as team leads' })
+  @ApiQuery({ name: 'assigned', required: false, description: 'Filter by already assigned leads (true/false)' })
+  @ApiResponse({ status: 200, description: 'List of available team leads' })
+  async getAvailableLeads(@Query('assigned') assigned?: string) {
+    // Convert string query parameter to boolean
+    let assignedBoolean: boolean | undefined;
+    if (assigned === 'true') assignedBoolean = true;
+    else if (assigned === 'false') assignedBoolean = false;
+    
+    return this.teamsService.getAvailableLeads(assignedBoolean);
+  }
+
+  @Get('available-employees')
+  @Roles('dep_manager', 'unit_head', 'team_lead')
+  @Departments('Production')
+  @ApiOperation({ summary: 'Get available employees to add to teams' })
+  @ApiQuery({ name: 'assigned', required: false, description: 'Filter by already assigned employees (true/false)' })
+  @ApiResponse({ status: 200, description: 'List of available employees' })
+  async getAvailableEmployees(@Query('assigned') assigned?: string) {
+    // Convert string query parameter to boolean
+    let assignedBoolean: boolean | undefined;
+    if (assigned === 'true') assignedBoolean = true;
+    else if (assigned === 'false') assignedBoolean = false;
+    
+    return this.teamsService.getAvailableEmployees(assignedBoolean);
   }
 
   @Get(':id')
@@ -111,36 +144,6 @@ export class TeamsController {
       );
     }
     return this.teamsService.deleteTeam(id);
-  }
-
-  @Get('available-leads')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Production')
-  @ApiOperation({ summary: 'Get available employees to assign as team leads' })
-  @ApiQuery({ name: 'assigned', required: false, description: 'Filter by already assigned leads (true/false)' })
-  @ApiResponse({ status: 200, description: 'List of available team leads' })
-  async getAvailableLeads(@Query('assigned') assigned?: string) {
-    // Convert string query parameter to boolean
-    let assignedBoolean: boolean | undefined;
-    if (assigned === 'true') assignedBoolean = true;
-    else if (assigned === 'false') assignedBoolean = false;
-    
-    return this.teamsService.getAvailableLeads(assignedBoolean);
-  }
-
-  @Get('available-employees')
-  @Roles('dep_manager', 'unit_head', 'team_lead')
-  @Departments('Production')
-  @ApiOperation({ summary: 'Get available employees to add to teams' })
-  @ApiQuery({ name: 'assigned', required: false, description: 'Filter by already assigned employees (true/false)' })
-  @ApiResponse({ status: 200, description: 'List of available employees' })
-  async getAvailableEmployees(@Query('assigned') assigned?: string) {
-    // Convert string query parameter to boolean
-    let assignedBoolean: boolean | undefined;
-    if (assigned === 'true') assignedBoolean = true;
-    else if (assigned === 'false') assignedBoolean = false;
-    
-    return this.teamsService.getAvailableEmployees(assignedBoolean);
   }
 
   @Post(':id/members')

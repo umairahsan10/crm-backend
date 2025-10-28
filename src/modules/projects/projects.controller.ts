@@ -17,7 +17,7 @@ import { ProjectsService } from './projects.service';
 import { CreateProjectFromPaymentDto } from './dto/create-project-from-payment.dto';
 import { AssignUnitHeadDto } from './dto/assign-unit-head.dto';
 import { UpdateProjectDetailsDto } from './dto/update-project-details.dto';
-import { AssignTeamDto } from './dto/assign-team.dto';
+import { AssignProjectTeamDto } from './dto/assign-team.dto';
 import { ProjectQueryDto } from './dto/project-query.dto';
 import { UnifiedUpdateProjectDto } from './dto/unified-update-project.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
