@@ -20,6 +20,7 @@ import { DepartmentsModule } from './modules/Departments/departments.module';
 import { RolesModule } from './modules/Roles/roles.module';
 import { IndustryModule } from './modules/industry/industry.module';
 import { setPrismaService } from './common/constants/department-name.enum';
+import { TimezoneUtil } from './common/utils/timezone.util';
 
 @Global() // Make this module global so PrismaService is available everywhere
 @Module({
@@ -48,8 +49,8 @@ import { setPrismaService } from './common/constants/department-name.enum';
     IndustryModule,
   ],
   controllers: [AppController],
-  providers: [PrismaService],
-  exports: [PrismaService], // Export PrismaService so it can be used by guards
+  providers: [PrismaService, TimezoneUtil],
+  exports: [PrismaService, TimezoneUtil], // Export both services globally
 })
 export class AppModule implements OnModuleInit {
   constructor(private readonly prismaService: PrismaService) {}

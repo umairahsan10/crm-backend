@@ -13,11 +13,16 @@ import {
   ErrorResponseDto 
 } from './dto/analytics-response.dto';
 
+import { TimezoneUtil } from '../../../common/utils/timezone.util';
+
 @ApiTags('Finance Analytics')
 @ApiBearerAuth()
 @Controller('accountant/analytics')
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly timezoneUtil: TimezoneUtil
+  ) {}
 
   /**
    * Get comprehensive finance analytics
@@ -295,12 +300,7 @@ export class AnalyticsController {
 
     // Validate date range if both dates are provided
     if (params.fromDate && params.toDate) {
-      const from = new Date(params.fromDate);
-      const to = new Date(params.toDate);
-      
-      if (from > to) {
-        throw new BadRequestException('fromDate cannot be later than toDate.');
-      }
+      this.timezoneUtil.validateDateRange(params.fromDate, params.toDate);
     }
 
     // Validate month (1-12)
@@ -314,7 +314,7 @@ export class AnalyticsController {
     // Validate year (reasonable range)
     if (params.year) {
       const yearNum = parseInt(params.year);
-      const currentYear = new Date().getFullYear();
+      const currentYear = this.timezoneUtil.getCurrentPKTDate().getFullYear();
       if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear + 10) {
         throw new BadRequestException(`Invalid year value. Year must be between 1900 and ${currentYear + 10}.`);
       }
@@ -379,12 +379,11 @@ export class AnalyticsController {
    * Validate date format (YYYY-MM-DD)
    */
   private isValidDate(dateString: string): boolean {
-    const regex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!regex.test(dateString)) {
+    try {
+      this.timezoneUtil.parsePKTDate(dateString);
+      return true;
+    } catch {
       return false;
     }
-
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString;
   }
 }

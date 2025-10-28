@@ -30,9 +30,14 @@ import { LateLogsStatsDto, LateLogsStatsResponseDto, EmployeeLateStatsDto, Reaso
 import { ExportHalfDayLogsDto } from './dto/export-half-day-logs.dto';
 import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto, EmployeeHalfDayStatsDto, ReasonStatsDto as HalfDayReasonStatsDto, PeriodStatsDto as HalfDayPeriodStatsDto } from './dto/half-day-logs-stats.dto';
 
+import { TimezoneUtil } from '../../../common/utils/timezone.util';
+
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly timezoneUtil: TimezoneUtil
+  ) { }
 
   // Helper function to create PKT timezone-aware date for storage
   private createPKTDateForStorage(dateString: string, timeString: string): Date {
@@ -3216,14 +3221,12 @@ export class AttendanceService {
   async bulkMarkAllEmployeesPresent(bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
     const { date, reason } = bulkMarkData;
     
-    // Parse date in PKT timezone to match frontend expectations
-    const targetDate = new Date(date + 'T00:00:00+05:00'); // PKT timezone
+    // Parse date in PKT timezone using TimezoneUtil
+    const targetDate = this.timezoneUtil.parsePKTDateForDB(date);
 
     // Allow present and past dates, but not future dates
-    const today = new Date();
-    const pktToday = new Date(today.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+    const pktToday = this.timezoneUtil.getCurrentPKTDate();
     pktToday.setHours(0, 0, 0, 0);
-    targetDate.setHours(0, 0, 0, 0);
     
     if (targetDate.getTime() > pktToday.getTime()) {
       throw new BadRequestException('Bulk mark present is not allowed for future dates.');

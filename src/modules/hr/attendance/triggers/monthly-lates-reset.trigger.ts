@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../../../prisma/prisma.service';
+import { TimezoneUtil } from '../../../../common/utils/timezone.util';
 
 @Injectable()
 export class MonthlyLatesResetTrigger {
   private readonly logger = new Logger(MonthlyLatesResetTrigger.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly timezoneUtil: TimezoneUtil
+  ) {}
 
   /**
    * Trigger that runs on the 1st of every month at 6:00 PM (18:00)
@@ -20,9 +24,8 @@ export class MonthlyLatesResetTrigger {
     try {
       this.logger.log('Starting monthly lates reset trigger...');
 
-      // Get current date in PKT
-      const now = new Date();
-      const pktDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+      // Get current date in PKT using TimezoneUtil
+      const pktDate = this.timezoneUtil.getCurrentPKTDate();
       
       this.logger.log(`Executing monthly lates reset for ${pktDate.toISOString()}`);
 
