@@ -8,6 +8,9 @@ import * as dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
+// Set timezone to PKT for consistent date handling
+process.env.TZ = 'Asia/Karachi';
+
 async function bootstrap() {
   const NODE_ENV = process.env.NODE_ENV || 'development';
   const isProduction = NODE_ENV === 'production';

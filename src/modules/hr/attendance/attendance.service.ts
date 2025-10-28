@@ -3215,14 +3215,17 @@ export class AttendanceService {
    */
   async bulkMarkAllEmployeesPresent(bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
     const { date, reason } = bulkMarkData;
-    const targetDate = new Date(date);
+    
+    // Parse date in PKT timezone to match frontend expectations
+    const targetDate = new Date(date + 'T00:00:00+05:00'); // PKT timezone
 
     // Allow present and past dates, but not future dates
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const pktToday = new Date(today.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+    pktToday.setHours(0, 0, 0, 0);
     targetDate.setHours(0, 0, 0, 0);
     
-    if (targetDate.getTime() > today.getTime()) {
+    if (targetDate.getTime() > pktToday.getTime()) {
       throw new BadRequestException('Bulk mark present is not allowed for future dates.');
     }
 
@@ -3244,125 +3247,211 @@ export class AttendanceService {
       throw new NotFoundException('No active employees found.');
     }
 
+    console.log(`Starting optimized bulk mark present operation for ${employees.length} employees on ${date}`);
+    
     let markedPresent = 0;
     let errors = 0;
     let skipped = 0;
+
+    const startTime = Date.now();
+    let transactionError: string | null = null;
     
-    console.log(`Starting bulk mark present operation for ${employees.length} employees on ${date}`);
-    
-    const batchSize = 20; // Reduced from 50 to 20 for better performance
-    console.log(`Processing ${employees.length} employees in batches of ${batchSize}`);
-    
-    for (let i = 0; i < employees.length; i += batchSize) {
-      const batch = employees.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
-      const totalBatches = Math.ceil(employees.length / batchSize);
-      console.log(`Processing batch ${batchNumber}/${totalBatches} with ${batch.length} employees`);
-    
+    try {
+      // Use a single large transaction for better performance
       await this.prisma.$transaction(async (tx) => {
-        for (const employee of batch) {
-          try {
-            const existingLog = await tx.attendanceLog.findFirst({
-              where: {
+        const employeeIds = employees.map(emp => emp.id);
+        
+        // 1. Get existing attendance logs for this date
+        const existingLogs = await tx.attendanceLog.findMany({
+          where: {
+            employeeId: { in: employeeIds },
+            date: targetDate
+          },
+          select: {
+            id: true,
+            employeeId: true,
+            status: true
+          }
+        });
+
+        const existingLogMap = new Map(existingLogs.map(log => [log.employeeId, log]));
+        const employeesToUpdate: Array<{
+          id: number;
+          employeeId: number;
+          shiftStart: string | null;
+          shiftEnd: string | null;
+          wasAbsent: boolean;
+        }> = [];
+        const employeesToCreate: Array<{
+          employeeId: number;
+          shiftStart: string | null;
+          shiftEnd: string | null;
+          wasAbsent: boolean;
+        }> = [];
+
+        // 2. Bulk fetch monthly summaries and absent counts for all employees
+        const monthYear = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+        const allEmployeeIds = employees.map(emp => emp.id);
+        
+        // Bulk fetch monthly summaries
+        const monthlySummaries = await tx.monthlyAttendanceSummary.findMany({
+          where: {
+            empId: { in: allEmployeeIds },
+            month: monthYear
+          },
+          select: { empId: true, totalAbsent: true }
+        });
+        const monthlySummaryMap = new Map(monthlySummaries.map(sum => [sum.empId, sum]));
+        
+        // Bulk count absent records for this month
+        const absentCounts = await tx.attendanceLog.groupBy({
+          by: ['employeeId'],
+          where: {
+            employeeId: { in: allEmployeeIds },
+            status: 'absent',
+            date: {
+              gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), 1),
+              lt: new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1)
+            }
+          },
+          _count: { employeeId: true }
+        });
+        const absentCountMap = new Map(absentCounts.map(count => [count.employeeId, count._count.employeeId]));
+        
+        // 3. Categorize employees based on existing logs and manual absent counts
+        for (const employee of employees) {
+          const existingLog = existingLogMap.get(employee.id);
+          
+          if (existingLog) {
+            if (existingLog.status === 'present') {
+              skipped++;
+            } else {
+              employeesToUpdate.push({
+                id: existingLog.id,
                 employeeId: employee.id,
-                date: targetDate
-              }
-            });
-
-            let wasAbsent = false; // Default to false for new records
-
-            if (existingLog) {
-              if (existingLog.status === 'present') {
-                skipped++;
-                continue;
-              }
-              wasAbsent = existingLog.status === 'absent';
-              
-              await tx.attendanceLog.update({
-                where: { id: existingLog.id },
-                data: {
-                  status: 'present',
-                  checkin: employee.shiftStart ? this.createShiftDateTime(targetDate, employee.shiftStart) : null,
-                  checkout: employee.shiftEnd ? this.createShiftDateTime(targetDate, employee.shiftEnd) : null,
-                  updatedAt: new Date()
-                }
-              });
-                        } else {
-              // For new records, check if this specific date was already counted as absent in the monthly summary
-              // This handles cases where HR manually marked someone absent without creating an attendance log
-              const monthYear = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
-              const monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
-                where: {
-                  empId: employee.id,
-                  month: monthYear
-                }
-              });
-              
-              if (monthlySummary && monthlySummary.totalAbsent > 0) {
-                // Count actual absent records for this month
-                const actualAbsentRecords = await tx.attendanceLog.count({
-                  where: {
-                    employeeId: employee.id,
-                    status: 'absent',
-                    date: {
-                      gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), 1),
-                      lt: new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1)
-                    }
-                  }
-                });
-                
-                // If monthly summary shows more absents than actual records, this date was manually counted
-                if (monthlySummary.totalAbsent > actualAbsentRecords) {
-                  wasAbsent = true;
-                }
-              }
-              
-              await tx.attendanceLog.create({
-                data: {
-                  employeeId: employee.id,
-                  date: targetDate,
-                  status: 'present',
-                  checkin: employee.shiftStart ? this.createShiftDateTime(targetDate, employee.shiftStart) : null,
-                  checkout: employee.shiftEnd ? this.createShiftDateTime(targetDate, employee.shiftEnd) : null,
-                  createdAt: new Date(),
-                  updatedAt: new Date()
-                }
+                shiftStart: employee.shiftStart,
+                shiftEnd: employee.shiftEnd,
+                wasAbsent: existingLog.status === 'absent'
               });
             }
-
-            await this.updateAttendanceForBulkMarkPresent(tx, employee.id, targetDate, wasAbsent);
-            await this.updateMonthlyAttendanceForBulkMarkPresent(tx, employee.id, targetDate, wasAbsent);
+          } else {
+            // Check if this employee was manually marked absent using bulk data
+            const monthlySummary = monthlySummaryMap.get(employee.id);
+            const actualAbsentCount = absentCountMap.get(employee.id) || 0;
             
-            markedPresent++;
-          } catch (error) {
-            console.error(`Error processing employee ${employee.id}:`, error);
-            errors++;
+            let wasAbsent = false;
+            if (monthlySummary && monthlySummary.totalAbsent > 0) {
+              // If monthly summary shows more absents than actual records, this date was manually counted
+              if (monthlySummary.totalAbsent > actualAbsentCount) {
+                wasAbsent = true;
+              }
+            }
+            
+            employeesToCreate.push({
+              employeeId: employee.id,
+              shiftStart: employee.shiftStart,
+              shiftEnd: employee.shiftEnd,
+              wasAbsent
+            });
           }
         }
+
+        // 4. Bulk update existing logs
+        if (employeesToUpdate.length > 0) {
+          console.log(`Updating ${employeesToUpdate.length} existing attendance logs`);
+          const updatePromises = employeesToUpdate.map(emp => 
+            tx.attendanceLog.update({
+              where: { id: emp.id },
+              data: {
+                status: 'present',
+                checkin: emp.shiftStart ? this.createShiftDateTime(targetDate, emp.shiftStart) : null,
+                checkout: emp.shiftEnd ? this.createShiftDateTime(targetDate, emp.shiftEnd) : null,
+                updatedAt: new Date()
+              }
+            })
+          );
+          await Promise.all(updatePromises);
+          markedPresent += employeesToUpdate.length;
+        }
+
+        // 5. Bulk create new logs
+        if (employeesToCreate.length > 0) {
+          console.log(`Creating ${employeesToCreate.length} new attendance logs`);
+          const createData = employeesToCreate.map(emp => ({
+            employeeId: emp.employeeId,
+            date: targetDate,
+            status: 'present' as const,
+            checkin: emp.shiftStart ? this.createShiftDateTime(targetDate, emp.shiftStart) : null,
+            checkout: emp.shiftEnd ? this.createShiftDateTime(targetDate, emp.shiftEnd) : null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }));
+
+          await tx.attendanceLog.createMany({
+            data: createData,
+            skipDuplicates: true
+          });
+          markedPresent += employeesToCreate.length;
+        }
+
+        // 6. Update attendance summaries with absent correction logic
+        console.log('Updating attendance summaries...');
+        await this.updateAttendanceSummariesWithAbsentCorrection(tx, employeesToUpdate, employeesToCreate, targetDate);
+        
+        // 7. Update monthly attendance summaries with absent correction logic
+        console.log('Updating monthly attendance summaries...');
+        await this.updateMonthlyAttendanceSummariesWithAbsentCorrection(tx, employeesToUpdate, employeesToCreate, targetDate);
+
       }, {
-        timeout: 30000, // Increase timeout to 30 seconds
-        maxWait: 10000  // Maximum wait time for transaction to start
+        timeout: 60000, // Increased timeout for bulk operations
+        maxWait: 15000
       });
+
+    } catch (error) {
+      transactionError = error instanceof Error ? error.message : 'Unknown transaction error';
+      console.error('Transaction failed in bulk mark present operation:', error);
       
-      // Add small delay between batches to prevent overwhelming the database
-      if (i + batchSize < employees.length) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
-      }
+      // If transaction fails, we can't determine partial success
+      // All operations are rolled back, so counts should be zero
+      errors = employees.length;
+      markedPresent = 0;
+      skipped = 0;
     }
     
-    console.log(`Bulk mark present operation completed. Marked: ${markedPresent}, Errors: ${errors}, Skipped: ${skipped}`);
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    // Comprehensive performance and result logging
+    console.log(`=== BULK MARK PRESENT COMPLETED ===`);
+    console.log(`📊 Results: Marked: ${markedPresent}, Errors: ${errors}, Skipped: ${skipped}`);
+    console.log(`⏱️  Duration: ${duration}ms (${(duration/1000).toFixed(2)}s)`);
+    console.log(`👥 Employees processed: ${employees.length}`);
+    console.log(`📈 Performance: ${(employees.length / (duration/1000)).toFixed(1)} employees/second`);
+    
+    if (transactionError) {
+      console.log(`❌ Transaction failed: ${transactionError}`);
+    } else {
+      console.log(`✅ Transaction completed successfully`);
+    }
     
     // Create a single HR log entry for the entire bulk operation
+    const hrLogDescription = transactionError 
+      ? `Bulk mark present FAILED for ${date} - Error: ${transactionError}${reason ? ` - Reason: ${reason}` : ''}`
+      : `Bulk marked ${markedPresent} employees present for ${date}${reason ? ` - Reason: ${reason}` : ''} (${duration}ms)`;
+    
     await this.prisma.hRLog.create({
       data: {
         hrId: 1, // TODO: Get from authenticated user
         actionType: 'bulk_mark_present',
         affectedEmployeeId: null, // Set to null for bulk operations
-        description: `Bulk marked ${markedPresent} employees present for ${date}${reason ? ` - Reason: ${reason}` : ''}`
+        description: hrLogDescription
       }
     });
 
-    const message = `Bulk mark present completed for ${date}${reason ? ` - Reason: ${reason}` : ''}`;
+    const message = transactionError 
+      ? `Bulk mark present failed for ${date} - ${transactionError}`
+      : `Bulk mark present completed for ${date}${reason ? ` - Reason: ${reason}` : ''}`;
+      
     return { message, marked_present: markedPresent, errors, skipped };
   }
 
@@ -3469,6 +3558,237 @@ export class AttendanceService {
     shiftDateTime.setHours(hours, minutes, 0, 0);
 
     return shiftDateTime;
+  }
+
+  /**
+   * Bulk update attendance summaries for multiple employees
+   */
+  private async bulkUpdateAttendanceSummaries(tx: any, employeeIds: number[], date: Date): Promise<void> {
+    // Get existing attendance records
+    const existingAttendance = await tx.attendance.findMany({
+      where: { employeeId: { in: employeeIds } },
+      select: { id: true, employeeId: true, presentDays: true, absentDays: true }
+    });
+
+    const existingMap = new Map<number, { id: number; employeeId: number; presentDays: number | null; absentDays: number | null }>(existingAttendance.map(att => [att.employeeId, att]));
+    
+    // Prepare bulk operations
+    const updates: Array<{
+      where: { id: number };
+      data: { presentDays: number };
+    }> = [];
+    const creates: Array<{
+      employeeId: number;
+      presentDays: number;
+      absentDays: number;
+      lateDays: number;
+      leaveDays: number;
+      remoteDays: number;
+      quarterlyLeaves: number;
+      monthlyLates: number;
+      halfDays: number;
+    }> = [];
+
+    for (const employeeId of employeeIds) {
+      const existing = existingMap.get(employeeId);
+      
+      if (existing) {
+        updates.push({
+          where: { id: existing.id },
+          data: { presentDays: (existing.presentDays || 0) + 1 }
+        });
+      } else {
+        creates.push({
+          employeeId,
+          presentDays: 1,
+          absentDays: 0,
+          lateDays: 0,
+          leaveDays: 0,
+          remoteDays: 0,
+          quarterlyLeaves: 0,
+          monthlyLates: 0,
+          halfDays: 0
+        });
+      }
+    }
+
+    // Execute bulk operations
+    if (updates.length > 0) {
+      await Promise.all(updates.map(update => tx.attendance.update(update)));
+    }
+    
+    if (creates.length > 0) {
+      await tx.attendance.createMany({ data: creates });
+    }
+  }
+
+  /**
+   * Update attendance summaries with proper absent correction logic
+   */
+  private async updateAttendanceSummariesWithAbsentCorrection(
+    tx: any, 
+    employeesToUpdate: Array<{ employeeId: number; wasAbsent: boolean }>, 
+    employeesToCreate: Array<{ employeeId: number; wasAbsent: boolean }>, 
+    date: Date
+  ): Promise<void> {
+    const allEmployeeIds = [
+      ...employeesToUpdate.map(emp => emp.employeeId),
+      ...employeesToCreate.map(emp => emp.employeeId)
+    ];
+
+    console.log(`Fetching attendance records for ${allEmployeeIds.length} employees`);
+    
+    // Single bulk query for all attendance records
+    const existingAttendance = await tx.attendance.findMany({
+      where: { employeeId: { in: allEmployeeIds } },
+      select: { id: true, employeeId: true, presentDays: true, absentDays: true }
+    });
+
+    const existingMap = new Map<number, { id: number; employeeId: number; presentDays: number | null; absentDays: number | null }>(existingAttendance.map(att => [att.employeeId, att]));
+    
+    console.log(`Processing ${employeesToUpdate.length} updates and ${employeesToCreate.length} creates`);
+    
+    // Process updates (employees with existing logs)
+    for (const emp of employeesToUpdate) {
+      const existing = existingMap.get(emp.employeeId);
+      
+      if (existing) {
+        const updateData: any = {
+          presentDays: (existing.presentDays || 0) + 1
+        };
+        
+        // Only decrement absent days if the employee was actually marked absent for this date
+        if (emp.wasAbsent && existing.absentDays && existing.absentDays > 0) {
+          updateData.absentDays = Math.max(0, existing.absentDays - 1);
+        }
+        
+        await tx.attendance.update({
+          where: { id: existing.id },
+          data: updateData
+        });
+      }
+    }
+
+    // Process creates (employees without existing logs)
+    for (const emp of employeesToCreate) {
+      const existing = existingMap.get(emp.employeeId);
+      
+      if (existing) {
+        const updateData: any = {
+          presentDays: (existing.presentDays || 0) + 1
+        };
+        
+        // Only decrement absent days if the employee was actually marked absent for this date
+        if (emp.wasAbsent && existing.absentDays && existing.absentDays > 0) {
+          updateData.absentDays = Math.max(0, existing.absentDays - 1);
+        }
+        
+        await tx.attendance.update({
+          where: { id: existing.id },
+          data: updateData
+        });
+      } else {
+        await tx.attendance.create({
+          data: {
+            employeeId: emp.employeeId,
+            presentDays: 1,
+            absentDays: 0,
+            lateDays: 0,
+            leaveDays: 0,
+            remoteDays: 0,
+            quarterlyLeaves: 0,
+            monthlyLates: 0,
+            halfDays: 0
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Update monthly attendance summaries with proper absent correction logic
+   */
+  private async updateMonthlyAttendanceSummariesWithAbsentCorrection(
+    tx: any, 
+    employeesToUpdate: Array<{ employeeId: number; wasAbsent: boolean }>, 
+    employeesToCreate: Array<{ employeeId: number; wasAbsent: boolean }>, 
+    date: Date
+  ): Promise<void> {
+    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const allEmployeeIds = [
+      ...employeesToUpdate.map(emp => emp.employeeId),
+      ...employeesToCreate.map(emp => emp.employeeId)
+    ];
+    
+    console.log(`Fetching monthly summaries for ${allEmployeeIds.length} employees in ${monthYear}`);
+    
+    // Single bulk query for all monthly summaries
+    const existingSummaries = await tx.monthlyAttendanceSummary.findMany({
+      where: {
+        empId: { in: allEmployeeIds },
+        month: monthYear
+      },
+      select: { id: true, empId: true, totalPresent: true, totalAbsent: true }
+    });
+
+    const existingMap = new Map<number, { id: number; empId: number; totalPresent: number | null; totalAbsent: number | null }>(existingSummaries.map(sum => [sum.empId, sum]));
+    
+    console.log(`Processing monthly summaries: ${employeesToUpdate.length} updates, ${employeesToCreate.length} creates`);
+    
+    // Process updates (employees with existing logs)
+    for (const emp of employeesToUpdate) {
+      const existing = existingMap.get(emp.employeeId);
+      
+      if (existing) {
+        const updateData: any = {
+          totalPresent: (existing.totalPresent || 0) + 1
+        };
+        
+        // Only decrement absent count if the employee was actually marked absent for this date
+        if (emp.wasAbsent && existing.totalAbsent && existing.totalAbsent > 0) {
+          updateData.totalAbsent = Math.max(0, existing.totalAbsent - 1);
+        }
+        
+        await tx.monthlyAttendanceSummary.update({
+          where: { id: existing.id },
+          data: updateData
+        });
+      }
+    }
+
+    // Process creates (employees without existing logs)
+    for (const emp of employeesToCreate) {
+      const existing = existingMap.get(emp.employeeId);
+      
+      if (existing) {
+        const updateData: any = {
+          totalPresent: (existing.totalPresent || 0) + 1
+        };
+        
+        // Only decrement absent count if the employee was actually marked absent for this date
+        if (emp.wasAbsent && existing.totalAbsent && existing.totalAbsent > 0) {
+          updateData.totalAbsent = Math.max(0, existing.totalAbsent - 1);
+        }
+        
+        await tx.monthlyAttendanceSummary.update({
+          where: { id: existing.id },
+          data: updateData
+        });
+      } else {
+        await tx.monthlyAttendanceSummary.create({
+          data: {
+            empId: emp.employeeId,
+            month: monthYear,
+            totalPresent: 1,
+            totalAbsent: 0,
+            totalLeaveDays: 0,
+            totalLateDays: 0,
+            totalHalfDays: 0,
+            totalRemoteDays: 0
+          }
+        });
+      }
+    }
   }
 
   // Helper method to update attendance counters for status changes
