@@ -4,6 +4,7 @@ SALES TEAMS API - COMPLETE TESTING GUIDE
 BASE URL: /sales/teams
 AUTHENTICATION: Bearer Token (JWT) required
 DEPARTMENT: Sales department access required
+TOTAL ENDPOINTS: 10
 
 =============================================================================
 1. CREATE SALES TEAM
@@ -257,7 +258,7 @@ Error Response (403 - Forbidden):
 }
 
 =============================================================================
-4. UPDATE SALES TEAM
+4. UPDATE SALES TEAM (Can also replace team lead)
 =============================================================================
 Method: PATCH
 Endpoint: /sales/teams/:id
@@ -270,10 +271,34 @@ Request Body (All fields optional):
   "salesUnitId": 2
 }
 
-Success Response (200):
+Note: When updating teamLeadId, all team members are automatically transferred to the new team lead.
+
+Success Response (200) - Regular Update:
 {
   "success": true,
   "message": "Team updated successfully",
+  "data": {
+    "id": 1,
+    "name": "Enhanced Alpha Team",
+    "teamLeadId": 456,
+    "salesUnitId": 2,
+    "teamLead": {
+      "id": 456,
+      "firstName": "Mike",
+      "lastName": "Johnson",
+      "email": "mike@company.com"
+    },
+    "salesUnit": {
+      "id": 2,
+      "name": "South Region"
+    }
+  }
+}
+
+Success Response (200) - Team Lead Replacement:
+{
+  "success": true,
+  "message": "Team updated successfully. Team lead replaced and 3 team member(s) transferred to new leader.",
   "data": {
     "id": 1,
     "name": "Enhanced Alpha Team",
@@ -337,57 +362,7 @@ Error Response (400 - Bad Request):
 }
 
 =============================================================================
-6. REPLACE TEAM LEAD
-=============================================================================
-Method: PUT
-Endpoint: /sales/teams/:teamId/replace-lead
-Roles: dep_manager, unit_head
-
-Request Body:
-{
-  "newTeamLeadId": 456
-}
-
-Example Request:
-PUT /sales/teams/1/replace-lead
-
-Success Response (200):
-{
-  "success": true,
-  "message": "Team lead replaced successfully. New team lead: Mike Johnson",
-  "data": {
-    "teamId": 1,
-    "teamName": "Alpha Sales Team",
-    "previousTeamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "newTeamLead": {
-      "id": 456,
-      "firstName": "Mike",
-      "lastName": "Johnson"
-    },
-    "employeeCount": 5
-  }
-}
-
-Error Response (404):
-{
-  "statusCode": 404,
-  "message": "Team with ID 999 does not exist",
-  "error": "Not Found"
-}
-
-Error Response (409 - Conflict):
-{
-  "statusCode": 409,
-  "message": "Employee with ID 456 is already a team lead of team \"Beta Team\"",
-  "error": "Conflict"
-}
-
-=============================================================================
-7. ADD SINGLE EMPLOYEE TO TEAM
+6. ADD SINGLE EMPLOYEE TO TEAM
 =============================================================================
 Method: POST
 Endpoint: /sales/teams/:teamId/add-employee
@@ -432,7 +407,7 @@ Error Response (409 - Conflict):
 }
 
 =============================================================================
-8. ADD MEMBERS TO TEAM (BULK OPERATION)
+7. ADD MEMBERS TO TEAM (BULK OPERATION)
 =============================================================================
 Method: POST
 Endpoint: /sales/teams/:id/members
@@ -481,7 +456,7 @@ Error Response (404):
 }
 
 =============================================================================
-9. REMOVE MEMBER FROM TEAM (Enhanced)
+8. REMOVE MEMBER FROM TEAM (Enhanced)
 =============================================================================
 Method: DELETE
 Endpoint: /sales/teams/:id/members/:employeeId
@@ -521,61 +496,7 @@ Error Response (400 - Bad Request):
 }
 
 =============================================================================
-10. REMOVE EMPLOYEE FROM TEAM (Legacy)
-=============================================================================
-Method: DELETE
-Endpoint: /sales/teams/:teamId/remove-employee/:employeeId
-Roles: dep_manager, unit_head
-
-Example Request:
-DELETE /sales/teams/1/remove-employee/124
-
-Success Response (200):
-{
-  "success": true,
-  "message": "Employee Jane Smith removed from team successfully",
-  "data": {
-    "teamId": 1,
-    "teamName": "Alpha Sales Team",
-    "employee": {
-      "id": 124,
-      "firstName": "Jane",
-      "lastName": "Smith"
-    },
-    "employeeCount": 5
-  }
-}
-
-=============================================================================
-11. UNASSIGN ALL EMPLOYEES FROM TEAM
-=============================================================================
-Method: POST
-Endpoint: /sales/teams/:teamId/unassign-employees
-Roles: dep_manager, unit_head
-
-Example Request:
-POST /sales/teams/1/unassign-employees
-
-Success Response (200):
-{
-  "success": true,
-  "message": "All employees unassigned from team successfully",
-  "data": {
-    "teamId": 1,
-    "teamName": "Alpha Sales Team",
-    "employeeCount": 1
-  }
-}
-
-Error Response (404):
-{
-  "statusCode": 404,
-  "message": "Team with ID 999 does not exist",
-  "error": "Not Found"
-}
-
-=============================================================================
-12. GET AVAILABLE TEAM LEADS
+9. GET AVAILABLE TEAM LEADS
 =============================================================================
 Method: GET
 Endpoint: /sales/teams/available-leads
@@ -638,7 +559,7 @@ Success Response (200):
 }
 
 =============================================================================
-13. GET AVAILABLE EMPLOYEES
+10. GET AVAILABLE EMPLOYEES
 =============================================================================
 Method: GET
 Endpoint: /sales/teams/available-employees
@@ -676,235 +597,6 @@ Success Response (200):
   "message": "Available employees retrieved successfully"
 }
 
-=============================================================================
-14. GET TEAMS IN SALES UNIT
-=============================================================================
-Method: GET
-Endpoint: /sales/teams/unit/:id
-Roles: dep_manager, unit_head
-
-Example Request:
-GET /sales/teams/unit/1
-
-Success Response (200):
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Alpha Sales Team",
-      "teamLeadId": 123,
-      "salesUnitId": 1,
-      "employeeCount": 5,
-      "completedLeads": 15,
-      "teamLead": {
-        "id": 123,
-        "firstName": "John",
-        "lastName": "Doe"
-      }
-    }
-  ],
-  "message": "Teams in sales unit retrieved successfully"
-}
-
-Error Response (404):
-{
-  "statusCode": 404,
-  "message": "Sales unit with ID 999 does not exist",
-  "error": "Not Found"
-}
-
-=============================================================================
-15. GET TEAM DETAILS (Legacy)
-=============================================================================
-Method: GET
-Endpoint: /sales/teams/details/:teamId
-Roles: dep_manager, unit_head, team_lead, senior, junior
-
-Example Request:
-GET /sales/teams/details/1
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Alpha Sales Team",
-    "teamLeadId": 123,
-    "salesUnitId": 1,
-    "employeeCount": 5,
-    "completedLeads": 15,
-    "teamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "salesUnit": {
-      "id": 1,
-      "name": "North Region"
-    }
-  },
-  "message": "Team details retrieved successfully"
-}
-
-=============================================================================
-16. GET EMPLOYEE'S TEAM
-=============================================================================
-Method: GET
-Endpoint: /sales/teams/employee/:employeeId
-Roles: dep_manager, unit_head, team_lead, senior, junior
-
-Example Request:
-GET /sales/teams/employee/124
-
-Success Response (200):
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Alpha Sales Team",
-    "teamLeadId": 123,
-    "salesUnitId": 1,
-    "employeeCount": 5,
-    "completedLeads": 15,
-    "teamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "salesUnit": {
-      "id": 1,
-      "name": "North Region"
-    }
-  },
-  "message": "Employee's team retrieved successfully"
-}
-
-Error Response (404):
-{
-  "statusCode": 404,
-  "message": "Employee with ID 999 is not in any team",
-  "error": "Not Found"
-}
-
-=============================================================================
-17. ASSIGN TEAM TO SALES UNIT
-=============================================================================
-Method: POST
-Endpoint: /sales/teams/assign
-Roles: dep_manager
-
-Request Body:
-{
-  "teamId": 1,
-  "salesUnitId": 2
-}
-
-Success Response (200):
-{
-  "success": true,
-  "message": "Team \"Alpha Sales Team\" successfully assigned to sales unit \"South Region\"",
-  "data": {
-    "teamId": 1,
-    "teamName": "Alpha Sales Team",
-    "teamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "salesUnit": {
-      "id": 2,
-      "name": "South Region"
-    }
-  }
-}
-
-Error Response (404):
-{
-  "statusCode": 404,
-  "message": "Team with ID 999 does not exist",
-  "error": "Not Found"
-}
-
-Error Response (409 - Conflict):
-{
-  "statusCode": 409,
-  "message": "Team is already assigned to sales unit \"North Region\"",
-  "error": "Conflict"
-}
-
-=============================================================================
-18. UNASSIGN TEAM FROM SALES UNIT
-=============================================================================
-Method: DELETE
-Endpoint: /sales/teams/unassign/:teamId
-Roles: dep_manager
-
-Example Request:
-DELETE /sales/teams/unassign/1
-
-Success Response (200):
-{
-  "success": true,
-  "message": "Team \"Alpha Sales Team\" successfully unassigned from sales unit \"North Region\"",
-  "data": {
-    "teamId": 1,
-    "teamName": "Alpha Sales Team",
-    "teamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "previousUnit": {
-      "id": 1,
-      "name": "North Region"
-    }
-  }
-}
-
-Error Response (404):
-{
-  "statusCode": 404,
-  "message": "Team with ID 999 does not exist",
-  "error": "Not Found"
-}
-
-=============================================================================
-19. GET AVAILABLE TEAMS
-=============================================================================
-Method: GET
-Endpoint: /sales/teams/available
-Roles: dep_manager
-
-Example Request:
-GET /sales/teams/available
-
-Success Response (200):
-{
-  "success": true,
-  "data": [
-    {
-      "id": 2,
-      "name": "Beta Team",
-      "teamLeadId": 456,
-      "employeeCount": 5,
-      "salesUnitId": null,
-      "createdAt": "2024-01-20T14:30:00Z",
-      "updatedAt": "2024-01-20T14:30:00Z",
-      "teamLead": {
-        "id": 456,
-        "firstName": "Jane",
-        "lastName": "Smith",
-        "department": {
-          "name": "Sales"
-        }
-      },
-      "actualEmployeeCount": 5
-    }
-  ],
-  "total": 1,
-  "message": "Available sales teams retrieved successfully"
-}
 
 =============================================================================
 COMMON ERROR RESPONSES
@@ -992,16 +684,11 @@ GET /sales/teams?hasLead=true&hasMembers=true&minMembers=2&page=1&limit=10&sortB
 Scenario 3: Search and Pagination
 GET /sales/teams?search=alpha&page=1&limit=5
 
-Scenario 4: Replace Team Lead
-PUT /sales/teams/1/replace-lead
-{
-  "newTeamLeadId": 456
-}
-
-Scenario 5: Update Team Information
+Scenario 4: Update Team Information (including team lead replacement)
 PATCH /sales/teams/1
 {
   "name": "Updated Team Name",
+  "teamLeadId": 456,
   "salesUnitId": 2
 }
 

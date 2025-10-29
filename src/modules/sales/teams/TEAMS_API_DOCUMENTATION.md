@@ -2,12 +2,13 @@
 
 This document contains all the APIs for the Sales Teams module.
 
+**Total Endpoints: 10**
 
 ## 1. Create Team
 
 ### Method and Endpoint
 - **Method**: `POST`
-- **Endpoint**: `/sales/teams/create`
+- **Endpoint**: `/sales/teams`
 
 ### API Description and Flow
 This API creates a new team in a sales unit. The flow includes:
@@ -35,7 +36,7 @@ This API creates a new team in a sales unit. The flow includes:
 
 ### Response Format
 
-**Success Response (200):**
+**Success Response (201):**
 ```json
 {
   "success": true,
@@ -118,31 +119,38 @@ This API creates a new team in a sales unit. The flow includes:
 
 ---
 
-## 2. Replace Team Lead
+## 2. Get All Sales Teams (Advanced Filtering)
 
 ### Method and Endpoint
-- **Method**: `PUT`
-- **Endpoint**: `/sales/teams/:teamId/replace-lead`
+- **Method**: `GET`
+- **Endpoint**: `/sales/teams`
 
 ### API Description and Flow
-This API replaces the team lead of an existing team. The flow includes:
-1. Validates that the team exists
-2. Validates that new team lead exists and belongs to Sales department
-3. Validates that new team lead has the correct role (team_lead)
-4. Checks if new team lead is already a team lead of another team
-5. Updates team with new team lead
-6. Transfers all team members to follow the new team lead
-7. Returns success response with replacement details
+This API retrieves all sales teams with advanced filtering, pagination, and search capabilities. The flow includes:
+1. Applies role-based access control (dep_manager sees all, unit_head sees their units, team_lead/senior/junior see their teams)
+2. Applies advanced filtering based on query parameters
+3. Supports pagination, sorting, and search
+4. Returns comprehensive team data with performance metrics
 
-### Request Body
-```json
-{
-  "newTeamLeadId": "number (required)"
-}
-```
-
-**Required Fields:**
-- `newTeamLeadId`: ID of the new team lead
+### Query Parameters (All Optional)
+- `teamId`: Filter by specific team ID
+- `salesUnitId`: Filter by sales unit ID
+- `hasLead`: Filter teams with/without team leads
+- `hasMembers`: Filter teams with/without members
+- `hasLeads`: Filter teams with/without leads
+- `teamName`: Search by team name (partial match)
+- `leadEmail`: Search by team lead email
+- `leadName`: Search by team lead name
+- `unitName`: Search by unit name
+- `minMembers`/`maxMembers`: Filter by member count range
+- `minCompletedLeads`/`maxCompletedLeads`: Filter by completed leads range
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 10, max: 100)
+- `sortBy`: Sort field (name, createdAt, updatedAt, employeeCount, completedLeads)
+- `sortOrder`: Sort direction (asc, desc)
+- `search`: Global search across team name, lead name, unit name
+- `assigned`: Filter assigned/unassigned teams
+- `include`: Include related data (members, leads, unit, lead)
 
 ### Response Format
 
@@ -150,117 +158,459 @@ This API replaces the team lead of an existing team. The flow includes:
 ```json
 {
   "success": true,
-  "message": "Team lead replaced successfully. All 5 team members transferred to new team lead.",
-  "data": {
-    "teamId": 1,
-    "teamName": "Sales Team A",
-    "previousTeamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "newTeamLead": {
-      "id": 456,
-      "firstName": "Jane",
-      "lastName": "Smith"
-    },
-    "memberCount": 5
-  }
-}
-```
-
-**Error Responses:**
-
-**Not Found Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Team with ID 123 does not exist",
-  "error": "Not Found"
-}
-```
-
-```json
-{
-  "statusCode": 404,
-  "message": "Employee with ID 456 does not exist",
-  "error": "Not Found"
-}
-```
-
-**Conflict Error (409):**
-```json
-{
-  "statusCode": 409,
-  "message": "Employee with ID 456 is already a team lead of team \"Another Team\"",
-  "error": "Conflict"
-}
-```
-
-**Bad Request Error (400):**
-```json
-{
-  "statusCode": 400,
-  "message": "Team lead must belong to Sales department. Current department: Production",
-  "error": "Bad Request"
-}
-```
-
-```json
-{
-  "statusCode": 400,
-  "message": "Only employees with team_lead role can be assigned as team leads. Current role: senior",
-  "error": "Bad Request"
+  "data": [
+    {
+      "id": 1,
+      "name": "Alpha Sales Team",
+      "teamLeadId": 123,
+      "salesUnitId": 1,
+      "employeeCount": 5,
+      "completedLeads": 15,
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "teamLead": {
+        "id": 123,
+        "firstName": "John",
+        "lastName": "Doe",
+        "email": "john@company.com",
+        "phone": "+1 (555) 123-4567",
+        "role": {
+          "id": 3,
+          "name": "team_lead"
+        }
+      },
+      "salesUnit": {
+        "id": 1,
+        "name": "North Region",
+        "email": "north@company.com",
+        "phone": "+1 (555) 987-6543"
+      },
+      "membersCount": 4,
+      "leadsCount": 25,
+      "completedLeadsCount": 15,
+      "actualEmployeeCount": 4
+    }
+  ],
+  "total": 5,
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  },
+  "message": "Teams retrieved successfully"
 }
 ```
 
 ### Access Control
 - **Authentication**: JWT token required
-- **Roles**: `dep_manager` OR `unit_head` role required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior` role required
 - **Departments**: `Sales` department required
 - **Admin Access**: Admins (admin, supermanager) have automatic access
 
 ---
 
-## 3. Add Employee to Team
+## 3. Get Available Team Leads
 
-**Endpoint**: `POST /sales/teams/:teamId/add-employee`
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/teams/available-leads`
 
-**Description**: Adds an employee to a sales team. This API has two modes:
-1. **Assign Team Lead**: If the team has no team lead and the employee has `team_lead` role, they are automatically assigned as team lead
-2. **Add Team Member**: If the team already has a team lead, the employee is added as a regular team member
+### API Description and Flow
+This API retrieves all available team leads for assignment to teams. The flow includes:
+1. Fetches employees with `team_lead` role from Sales department
+2. Optionally filters by assignment status (assigned/unassigned)
+3. Includes current team information for assigned leads
+4. Returns formatted list of available team leads
 
-**Request Body**:
+### Query Parameters (Optional)
+- `assigned`: Filter by assignment status (true/false)
+
+### Response Format
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john@company.com",
+      "phone": "+1 (555) 123-4567",
+      "role": {
+        "id": 3,
+        "name": "team_lead"
+      },
+      "department": {
+        "id": 1,
+        "name": "Sales"
+      },
+      "currentTeam": null,
+      "isAssigned": false
+    }
+  ],
+  "total": 5,
+  "message": "Available team leads retrieved successfully"
+}
+```
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
+## 4. Get Available Employees
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/teams/available-employees`
+
+### API Description and Flow
+This API retrieves all available employees for team assignment. The flow includes:
+1. Fetches employees with `senior` or `junior` role from Sales department
+2. Optionally filters by assignment status (assigned/unassigned)
+3. Includes current team information for assigned employees
+4. Returns formatted list of available employees
+
+### Query Parameters (Optional)
+- `assigned`: Filter by assignment status (true/false)
+
+### Response Format
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 124,
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "email": "jane@company.com",
+      "phone": "+1 (555) 456-7890",
+      "role": {
+        "id": 4,
+        "name": "senior"
+      },
+      "department": {
+        "id": 1,
+        "name": "Sales"
+      },
+      "currentTeam": null,
+      "isAssigned": false
+    }
+  ],
+  "total": 15,
+  "message": "Available employees retrieved successfully"
+}
+```
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
+## 5. Get Team by ID
+
+### Method and Endpoint
+- **Method**: `GET`
+- **Endpoint**: `/sales/teams/:id`
+
+### API Description and Flow
+This API retrieves detailed information about a specific team including team members, leads, and performance metrics. The flow includes:
+1. Validates that the team exists and is a Sales team
+2. Applies role-based access control
+3. Retrieves team details, members, active leads, and completed leads
+4. Returns comprehensive team information with performance data
+
+### Response Format
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Alpha Sales Team",
+    "teamLeadId": 123,
+    "salesUnitId": 1,
+    "employeeCount": 5,
+    "completedLeads": 15,
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z",
+    "teamLead": {
+      "id": 123,
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john@company.com",
+      "phone": "+1 (555) 123-4567",
+      "role": {
+        "id": 3,
+        "name": "team_lead"
+      }
+    },
+    "salesUnit": {
+      "id": 1,
+      "name": "North Region",
+      "email": "north@company.com",
+      "phone": "+1 (555) 987-6543",
+      "address": "123 Business St, City"
+    },
+    "members": [
+      {
+        "id": 124,
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "email": "jane@company.com",
+        "phone": "+1 (555) 456-7890",
+        "role": {
+          "id": 4,
+          "name": "senior"
+        }
+      }
+    ],
+    "leads": [
+      {
+        "id": 1,
+        "name": "Lead Prospect",
+        "email": "prospect@example.com",
+        "phone": "+1 (555) 111-2222",
+        "source": "PPC",
+        "type": "warm",
+        "status": "in_progress",
+        "createdAt": "2024-01-20T10:00:00Z",
+        "assignedTo": {
+          "id": 124,
+          "firstName": "Jane",
+          "lastName": "Smith"
+        }
+      }
+    ],
+    "completedLeads": [
+      {
+        "id": 1,
+        "crackedAt": "2024-01-20T14:30:00Z",
+        "amount": 5000.00,
+        "lead": {
+          "id": 2,
+          "name": "Converted Lead",
+          "email": "converted@example.com",
+          "phone": "+1 (555) 333-4444"
+        },
+        "employee": {
+          "id": 124,
+          "firstName": "Jane",
+          "lastName": "Smith"
+        }
+      }
+    ],
+    "summary": {
+      "membersCount": 4,
+      "leadsCount": 25,
+      "completedLeadsCount": 15,
+      "conversionRate": 60.0
+    }
+  },
+  "message": "Team details retrieved successfully"
+}
+```
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
+## 6. Update Team (Can also replace team lead)
+
+### Method and Endpoint
+- **Method**: `PATCH`
+- **Endpoint**: `/sales/teams/:id`
+
+### API Description and Flow
+This API updates team information and can also replace the team lead. The flow includes:
+1. Validates that the team exists and is a Sales team
+2. Applies role-based access control
+3. Updates team name (if provided) with uniqueness validation
+4. Updates team lead (if provided) with member transfer
+5. Updates sales unit assignment (if provided)
+6. Returns success response with updated team details
+
+### Request Body (All fields optional)
+```json
+{
+  "name": "Enhanced Alpha Team",
+  "teamLeadId": 456,
+  "salesUnitId": 2
+}
+```
+
+**Optional Fields:**
+- `name`: New team name (must be unique within the unit)
+- `teamLeadId`: New team lead ID (transfers all members to new lead)
+- `salesUnitId`: New sales unit assignment
+
+### Response Format
+
+**Success Response (200) - Regular Update:**
+```json
+{
+  "success": true,
+  "message": "Team updated successfully",
+  "data": {
+    "id": 1,
+    "name": "Enhanced Alpha Team",
+    "teamLeadId": 456,
+    "salesUnitId": 2,
+    "teamLead": {
+      "id": 456,
+      "firstName": "Mike",
+      "lastName": "Johnson",
+      "email": "mike@company.com"
+    },
+    "salesUnit": {
+      "id": 2,
+      "name": "South Region"
+    }
+  }
+}
+```
+
+**Success Response (200) - Team Lead Replacement:**
+```json
+{
+  "success": true,
+  "message": "Team updated successfully. Team lead replaced and 3 team member(s) transferred to new leader.",
+  "data": {
+    "id": 1,
+    "name": "Enhanced Alpha Team",
+    "teamLeadId": 456,
+    "salesUnitId": 2,
+    "teamLead": {
+      "id": 456,
+      "firstName": "Mike",
+      "lastName": "Johnson",
+      "email": "mike@company.com"
+    },
+    "salesUnit": {
+      "id": 2,
+      "name": "South Region"
+    }
+  }
+}
+```
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
+## 7. Add Members to Team (Bulk Operation)
+
+### Method and Endpoint
+- **Method**: `POST`
+- **Endpoint**: `/sales/teams/:id/members`
+
+### API Description and Flow
+This API adds multiple employees to a team in a single operation. The flow includes:
+1. Validates that the team exists and is a Sales team
+2. Applies role-based access control
+3. Processes each employee ID in the array
+4. Validates each employee and adds them to the team
+5. Returns detailed results showing successful and failed additions
+
+### Request Body
+```json
+{
+  "employeeIds": [124, 125, 126]
+}
+```
+
+**Required Fields:**
+- `employeeIds`: Array of employee IDs to add (1-20 employees per request)
+
+### Response Format
+
+**Success Response (201):**
+```json
+{
+  "success": true,
+  "message": "Added 2 members to team. 1 failed.",
+  "data": {
+    "successful": [
+      {
+        "success": true,
+        "message": "Employee Jane Smith added to team successfully"
+      },
+      {
+        "success": true,
+        "message": "Employee Bob Johnson added to team successfully"
+      }
+    ],
+    "failed": [
+      {
+        "employeeId": 126,
+        "error": "Employee is already in another team"
+      }
+    ],
+    "totalProcessed": 3,
+    "successCount": 2,
+    "failureCount": 1
+  }
+}
+```
+
+### Access Control
+- **Authentication**: JWT token required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead` role required
+- **Departments**: `Sales` department required
+- **Admin Access**: Admins (admin, supermanager) have automatic access
+
+---
+
+## 8. Add Single Employee to Team
+
+### Method and Endpoint
+- **Method**: `POST`
+- **Endpoint**: `/sales/teams/:teamId/add-employee`
+
+### API Description and Flow
+This API adds an employee to a sales team. The flow includes:
+1. Validates that the team exists and is assigned to a Sales unit
+2. Validates that employee exists and belongs to Sales department
+3. Checks if team has no team lead and employee has `team_lead` role → Employee becomes team lead
+4. If team already has team lead → Employee is added as regular member (requires `senior` or `junior` role)
+5. Ensures employee isn't already in another team
+6. Updates employee's `teamLeadId` and team's employee count
+7. Returns success response with team details and action performed
+
+### Request Body
 ```json
 {
   "employeeId": "number (required)"
 }
 ```
 
-**Required Fields**:
+**Required Fields:**
 - `employeeId`: ID of the employee to add to the team
 
-**API Description and Flow**:
-1. **Team Validation**: Ensures the team exists and is assigned to a Sales unit
-2. **Employee Validation**: Verifies employee exists and belongs to Sales department
-3. **Team Lead Assignment Mode**: 
-   - If team has no team lead AND employee has `team_lead` role → Employee becomes team lead
-   - Checks that employee isn't already leading another team
-4. **Team Member Mode**: 
-   - If team already has team lead → Employee is added as regular member
-   - Requires employee to have `senior` or `junior` role
-5. **Team Membership Check**: Ensures employee isn't already in another team
-6. **Database Update**: Updates employee's `teamLeadId` and team's employee count
-7. **Response**: Returns success message with team details and action performed
+### Response Format
 
-**Business Rules**:
-- **Team Lead Assignment**: If team has no team lead, only employees with `team_lead` role can be added
-- **Team Member Addition**: If team has team lead, only `senior` or `junior` employees can be added
-- **One Team Per Employee**: Employee cannot be in multiple teams simultaneously
-- **Sales Department**: All employees must belong to Sales department
-- **Team Lead Uniqueness**: A team lead can only lead one team at a time
-
-**Success Response**:
+**Success Response (200):**
 ```json
 {
   "success": true,
@@ -285,11 +635,6 @@ This API replaces the team lead of an existing team. The flow includes:
 }
 ```
 
-**Error Responses**:
-- `400 Bad Request`: Team not assigned to Sales unit, employee wrong department/role, team lead already exists
-- `404 Not Found`: Team or employee not found
-- `409 Conflict`: Employee already in another team, team lead already leads another team
-
 ### Access Control
 - **Authentication**: JWT token required
 - **Roles**: `dep_manager` OR `unit_head` role required
@@ -298,27 +643,23 @@ This API replaces the team lead of an existing team. The flow includes:
 
 ---
 
-## 4. Remove Employee from Team
+## 9. Remove Member from Team
 
 ### Method and Endpoint
 - **Method**: `DELETE`
-- **Endpoint**: `/sales/teams/:teamId/remove-employee/:employeeId`
+- **Endpoint**: `/sales/teams/:id/members/:employeeId`
 
 ### API Description and Flow
 This API removes an employee from a team. The flow includes:
-1. Validates that the team exists
-2. Validates that employee exists
-3. Checks if employee is the team lead (cannot remove team lead)
-4. Checks if employee is actually in this team
-5. Checks if employee has completed leads (blocks removal if completed leads exist)
-6. Removes employee from team by setting teamLeadId to null
-7. Updates team employee count
-8. Returns success response with removal details
-
-### Request Body/Parameters
-- **Path Parameter**: `teamId` (number) - Team ID
-- **Path Parameter**: `employeeId` (number) - Employee ID to remove
-- **Request Body**: None
+1. Validates that the team exists and is a Sales team
+2. Applies role-based access control
+3. Validates that employee exists
+4. Checks if employee is the team lead (cannot remove team lead)
+5. Checks if employee is actually in this team
+6. Checks if employee has completed leads (blocks removal if completed leads exist)
+7. Removes employee from team by setting teamLeadId to null
+8. Updates team employee count and project associations
+9. Returns success response with removal details
 
 ### Response Format
 
@@ -326,170 +667,34 @@ This API removes an employee from a team. The flow includes:
 ```json
 {
   "success": true,
-  "message": "Employee \"Jane Smith\" successfully removed from team \"Sales Team A\"",
+  "message": "Employee \"Jane Smith\" successfully removed from team \"Alpha Sales Team\" and all team projects",
   "data": {
     "teamId": 1,
-    "teamName": "Sales Team A",
+    "teamName": "Alpha Sales Team",
     "removedEmployee": {
-      "id": 456,
+      "id": 124,
       "firstName": "Jane",
       "lastName": "Smith"
     },
-    "newEmployeeCount": 5
+    "newEmployeeCount": 5,
+    "projectsUpdated": 3
   }
-}
-```
-
-**Error Responses:**
-
-**Not Found Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Team with ID 123 does not exist",
-  "error": "Not Found"
-}
-```
-
-```json
-{
-  "statusCode": 404,
-  "message": "Employee with ID 456 does not exist",
-  "error": "Not Found"
-}
-```
-
-**Bad Request Error (400):**
-```json
-{
-  "statusCode": 400,
-  "message": "Cannot remove team lead from team. Use replace-lead endpoint instead.",
-  "error": "Bad Request"
-}
-```
-
-```json
-{
-  "statusCode": 400,
-  "message": "Employee with ID 456 is not a member of this team",
-  "error": "Bad Request"
-}
-```
-
-**Conflict Error (409):**
-```json
-{
-  "statusCode": 409,
-  "message": "Cannot remove employee. 3 completed lead(s) are assigned to this employee. Please reassign these leads first.",
-  "error": "Conflict"
 }
 ```
 
 ### Access Control
 - **Authentication**: JWT token required
-- **Roles**: `dep_manager` OR `unit_head` role required
+- **Roles**: `dep_manager`, `unit_head`, `team_lead` role required
 - **Departments**: `Sales` department required
 - **Admin Access**: Admins (admin, supermanager) have automatic access
 
 ---
 
-## 5. Unassign All From Team
-
-### Method and Endpoint
-- **Method**: `POST`
-- **Endpoint**: `/sales/teams/:teamId/unassign-employees`
-
-### API Description and Flow
-This API unassigns all employees and the team lead from a team (sets their teamLeadId to null) without deleting the team. The flow includes:
-1. Validates that the team exists
-2. Gets all team members (excluding team lead)
-3. Sets teamLeadId to null for all team members
-4. Unassigns the team lead if one exists
-5. Returns success response with unassignment details
-
-### Request Body/Parameters
-- **Path Parameter**: `teamId` (number) - Team ID to unassign employees from
-- **Request Body**: None (no body required)
-
-### Response Format
-
-**Success Response (200):**
-```json
-{
-  "success": true,
-  "message": "2 employee(s) and team lead successfully unassigned from team \"Sales Test Team\"",
-  "data": {
-    "teamId": 8,
-    "teamName": "Sales Test Team",
-    "teamLead": null,
-    "unassignedTeamLead": {
-      "id": 11,
-      "firstName": "Mellie",
-      "lastName": "Nolan",
-      "department": "Sales"
-    },
-    "unassignedEmployees": [
-      {
-        "id": 15,
-        "firstName": "Shaniya",
-        "lastName": "MacGyver"
-      },
-      {
-        "id": 4,
-        "firstName": "Joan",
-        "lastName": "Dibbert"
-      }
-    ],
-    "unassignedCount": 2,
-    "teamLeadUnassigned": true,
-    "totalUnassigned": 3
-  }
-}
-```
-
-**No Employees to Unassign (200):**
-```json
-{
-  "success": true,
-  "message": "No employees to unassign from team \"Sales Team A\"",
-  "data": {
-    "teamId": 1,
-    "teamName": "Sales Team A",
-    "teamLead": {
-      "id": 10,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "unassignedEmployees": [],
-    "unassignedCount": 0
-  }
-}
-```
-
-**Error Responses:**
-
-**Not Found Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Team with ID 123 does not exist",
-  "error": "Not Found"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` OR `unit_head` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-
----
-
-## 6. Delete Team
+## 10. Delete Team
 
 ### Method and Endpoint
 - **Method**: `DELETE`
-- **Endpoint**: `/sales/teams/:teamId`
+- **Endpoint**: `/sales/teams/:id`
 
 ### API Description and Flow
 This API deletes a team. The flow includes:
@@ -498,10 +703,6 @@ This API deletes a team. The flow includes:
 3. If team has employees/team lead, returns detailed response with assignment info (doesn't delete)
 4. If no blocking issues, deletes the team
 5. Returns success response with deletion details
-
-### Request Body/Parameters
-- **Path Parameter**: `teamId` (number) - Team ID to delete
-- **Request Body**: None
 
 ### Response Format
 
@@ -551,630 +752,27 @@ This API deletes a team. The flow includes:
 - **Departments**: `Sales` department required
 - **Admin Access**: Admins (admin, supermanager) have automatic access
 
----
-
-## 7. Get Team Details
-
-### Method and Endpoint
-- **Method**: `GET`
-- **Endpoint**: `/sales/teams/:teamId`
-
-### API Description and Flow
-**API Description and Flow**:
-1. **Team Validation**: Ensures the team exists and is assigned to a Sales unit
-2. **Team Lead Validation**: Verifies team has a team lead assigned
-3. **Team Members Retrieval**: Gets all employees who follow the team lead
-4. **Completed Leads Retrieval**: Gets the completed leads count from the team's database field
-5. **Employee Count Calculation**: Calculates actual team size (team lead + members)
-6. **Response**: Returns comprehensive team details with performance metrics
-
-**Business Rules**:
-- **Sales Unit Required**: Team must be assigned to a sales unit
-- **Team Lead Required**: Team must have a team lead assigned
-- **Completed Leads Metric**: Returns the completed leads count stored in the team's database field
-- **Performance Measurement**: Team success is measured by the completed leads counter
-
-### Request Body/Parameters
-- **Path Parameter**: `teamId` (number) - Team ID to get details for
-- **Request Body**: None
-
-### Response Format
-
-**Success Response (200):**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "name": "Sales Team A",
-    "teamLeadId": 123,
-    "employeeCount": 6,
-    "salesUnitId": 1,
-    "createdAt": "2024-01-15T10:30:00Z",
-    "updatedAt": "2024-01-15T10:30:00Z",
-    "teamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "completedLeads": {
-      "count": 45,
-      "status": "completed"
-    },
-    "salesUnit": {
-      "id": 1,
-      "name": "Sales Unit A"
-    },
-    "teamMembers": [
-      {
-        "id": 123,
-        "firstName": "John",
-        "lastName": "Doe",
-        "email": "john.doe@company.com"
-      },
-      {
-        "id": 456,
-        "firstName": "Jane",
-        "lastName": "Smith",
-        "email": "jane.smith@company.com"
-      }
-    ],
-    "actualEmployeeCount": 6
-  }
-}
-```
-
-**Error Response:**
-
-**Not Found Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Team with ID 123 does not exist",
-  "error": "Not Found"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
 
 ---
 
-## 8. Get Employee's Team
-
-### Method and Endpoint
-- **Method**: `GET`
-- **Endpoint**: `/sales/teams/employee/:employeeId`
-
-### API Description and Flow
-This API retrieves information about which team an employee belongs to. The flow includes:
-1. Validates that the employee exists
-2. Checks if employee is assigned to any team
-3. Finds the team where employee's team lead is the team lead
-4. Returns employee and team information
-
-### Request Body/Parameters
-- **Path Parameter**: `employeeId` (number) - Employee ID to get team for
-- **Request Body**: None
-
-### Response Format
-
-**Success Response with Team (200):**
-```json
-{
-  "success": true,
-  "data": {
-    "employee": {
-      "id": 456,
-      "firstName": "Jane",
-      "lastName": "Smith",
-      "department": "Sales"
-    },
-    "team": {
-      "id": 1,
-      "name": "Sales Team A",
-      "teamLeadId": 123,
-      "employeeCount": 6,
-      "salesUnitId": 1,
-      "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z",
-      "teamLead": {
-        "id": 123,
-        "firstName": "John",
-        "lastName": "Doe"
-      },
-      "completedLeads": {
-        "count": 45,
-        "status": "completed"
-      },
-      "salesUnit": {
-        "id": 1,
-        "name": "Sales Unit A"
-      }
-    }
-  }
-}
-```
-
-**Success Response - No Team (200):**
-```json
-{
-  "success": true,
-  "data": null,
-  "message": "Employee \"Jane Smith\" is not assigned to any team"
-}
-```
-
-**Error Response:**
-
-**Not Found Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Employee with ID 456 does not exist",
-  "error": "Not Found"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-
----
-
-## 9. Get All Sales Teams
-
-### Method and Endpoint
-- **Method**: `GET`
-- **Endpoint**: `/sales/teams/all`
-
-GET /sales/teams/all - Get all sales teams across all units
-GET /sales/teams/all?salesUnitId=1 - Get teams from specific unit
-
-### API Description and Flow
-This API retrieves all teams in the Sales department with optional unit filtering. The flow includes:
-1. Fetches all teams with team lead and sales unit information
-2. Optionally filters by sales unit ID if provided
-3. Calculates actual employee count for each team
-4. Orders teams by sales unit name and team name
-5. Returns comprehensive list of all teams
-
-### Request Body/Parameters
-- **Query Parameter**: `salesUnitId` (optional, number) - Sales Unit ID to filter teams
-- **Request Body**: None
-
-### Response Format
-
-**Success Response (200) - All Teams:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Sales Team A",
-      "teamLeadId": 123,
-      "employeeCount": 6,
-      "salesUnitId": 1,
-      "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z",
-      "teamLead": {
-        "id": 123,
-        "firstName": "John",
-        "lastName": "Doe"
-      },
-      "salesUnit": {
-        "id": 1,
-        "name": "Sales Unit A"
-      },
-      "actualEmployeeCount": 6
-    }
-  ],
-  "total": 1,
-  "message": "All sales teams retrieved successfully"
-}
-```
-
-**Success Response (200) - Filtered by Unit:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Sales Team A",
-      "teamLeadId": 123,
-      "employeeCount": 6,
-      "salesUnitId": 1,
-      "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:00:00Z",
-      "teamLead": {
-        "id": 123,
-        "firstName": "John",
-        "lastName": "Doe"
-      },
-      "salesUnit": {
-        "id": 1,
-        "name": "Sales Unit A"
-      },
-      "actualEmployeeCount": 6
-    }
-  ],
-  "total": 1,
-  "message": "Sales teams in unit retrieved successfully"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` OR `unit_head` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-
----
-
-## 10. Assign Team to New Sales Unit
-
-### Method and Endpoint
-- **Method**: `POST`
-- **Endpoint**: `/sales/teams/assign`
-
-### API Description and Flow
-This API assigns a team to a sales unit. The flow includes:
-1. Validates that the team exists
-2. Validates that the sales unit exists
-3. Checks if team is already assigned to this unit
-4. Checks if team is assigned to another sales unit
-5. Validates that team has a team lead assigned
-6. Validates that team lead belongs to Sales department
-7. Assigns team to the sales unit
-8. Returns success response with assignment details
-
-### Request Body
-```json
-{
-  "teamId": "number (required)",
-  "salesUnitId": "number (required)"
-}
-```
-
-**Required Fields:**
-- `teamId`: ID of the team to assign
-- `salesUnitId`: ID of the sales unit to assign the team to
-
-### Response Format
-
-**Success Response (200):**
-```json
-{
-  "success": true,
-  "message": "Team \"Sales Team A\" successfully assigned to sales unit \"Sales Unit A\"",
-  "data": {
-    "teamId": 1,
-    "teamName": "Sales Team A",
-    "teamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "salesUnit": {
-      "id": 1,
-      "name": "Sales Unit A"
-    }
-  }
-}
-```
-
-**Error Responses:**
-
-**Not Found Errors (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Team with ID 123 does not exist",
-  "error": "Not Found"
-}
-```
-
-```json
-{
-  "statusCode": 404,
-  "message": "Sales unit with ID 456 does not exist",
-  "error": "Not Found"
-}
-```
-
-**Conflict Errors (409):**
-```json
-{
-  "statusCode": 409,
-  "message": "Team is already assigned to this sales unit",
-  "error": "Conflict"
-}
-```
-
-```json
-{
-  "statusCode": 409,
-  "message": "Team is already assigned to sales unit ID 2. Please unassign first.",
-  "error": "Conflict"
-}
-```
-
-**Bad Request Errors (400):**
-```json
-{
-  "statusCode": 400,
-  "message": "Team must have a team lead assigned before it can be assigned to a sales unit",
-  "error": "Bad Request"
-}
-```
-
-```json
-{
-  "statusCode": 400,
-  "message": "Team lead must belong to Sales department. Current department: Production",
-  "error": "Bad Request"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-
----
-
-## 11. Unassign Team from Previous Sales Unit
-
-### Method and Endpoint
-- **Method**: `DELETE`
-- **Endpoint**: `/sales/teams/unassign/:teamId`
-
-### API Description and Flow
-This API unassigns a team from its current sales unit. The flow includes:
-1. Validates that the team exists
-2. Checks if team is assigned to any sales unit
-3. Unassigns team from the sales unit (no restrictions)
-4. Returns success response with unassignment details
-
-### Request Body/Parameters
-- **Path Parameter**: `teamId` (number) - Team ID to unassign
-- **Request Body**: None
-
-### Response Format
-
-**Success Response (200):**
-```json
-{
-  "success": true,
-  "message": "Team \"Sales Team A\" successfully unassigned from sales unit \"Sales Unit A\"",
-  "data": {
-    "teamId": 1,
-    "teamName": "Sales Team A",
-    "teamLead": {
-      "id": 123,
-      "firstName": "John",
-      "lastName": "Doe"
-    },
-    "previousUnit": {
-      "id": 1,
-      "name": "Sales Unit A"
-    }
-  }
-}
-```
-
-**Error Responses:**
-
-**Not Found Error (404):**
-```json
-{
-  "statusCode": 404,
-  "message": "Team with ID 123 does not exist",
-  "error": "Not Found"
-}
-```
-
-**Bad Request Error (400):**
-```json
-{
-  "statusCode": 400,
-  "message": "Team is not assigned to any sales unit",
-  "error": "Bad Request"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-
----
-
-## 12. Get Teams in Sales Unit
-
-### Method and Endpoint
-- **Method**: `GET`
-- **Endpoint**: `/sales/teams/unit/:id`
-
-### API Description and Flow
-This API retrieves all teams assigned to a specific sales unit. The flow includes:
-1. Validates that the sales unit exists
-2. Checks user permissions (unit_head can only access their own unit)
-3. Fetches all teams assigned to the unit
-4. Includes team lead details
-5. Calculates actual employee count for each team
-6. Orders teams alphabetically by name
-7. Returns formatted response with team data
-
-### Path Parameters
-- `id` (required, number): Sales Unit ID
-
-### Response Format
-
-**Success Response with Teams (200):**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "name": "Sales Team A",
-      "teamLead": {
-        "id": 123,
-        "firstName": "John",
-        "lastName": "Doe"
-      },
-      "employeeCount": 6,
-      "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z",
-      "actualEmployeeCount": 6
-    }
-  ],
-  "total": 1,
-  "message": "Teams retrieved successfully"
-}
-```
-
-**Success Response - No Teams (200):**
-```json
-{
-  "success": true,
-  "data": [],
-  "total": 0,
-  "message": "No teams found in this unit"
-}
-```
-
-**Error Responses:**
-
-**Unit Not Found (200):**
-```json
-{
-  "success": false,
-  "message": "Unit with ID 999 does not exist"
-}
-```
-
-**Access Denied (200):**
-```json
-{
-  "success": false,
-  "message": "You can only access your own unit"
-}
-```
-
-**Authentication/Authorization Errors (401/403):**
-```json
-{
-  "statusCode": 401,
-  "message": "Unauthorized",
-  "error": "Unauthorized"
-}
-```
-
-```json
-{
-  "statusCode": 403,
-  "message": "User does not have the required roles. Required: dep_manager, unit_head. User role: junior",
-  "error": "Forbidden"
-}
-```
-
-```json
-{
-  "statusCode": 403,
-  "message": "User does not belong to required departments. Required: Sales. User department: HR",
-  "error": "Forbidden"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` OR `unit_head` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-- **Unit Head Access**: ✅ **ALLOWED** - Can access their own unit only
-
----
-
-## 13. Get Available Teams No Unit 
-
-### Method and Endpoint
-- **Method**: `GET`
-- **Endpoint**: `/sales/teams/available`
-
-### API Description and Flow
-This API retrieves all teams that are available for assignment to sales units. The flow includes:
-1. Fetches all teams not assigned to any sales unit
-2. Filters teams that have a team lead assigned
-3. Filters teams where team lead belongs to Sales department
-4. Calculates actual employee count for each team
-5. Orders teams alphabetically by name
-6. Returns formatted response with available team data
-
-### Request Body/Parameters
-- **Path Parameter**: None
-- **Request Body**: None
-
-### Response Format
-
-**Success Response with Available Teams (200):**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 2,
-      "name": "QA Team",
-      "teamLeadId": 456,
-      "employeeCount": 5,
-      "salesUnitId": null,
-      "createdAt": "2024-01-20T14:30:00Z",
-      "updatedAt": "2024-01-20T14:30:00Z",
-      "teamLead": {
-        "id": 456,
-        "firstName": "Jane",
-        "lastName": "Smith",
-        "department": {
-          "name": "Sales"
-        }
-      },
-      "actualEmployeeCount": 5
-    }
-  ],
-  "total": 1,
-  "message": "Available sales teams retrieved successfully"
-}
-```
-
-**Success Response - No Available Teams (200):**
-```json
-{
-  "success": true,
-  "data": [],
-  "total": 0,
-  "message": "No available sales teams found"
-}
-```
-
-### Access Control
-- **Authentication**: JWT token required
-- **Roles**: `dep_manager` role required
-- **Departments**: `Sales` department required
-- **Admin Access**: Admins (admin, supermanager) have automatic access
-
----
-
-
+## Removed APIs (No Longer Available)
+
+The following APIs have been removed as they were redundant or should be handled by the Units API:
+
+1. **❌ UNASSIGN ALL EMPLOYEES FROM TEAM** - `POST /sales/teams/:teamId/unassign-employees`
+2. **❌ GET TEAMS IN SALES UNIT** - `GET /sales/teams/unit/:id`
+3. **❌ GET TEAM DETAILS (Legacy)** - `GET /sales/teams/details/:teamId`
+4. **❌ GET EMPLOYEE'S TEAM** - `GET /sales/teams/employee/:employeeId`
+5. **❌ ASSIGN TEAM TO SALES UNIT** - `POST /sales/teams/assign`
+6. **❌ UNASSIGN TEAM FROM SALES UNIT** - `DELETE /sales/teams/unassign/:teamId`
+7. **❌ GET AVAILABLE TEAMS** - `GET /sales/teams/available`
+
+**Reasoning for Removal:**
+- **Bulk Unassign**: Redundant with individual member removal
+- **Unit Management**: Should be handled by Units API
+- **Legacy Endpoints**: Redundant with enhanced endpoints
+- **Employee Team Lookup**: Not needed as specified
+- **Team-Unit Assignment**: Should be managed through Units API
 
 ---
 
@@ -1216,11 +814,6 @@ This API retrieves all teams that are available for assignment to sales units. T
 2. **Performance Tracking**: The completed leads field is maintained separately and displayed in team details
 3. **Team Evaluation**: Teams are evaluated based on their completed leads counter
 
-### Unit Assignment Rules:
-1. **One Unit Per Team**: A team can only be assigned to one sales unit at a time
-2. **Team Lead Required**: Team must have a team lead before unit assignment
-3. **No Duplicate Assignment**: Team cannot be assigned to the same unit twice
-
 ### Validation Hierarchy:
 1. **Existence Check**: Team, unit, and employee must exist
 2. **Security Validation**: Ensure team is a Sales team (salesUnitId + Sales department team lead)
@@ -1236,18 +829,14 @@ This API retrieves all teams that are available for assignment to sales units. T
 | Action | dep_manager | unit_head | team_lead | senior/junior |
 |--------|-------------|-----------|-----------|---------------|
 | Create Team | ✅ | ✅ | ❌ | ❌ |
-| Replace Team Lead | ✅ | ✅ | ❌ | ❌ |
+| Update Team (Replace Lead) | ✅ | ✅ | ❌ | ❌ |
 | Add Team Member | ✅ | ✅ | ❌ | ❌ |
 | Remove Team Member | ✅ | ✅ | ❌ | ❌ |
-| Unassign All From Team | ✅ | ✅ | ❌ | ❌ |
 | Delete Team | ✅ | ❌ | ❌ | ❌ |
-| Assign Team to Unit | ✅ | ❌ | ❌ | ❌ |
-| Unassign Team from Unit | ✅ | ❌ | ❌ | ❌ |
-| View Teams in Unit | ✅ | ✅ | ✅ | ✅ |
-| View Available Teams | ✅ | ❌ | ❌ | ❌ |
 | View Team Details | ✅ | ✅ | ✅ | ✅ |
-| View Employee's Team | ✅ | ✅ | ✅ | ✅ |
-| View All Teams | ✅ | ✅ | ❌ | ❌ |
+| View All Teams | ✅ | ✅ | ✅ | ✅ |
+| Get Available Leads | ✅ | ✅ | ❌ | ❌ |
+| Get Available Employees | ✅ | ✅ | ❌ | ❌ |
 
 ---
 
@@ -1275,28 +864,13 @@ This API retrieves all teams that are available for assignment to sales units. T
 
 ---
 
-## Redundancy Reduction
-
-### Combined APIs:
-- **"Get All Sales Teams" + "Get Teams in Unit"**: Combined into one API with optional `salesUnitId` query parameter for filtering
-- **Benefits**: Reduces API endpoints while maintaining functionality
-- **Usage**: 
-  - `/sales/teams/all` - Gets all teams
-  - `/sales/teams/all?salesUnitId=1` - Gets teams in specific unit
-
-### Separate APIs (as requested):
-- **"Get Team Details" + "Get Employee's Team"**: Kept separate as requested by user
-- **Reasoning**: Different use cases and data requirements
-
----
-
-*This documentation covers all implemented team management APIs for the Sales Teams module, following the same pattern as Production Teams but adapted for sales-specific business logic.* 
-
-### Employee Count Logic:
+## Employee Count Logic:
 1. **Team Lead Assignment**: When assigning a team lead to a team with no team lead, employee count = 1 (team lead only)
 2. **Team Member Addition**: When adding team members, employee count = team lead (1) + team members count
 3. **Team Member Removal**: When removing team members, employee count = team lead (1) + remaining team members count
 4. **Team Lead Replacement**: Employee count remains the same (team lead + team members)
 5. **Unassign All**: Employee count = 0 (no team lead, no members)
 
-**Note**: Employee count always includes the team lead (counts as 1) plus any team members who follow that team lead. 
+**Note**: Employee count always includes the team lead (counts as 1) plus any team members who follow that team lead.
+
+*This documentation covers all implemented team management APIs for the Sales Teams module, following the same pattern as Production Teams but adapted for sales-specific business logic.*

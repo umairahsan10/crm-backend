@@ -7,7 +7,6 @@ import { Departments } from '../../../common/decorators/departments.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 import { CreateSalesTeamDto } from './dto/create-team.dto';
-import { ReplaceTeamLeadDto } from './dto/replace-team-lead.dto';
 import { AddEmployeeDto } from './dto/add-employee.dto';
 import { AssignSalesTeamDto } from './dto/assign-team.dto';
 import { SalesTeamsQueryDto } from './dto/teams-query.dto';
@@ -80,21 +79,7 @@ export class TeamsController {
     return this.teamsService.getAllTeams(req.user, query);
   }
 
-  // 3. Replace Team Lead (Preserved Sales Teams Feature)
-  @Put(':teamId/replace-lead')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Replace a team lead' })
-  @ApiParam({ name: 'teamId', description: 'ID of the team', type: Number })
-  @ApiBody({ type: ReplaceTeamLeadDto })
-  async replaceTeamLead(
-    @Param('teamId', ParseIntPipe) teamId: number,
-    @Body() replaceTeamLeadDto: ReplaceTeamLeadDto
-  ) {
-    return this.teamsService.replaceTeamLead(teamId, replaceTeamLeadDto.newTeamLeadId);
-  }
-
-  // 4. Get Available Team Leads
+  // 3. Get Available Team Leads
   @Get('available-leads')
   @Roles('dep_manager', 'unit_head')
   @Departments('Sales')
@@ -109,7 +94,7 @@ export class TeamsController {
     return this.teamsService.getAvailableLeads(assignedBoolean);
   }
 
-  // 5. Get Available Employees
+  // 4. Get Available Employees
   @Get('available-employees')
   @Roles('dep_manager', 'unit_head', 'team_lead')
   @Departments('Sales')
@@ -124,7 +109,7 @@ export class TeamsController {
     return this.teamsService.getAvailableEmployees(assignedBoolean);
   }
 
-  // 6. Get Team by ID (Enhanced)
+  // 5. Get Team by ID (Enhanced)
   @Get(':id')
   @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
   @Departments('Sales')
@@ -135,7 +120,7 @@ export class TeamsController {
     return this.teamsService.getTeam(id, req.user);
   }
 
-  // 7. Update Team (New Feature)
+  // 6. Update Team (Can also replace team lead)
   @Patch(':id')
   @Roles('dep_manager', 'unit_head', 'team_lead')
   @Departments('Sales')
@@ -203,33 +188,7 @@ export class TeamsController {
     return this.teamsService.removeMemberFromTeam(teamId, employeeId, req.user);
   }
 
-  // 11. Remove Employee from Team (Preserved Sales Teams Feature)
-  @Delete(':teamId/remove-employee/:employeeId')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Remove an employee from a team' })
-  @ApiParam({ name: 'teamId', description: 'ID of the team', type: Number })
-  @ApiParam({ name: 'employeeId', description: 'ID of the employee', type: Number })
-  async removeEmployeeFromTeam(
-    @Param('teamId', ParseIntPipe) teamId: number,
-    @Param('employeeId', ParseIntPipe) employeeId: number
-  ) {
-    return this.teamsService.removeEmployeeFromTeam(teamId, employeeId);
-  }
-
-  // 12. Unassign All From Team (Preserved Sales Teams Feature)
-  @Post(':teamId/unassign-employees')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Unassign all employees from a team' })
-  @ApiParam({ name: 'teamId', description: 'ID of the team', type: Number })
-  async unassignEmployeesFromTeam(
-    @Param('teamId', ParseIntPipe) teamId: number
-  ) {
-    return this.teamsService.unassignEmployeesFromTeam(teamId);
-  }
-
-  // 13. Delete Team
+  // 11. Delete Team
   @Delete(':id')
   @Roles('dep_manager')
   @Departments('Sales')
@@ -245,67 +204,11 @@ export class TeamsController {
     return this.teamsService.deleteTeam(id);
   }
 
-  // 14. Get Teams in Sales Unit (Preserved Sales Teams Feature)
-  @Get('unit/:id')
-  @Roles('dep_manager', 'unit_head')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Get teams in a sales unit' })
-  @ApiParam({ name: 'id', description: 'Sales Unit ID', type: Number })
-  async getTeamsInUnit(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.teamsService.getTeamsInUnit(id, req.user);
-  }
 
-  // 15. Get Team Details (Preserved Sales Teams Feature)
-  @Get('details/:teamId')
-  @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Get details of a team' })
-  @ApiParam({ name: 'teamId', description: 'Team ID', type: Number })
-  async getTeamDetails(@Param('teamId', ParseIntPipe) teamId: number) {
-    return this.teamsService.getTeamDetails(teamId);
-  }
 
-  // 16. Get Employee's Team (Preserved Sales Teams Feature)
-  @Get('employee/:employeeId')
-  @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Get the team of a specific employee' })
-  @ApiParam({ name: 'employeeId', description: 'Employee ID', type: Number })
-  async getEmployeeTeam(@Param('employeeId', ParseIntPipe) employeeId: number) {
-    return this.teamsService.getEmployeeTeam(employeeId);
-  }
 
-  // 17. Assign Team to Sales Unit (Preserved Sales Teams Feature)
-  @Post('assign')
-  @Roles('dep_manager')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Assign a team to a sales unit' })
-  @ApiBody({ type: AssignSalesTeamDto })
-  async assignTeamToUnit(@Body() assignTeamDto: AssignSalesTeamDto) {
-    if (!assignTeamDto || !assignTeamDto.teamId || !assignTeamDto.salesUnitId) {
-      throw new BadRequestException('Request body must contain teamId and salesUnitId');
-    }
-    return this.teamsService.assignTeamToUnit(assignTeamDto.teamId, assignTeamDto.salesUnitId);
-  }
 
-  // 18. Unassign Team from Sales Unit (Preserved Sales Teams Feature)
-  @Delete('unassign/:teamId')
-  @Roles('dep_manager')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Unassign a team from a sales unit' })
-  @ApiParam({ name: 'teamId', description: 'Team ID', type: Number })
-  unassignTeamFromUnit(@Param('teamId', ParseIntPipe) teamId: number) {
-    return this.teamsService.unassignTeamFromUnit(teamId);
-  }
 
-  // 19. Get Available Teams (Preserved Sales Teams Feature)
-  @Get('available')
-  @Roles('dep_manager')
-  @Departments('Sales')
-  @ApiOperation({ summary: 'Get all available teams' })
-  async getAvailableTeams() {
-    return this.teamsService.getAvailableTeams();
-  }
 
 
 } 
