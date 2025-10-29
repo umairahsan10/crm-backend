@@ -1523,6 +1523,46 @@ export class TeamsService {
       }
     }
 
+    // Handle general search parameter (searches across team name, lead name, and unit name)
+    if (query.search) {
+      whereClause.OR = [
+        // Search in team name
+        {
+          name: {
+            contains: query.search,
+            mode: 'insensitive'
+          }
+        },
+        // Search in team lead first name
+        {
+          teamLead: {
+            firstName: {
+              contains: query.search,
+              mode: 'insensitive'
+            }
+          }
+        },
+        // Search in team lead last name
+        {
+          teamLead: {
+            lastName: {
+              contains: query.search,
+              mode: 'insensitive'
+            }
+          }
+        },
+        // Search in sales unit name
+        {
+          salesUnit: {
+            name: {
+              contains: query.search,
+              mode: 'insensitive'
+            }
+          }
+        }
+      ];
+    }
+
     return whereClause;
   }
 
