@@ -161,26 +161,13 @@ export class AttendanceService {
 
       const checkinLocal = new Date(checkinUtc.getTime() + effectiveOffsetMinutes * 60 * 1000);
 
-      // Derive local business date (YYYY-MM-DD) from local time
+      // Derive initial business date (YYYY-MM-DD) from local time
       const localDateStr = `${checkinLocal.getUTCFullYear()}-${String(checkinLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(checkinLocal.getUTCDate()).padStart(2, '0')}`;
-      const businessDateLocal = new Date(localDateStr);
-
-      // Check if already checked in for this local business date
-      const existingCheckin = await this.prisma.attendanceLog.findFirst({
-        where: {
-          employeeId,
-          date: businessDateLocal
-        }
-      });
-
-      if (existingCheckin && existingCheckin.checkin) {
-        throw new BadRequestException('Employee already checked in for this date');
-      }
+      let initialBusinessDate = new Date(localDateStr);
 
       // Use computed local time for storage and calculations
       const checkinTimeForStorage = checkinLocal;
       const checkinTimeForCalculation = checkinLocal;
-      const checkinDatePKT = businessDateLocal; // local business date
 
       // Get employee's shift times (default to 9:00 AM - 5:00 PM if not set)
       const shiftStart = employee.shiftStart || '09:00';
@@ -199,7 +186,38 @@ export class AttendanceService {
       
       console.log('Parsed shift times:', { shiftStartHour, shiftStartMinute, shiftEndHour, shiftEndMinute });
 
-      // Create expected shift start in the same local timeline (use UTC setters on businessDateLocal)
+      // Determine the correct business date for this employee (same logic as bulk-mark-present)
+      // For night shifts (shiftEnd < shiftStart), if current time is before shift end,
+      // the business date should be the previous day (when the shift started)
+      let checkinDatePKT = new Date(initialBusinessDate);
+      const currentHour = checkinTimeForCalculation.getUTCHours();
+      const currentMinute = checkinTimeForCalculation.getUTCMinutes();
+      
+      // If it's a night shift (crosses midnight)
+      if (shiftEndHour < shiftStartHour) {
+        // If current time is before shift end (e.g., 01:00 AM when shift end is 05:00 AM)
+        // then this is the previous day's shift
+        if (currentHour < shiftEndHour || (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)) {
+          // Use previous day as business date
+          checkinDatePKT = new Date(initialBusinessDate);
+          checkinDatePKT.setDate(checkinDatePKT.getDate() - 1);
+          console.log(`Night shift: Using previous day (${checkinDatePKT.toISOString().split('T')[0]}) for employee ${employeeId}`);
+        }
+      }
+
+      // Check if already checked in for this business date
+      const existingCheckin = await this.prisma.attendanceLog.findFirst({
+        where: {
+          employeeId,
+          date: checkinDatePKT
+        }
+      });
+
+      if (existingCheckin && existingCheckin.checkin) {
+        throw new BadRequestException('Employee already checked in for this date');
+      }
+
+      // Create expected shift start for the correct business date
       console.log('Creating expected shift start...');
       const expectedShiftStart = new Date(checkinDatePKT);
       expectedShiftStart.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
@@ -213,13 +231,11 @@ export class AttendanceService {
       // Calculate minutes late from shift start using local calculation time
       let minutesLate = Math.floor((checkinTimeForCalculation.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
       
-      // Handle night shifts that cross midnight
-      // If shift end is before shift start (e.g., 21:00 to 05:00), it's a night shift
+      // Handle night shifts that cross midnight (adjust calculation if needed)
       if (shiftEndHour < shiftStartHour) {
-        // If check-in time is before shift start (e.g., 00:26 vs 21:00), 
-        // it means employee is checking in late for the previous day's shift
+        // If we're using previous day's date and minutesLate is negative, add 24 hours
+        // This means the shift started yesterday and we're calculating from today's time
         if (minutesLate < 0) {
-          // Add 24 hours to get the correct late time
           minutesLate = minutesLate + (24 * 60);
           console.log('Night shift detected - adjusted minutes late:', minutesLate);
         }
@@ -3035,8 +3051,22 @@ export class AttendanceService {
         }
 
         // Calculate deadline (shift start + absentTime from company settings)
+        // Handle shift times that might be just hours (e.g., '21' instead of '21:00')
         const shiftStartTime = employee.shiftStart;
-        const [shiftHours, shiftMins] = shiftStartTime.split(':').map(Number);
+        const shiftStartParts = shiftStartTime.split(':');
+        const shiftHours = parseInt(shiftStartParts[0], 10);
+        let shiftMins = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
+        
+        // Validate parsed values
+        if (isNaN(shiftHours) || shiftHours < 0 || shiftHours > 23) {
+          console.log(`Employee ${employee.id} has invalid shift start time: ${shiftStartTime}, skipping`);
+          continue;
+        }
+        if (isNaN(shiftMins) || shiftMins < 0 || shiftMins > 59) {
+          console.log(`Employee ${employee.id} has invalid shift start minutes: ${shiftStartTime}, defaulting to 0`);
+          shiftMins = 0;
+        }
+        
         const deadlineTotalMinutes = shiftHours * 60 + shiftMins + absentTimeMinutes;
         const deadlineHours = Math.floor(deadlineTotalMinutes / 60);
         const deadlineMins = deadlineTotalMinutes % 60;
@@ -3199,27 +3229,78 @@ export class AttendanceService {
   }
 
   /**
-   * Bulk mark all active employees as present for a specific date
+   * Bulk mark employees as present - follows checkin logic pattern
+   * Uses current PKT time as checkin time, calculates status based on company settings
+   * Creates late/half-day logs as needed, supports cross-day scenarios
    * Updates attendance_logs, attendance, monthly_attendance_summary, and hr_logs tables
    */
   async bulkMarkAllEmployeesPresent(bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
-    const { date, reason } = bulkMarkData;
-    const targetDate = new Date(date);
+    const { date, employee_ids, reason } = bulkMarkData;
 
-    // Allow present and past dates, but not future dates
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    targetDate.setHours(0, 0, 0, 0);
+    // Get current time in PKT (following checkin pattern)
+    const now = new Date();
+    const nowPkt = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
     
-    if (targetDate.getTime() > today.getTime()) {
-      throw new BadRequestException('Bulk mark present is not allowed for future dates.');
+    // Compute local time using PKT offset (+300 minutes = UTC+5)
+    const effectiveOffsetMinutes = 300; // PKT UTC+5
+    const currentTimeLocal = new Date(now.getTime() + effectiveOffsetMinutes * 60 * 1000);
+    
+    // Derive local business date (YYYY-MM-DD) from local time (following checkin pattern)
+    const localDateStr = `${currentTimeLocal.getUTCFullYear()}-${String(currentTimeLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(currentTimeLocal.getUTCDate()).padStart(2, '0')}`;
+    const businessDateLocal = new Date(localDateStr);
+    
+    // Determine target date: use provided date or default to current PKT business date
+    let targetBusinessDate: Date;
+    if (date) {
+      // Parse provided date string (YYYY-MM-DD format)
+      const inputDate = new Date(date + 'T00:00:00');
+      if (isNaN(inputDate.getTime())) {
+        throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
+      }
+      targetBusinessDate = new Date(inputDate);
+      targetBusinessDate.setHours(0, 0, 0, 0);
+      
+      // Get today in PKT for validation
+      const todayPKT = new Date(nowPkt);
+      todayPKT.setHours(0, 0, 0, 0);
+      
+      // Allow present and past dates, but not future dates (based on PKT)
+      if (targetBusinessDate.getTime() > todayPKT.getTime()) {
+        throw new BadRequestException('Bulk mark present is not allowed for future dates.');
+      }
+    } else {
+      // Use current PKT business date as default
+      targetBusinessDate = new Date(businessDateLocal);
     }
 
-    // Get all active employees
+    // Fetch company settings (required for status determination)
+    const company = await this.prisma.company.findFirst();
+    if (!company) {
+      throw new InternalServerErrorException('Company settings not found');
+    }
+
+    // Get company policy values
+    const lateTime = company.lateTime || 30;
+    const halfTime = company.halfTime || 90;
+    const absentTime = company.absentTime || 180;
+
+    // Build employee query: filter by employee_ids if provided, otherwise get all active
+    const employeeWhere: any = {
+      status: 'active'
+    };
+
+    if (employee_ids && employee_ids.length > 0) {
+      // Validate employee IDs are positive integers
+      const invalidIds = employee_ids.filter(id => !Number.isInteger(id) || id <= 0);
+      if (invalidIds.length > 0) {
+        throw new BadRequestException(`Invalid employee IDs: ${invalidIds.join(', ')}. All IDs must be positive integers.`);
+      }
+      employeeWhere.id = { in: employee_ids };
+    }
+
+    // Get employees based on filter
     const employees = await this.prisma.employee.findMany({
-      where: {
-        status: 'active'
-      },
+      where: employeeWhere,
       select: {
         id: true,
         firstName: true,
@@ -3230,16 +3311,35 @@ export class AttendanceService {
     });
 
     if (employees.length === 0) {
-      throw new NotFoundException('No active employees found.');
+      const message = employee_ids && employee_ids.length > 0
+        ? `No active employees found with the provided employee IDs: ${employee_ids.join(', ')}`
+        : 'No active employees found.';
+      throw new NotFoundException(message);
     }
+
+    // Validate that all requested employee IDs exist (if provided)
+    if (employee_ids && employee_ids.length > 0) {
+      const foundIds = employees.map(emp => emp.id);
+      const missingIds = employee_ids.filter(id => !foundIds.includes(id));
+      if (missingIds.length > 0) {
+        throw new NotFoundException(`Employees not found or not active: ${missingIds.join(', ')}`);
+      }
+    }
+
+    console.log(`Bulk mark present: Using PKT date ${targetBusinessDate.toISOString().split('T')[0]} for ${employees.length} employee(s)`);
 
     let markedPresent = 0;
     let errors = 0;
     let skipped = 0;
+    let markedLate = 0;
+    let markedHalfDay = 0;
     
-    console.log(`Starting bulk mark present operation for ${employees.length} employees on ${date}`);
+    const dateStr = targetBusinessDate.toISOString().split('T')[0];
+    const checkinTimeForStorage = currentTimeLocal; // Use current PKT time as checkin time
     
-    const batchSize = 20; // Reduced from 50 to 20 for better performance
+    console.log(`Starting bulk checkin operation for ${employees.length} employee(s) on ${dateStr} at ${checkinTimeForStorage.toISOString()}`);
+    
+    const batchSize = 20;
     console.log(`Processing ${employees.length} employees in batches of ${batchSize}`);
     
     for (let i = 0; i < employees.length; i += batchSize) {
@@ -3251,35 +3351,112 @@ export class AttendanceService {
       await this.prisma.$transaction(async (tx) => {
         for (const employee of batch) {
           try {
+            // Get employee's shift times (default to 9:00 AM - 5:00 PM if not set)
+            const shiftStart = employee.shiftStart || '09:00';
+            const shiftEnd = employee.shiftEnd || '17:00';
+            
+            // Handle shift times that might be stored as just hours
+            const shiftStartParts = shiftStart.split(':');
+            const shiftEndParts = shiftEnd.split(':');
+            const shiftStartHour = parseInt(shiftStartParts[0], 10);
+            const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
+            const shiftEndHour = parseInt(shiftEndParts[0], 10);
+            const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
+            
+            // Determine the correct business date for this employee
+            // For night shifts (shiftEnd < shiftStart), if current time is before shift end,
+            // the business date should be the previous day (when the shift started)
+            let employeeBusinessDate = new Date(targetBusinessDate);
+            const currentHour = checkinTimeForStorage.getUTCHours();
+            const currentMinute = checkinTimeForStorage.getUTCMinutes();
+            
+            // If it's a night shift (crosses midnight)
+            if (shiftEndHour < shiftStartHour) {
+              // If current time is before shift end (e.g., 01:00 AM when shift end is 05:00 AM)
+              // then this is the previous day's shift
+              if (currentHour < shiftEndHour || (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)) {
+                // Use previous day as business date
+                employeeBusinessDate = new Date(targetBusinessDate);
+                employeeBusinessDate.setDate(employeeBusinessDate.getDate() - 1);
+                console.log(`Night shift: Using previous day (${employeeBusinessDate.toISOString().split('T')[0]}) for employee ${employee.id}`);
+              }
+            }
+            
+            // Create expected shift start for the employee's business date
+            const expectedShiftStart = new Date(employeeBusinessDate);
+            expectedShiftStart.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
+            
+            // Calculate minutes late from shift start (following checkin pattern)
+            let minutesLate = Math.floor((checkinTimeForStorage.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+            
+            // Handle night shifts that cross midnight (adjust calculation if needed)
+            if (shiftEndHour < shiftStartHour) {
+              // If we're using previous day's date and minutesLate is negative, add 24 hours
+              // This means the shift started yesterday and we're calculating from today's time
+              if (minutesLate < 0) {
+                minutesLate = minutesLate + (24 * 60);
+              }
+            }
+            
+            // Normalize negative minutes (early/on-time)
+            if (minutesLate < 0) {
+              minutesLate = 0;
+            }
+            
+            // Determine status based on company policy (following checkin pattern)
+            let status: 'present' | 'late' | 'half_day' | 'absent' = 'present';
+            
+            if (minutesLate === 0) {
+              // On-time or early: explicitly set as present
+              status = 'present';
+            } else if (minutesLate > 0) {
+              // Late: determine status based on company thresholds
+              if (minutesLate <= lateTime) {
+                // Within late time limit: still marked as present
+                status = 'present';
+              } else if (minutesLate > lateTime && minutesLate <= halfTime) {
+                // Exceeds late time but within half time: late
+                status = 'late';
+              } else if (minutesLate > halfTime && minutesLate <= absentTime) {
+                // Exceeds half time but within absent time: half-day
+                status = 'half_day';
+              } else {
+                // Exceeds absent time: absent
+                status = 'absent';
+              }
+            }
+            
+            // Check for existing attendance log using employee's business date
             const existingLog = await tx.attendanceLog.findFirst({
               where: {
                 employeeId: employee.id,
-                date: targetDate
+                date: employeeBusinessDate
               }
             });
 
-            let wasAbsent = false; // Default to false for new records
+            let wasAbsent = false;
 
             if (existingLog) {
-              if (existingLog.status === 'present') {
+              if (existingLog.checkin && existingLog.status === status) {
                 skipped++;
                 continue;
               }
               wasAbsent = existingLog.status === 'absent';
               
+              // Update existing log with current checkin time and calculated status
               await tx.attendanceLog.update({
                 where: { id: existingLog.id },
                 data: {
-                  status: 'present',
-                  checkin: employee.shiftStart ? this.createShiftDateTime(targetDate, employee.shiftStart) : null,
-                  checkout: employee.shiftEnd ? this.createShiftDateTime(targetDate, employee.shiftEnd) : null,
+                  checkin: checkinTimeForStorage,
+                  status,
+                  mode: 'onsite',
                   updatedAt: new Date()
+                  // Note: checkout remains null - will be set when employee checks out
                 }
               });
-                        } else {
-              // For new records, check if this specific date was already counted as absent in the monthly summary
-              // This handles cases where HR manually marked someone absent without creating an attendance log
-              const monthYear = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+            } else {
+              // Check if this date was manually counted as absent
+              const monthYear = `${employeeBusinessDate.getFullYear()}-${String(employeeBusinessDate.getMonth() + 1).padStart(2, '0')}`;
               const monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
                 where: {
                   empId: employee.id,
@@ -3288,70 +3465,112 @@ export class AttendanceService {
               });
               
               if (monthlySummary && monthlySummary.totalAbsent > 0) {
-                // Count actual absent records for this month
                 const actualAbsentRecords = await tx.attendanceLog.count({
                   where: {
                     employeeId: employee.id,
                     status: 'absent',
                     date: {
-                      gte: new Date(targetDate.getFullYear(), targetDate.getMonth(), 1),
-                      lt: new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1)
+                      gte: new Date(employeeBusinessDate.getFullYear(), employeeBusinessDate.getMonth(), 1),
+                      lt: new Date(employeeBusinessDate.getFullYear(), employeeBusinessDate.getMonth() + 1, 1)
                     }
                   }
                 });
                 
-                // If monthly summary shows more absents than actual records, this date was manually counted
                 if (monthlySummary.totalAbsent > actualAbsentRecords) {
                   wasAbsent = true;
                 }
               }
               
+              // Create new attendance log with current checkin time and calculated status
               await tx.attendanceLog.create({
                 data: {
                   employeeId: employee.id,
-                  date: targetDate,
-                  status: 'present',
-                  checkin: employee.shiftStart ? this.createShiftDateTime(targetDate, employee.shiftStart) : null,
-                  checkout: employee.shiftEnd ? this.createShiftDateTime(targetDate, employee.shiftEnd) : null,
+                  date: employeeBusinessDate,
+                  checkin: checkinTimeForStorage,
+                  checkout: null, // No checkout - will be set when employee checks out
+                  mode: 'onsite',
+                  status,
                   createdAt: new Date(),
                   updatedAt: new Date()
                 }
               });
             }
 
-            await this.updateAttendanceForBulkMarkPresent(tx, employee.id, targetDate, wasAbsent);
-            await this.updateMonthlyAttendanceForBulkMarkPresent(tx, employee.id, targetDate, wasAbsent);
+            // Update attendance tables (following checkin pattern)
+            await this.updateMonthlyAttendanceSummary(employee.id, employeeBusinessDate, status);
+            await this.updateBaseAttendance(employee.id, status);
+
+            // Create late log if status is 'late' (following checkin pattern)
+            if (status === 'late') {
+              const actualTimeIn = `${checkinTimeForStorage.getUTCHours().toString().padStart(2, '0')}:${checkinTimeForStorage.getUTCMinutes().toString().padStart(2, '0')}`;
+              
+              await tx.lateLog.create({
+                data: {
+                  empId: employee.id,
+                  date: employeeBusinessDate,
+                  scheduledTimeIn: shiftStart,
+                  actualTimeIn: actualTimeIn,
+                  minutesLate: minutesLate,
+                  reason: null,
+                  actionTaken: 'Created',
+                  lateType: null,
+                  justified: null
+                }
+              });
+              markedLate++;
+            }
+
+            // Create half-day log if status is 'half_day' (following checkin pattern)
+            if (status === 'half_day') {
+              const actualTimeIn = `${checkinTimeForStorage.getUTCHours().toString().padStart(2, '0')}:${checkinTimeForStorage.getUTCMinutes().toString().padStart(2, '0')}`;
+              
+              await tx.halfDayLog.create({
+                data: {
+                  empId: employee.id,
+                  date: employeeBusinessDate,
+                  scheduledTimeIn: shiftStart,
+                  actualTimeIn: actualTimeIn,
+                  minutesLate: minutesLate,
+                  reason: null,
+                  actionTaken: 'Created',
+                  halfDayType: null,
+                  justified: null
+                }
+              });
+              markedHalfDay++;
+            }
             
             markedPresent++;
           } catch (error) {
-            console.error(`Error processing employee ${employee.id}:`, error);
+            console.error(`Error processing employee ${employee.id} (${employee.firstName} ${employee.lastName}):`, error);
             errors++;
           }
         }
       }, {
-        timeout: 30000, // Increase timeout to 30 seconds
-        maxWait: 10000  // Maximum wait time for transaction to start
+        timeout: 30000,
+        maxWait: 10000
       });
       
-      // Add small delay between batches to prevent overwhelming the database
       if (i + batchSize < employees.length) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
     
-    console.log(`Bulk mark present operation completed. Marked: ${markedPresent}, Errors: ${errors}, Skipped: ${skipped}`);
+    console.log(`Bulk checkin operation completed. Marked: ${markedPresent} (${markedLate} late, ${markedHalfDay} half-day), Errors: ${errors}, Skipped: ${skipped}`);
     
     // Create a single HR log entry for the entire bulk operation
     await this.prisma.hRLog.create({
       data: {
         hrId: 1, // TODO: Get from authenticated user
         actionType: 'bulk_mark_present',
-        affectedEmployeeId: null, // Set to null for bulk operations
-        description: `Bulk marked ${markedPresent} employees present for ${date}${reason ? ` - Reason: ${reason}` : ''}`
+        affectedEmployeeId: null,
+        description: `Bulk checkin: ${markedPresent} employee(s) for ${dateStr}${employee_ids ? ` (IDs: ${employee_ids.join(', ')})` : ''} - Status: ${markedPresent - markedLate - markedHalfDay} present, ${markedLate} late, ${markedHalfDay} half-day${reason ? ` - Reason: ${reason}` : ''}`
       }
     });
 
-    const message = `Bulk mark present completed for ${date}${reason ? ` - Reason: ${reason}` : ''}`;
+    const employeeInfo = employee_ids ? ` for ${employee_ids.length} specified employee(s)` : '';
+    const statusInfo = markedLate > 0 || markedHalfDay > 0 ? ` (${markedPresent - markedLate - markedHalfDay} present, ${markedLate} late, ${markedHalfDay} half-day)` : '';
+    const message = `Bulk checkin completed${employeeInfo} for ${dateStr}${statusInfo}${reason ? ` - Reason: ${reason}` : ''}`;
     return { message, marked_present: markedPresent, errors, skipped };
   }
 
@@ -3444,18 +3663,23 @@ export class AttendanceService {
   }
 
   /**
-   * Helper method to create shift date time for a specific date
+   * Creates a shift datetime from date and time string, handling PKT timezone consistently
+   * with check-in logic. Uses UTC setters to ensure proper date/time handling.
    */
   private createShiftDateTime(date: Date, timeString: string): Date {
-    // Parse time string directly (e.g., "09:00" -> hours=9, minutes=0)
-    const [hours, minutes] = timeString.split(':').map(Number);
+    // Handle time strings that might be just hours (e.g., '21' instead of '21:00')
+    const timeParts = timeString.split(':');
+    const hours = parseInt(timeParts[0], 10);
+    const minutes = timeParts[1] ? parseInt(timeParts[1], 10) : 0;
     
-    if (isNaN(hours) || isNaN(minutes)) {
-      throw new Error(`Invalid time format: ${timeString}. Expected format: HH:MM`);
+    if (isNaN(hours) || hours < 0 || hours > 23 || isNaN(minutes) || minutes < 0 || minutes > 59) {
+      throw new Error(`Invalid time format: ${timeString}. Expected format: HH:MM or HH`);
     }
 
+    // Create datetime using UTC setters for consistency with check-in logic
+    // This ensures the time is set correctly regardless of server timezone
     const shiftDateTime = new Date(date);
-    shiftDateTime.setHours(hours, minutes, 0, 0);
+    shiftDateTime.setUTCHours(hours, minutes, 0, 0);
 
     return shiftDateTime;
   }
