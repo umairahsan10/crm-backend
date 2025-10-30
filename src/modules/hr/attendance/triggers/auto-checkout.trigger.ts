@@ -57,11 +57,15 @@ export class AutoCheckoutTrigger {
       targetDate.setHours(0, 0, 0, 0);
 
       // Fetch all attendance logs for targetDate with missing checkout and not absent
+      // Only include logs for active employees
       const logs = await this.prisma.attendanceLog.findMany({
         where: {
           date: targetDate,
           checkout: null,
-          NOT: { status: 'absent' }
+          NOT: { status: 'absent' },
+          employee: {
+            status: 'active'
+          }
         },
         select: {
           id: true,
@@ -69,7 +73,7 @@ export class AutoCheckoutTrigger {
           checkin: true,
           status: true,
           employee: {
-            select: { shiftStart: true, shiftEnd: true }
+            select: { shiftStart: true, shiftEnd: true, status: true }
           }
         }
       });
