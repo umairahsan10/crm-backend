@@ -34,81 +34,7 @@ import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto, EmployeeHalfDayStatsD
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) { }
 
-  // Helper function to create PKT timezone-aware date for storage
-  private createPKTDateForStorage(dateString: string, timeString: string): Date {
-    try {
-      // Extract time components directly from the ISO string
-      const timeMatch = timeString.match(/T(\d{2}):(\d{2}):(\d{2})/);
 
-      if (!timeMatch) {
-        throw new BadRequestException('Invalid time format - could not extract time from: ' + timeString);
-      }
-
-      const hours = parseInt(timeMatch[1], 10);
-      const minutes = parseInt(timeMatch[2], 10);
-      const seconds = parseInt(timeMatch[3], 10);
-
-      console.log(`Storage - Parsed time components: ${hours}:${minutes}:${seconds}`);
-
-      // Create the date
-      const date = new Date(dateString);
-      
-      if (isNaN(date.getTime())) {
-        throw new BadRequestException('Invalid date format: ' + dateString);
-      }
-
-      // Set UTC time directly to ensure it stores as entered time
-      // Since PKT is UTC+5, if we want to store 9:00 as 9:00, 
-      // we set UTC time to 9:00 (which will display as 9:00)
-      const pktDate = new Date(date);
-      pktDate.setUTCHours(hours, minutes, seconds, 0);
-
-      if (isNaN(pktDate.getTime())) {
-        throw new BadRequestException('Invalid time values for storage: ' + hours + ':' + minutes + ':' + seconds);
-      }
-
-      return pktDate;
-    } catch (error) {
-      console.error('Error in createPKTDateForStorage:', error);
-      throw new BadRequestException('Failed to parse time for storage: ' + error.message);
-    }
-  }
-
-  // Helper function to create local time for calculations
-  private createLocalTimeForCalculation(dateString: string, timeString: string): Date {
-    try {
-      // Extract time components directly from the ISO string
-      const timeMatch = timeString.match(/T(\d{2}):(\d{2}):(\d{2})/);
-
-      if (!timeMatch) {
-        throw new BadRequestException('Invalid time format - could not extract time from: ' + timeString);
-      }
-
-      const hours = parseInt(timeMatch[1], 10);
-      const minutes = parseInt(timeMatch[2], 10);
-      const seconds = parseInt(timeMatch[3], 10);
-
-      console.log(`Parsed time components: ${hours}:${minutes}:${seconds}`);
-
-      // Since input is already Pakistani time, treat it as local time
-      const date = new Date(dateString);
-      
-      if (isNaN(date.getTime())) {
-        throw new BadRequestException('Invalid date format: ' + dateString);
-      }
-
-      date.setHours(hours, minutes, seconds, 0);
-
-      if (isNaN(date.getTime())) {
-        throw new BadRequestException('Invalid time values: ' + hours + ':' + minutes + ':' + seconds);
-      }
-
-      return date;
-    } catch (error) {
-      console.error('Error in createLocalTimeForCalculation:', error);
-      throw new BadRequestException('Failed to parse time: ' + error.message);
-    }
-  }
 
   async getAttendanceLogs(query: GetAttendanceLogsDto): Promise<AttendanceLogResponseDto[]> {
     try {
@@ -201,7 +127,7 @@ export class AttendanceService {
       console.log('=== CHECKIN DEBUG START ===');
       console.log('Input data:', checkinData);
       
-      const { employee_id, date, checkin, mode } = checkinData;
+      const { employee_id, date, checkin, mode, timezone, offset_minutes } = checkinData;
 
       // Ensure employee_id is a number
       const employeeId = Number(employee_id);
@@ -223,11 +149,27 @@ export class AttendanceService {
         throw new BadRequestException('Employee not found');
       }
 
-      // Check if already checked in for this date
+      // Compute local time using provided offset or default +300 (Asia/Karachi)
+      const checkinUtc = new Date(checkin);
+      if (isNaN(checkinUtc.getTime())) {
+        throw new BadRequestException('Invalid checkin timestamp');
+      }
+
+      const effectiveOffsetMinutes = Number.isFinite(offset_minutes as any)
+        ? Number(offset_minutes)
+        : 300; // default PKT UTC+5
+
+      const checkinLocal = new Date(checkinUtc.getTime() + effectiveOffsetMinutes * 60 * 1000);
+
+      // Derive local business date (YYYY-MM-DD) from local time
+      const localDateStr = `${checkinLocal.getUTCFullYear()}-${String(checkinLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(checkinLocal.getUTCDate()).padStart(2, '0')}`;
+      const businessDateLocal = new Date(localDateStr);
+
+      // Check if already checked in for this local business date
       const existingCheckin = await this.prisma.attendanceLog.findFirst({
         where: {
           employeeId,
-          date: new Date(date)
+          date: businessDateLocal
         }
       });
 
@@ -235,17 +177,10 @@ export class AttendanceService {
         throw new BadRequestException('Employee already checked in for this date');
       }
 
-      // Create dates - one for storage (PKT timezone-aware) and one for calculations (local)
-      console.log('About to parse time for storage...');
-      const checkinTimeForStorage = this.createPKTDateForStorage(date, checkin);
-      console.log('Storage time parsed successfully:', checkinTimeForStorage);
-      
-      console.log('About to parse time for calculation...');
-      const checkinTimeForCalculation = this.createLocalTimeForCalculation(date, checkin);
-      console.log('Calculation time parsed successfully:', checkinTimeForCalculation);
-      
-      const checkinDatePKT = new Date(date);
-      console.log('Date PKT created:', checkinDatePKT);
+      // Use computed local time for storage and calculations
+      const checkinTimeForStorage = checkinLocal;
+      const checkinTimeForCalculation = checkinLocal;
+      const checkinDatePKT = businessDateLocal; // local business date
 
       // Get employee's shift times (default to 9:00 AM - 5:00 PM if not set)
       const shiftStart = employee.shiftStart || '09:00';
@@ -264,15 +199,15 @@ export class AttendanceService {
       
       console.log('Parsed shift times:', { shiftStartHour, shiftStartMinute, shiftEndHour, shiftEndMinute });
 
-      // Create expected shift times for the PKT date (for calculation purposes)
+      // Create expected shift start in the same local timeline (use UTC setters on businessDateLocal)
       console.log('Creating expected shift start...');
       const expectedShiftStart = new Date(checkinDatePKT);
-      expectedShiftStart.setHours(shiftStartHour, shiftStartMinute, 0, 0);
+      expectedShiftStart.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
       console.log('Expected shift start created:', expectedShiftStart);
 
       console.log('Creating expected shift end...');
       const expectedShiftEnd = new Date(checkinDatePKT);
-      expectedShiftEnd.setHours(shiftEndHour, shiftEndMinute, 0, 0);
+      expectedShiftEnd.setUTCHours(shiftEndHour, shiftEndMinute, 0, 0);
       console.log('Expected shift end created:', expectedShiftEnd);
 
       // Calculate minutes late from shift start using local calculation time
@@ -292,9 +227,9 @@ export class AttendanceService {
       
       // Debug logging
       console.log(`Check-in Debug Info:`);
-      console.log(`- Input time: ${checkin} (Pakistani time)`);
-      console.log(`- Calculated time: ${checkinTimeForCalculation.toISOString()}`);
-      console.log(`- Date: ${checkinDatePKT.toISOString().split('T')[0]}`);
+      console.log(`- Input UTC time: ${checkin}`);
+      console.log(`- Local time (offset ${effectiveOffsetMinutes}): ${checkinTimeForCalculation.toISOString()}`);
+      console.log(`- Local business date: ${checkinDatePKT.toISOString().split('T')[0]}`);
       console.log(`- Shift start: ${expectedShiftStart.toISOString()}`);
       console.log(`- Minutes late: ${minutesLate}`);
 
@@ -347,21 +282,21 @@ export class AttendanceService {
         }
       }
 
-      // Create or update attendance log using the PKT timezone-aware time for storage
+      // Create or update attendance log using the local timezone-normalized time for storage
       const attendanceLog = await this.prisma.attendanceLog.upsert({
         where: {
           id: existingCheckin?.id || 0
         },
         update: {
-          checkin: checkinTimeForStorage, // This will store as 9:00 if entered as 9:00
+          checkin: checkinTimeForStorage,
           mode: mode || null,
           status,
           updatedAt: new Date()
         },
         create: {
           employeeId,
-          date: checkinDatePKT, // Use the PKT date (which might be next day)
-          checkin: checkinTimeForStorage, // This will store as 9:00 if entered as 9:00
+          date: checkinDatePKT,
+          checkin: checkinTimeForStorage,
           mode: mode || null,
           status
         }
@@ -428,9 +363,13 @@ export class AttendanceService {
         employee_id: attendanceLog.employeeId,
         date: attendanceLog.date?.toISOString().split('T')[0] || null,
         checkin: attendanceLog.checkin?.toISOString() || null,
+        checkin_local: checkinTimeForCalculation?.toISOString() || null,
         mode: attendanceLog.mode,
         status: attendanceLog.status as 'present' | 'late' | 'half_day' | 'absent' | null,
         late_details: lateDetails,
+        timezone: timezone || 'Asia/Karachi',
+        offset_minutes: effectiveOffsetMinutes,
+        local_date: localDateStr,
         created_at: attendanceLog.createdAt.toISOString(),
         updated_at: attendanceLog.updatedAt.toISOString()
       };
@@ -445,7 +384,7 @@ export class AttendanceService {
 
   async checkout(checkoutData: CheckoutDto): Promise<CheckoutResponseDto> {
     try {
-      const { employee_id, date, checkout } = checkoutData;
+      const { employee_id, date, checkout, timezone, offset_minutes } = checkoutData;
 
       // Ensure employee_id is a number
       const employeeId = Number(employee_id);
@@ -459,11 +398,25 @@ export class AttendanceService {
         throw new BadRequestException('Employee not found');
       }
 
-      // Check if employee has checked in for this date
+      // Compute local time for checkout using provided offset (default +300 for PKT)
+      const checkoutUtc = new Date(checkout);
+      if (isNaN(checkoutUtc.getTime())) {
+        throw new BadRequestException('Invalid checkout timestamp');
+      }
+
+      const effectiveOffsetMinutes = Number.isFinite(offset_minutes as any)
+        ? Number(offset_minutes)
+        : 300;
+
+      const checkoutLocal = new Date(checkoutUtc.getTime() + effectiveOffsetMinutes * 60 * 1000);
+      const localDateStr = `${checkoutLocal.getUTCFullYear()}-${String(checkoutLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(checkoutLocal.getUTCDate()).padStart(2, '0')}`;
+      const businessDateLocal = new Date(localDateStr);
+
+      // Check if employee has checked in for this local business date
       const existingAttendance = await this.prisma.attendanceLog.findFirst({
         where: {
           employeeId,
-          date: new Date(date)
+          date: businessDateLocal
         }
       });
 
@@ -475,8 +428,8 @@ export class AttendanceService {
         throw new BadRequestException('Employee already checked out for this date');
       }
 
-      // Create checkout time for storage (PKT timezone-aware)
-      const checkoutTimeForStorage = this.createPKTDateForStorage(date, checkout);
+      // Use local time for storage
+      const checkoutTimeForStorage = checkoutLocal;
 
       // Calculate total hours worked using the stored times
       const checkinTime = existingAttendance.checkin;
@@ -498,9 +451,13 @@ export class AttendanceService {
         date: updatedAttendance.date?.toISOString().split('T')[0] || null,
         checkin: updatedAttendance.checkin?.toISOString() || null,
         checkout: updatedAttendance.checkout?.toISOString() || null,
+        checkout_local: checkoutLocal.toISOString(),
         mode: updatedAttendance.mode,
         status: updatedAttendance.status as 'present' | 'late' | 'half_day' | 'absent' | null,
         total_hours_worked: totalHoursWorked,
+        timezone: timezone || 'Asia/Karachi',
+        offset_minutes: effectiveOffsetMinutes,
+        local_date: localDateStr,
         created_at: updatedAttendance.createdAt.toISOString(),
         updated_at: updatedAttendance.updatedAt.toISOString()
       };
