@@ -224,6 +224,11 @@ export class AttendanceService {
           console.log('Night shift detected - adjusted minutes late:', minutesLate);
         }
       }
+
+      // If minutesLate is negative (early/on-time), normalize to 0 to avoid misclassification
+      if (minutesLate < 0) {
+        minutesLate = 0;
+      }
       
       // Debug logging
       console.log(`Check-in Debug Info:`);
@@ -280,6 +285,10 @@ export class AttendanceService {
             requires_reason: true
           };
         }
+      } else {
+        // Explicitly set present when on-time or early
+        status = 'present';
+        lateDetails = null;
       }
 
       // Create or update attendance log using the local timezone-normalized time for storage
