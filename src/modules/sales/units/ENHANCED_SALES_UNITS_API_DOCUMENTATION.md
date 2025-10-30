@@ -1,37 +1,238 @@
-# Enhanced Sales Units API Documentation
+# Sales Units API Testing Guide
 
-This document contains the **COMPLETELY ENHANCED** Sales Units API that now matches and exceeds Production Units API capabilities.
-
----
-
-## 🚀 New Features Overview
-
-### ✅ **Advanced Query Capabilities**
-- **Pagination Support** - Page-based navigation with configurable limits
-- **Advanced Filtering** - Filter by head assignment, teams, leads, employees
-- **Search Functionality** - Search by name, email, or phone
-- **Sorting Options** - Sort by any field with asc/desc order
-- **Include Parameters** - Include related data (employees, teams, leads)
-
-### ✅ **Hierarchical Role-Based Access Control**
-- **dep_manager** - Full access to all units
-- **unit_head** - Access to own unit only
-- **team_lead** - Access to units where they lead teams
-- **senior/junior** - Access to units where they are sales employees
-
-### ✅ **Team Management**
-- **Add Teams** - Assign orphan teams to sales units
-- **Remove Teams** - Remove teams from sales units
-- **Available Teams** - List teams available for assignment
-
-### ✅ **Enhanced Data Filtering**
-- **Role-based Data Filtering** - Users see only data they're authorized to access
-- **Dynamic Include Clauses** - Include related data based on query parameters
-- **Comprehensive Counts** - Teams, employees, leads, and archive leads counts
+This guide mirrors the Production Units testing document style and provides complete, ready-to-use testing bodies for all Sales Units endpoints.
 
 ---
 
-## 📋 API Endpoints
+## Authentication Setup
+1. Login with a user who has Sales department access.
+2. Copy the JWT token from the response.
+3. In Swagger UI, click Authorize and enter: `Bearer <your_jwt_token>`.
+
+---
+
+## 1. Create Sales Unit
+
+Endpoint: `POST /sales/units`
+
+Required Role: `dep_manager`
+
+Test Body 1: Create Unit with Head
+```json
+{
+  "name": "North Region",
+  "email": "north@sales.example",
+  "phone": "+1-555-0100",
+  "address": "123 Ave, City",
+  "headId": 101
+}
+```
+
+Test Body 2: Create Unit without Head
+```json
+{
+  "name": "South Region",
+  "email": "south@sales.example",
+  "phone": "+1-555-0200",
+  "address": "456 Blvd, City"
+}
+```
+
+Expected Response:
+```json
+{
+  "success": true,
+  "message": "New Unit Created Successfully"
+}
+```
+
+Note: Query parameters are not allowed on POST. Use body only.
+
+---
+
+## 2. Get All Sales Units (Basic)
+
+Endpoint: `GET /sales/units`
+
+Required Role: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior`
+
+Test Cases:
+
+Test 1: Get All Units (No Parameters)
+```
+GET /sales/units
+```
+
+Test 2: Get Specific Unit via unitId
+```
+GET /sales/units?unitId=1
+```
+
+Test 3: Get Units with Employees
+```
+GET /sales/units?include=employees
+```
+
+Test 4: Get Units with Teams
+```
+GET /sales/units?include=teams
+```
+
+Test 5: Get Units with Leads
+```
+GET /sales/units?include=leads
+```
+
+Test 6: Get Units with Head, Teams, Employees, Leads
+```
+GET /sales/units?include=employees,teams,head,leads
+```
+
+Expected Response (shape):
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "North Region",
+      "email": "north@sales.example",
+      "phone": "+1-555-0100",
+      "address": "123 Ave, City",
+      "headId": 101,
+      "head": { "id": 101, "firstName": "John", "lastName": "Doe" },
+      "teamsCount": 2,
+      "employeesCount": 8,
+      "leadsCount": 25,
+      "crackedLeadsCount": 5,
+      "archiveLeadsCount": 4,
+      "conversionRate": 20.0,
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "total": 1,
+  "pagination": { "page": 1, "limit": 10, "totalPages": 1 },
+  "message": "Units retrieved successfully"
+}
+```
+
+---
+
+## 3. Advanced Filtering (Same Endpoint)
+
+Endpoint: `GET /sales/units` (with query parameters)
+
+Required Role: `dep_manager`, `unit_head`, `team_lead`, `senior`, `junior`
+
+Available Query Parameters:
+
+| Parameter     | Type     | Description                                      | Example                          |
+|---------------|----------|--------------------------------------------------|----------------------------------|
+| unitId        | number   | Get specific unit by ID                          | ?unitId=1                        |
+| include       | string   | employees,teams,head,leads (comma-separated)     | ?include=employees,teams,head    |
+| hasHead       | boolean  | Filter units with/without heads                  | ?hasHead=true                    |
+| hasTeams      | boolean  | Filter units with/without teams                  | ?hasTeams=true                   |
+| hasLeads      | boolean  | Filter units with/without leads                  | ?hasLeads=true                   |
+| hasEmployees  | boolean  | Filter units with/without employees              | ?hasEmployees=true               |
+| headEmail     | string   | Filter by unit head email (partial, ci)          | ?headEmail=john@                 |
+| headName      | string   | Filter by head first/last name (partial, ci)     | ?headName=john                   |
+| unitName      | string   | Filter by unit name (partial, ci)                | ?unitName=north                  |
+| minTeams      | number   | Minimum number of teams                          | ?minTeams=1                      |
+| maxTeams      | number   | Maximum number of teams                          | ?maxTeams=10                     |
+| minLeads      | number   | Minimum number of leads                          | ?minLeads=5                      |
+| maxLeads      | number   | Maximum number of leads                          | ?maxLeads=100                    |
+| page          | number   | Page number for pagination                        | ?page=1                          |
+| limit         | number   | Items per page (1..100)                           | ?limit=10                        |
+| sortBy        | string   | name,email,createdAt,updatedAt,headId            | ?sortBy=name                     |
+| sortOrder     | string   | asc, desc                                        | ?sortOrder=desc                  |
+| search        | string   | Search in name/email/phone                       | ?search=sales                    |
+
+Test Cases:
+
+Test 1: Basic Query
+```
+GET /sales/units?include=employees,teams
+```
+
+Test 2: Filter Units with Heads
+```
+GET /sales/units?hasHead=true
+```
+
+Test 3: Filter Units by Head Name
+```
+GET /sales/units?headName=john
+```
+
+Test 4: Filter Units with Leads Count Range
+```
+GET /sales/units?minLeads=10&maxLeads=100
+```
+
+Test 5: Pagination Test
+```
+GET /sales/units?page=1&limit=5
+```
+
+Test 6: Sorting Test
+```
+GET /sales/units?sortBy=name&sortOrder=desc
+```
+
+Test 7: Complex Filter
+```
+GET /sales/units?hasHead=true&hasTeams=true&include=employees,teams,head&sortBy=createdAt&sortOrder=desc
+```
+
+
+## 3.a. Get Available Heads
+
+Endpoint: `GET /sales/units/available-heads`
+
+Required Role: `dep_manager`
+
+Test 1: Get All Available Heads
+```
+GET /sales/units/available-heads
+```
+
+Test 2: Get Only Assigned Heads
+```
+GET /sales/units/available-heads?assigned=true
+```
+
+Test 3: Get Only Unassigned Heads
+```
+GET /sales/units/available-heads?assigned=false
+```
+
+Expected Response:
+```json
+{
+  "success": true,
+  "data": {
+    "heads": [
+      {
+        "id": 101,
+        "firstName": "John",
+        "lastName": "Doe",
+        "email": "john@example.com",
+        "currentUnit": { "id": 1, "name": "North Region" }
+      },
+      {
+        "id": 102,
+        "firstName": "Sarah",
+        "lastName": "Lee",
+        "email": "sarah@example.com",
+        "currentUnit": null
+      }
+    ]
+  },
+  "message": "Unit heads retrieved successfully"
+}
+```
+
 
 ### 1. **Enhanced Get All Units** (Now with Advanced Filtering)
 
@@ -279,7 +480,12 @@ GET /sales/units?hasHead=true&hasTeams=true&page=1&limit=10&sortBy=name&sortOrde
 ```
 
 #### **Add Team to Unit**
-**Endpoint:** `POST /sales/units/:id/teams/:teamId`
+**Endpoint:** `POST /sales/units/:id/teams`
+
+**Body:**
+```json
+{ "teamId": 5 }
+```
 
 **Response:**
 ```json
@@ -448,7 +654,8 @@ GET /sales/units/available-teams?assigned=false
 
 ### **Assign Team to Unit**
 ```bash
-POST /sales/units/1/teams/5
+POST /sales/units/1/teams
+{ "teamId": 5 }
 ```
 
 ---
@@ -466,3 +673,125 @@ The **Enhanced Sales Units API** now provides:
 7. **🎯 Sales-Specific Features** - Lead management, archive system, contact info
 
 **The Sales Units API now matches and exceeds Production Units API capabilities while maintaining its unique sales-specific features!**
+
+---
+
+# Complete Endpoint Reference (Parity + Sales Semantics)
+
+This section enumerates every endpoint with roles, parameters, bodies, responses, and errors to aid testing.
+
+Global
+- Auth: Bearer JWT
+- Department: Sales
+- No query params allowed on POST/PATCH/DELETE (400 if present)
+
+1) POST /sales/units (Create)
+- Roles: dep_manager
+- Body:
+```json
+{ "name": "North Region", "email": "north@sales.example", "phone": "+1-555-0100", "address": "123 Ave", "headId": 101, "logoUrl": null, "website": null }
+```
+- 201:
+```json
+{ "success": true, "message": "New Unit Created Successfully" }
+```
+- Errors: 400 invalid head/head role; 409 duplicate name/email/phone
+
+2) GET /sales/units (List)
+- Roles: dep_manager, unit_head, team_lead, senior, junior
+- Query:
+  - unitId, hasHead, hasTeams, hasLeads, hasEmployees
+  - headEmail, headName, unitName
+  - minTeams, maxTeams, minLeads, maxLeads
+  - include=employees,teams,head,leads
+  - page, limit, sortBy=name|email|createdAt|updatedAt|headId, sortOrder
+  - search
+- 200 example (truncated):
+```json
+{ "success": true, "data": [{ "id": 1, "name": "North Region", "teamsCount": 2, "employeesCount": 8, "leadsCount": 25, "crackedLeadsCount": 5, "archiveLeadsCount": 4, "conversionRate": 20.0 }], "total": 1, "pagination": { "page": 1, "limit": 10, "totalPages": 1 }, "message": "Units retrieved successfully" }
+```
+
+3) GET /sales/units/:id (Detail)
+- Roles: dep_manager, unit_head, team_lead, senior, junior
+- 200 example (truncated):
+```json
+{ "success": true, "data": { "id": 1, "name": "North Region", "head": { "id": 101 }, "teams": [ { "id": 7, "name": "Alpha", "teamLead": { "id": 201, "firstName": "Jane", "lastName": "Smith" } } ], "leads": [ { "id": 1001, "name": "Prospect A", "email": "a@example.com", "phone": "+1-555-4000", "assignedTo": { "id": 301, "firstName": "Bob", "lastName": "Johnson" } } ], "completedLeads": [ { "id": 2001, "crackedAt": "2024-01-20T14:30:00.000Z", "lead": { "id": 1002, "name": "Prospect B", "email": "b@example.com", "phone": "+1-555-4100" }, "employee": { "id": 301, "firstName": "Bob", "lastName": "Johnson" } } ], "summary": { "teamsCount": 2, "leadsCount": { "leads": 16, "completedLeads": 5, "total": 21 }, "conversionRate": 19.05 } }, "message": "Unit details retrieved successfully" }
+```
+- Errors: 404 not found, 403 forbidden by scope
+
+4) PATCH /sales/units/:id (Update)
+- Roles: dep_manager, unit_head (own unit)
+- Body (any subset):
+```json
+{ "name": "North Region Plus", "email": "north.plus@example", "headId": 102 }
+```
+- 200:
+```json
+{ "success": true, "message": "Unit updated successfully", "data": { "id": 1, "name": "North Region Plus", "head": { "id": 102, "firstName": "...", "lastName": "..." } } }
+```
+- Errors: 404 unit; 400 invalid head; 409 duplicate name/email/phone
+
+5) DELETE /sales/units/:id (Delete)
+- Roles: dep_manager
+- 200 (deleted):
+```json
+{ "success": true, "message": "Unit deleted successfully. 0 archived leads have been assigned unit ID null." }
+```
+- 200 (blocked):
+```json
+{ "success": false, "message": "Cannot delete unit. Please reassign dependencies first.", "dependencies": { "teams": { "count": 2, "details": [] }, "leads": { "count": 4, "details": [] }, "employees": { "count": 5, "details": [] } }, "archiveLeads": { "count": 3, "message": "3 archived leads will be assigned unit ID null" } }
+```
+- Errors: 404 unit
+
+6) GET /sales/units/available-heads
+- Roles: dep_manager
+- Query: assigned=true|false (optional)
+- 200:
+```json
+{ "success": true, "message": "Unit heads retrieved successfully", "data": { "heads": [{ "id": 101, "firstName": "John", "lastName": "Doe", "email": "john@example.com", "currentUnit": { "id": 1, "name": "North Region" } }] } }
+```
+
+7) GET /sales/units/available-teams
+- Roles: dep_manager, unit_head
+- Query: assigned=true|false (optional)
+- 200:
+```json
+{ "success": true, "data": [{ "id": 7, "name": "Alpha", "employeeCount": 5, "teamLead": { "id": 201, "firstName": "Jane", "lastName": "Smith", "email": "jane@example.com", "role": { "id": 4, "name": "team_lead" } }, "isAssigned": false, "currentUnit": null }], "total": 1, "message": "Available teams retrieved successfully" }
+```
+
+8) POST /sales/units/:id/teams (Assign team)
+- Roles: dep_manager, unit_head
+- Body:
+```json
+{ "teamId": 7 }
+```
+- 200:
+```json
+{ "success": true, "message": "Team \"Alpha\" successfully assigned to unit \"North Region\"" }
+```
+- Errors: 404 unit/team; 400 team already assigned
+
+9) DELETE /sales/units/:id/teams/:teamId (Unassign team)
+- Roles: dep_manager, unit_head
+- 200:
+```json
+{ "success": true, "message": "Team \"Alpha\" successfully removed from unit \"North Region\"" }
+```
+- Errors: 404 unit/team; 400 team does not belong to unit
+
+10) GET /sales/units/deleted/completed-leads
+- Roles: dep_manager
+- 200:
+```json
+{ "success": true, "data": [{ "id": 2001, "crackedAt": "2024-01-20T14:30:00.000Z", "lead": { "id": 1002, "name": "Prospect B", "email": "b@example.com", "phone": "+1-555-4100", "createdAt": "2024-01-10T09:00:00.000Z" }, "closedBy": { "id": 301, "firstName": "Bob", "lastName": "Johnson" } }], "total": 1, "message": "Completed leads from deleted units retrieved successfully" }
+```
+
+Standard Errors
+```json
+{ "statusCode": 400, "message": "Validation failed", "error": "Bad Request" }
+{ "statusCode": 401, "message": "Unauthorized", "error": "Unauthorized" }
+{ "statusCode": 403, "message": "Insufficient permissions", "error": "Forbidden" }
+{ "statusCode": 404, "message": "Resource not found", "error": "Not Found" }
+{ "statusCode": 409, "message": "Conflict occurred", "error": "Conflict" }
+{ "statusCode": 500, "message": "Internal server error", "error": "Internal Server Error" }
+```
