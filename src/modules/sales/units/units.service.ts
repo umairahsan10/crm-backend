@@ -112,6 +112,28 @@ export class UnitsService {
       }
     }
 
+    // Head filters
+    if (query.headEmail) {
+      whereClause.head = {
+        is: {
+          email: { contains: query.headEmail, mode: 'insensitive' }
+        }
+      };
+    }
+    if (query.headName) {
+      whereClause.head = {
+        is: {
+          OR: [
+            { firstName: { contains: query.headName, mode: 'insensitive' } },
+            { lastName: { contains: query.headName, mode: 'insensitive' } }
+          ]
+        }
+      };
+    }
+    if (query.unitName) {
+      whereClause.name = { contains: query.unitName, mode: 'insensitive' };
+    }
+
     // Search functionality
     if (query.search) {
       whereClause.OR = [
@@ -142,7 +164,7 @@ export class UnitsService {
             id: true,
             firstName: true,
             lastName: true
-            }
+          }
           },
           ...include
         },
@@ -168,9 +190,18 @@ export class UnitsService {
           where: { salesUnitId: unit.id }
         });
 
+        const crackedLeadsCount = await this.prisma.crackedLead.count({
+          where: { lead: { salesUnitId: unit.id } }
+        });
+
         const archiveLeadsCount = await this.prisma.archiveLead.count({
           where: { unitId: unit.id }
         });
+
+        const totalLeadsForConversion = leadsCount + archiveLeadsCount;
+        const conversionRate = totalLeadsForConversion > 0
+          ? Math.round(((crackedLeadsCount / totalLeadsForConversion) * 100) * 100) / 100
+          : 0;
 
         return {
           id: unit.id,
@@ -191,7 +222,9 @@ export class UnitsService {
           teamsCount,
           employeesCount,
           leadsCount,
+          crackedLeadsCount,
           archiveLeadsCount,
+          conversionRate,
           ...(unit.teams && { teams: unit.teams }),
           ...(unit.salesEmployees && { salesEmployees: unit.salesEmployees }),
           ...(unit.leads && { leads: unit.leads })
@@ -340,9 +373,41 @@ export class UnitsService {
       where: { unitId: unit.id }
     });
 
-    // Calculate conversion rate
-    const totalLeads = leadsCount + archiveLeadsCount;
-    const conversionRate = totalLeads > 0 ? (crackedLeadsCount / totalLeads) * 100 : 0;
+    // Calculate conversion rate (based on leads + completedLeads only for detail view)
+    const computedLeadsCount = Array.isArray(filteredLeads.active) ? filteredLeads.active.length : 0;
+    const computedCompletedCount = Array.isArray(filteredLeads.cracked) ? filteredLeads.cracked.length : 0;
+    const totalLeads = computedLeadsCount + computedCompletedCount;
+    const conversionRate = totalLeads > 0 ? (computedCompletedCount / totalLeads) * 100 : 0;
+
+    // Limit details; expose keys as leads and completedLeads (parity with teams)
+    const limitedLeads = {
+      leads: (filteredLeads.active || []).map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        email: l.email,
+        phone: l.phone,
+        assignedTo: l.assignedTo ? {
+          id: l.assignedTo.id,
+          firstName: l.assignedTo.firstName,
+          lastName: l.assignedTo.lastName
+        } : null
+      })),
+      completedLeads: (filteredLeads.cracked || []).map((c: any) => ({
+        id: c.id,
+        crackedAt: c.crackedAt,
+        lead: c.lead ? {
+          id: c.lead.id,
+          name: c.lead.name,
+          email: c.lead.email,
+          phone: c.lead.phone
+        } : null,
+        employee: c.employee ? {
+          id: c.employee.id,
+          firstName: c.employee.firstName,
+          lastName: c.employee.lastName
+        } : null
+      }))
+    };
 
     return {
       success: true,
@@ -359,16 +424,14 @@ export class UnitsService {
         updatedAt: unit.updatedAt,
         head: unit.head,
         teams: filteredTeams,
-        employees: filteredSalesEmployees,
-        leads: filteredLeads,
+        leads: limitedLeads.leads,
+        completedLeads: limitedLeads.completedLeads,
         summary: {
           teamsCount: filteredTeams.length,
-          employeesCount,
           leadsCount: {
-            active: filteredLeads.active.length,
-            cracked: filteredLeads.cracked.length,
-            archived: filteredLeads.archived.length,
-            total: leadsCount + archiveLeadsCount
+            leads: computedLeadsCount,
+            completedLeads: computedCompletedCount,
+            total: totalLeads
           },
           conversionRate: Math.round(conversionRate * 100) / 100
         }
@@ -380,10 +443,28 @@ export class UnitsService {
 
 
   async getArchiveLeadsFromDeletedUnits(currentUser: any) {
-    // Get all archive leads from deleted units (unitId = null)
-    const archiveLeads = await this.prisma.archiveLead.findMany({
-      where: { unitId: null },
+    // Deprecated in parity mode: replaced by completed leads endpoint
+    return this.getCompletedLeadsFromDeletedUnits(currentUser);
+  }
+
+  async getCompletedLeadsFromDeletedUnits(currentUser: any) {
+    // Get all completed (cracked) leads where the original unit has been deleted (lead.salesUnitId = null)
+    const cracked = await this.prisma.crackedLead.findMany({
+      where: {
+        lead: {
+          salesUnitId: null
+        }
+      },
       include: {
+        lead: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            createdAt: true
+          }
+        },
         employee: {
           select: {
             id: true,
@@ -393,31 +474,20 @@ export class UnitsService {
         }
       },
       orderBy: {
-        archivedOn: 'desc'
+        crackedAt: 'desc'
       }
     });
 
     return {
       success: true,
-      data: archiveLeads.map(archiveLead => ({
-        id: archiveLead.id,
-        leadId: archiveLead.leadId,
-        name: archiveLead.name,
-        email: archiveLead.email,
-        phone: archiveLead.phone,
-        source: archiveLead.source,
-        outcome: archiveLead.outcome,
-        qualityRating: archiveLead.qualityRating,
-        createdAt: archiveLead.createdAt,
-        archivedOn: archiveLead.archivedOn,
-        assignedTo: archiveLead.employee ? {
-          id: archiveLead.employee.id,
-          firstName: archiveLead.employee.firstName,
-          lastName: archiveLead.employee.lastName
-        } : null
+      data: cracked.map(item => ({
+        id: item.id,
+        crackedAt: item.crackedAt,
+        lead: item.lead,
+        closedBy: item.employee
       })),
-      total: archiveLeads.length,
-      message: archiveLeads.length > 0 ? 'Archive leads from deleted units retrieved successfully' : 'No archive leads found from deleted units'
+      total: cracked.length,
+      message: cracked.length > 0 ? 'Completed leads from deleted units retrieved successfully' : 'No completed leads found from deleted units'
     };
   }
 

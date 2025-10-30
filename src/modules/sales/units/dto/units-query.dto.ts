@@ -33,6 +33,45 @@ export class SalesUnitsQueryDto {
   @IsBoolean()
   hasEmployees?: boolean;
 
+  @ApiPropertyOptional({ description: 'Filter by unit head email (partial match)', example: 'head@company.com' })
+  @IsOptional()
+  @IsString()
+  headEmail?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by unit head name (firstName or lastName, partial)', example: 'john' })
+  @IsOptional()
+  @IsString()
+  headName?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by unit name (partial match)', example: 'north' })
+  @IsOptional()
+  @IsString()
+  unitName?: string;
+
+  @ApiPropertyOptional({ description: 'Minimum number of teams', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minTeams?: number;
+
+  @ApiPropertyOptional({ description: 'Maximum number of teams', example: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxTeams?: number;
+
+  @ApiPropertyOptional({ description: 'Minimum number of leads', example: 5 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minLeads?: number;
+
+  @ApiPropertyOptional({ description: 'Maximum number of leads', example: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxLeads?: number;
+
   @ApiPropertyOptional({ description: 'Include related data (employees,teams,leads)', example: 'employees,teams' })
   @IsOptional()
   @IsString()
