@@ -10,6 +10,7 @@ import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update
 import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
 import { FutureHolidayTrigger } from './triggers/future-holiday-trigger';
 import { AutoCheckoutTrigger } from './triggers/auto-checkout.trigger';
+import { AutoMarkAbsentTrigger } from './triggers/auto-mark-absent.trigger';
 
 @Module({
   imports: [ScheduleModule.forRoot()],
@@ -22,7 +23,8 @@ import { AutoCheckoutTrigger } from './triggers/auto-checkout.trigger';
           QuarterlyLeavesUpdateTrigger,
           WeekendAutoPresentTrigger,
           FutureHolidayTrigger,
-          AutoCheckoutTrigger
+          AutoCheckoutTrigger,
+          AutoMarkAbsentTrigger
         ],
 })
 export class AttendanceModule {}

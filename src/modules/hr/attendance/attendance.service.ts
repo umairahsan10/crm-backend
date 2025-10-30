@@ -3002,7 +3002,16 @@ export class AttendanceService {
 
       console.log(`Auto-marking absent for date: ${today}, current time: ${currentTime}`);
 
-      // Get all employees with their shift end times
+      // Get company settings to retrieve absentTime configuration
+      const company = await this.prisma.company.findFirst();
+      if (!company) {
+        throw new InternalServerErrorException('Company settings not found');
+      }
+
+      const absentTimeMinutes = company.absentTime || 180; // Default to 180 minutes (3 hours) if not set
+      console.log(`Using company absentTime: ${absentTimeMinutes} minutes`);
+
+      // Get all employees with their shift start times
       const employees = await this.prisma.employee.findMany({
         where: {
           status: 'active'
@@ -3011,6 +3020,7 @@ export class AttendanceService {
           id: true,
           firstName: true,
           lastName: true,
+          shiftStart: true,
           shiftEnd: true
         }
       });
@@ -3019,23 +3029,36 @@ export class AttendanceService {
       let leaveApplied = 0;
 
       for (const employee of employees) {
-        if (!employee.shiftEnd) {
-          console.log(`Employee ${employee.id} has no shift end time, skipping`);
+        if (!employee.shiftStart) {
+          console.log(`Employee ${employee.id} has no shift start time, skipping`);
           continue;
         }
 
-        // Calculate deadline (shift end + 30 minutes)
-        const shiftEndTime = employee.shiftEnd;
-        const [hours, minutes] = shiftEndTime.split(':').map(Number);
-        const deadlineMinutes = hours * 60 + minutes + 30;
-        const deadlineHours = Math.floor(deadlineMinutes / 60);
-        const deadlineMins = deadlineMinutes % 60;
-        const deadlineTime = `${deadlineHours.toString().padStart(2, '0')}:${deadlineMins.toString().padStart(2, '0')}:00`;
+        // Calculate deadline (shift start + absentTime from company settings)
+        const shiftStartTime = employee.shiftStart;
+        const [shiftHours, shiftMins] = shiftStartTime.split(':').map(Number);
+        const deadlineTotalMinutes = shiftHours * 60 + shiftMins + absentTimeMinutes;
+        const deadlineHours = Math.floor(deadlineTotalMinutes / 60);
+        const deadlineMins = deadlineTotalMinutes % 60;
+        
+        // Handle midnight crossing: if deadline goes past 23:59, wrap to next day
+        // For comparison, check if deadline has passed
+        const deadlineHoursSameDay = deadlineHours % 24;
+        const deadlineTime = `${deadlineHoursSameDay.toString().padStart(2, '0')}:${deadlineMins.toString().padStart(2, '0')}:00`;
 
-        console.log(`Employee ${employee.id} (${employee.firstName} ${employee.lastName}) - Shift end: ${shiftEndTime}, Deadline: ${deadlineTime}`);
+        console.log(`Employee ${employee.id} (${employee.firstName} ${employee.lastName}) - Shift start: ${shiftStartTime}, AbsentTime: ${absentTimeMinutes}min, Deadline: ${deadlineTime}${deadlineHours >= 24 ? ' (next day)' : ''}`);
 
         // Check if current time is past the deadline
-        if (currentTime > deadlineTime) {
+        // If deadline crossed midnight (deadlineHours >= 24), check if current time >= shiftStartTime (normalized to HH:MM:SS)
+        // Otherwise, check if current time > deadlineTime
+        const shiftStartTimeNormalized = shiftStartTime.includes(':') && shiftStartTime.split(':').length === 2 
+          ? shiftStartTime + ':00' 
+          : shiftStartTime;
+        const hasDeadlinePassed = deadlineHours >= 24 
+          ? currentTime >= shiftStartTimeNormalized 
+          : currentTime > deadlineTime;
+        
+        if (hasDeadlinePassed) {
           // Check if employee already has attendance log for today
           const existingLog = await this.prisma.attendanceLog.findFirst({
             where: {
