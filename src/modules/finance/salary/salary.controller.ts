@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Query, UseGuards, BadRequestException, Patch, Body } from '@nestjs/common';
+import { Controller, Post, Get, Param, Query, UseGuards, BadRequestException, Patch, Body, Request } from '@nestjs/common';
 import { FinanceSalaryService } from './salary.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
@@ -7,6 +7,17 @@ import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { Departments } from '../../../common/decorators/departments.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { MarkPaidBulkDto } from './dto/mark-paid.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: number;
+    role: string | number;
+    type: string;
+    department?: string;
+    permissions?: any;
+  };
+}
 
 @ApiTags('Finance Salary')
 @ApiBearerAuth()
@@ -33,10 +44,34 @@ export class FinanceSalaryController {
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
   @ApiOperation({ summary: 'Trigger salary calculation for all active employees' })
-  @ApiResponse({ status: 200, description: 'Salary calculation triggered for all employees' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Salary calculation triggered for all employees',
+    schema: {
+      type: 'object',
+      properties: {
+        totalEmployees: { type: 'number' },
+        successful: { type: 'number' },
+        failed: { type: 'number' },
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              employeeId: { type: 'number' },
+              employeeName: { type: 'string' },
+              status: { type: 'string' },
+              logId: { type: 'number', nullable: true },
+              error: { type: 'string', nullable: true }
+            }
+          }
+        }
+      }
+    }
+  })
   async calculateAllSalaries() {
-    await this.financeSalaryService.handleMonthlySalaryCalculation();
-    return { message: 'Salary calculation triggered for all employees' };
+    const data = await this.financeSalaryService.handleMonthlySalaryCalculation();
+    return data;
   }
 
   /**
@@ -77,36 +112,6 @@ export class FinanceSalaryController {
   }
 
   /**
-   * Get salary display for a specific employee with deductions subtracted
-   * 
-   * This endpoint retrieves the latest salary record for an employee and returns
-   * the salary information formatted for frontend display, including:
-   * - Net salary (base + bonus + commissions)
-   * - Deductions (attendance + chargeback + refund)
-   * - Final salary (net salary - deductions)
-   * 
-   * This is designed for frontend consumption to display salary information
-   * in employee salary lists and dashboards.
-   * 
-   * @param employeeId - Employee ID to retrieve salary for
-   * @param month - Optional month in YYYY-MM format (defaults to current month)
-   * @returns Salary display information with deductions subtracted
-   * 
-   * Required Permissions: salary_permission
-   */
-  @Get('display/:employeeId')
-  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-  @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Get salary display for a specific employee with deductions' })
-  @ApiParam({ name: 'employeeId', description: 'Employee ID to retrieve salary for', type: Number })
-  @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
-  @ApiResponse({ status: 200, description: 'Salary display returned successfully' })
-  async getSalaryDisplay(@Param('employeeId') employeeId: string, @Query('month') month?: string) {
-    const result = await this.financeSalaryService.getSalaryDisplay(parseInt(employeeId), month);
-    return result;
-  }
-
-  /**
    * Get comprehensive salary display for all employees with detailed breakdown
    * 
    * This endpoint retrieves comprehensive salary information for all active employees
@@ -114,23 +119,89 @@ export class FinanceSalaryController {
    * - Salary components (base salary, commission, bonus, deductions)
    * - Final salary calculation using formula: Base Salary + Bonus + Commission - Deductions
    * - Summary totals for all salary components
+   * - Pagination support for efficient data retrieval
    * 
    * This is designed for frontend consumption to display complete salary information
    * in salary management dashboards and reports.
    * 
    * @param month - Optional month in YYYY-MM format (defaults to current month)
-   * @returns Comprehensive salary information for all employees with detailed breakdown
+   * @param page - Page number (defaults to 1)
+   * @param limit - Number of records per page (defaults to 20, max 100)
+   * @returns Comprehensive salary information for all employees with detailed breakdown and pagination
    * 
    * Required Permissions: salary_permission
    */
   @Get('display-all')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Get comprehensive salary display for all employees' })
+  @ApiOperation({ summary: 'Get comprehensive salary display for all employees with pagination' })
   @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
-  @ApiResponse({ status: 200, description: 'All salaries display returned successfully' })
-  async getAllSalariesDisplay(@Query('month') month?: string) {
-    const result = await this.financeSalaryService.getAllSalariesDisplay(month);
+  @ApiQuery({ name: 'page', description: 'Page number (defaults to 1)', required: false, type: Number })
+  @ApiQuery({ name: 'limit', description: 'Number of records per page (defaults to 20, max 100)', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'All salaries display returned successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        month: { type: 'string' },
+        summary: {
+          type: 'object',
+          properties: {
+            totalEmployees: { type: 'number' },
+            totalBaseSalary: { type: 'number' },
+            totalCommission: { type: 'number' },
+            totalBonus: { type: 'number' },
+            totalNetSalary: { type: 'number' },
+            totalDeductions: { type: 'number' },
+            totalFinalSalary: { type: 'number' },
+          },
+        },
+        employees: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              employeeId: { type: 'number' },
+              employeeName: { type: 'string' },
+              department: { type: 'string' },
+              month: { type: 'string' },
+              baseSalary: { type: 'number' },
+              commission: { type: 'number' },
+              bonus: { type: 'number' },
+              netSalary: { type: 'number' },
+              attendanceDeductions: { type: 'number' },
+              chargebackDeduction: { type: 'number' },
+              refundDeduction: { type: 'number' },
+              deductions: { type: 'number' },
+              finalSalary: { type: 'number' },
+              status: { type: 'string', enum: ['paid', 'unpaid'] },
+              paidOn: { type: 'string', format: 'date-time', nullable: true },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+        pagination: {
+          type: 'object',
+          properties: {
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            total: { type: 'number' },
+            totalPages: { type: 'number' },
+            retrieved: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async getAllSalariesDisplay(
+    @Query('month') month?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    const result = await this.financeSalaryService.getAllSalariesDisplay(month, pageNum, limitNum);
     return result;
   }
 
@@ -209,6 +280,129 @@ export class FinanceSalaryController {
   @ApiResponse({ status: 200, description: 'Sales employee bonus updated successfully' })
   async updateSalesEmployeeBonus(@Body() body: { employee_id: number; bonusAmount: number }) {
     const result = await this.financeSalaryService.updateSalesEmployeeBonus(body.employee_id, body.bonusAmount);
+    return result;
+  }
+
+  /**
+   * Mark salary as paid for a single employee
+   * 
+   * This endpoint marks a specific employee's salary as paid for a given month.
+   * It updates the status to 'paid' and sets the paidOn timestamp.
+   * 
+   * @param employeeId - Employee ID to mark as paid
+   * @param month - Optional month in YYYY-MM format (defaults to current month)
+   * @param req - Authenticated request containing user information
+   * @returns Updated salary log information with payment details
+   * 
+   * Required Permissions: salary_permission
+   */
+  @Patch('mark-paid/:employeeId')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Mark salary as paid for a single employee' })
+  @ApiParam({ name: 'employeeId', description: 'Employee ID to mark as paid', type: Number })
+  @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
+  @ApiResponse({
+    status: 200,
+    description: 'Salary marked as paid successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        employeeId: { type: 'number' },
+        employeeName: { type: 'string' },
+        month: { type: 'string' },
+        status: { type: 'string', enum: ['paid'] },
+        paidOn: { type: 'string', format: 'date-time' },
+        processedBy: { type: 'number' },
+        processedByRole: { type: 'string', enum: ['Employee', 'Admin'] },
+        message: { type: 'string' },
+      },
+    },
+  })
+  async markSalaryAsPaid(
+    @Param('employeeId') employeeId: string,
+    @Query('month') month: string | undefined,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const employeeIdNum = parseInt(employeeId);
+    if (isNaN(employeeIdNum) || employeeIdNum <= 0) {
+      throw new BadRequestException('Invalid employeeId. Must be a positive number.');
+    }
+
+    if (!req.user || !req.user.id) {
+      throw new BadRequestException('User information not found in request.');
+    }
+
+    const processedByRole = req.user.type === 'admin' ? 'Admin' : 'Employee';
+    const result = await this.financeSalaryService.markSalaryAsPaid(
+      employeeIdNum,
+      month,
+      req.user.id,
+      processedByRole,
+    );
+    return result;
+  }
+
+  /**
+   * Mark salaries as paid for multiple employees in bulk
+   * 
+   * This endpoint marks salaries as paid for multiple employees in a single operation.
+   * It updates the status to 'paid' and sets the paidOn timestamp for all specified employees.
+   * 
+   * @param body - Request body containing employeeIds array and optional month
+   * @param req - Authenticated request containing user information
+   * @returns Summary of bulk operation with results for each employee
+   * 
+   * Required Permissions: salary_permission
+   */
+  @Patch('mark-paid-bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Permissions(PermissionName.salary_permission)
+  @ApiOperation({ summary: 'Mark salaries as paid for multiple employees in bulk' })
+  @ApiBody({ type: MarkPaidBulkDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk mark as paid operation completed',
+    schema: {
+      type: 'object',
+      properties: {
+        month: { type: 'string' },
+        totalEmployees: { type: 'number' },
+        successful: { type: 'number' },
+        alreadyPaid: { type: 'number' },
+        failed: { type: 'number' },
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              employeeId: { type: 'number' },
+              employeeName: { type: 'string' },
+              status: { type: 'string', enum: ['success', 'error', 'skipped'] },
+              message: { type: 'string' },
+              month: { type: 'string', nullable: true },
+              paidOn: { type: 'string', format: 'date-time', nullable: true },
+            },
+          },
+        },
+      },
+    },
+  })
+  async markSalariesAsPaidBulk(
+    @Body() body: MarkPaidBulkDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    if (!req.user || !req.user.id) {
+      throw new BadRequestException('User information not found in request.');
+    }
+
+    const processedByRole = req.user.type === 'admin' ? 'Admin' : 'Employee';
+    const result = await this.financeSalaryService.markSalariesAsPaidBulk(
+      body.employeeIds,
+      body.month,
+      req.user.id,
+      processedByRole,
+    );
     return result;
   }
 } 

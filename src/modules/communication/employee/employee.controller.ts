@@ -71,7 +71,7 @@ export class EmployeeController {
   }
 
   @Get('hr-requests/my-requests')
-  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production')
+  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production', 'Accounts')
   @ApiOperation({ summary: 'Get HR requests by employee', description: 'Returns all HR requests raised by a specific employee.' })
   @ApiQuery({ name: 'employeeId', type: Number, required: true, description: 'Employee ID to fetch HR requests for.' })
   @ApiResponse({ status: 200, description: 'Employee-specific HR requests retrieved successfully.' })
@@ -108,7 +108,7 @@ export class EmployeeController {
 
   @Post('hr-requests')
   @HttpCode(HttpStatus.CREATED)
-  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production')
+  @Departments('HR', 'Admin', 'Development', 'Marketing', 'Sales', 'Production', 'Accounts')
   @ApiOperation({ summary: 'Create a new HR request', description: 'Allows employees to raise a new HR request.' })
   @ApiBody({ type: CreateHrRequestDto })
   @ApiResponse({ status: 201, description: 'HR request created successfully.' })
