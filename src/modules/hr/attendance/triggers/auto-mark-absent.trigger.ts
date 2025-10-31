@@ -32,11 +32,12 @@ export class AutoMarkAbsentTrigger {
 
   /**
    * Auto-mark absent cron job.
-   * Runs every 30 minutes to check for employees who should be marked as absent.
-   * Marks employees as absent if they haven't checked in after their shift end time + 30 minutes.
+   * Runs every 2 hours from 11pm (23:00) to 3am (03:00) each day.
+   * Marks employees as absent if they haven't checked in after their shift end time + grace period.
    * If an employee has approved leave, applies leave instead of absent.
+   * Cron: '0 23,1,3 * * *' = At 23:00, 01:00, and 03:00 every day
    * */
-  @Cron('*/30 * * * *', {
+  @Cron('0 23,1,3 * * *', {
     name: 'auto-mark-absent',
     timeZone: 'Asia/Karachi' // PKT timezone
   })

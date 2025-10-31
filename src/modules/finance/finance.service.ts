@@ -480,37 +480,6 @@ export class FinanceService {
     return logEntry;
   }
 
-  /**
-   * Monthly salary calculation cron job.
-   * Runs on the 4th of every month at 5:00 PM PKT.
-   * Cron expression: '0 17 4 * *' = At 17:00 (5:00 PM) on day-of-month 4
-   */
-  @Cron('0 17 4 * *', { timeZone: 'Asia/Karachi' })
-  async handleMonthlySalaryCalculation() {
-    try {
-      // Check database connection first
-      const isHealthy = await this.prisma.isConnectionHealthy();
-      if (!isHealthy) {
-        this.logger.warn('Database connection is unhealthy, attempting to reconnect...');
-        const reconnected = await this.prisma.reconnectIfNeeded();
-        if (!reconnected) {
-          this.logger.warn('Failed to reconnect to database, skipping monthly salary calculation');
-          return;
-        }
-      }
-      
-      this.logger.log('🕔 5:00 PM PKT reached - Starting monthly auto salary calculation');
-      await this.calculateAllEmployees();
-      this.logger.log('✅ Monthly auto salary calculation completed successfully');
-    } catch (error) {
-      if (error.message?.includes("Can't reach database server") || error.code === 'P1001') {
-        this.logger.warn(`❌ Database connection issue in monthly salary cron: ${error.message}`);
-      } else {
-        this.logger.error(`❌ Monthly salary cron failed: ${error.message}`);
-        throw error; // Re-throw to let NestJS handle the error
-      }
-    }
-  }
 
   /**
    * Executes the daily job; if today is the last day of its month, calculate
