@@ -9,15 +9,6 @@ export class FinanceSalaryService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Get current date/time in PKT (Pakistan Time, UTC+5).
-   * Follows the same convention as attendance service.
-   * Note: For database timestamps, Prisma handles timezone conversion automatically via @default(now()) and @updatedAt.
-   */
-  private getCurrentDateInPKT(): Date {
-    const now = new Date();
-    return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
-  }
 
   /**
    * Get PKT date components (year, month, day) for accurate date calculations.
@@ -37,6 +28,141 @@ export class FinanceSalaryService {
   }
 
   /**
+   * Get calculation month string (YYYY-MM format).
+   * Uses PKT timezone for accurate month calculation.
+   * @param month - Optional month string (YYYY-MM). If not provided, defaults to current PKT month.
+   * @returns Month string in YYYY-MM format
+   */
+  private getCalculationMonth(month?: string): string {
+    const pktDate = this.getPKTDateComponents();
+    return month || `${pktDate.year}-${String(pktDate.month + 1).padStart(2, '0')}`;
+  }
+
+  /**
+   * Get previous month string (YYYY-MM format) from a given month.
+   * @param month - Month string (YYYY-MM)
+   * @returns Previous month string in YYYY-MM format
+   */
+  private getPreviousMonth(month: string): string {
+    const [year, monthNum] = month.split('-').map(Number);
+    let prevYear = year;
+    let prevMonth = monthNum - 1;
+
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+
+    return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+  }
+
+  /**
+   * Validate employee ID.
+   * @param employeeId - Employee ID to validate
+   * @throws BadRequestException if employee ID is invalid
+   */
+  private validateEmployeeId(employeeId: number): void {
+    if (!employeeId || employeeId <= 0 || isNaN(employeeId)) {
+      throw new BadRequestException('Invalid employeeId. Must be a positive number.');
+    }
+  }
+
+  /**
+   * Validate month format (YYYY-MM).
+   * @param month - Month string to validate
+   * @throws BadRequestException if month format is invalid
+   */
+  private validateMonthFormat(month?: string): void {
+    if (month) {
+      const monthRegex = /^\d{4}-\d{2}$/;
+      if (!monthRegex.test(month)) {
+        throw new BadRequestException('Invalid month format. Must be in YYYY-MM format (e.g., 2025-01).');
+      }
+    }
+  }
+
+  /**
+   * Get latest salary log for an employee and month.
+   * @param employeeId - Employee ID
+   * @param month - Month string (YYYY-MM)
+   * @returns Latest salary log or null if not found
+   */
+  private async getLatestSalaryLog(employeeId: number, month: string) {
+    return await this.prisma.netSalaryLog.findFirst({
+      where: {
+        employeeId,
+        month,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Parse month string to UTC date range (start and end of month).
+   * @param month - Month string in YYYY-MM format
+   * @returns Object with startDate and endDate (UTC)
+   */
+  private parseMonthToDateRange(month: string): { startDate: Date; endDate: Date } {
+    const [year, monthNum] = month.split('-').map(Number);
+    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999)); // Last day of the month
+    return { startDate, endDate };
+  }
+
+  /**
+   * Convert any date to PKT timezone components.
+   * @param date - Date to convert (Date object or string)
+   * @returns PKT date components (year, month, day, date)
+   */
+  private convertDateToPKT(date: Date | string): { year: number; month: number; day: number; date: Date } {
+    const inputDate = new Date(date);
+    // Convert to PKT (UTC+5)
+    const pktTime = new Date(inputDate.getTime() + (5 * 60 * 60 * 1000));
+    return {
+      year: pktTime.getUTCFullYear(),
+      month: pktTime.getUTCMonth(), // 0-based (0 = Jan)
+      day: pktTime.getUTCDate(),
+      date: pktTime,
+    };
+  }
+
+  /**
+   * Convert employee start date to PKT timezone components.
+   * @param startDate - Employee start date
+   * @returns PKT date components (year, month, day)
+   */
+  private convertEmployeeStartDateToPKT(startDate: Date | string): { year: number; month: number; day: number } {
+    const employeeStartDate = new Date(startDate);
+    const employeeStartPKT = new Date(employeeStartDate.getTime() + (5 * 60 * 60 * 1000));
+    return {
+      year: employeeStartPKT.getUTCFullYear(),
+      month: employeeStartPKT.getUTCMonth(),
+      day: employeeStartPKT.getUTCDate(),
+    };
+  }
+
+  /**
+   * Calculate final salary (net salary - deductions).
+   * Ensures final salary is not negative.
+   * @param netSalary - Net salary amount
+   * @param deductions - Total deductions
+   * @returns Final salary (non-negative)
+   */
+  private calculateFinalSalary(netSalary: number, deductions: number): number {
+    return Math.max(0, netSalary - deductions);
+  }
+
+  /**
+   * Format employee name from first and last name.
+   * @param firstName - Employee first name
+   * @param lastName - Employee last name
+   * @returns Formatted full name
+   */
+  private formatEmployeeName(firstName: string, lastName: string): string {
+    return `${firstName} ${lastName}`;
+  }
+
+  /**
    * Read-only salary calculation for current period (up to current date).
    * This method calculates salary and deductions but does NOT update the database.
    * It's used for real-time salary preview and analysis.
@@ -49,11 +175,9 @@ export class FinanceSalaryService {
     this.logger.log(`⏳ Starting read-only salary preview for employee ${employeeId} (end=${endDate ?? 'current date'})`);
     
     // Validate employeeId
-    if (!employeeId || isNaN(employeeId)) {
-      throw new BadRequestException(`Invalid employee ID: ${employeeId}`);
-    }
+    this.validateEmployeeId(employeeId);
     
-    this.logger.log(`✅ Employee ID validated: ${employeeId}`);
+    this.logger.log(`Employee ID validated: ${employeeId}`);
     
     // Calculate salary first (existing logic)
     const salaryResult = await this.calculateSalaryInternal(employeeId, undefined, endDate);
@@ -98,7 +222,7 @@ export class FinanceSalaryService {
     // Calculate final salary (base + bonus + commission - deductions)
     const finalSalary = salaryResult.netSalary.minus(deductionResult);
 
-    this.logger.log(`✅ Read-only salary preview completed for employee ${employeeId}`);
+    this.logger.log(`Read-only salary preview completed for employee ${employeeId}`);
     
     return {
       employee: {
@@ -143,20 +267,49 @@ export class FinanceSalaryService {
    * @param month - Optional month in YYYY-MM format (defaults to current month)
    * @param page - Page number (defaults to 1)
    * @param limit - Number of records per page (defaults to 20)
+   * @param departmentIds - Optional array of department IDs to filter by
+   * @param status - Optional employee status filter (active, inactive, terminated)
+   * @param minSalary - Optional minimum final salary filter
+   * @param maxSalary - Optional maximum final salary filter
+   * @param fromDate - Optional filter by salary log creation date from (YYYY-MM-DD)
+   * @param toDate - Optional filter by salary log creation date to (YYYY-MM-DD)
    * @returns Paginated salary display with summary and employee list
    */
-  public async getAllSalariesDisplay(month?: string, page: number = 1, limit: number = 20) {
-    // Get PKT date components for accurate month calculation
-    const pktDate = this.getPKTDateComponents();
-    const calculationMonth = month || `${pktDate.year}-${String(pktDate.month + 1).padStart(2, '0')}`;
+  public async getAllSalariesDisplay(
+    month?: string,
+    page: number = 1,
+    limit: number = 20,
+    departmentIds?: number[],
+    status?: string,
+    minSalary?: number,
+    maxSalary?: number,
+    fromDate?: string,
+    toDate?: string,
+  ) {
+    // Validate and get calculation month
+    this.validateMonthFormat(month);
+    const requestedMonth = this.getCalculationMonth(month);
 
-    this.logger.log(`📊 Fetching salary display for month: ${calculationMonth}`);
+    this.logger.log(`Fetching salary display for month: ${requestedMonth}${departmentIds ? `, departments: ${departmentIds.join(',')}` : ''}${status ? `, status: ${status}` : ''}`);
 
-    // STEP 1: Batch fetch all active employees with related data (1 query)
+    // Build employee where clause with filters
+    const employeeWhere: any = {};
+    
+    // Status filter - default to 'active' if not specified
+    if (status) {
+      employeeWhere.status = status;
+    } else {
+      employeeWhere.status = 'active';
+    }
+    
+    // Department filter
+    if (departmentIds && departmentIds.length > 0) {
+      employeeWhere.departmentId = { in: departmentIds };
+    }
+
+    // STEP 1: Batch fetch employees with related data (1 query) - with filters
     const employees = await this.prisma.employee.findMany({
-      where: {
-        status: 'active',
-      },
+      where: employeeWhere,
       select: {
         id: true,
         firstName: true,
@@ -181,7 +334,7 @@ export class FinanceSalaryService {
     const employeeIds = employees.map(emp => emp.id);
     if (employeeIds.length === 0) {
       return {
-        month: calculationMonth,
+        month: requestedMonth,
         summary: {
           totalEmployees: 0,
           totalBaseSalary: 0,
@@ -195,14 +348,55 @@ export class FinanceSalaryService {
       };
     }
 
-    // STEP 2: Batch fetch all salary logs for the month (1 query instead of N queries)
-    const salaryLogs = await this.prisma.netSalaryLog.findMany({
-      where: {
-        employeeId: { in: employeeIds },
-        month: calculationMonth,
-      },
+    // Build salary log where clause with date filters
+    const salaryLogWhere: any = {
+      employeeId: { in: employeeIds },
+      month: requestedMonth,
+    };
+    
+    // Date range filter for salary log creation date
+    if (fromDate || toDate) {
+      salaryLogWhere.createdAt = {};
+      if (fromDate) {
+        salaryLogWhere.createdAt.gte = new Date(fromDate + 'T00:00:00.000Z');
+      }
+      if (toDate) {
+        // Include the entire end date (up to 23:59:59.999)
+        const endDateTime = new Date(toDate + 'T23:59:59.999Z');
+        salaryLogWhere.createdAt.lte = endDateTime;
+      }
+    }
+
+    // STEP 2: Batch fetch all salary logs for the requested month (1 query instead of N queries)
+    let salaryLogs = await this.prisma.netSalaryLog.findMany({
+      where: salaryLogWhere,
       orderBy: { createdAt: 'desc' },
     });
+
+    // If no logs found for the requested month, try the previous month
+    let calculationMonth = requestedMonth;
+    if (salaryLogs.length === 0) {
+      const previousMonth = this.getPreviousMonth(requestedMonth);
+      this.logger.log(`No logs found for ${requestedMonth}, trying previous month: ${previousMonth}`);
+      
+      // Update month filter for previous month search, but keep date filters if present
+      const previousMonthWhere = {
+        ...salaryLogWhere,
+        month: previousMonth,
+      };
+      
+      salaryLogs = await this.prisma.netSalaryLog.findMany({
+        where: previousMonthWhere,
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (salaryLogs.length > 0) {
+        calculationMonth = previousMonth;
+        this.logger.log(`Found logs for previous month ${previousMonth}, using that instead`);
+      } else {
+        this.logger.log(`No logs found for previous month ${previousMonth} either`);
+      }
+    }
 
     // Create lookup map for O(1) access
     const salaryLogMap = new Map<number, typeof salaryLogs[0]>();
@@ -248,13 +442,13 @@ export class FinanceSalaryService {
         const refundDeduction = Number(employee.salesDepartment?.[0]?.refundDeductions || 0);
         
         // Final salary = netSalary (base + bonus + commission) - deductions
-        const finalSalary = Math.max(0, storedNetSalary - storedDeductions);
+        const finalSalary = this.calculateFinalSalary(storedNetSalary, storedDeductions);
 
         salaryResults.push({
-          employeeId: employee.id,
-          employeeName: `${employee.firstName} ${employee.lastName}`,
-          department: employee.department?.name || 'N/A',
-          month: calculationMonth,
+        employeeId: employee.id,
+        employeeName: this.formatEmployeeName(employee.firstName, employee.lastName),
+        department: employee.department?.name || 'N/A',
+          month: calculationMonth, // Use the actual month we found logs for
           baseSalary: parseFloat(baseSalary.toFixed(2)),
           commission: parseFloat(commission.toFixed(2)),
           bonus: parseFloat(bonus.toFixed(2)),
@@ -269,7 +463,7 @@ export class FinanceSalaryService {
           createdAt: salaryLog.createdAt,
         });
 
-        // Accumulate totals
+        // Accumulate totals (before salary filter - we'll recalculate after filtering)
         totalBaseSalary += baseSalary;
         totalCommission += commission;
         totalBonus += bonus;
@@ -282,21 +476,50 @@ export class FinanceSalaryService {
       }
     }
 
+    // Apply salary range filters (minSalary, maxSalary) if provided
+    let filteredResults = salaryResults;
+    if (minSalary !== undefined || maxSalary !== undefined) {
+      filteredResults = salaryResults.filter(result => {
+        const meetsMin = minSalary === undefined || result.finalSalary >= minSalary;
+        const meetsMax = maxSalary === undefined || result.finalSalary <= maxSalary;
+        return meetsMin && meetsMax;
+      });
+
+      // Recalculate totals based on filtered results
+      totalBaseSalary = 0;
+      totalCommission = 0;
+      totalBonus = 0;
+      totalNetSalary = 0;
+      totalDeductions = 0;
+      totalFinalSalary = 0;
+
+      filteredResults.forEach(result => {
+        totalBaseSalary += result.baseSalary;
+        totalCommission += result.commission;
+        totalBonus += result.bonus;
+        totalNetSalary += result.netSalary;
+        totalDeductions += result.deductions;
+        totalFinalSalary += result.finalSalary;
+      });
+
+      this.logger.log(`Applied salary range filter: ${salaryResults.length} -> ${filteredResults.length} results (min=${minSalary || 'none'}, max=${maxSalary || 'none'})`);
+    }
+
     // Validate pagination parameters
     const validatedPage = Math.max(1, Math.floor(page) || 1);
     const validatedLimit = Math.max(1, Math.min(100, Math.floor(limit) || 20)); // Max 100 per page
     const skip = (validatedPage - 1) * validatedLimit;
 
     // Calculate total before pagination (for pagination metadata)
-    const total = salaryResults.length;
+    const total = filteredResults.length;
     const totalPages = Math.ceil(total / validatedLimit);
 
     // Apply pagination to results
-    const paginatedResults = salaryResults.slice(skip, skip + validatedLimit);
+    const paginatedResults = filteredResults.slice(skip, skip + validatedLimit);
 
-    // Calculate summary totals (these are for ALL employees, not just the current page)
+    // Calculate summary totals (these are for ALL filtered employees, not just the current page)
     const summary = {
-      totalEmployees: total, // Total employees with salary records
+      totalEmployees: total, // Total employees with salary records after filters
       totalBaseSalary: parseFloat(totalBaseSalary.toFixed(2)),
       totalCommission: parseFloat(totalCommission.toFixed(2)),
       totalBonus: parseFloat(totalBonus.toFixed(2)),
@@ -306,11 +529,11 @@ export class FinanceSalaryService {
     };
 
     this.logger.log(
-      `✅ Salary display fetched: ${total} employees processed, showing page ${validatedPage} (${paginatedResults.length} records)`,
+      `Salary display fetched: ${total} employees processed, showing page ${validatedPage} (${paginatedResults.length} records)`,
     );
 
     return {
-      month: calculationMonth,
+      month: calculationMonth, // Return the actual month we found logs for
       summary,
       employees: paginatedResults,
       pagination: {
@@ -328,21 +551,10 @@ export class FinanceSalaryService {
    * This provides comprehensive salary information including commission breakdown and deduction details.
    */
   public async getDetailedSalaryBreakdown(employeeId: number, month?: string) {
-    // Validate employeeId
-    if (!employeeId || employeeId <= 0) {
-      throw new BadRequestException('Invalid employeeId. Must be a positive number.');
-    }
-
-    // Validate month format if provided
-    if (month) {
-      const monthRegex = /^\d{4}-\d{2}$/;
-      if (!monthRegex.test(month)) {
-        throw new BadRequestException('Invalid month format. Must be in YYYY-MM format (e.g., 2025-01).');
-      }
-    }
-
-    const currentDate = this.getCurrentDateInPKT();
-    const calculationMonth = month || `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    // Validate inputs
+    this.validateEmployeeId(employeeId);
+    this.validateMonthFormat(month);
+    const calculationMonth = this.getCalculationMonth(month);
 
     // Check if employee exists
     const employee = await this.prisma.employee.findUnique({
@@ -370,16 +582,10 @@ export class FinanceSalaryService {
     }
 
     // Get the latest salary log for this employee and month
-    const salaryLog = await this.prisma.netSalaryLog.findFirst({
-      where: {
-        employeeId,
-        month: calculationMonth,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const salaryLog = await this.getLatestSalaryLog(employeeId, calculationMonth);
 
     if (!salaryLog) {
-      throw new NotFoundException(`No salary record found for employee ${employee.firstName} ${employee.lastName} (ID: ${employeeId}) for month ${calculationMonth}. Please calculate salary first.`);
+      throw new NotFoundException(`No salary record found for employee ${this.formatEmployeeName(employee.firstName, employee.lastName)} (ID: ${employeeId}) for month ${calculationMonth}. Please calculate salary first.`);
     }
 
     // Get commission breakdown
@@ -397,7 +603,7 @@ export class FinanceSalaryService {
     const totalDeductions = attendanceDeductions + chargebackDeduction + refundDeduction;
 
     // Calculate final salary using the formula: Base Salary + Bonus + Commission - Deductions
-    const finalSalary = baseSalary + bonus + commission - totalDeductions;
+    const finalSalary = this.calculateFinalSalary(baseSalary + bonus + commission, totalDeductions);
 
     return {
       employee: {
@@ -435,14 +641,12 @@ export class FinanceSalaryService {
    * This method is called automatically by the cron job on the 4th of every month.
    */
   async handleMonthlySalaryCalculation() {
-    this.logger.log('🕔 5:00 PM PKT reached - Starting monthly auto salary calculation');
-    
     try {
       const result = await this.calculateAllEmployees();
-      this.logger.log('✅ Monthly salary calculation completed successfully');
+      this.logger.log('Monthly salary calculation completed successfully');
       return result;
     } catch (error) {
-      this.logger.error(`❌ Monthly salary calculation failed: ${error.message}`);
+      this.logger.error(`Monthly salary calculation failed: ${error.message}`);
       throw error;
     }
   }
@@ -453,7 +657,7 @@ export class FinanceSalaryService {
    * Uses batch operations to minimize database calls (O(n) -> O(1) queries).
    */
   public async calculateAllEmployees() {
-    this.logger.log('🔄 Starting optimized bulk salary calculation for all active employees');
+    this.logger.log('Starting optimized bulk salary calculation for all active employees');
     
     // Get PKT date components to ensure correct month/year calculation
     const pktDate = this.getPKTDateComponents();
@@ -464,7 +668,7 @@ export class FinanceSalaryService {
     const DAYS_IN_CYCLE = 30;
 
     // STEP 1: Batch fetch all employee data with joined accounts (reduces queries)
-    this.logger.log('📊 Batch fetching all employee data with accounts...');
+    this.logger.log('Batch fetching all employee data with accounts...');
     const [employees, salesDepts, company] = await Promise.all([
       this.prisma.employee.findMany({
       where: { status: 'active' },
@@ -498,7 +702,7 @@ export class FinanceSalaryService {
     ]);
 
     const employeeIds = employees.map(emp => emp.id);
-    this.logger.log(`📊 Found ${employees.length} active employees to process`);
+    this.logger.log(`Found ${employees.length} active employees to process`);
 
     // STEP 2: Batch fetch attendance summaries for current month (1 query instead of N)
     const attendanceSummaries = await this.prisma.monthlyAttendanceSummary.findMany({
@@ -546,7 +750,7 @@ export class FinanceSalaryService {
     const existingLogMap = new Map(existingSalaryLogs.map(log => [log.employeeId, log.id]));
 
     // STEP 5: Process all calculations in memory (0 DB queries)
-    this.logger.log('🔢 Processing salary calculations in memory...');
+    this.logger.log('Processing salary calculations in memory...');
     const salaryResults: any[] = [];
     const logUpdates: any[] = [];
     const logCreates: any[] = [];
@@ -575,13 +779,9 @@ export class FinanceSalaryService {
         // Compare using PKT date components for accuracy
         let startDay = 1;
         if (employee.startDate) {
-          const employeeStartDate = new Date(employee.startDate);
-          // Convert employee start date to PKT for comparison
-          const employeeStartPKT = new Date(employeeStartDate.getTime() + (5 * 60 * 60 * 1000));
-          const employeeStartYear = employeeStartPKT.getUTCFullYear();
-          const employeeStartMonth = employeeStartPKT.getUTCMonth();
-          if (employeeStartYear === year && employeeStartMonth === month) {
-            startDay = employeeStartPKT.getUTCDate();
+          const employeeStartPKT = this.convertEmployeeStartDateToPKT(employee.startDate);
+          if (employeeStartPKT.year === year && employeeStartPKT.month === month) {
+            startDay = employeeStartPKT.day;
           }
         }
 
@@ -630,16 +830,16 @@ export class FinanceSalaryService {
 
         results.push({
           employeeId: employee.id,
-          employeeName: `${employee.firstName} ${employee.lastName}`,
+          employeeName: this.formatEmployeeName(employee.firstName, employee.lastName),
           status: 'success',
           logId: existingLogId || null, // Will be set after create
         });
         successCount++;
       } catch (error) {
-        this.logger.error(`❌ Failed to process employee ${employee.id}: ${error.message}`);
+        this.logger.error(`Failed to process employee ${employee.id}: ${error.message}`);
         results.push({
           employeeId: employee.id,
-          employeeName: `${employee.firstName} ${employee.lastName}`,
+          employeeName: this.formatEmployeeName(employee.firstName, employee.lastName),
           status: 'error',
           error: error.message,
         });
@@ -648,6 +848,252 @@ export class FinanceSalaryService {
     }
 
     // STEP 6: Batch update/create salary logs in transaction (2-3 queries total)
+    this.logger.log(`Batch saving ${logUpdates.length} updates and ${logCreates.length} creates...`);
+    await this.prisma.$transaction(async (tx) => {
+      // Batch update existing logs
+      for (const update of logUpdates) {
+        await tx.netSalaryLog.update({
+          where: { id: update.id },
+          data: update.data,
+        });
+      }
+
+      // Batch create new logs
+      if (logCreates.length > 0) {
+        const createdLogs = await tx.netSalaryLog.createManyAndReturn({
+          data: logCreates,
+        });
+        
+        // Update results with new log IDs
+        createdLogs.forEach(log => {
+          const result = results.find(r => r.employeeId === log.employeeId && r.status === 'success');
+          if (result) {
+            result.logId = log.id;
+          }
+        });
+      }
+    });
+
+    this.logger.log(`Salary calculation summary: ${successCount} successful, ${errorCount} failed`);
+    this.logger.log(`Optimized bulk calculation completed - Reduced from ~${employees.length * 7} queries to ~8 queries`);
+
+    return {
+      totalEmployees: employees.length,
+      successful: successCount,
+      failed: errorCount,
+      results: results,
+    };
+  }
+
+  /**
+   * Calculate salary for all active employees for a SPECIFIC month.
+   * Used by cron job to calculate previous month's salary on 1st of each month.
+   * Handles full month calculation (30/31 days depending on month).
+   * 
+   * @param targetYear - Year to calculate for (e.g., 2025)
+   * @param targetMonth - Month to calculate for (0-based: 0 = Jan, 11 = Dec)
+   * @returns Calculation results with summary
+   */
+  public async calculateForSpecificMonth(targetYear: number, targetMonth: number) {
+    this.logger.log(`Starting salary calculation for ${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`);
+    
+    // Get last day of the target month (handles 30/31/28/29)
+    const lastDayOfMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const calculationMonth = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+    const DAYS_IN_CYCLE = 30;
+
+    // STEP 1: Batch fetch all employee data with joined accounts
+    this.logger.log('Batch fetching all employee data with accounts...');
+    const [employees, salesDepts, company] = await Promise.all([
+      this.prisma.employee.findMany({
+        where: { status: 'active' },
+        select: { 
+          id: true, 
+          firstName: true, 
+          lastName: true,
+          startDate: true,
+          endDate: true,
+          bonus: true,
+          accounts: {
+            select: {
+              baseSalary: true,
+            },
+          },
+        },
+      }),
+      this.prisma.salesDepartment.findMany({
+        where: { employee: { status: 'active' } },
+        select: { 
+          employeeId: true, 
+          commissionAmount: true, 
+          salesBonus: true,
+          chargebackDeductions: true,
+          refundDeductions: true,
+        },
+      }),
+      this.prisma.company.findFirst({
+        select: { monthlyLatesDays: true },
+      }),
+    ]);
+
+    const employeeIds = employees.map(emp => emp.id);
+    this.logger.log(`Found ${employees.length} active employees to process`);
+
+    // STEP 2: Batch fetch attendance summaries for target month
+    const attendanceSummaries = await this.prisma.monthlyAttendanceSummary.findMany({
+      where: {
+        empId: { in: employeeIds },
+        month: calculationMonth,
+      },
+      select: {
+        empId: true,
+        totalAbsent: true,
+        totalLateDays: true,
+        totalHalfDays: true,
+      },
+    });
+
+    // STEP 3: Batch fetch half-day counts for target month
+    const startDate = new Date(Date.UTC(targetYear, targetMonth, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(targetYear, targetMonth + 1, 0, 23, 59, 59, 999)); // Last day of month
+    const halfDayLogs = await this.prisma.attendanceLog.findMany({
+      where: {
+        employeeId: { in: employeeIds },
+        date: { gte: startDate, lte: endDate },
+        status: 'half_day',
+      },
+      select: { employeeId: true },
+    });
+
+    // STEP 4: Batch fetch existing salary logs
+    const existingSalaryLogs = await this.prisma.netSalaryLog.findMany({
+      where: {
+        employeeId: { in: employeeIds },
+        month: calculationMonth,
+      },
+      select: { id: true, employeeId: true },
+    });
+
+    // Create lookup maps for O(1) access
+    const salesDeptMap = new Map(salesDepts.map(sd => [sd.employeeId, sd]));
+    const attendanceMap = new Map(attendanceSummaries.map(att => [att.empId, att]));
+    const halfDayCountMap = new Map<number, number>();
+    halfDayLogs.forEach(log => {
+      halfDayCountMap.set(log.employeeId, (halfDayCountMap.get(log.employeeId) || 0) + 1);
+    });
+    const existingLogMap = new Map(existingSalaryLogs.map(log => [log.employeeId, log.id]));
+
+    // STEP 5: Process all calculations in memory
+    this.logger.log('🔢 Processing salary calculations in memory...');
+    const logUpdates: any[] = [];
+    const logCreates: any[] = [];
+    const results: any[] = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    const monthlyLatesDays = company?.monthlyLatesDays || 0;
+
+    for (const employee of employees) {
+      try {
+        // Base salary is now joined with employee (accounts is an array, take first)
+        if (!employee.accounts?.[0]?.baseSalary) {
+          throw new Error(`No base salary found for employee ${employee.id}`);
+        }
+
+        // Calculate salary
+        const baseSalary: Prisma.Decimal = employee.accounts[0].baseSalary as Prisma.Decimal;
+        const salesDept = salesDeptMap.get(employee.id);
+        const commission: Prisma.Decimal = (salesDept?.commissionAmount ?? new Prisma.Decimal(0)) as Prisma.Decimal;
+        const salesBonus: Prisma.Decimal = (salesDept?.salesBonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
+        const employeeBonus: Prisma.Decimal = (employee.bonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
+        const totalBonus = salesBonus.plus(employeeBonus);
+
+        // Determine start day based on employee type
+        // For employees who started in the target month, prorate from start day
+        // For employees who started before target month, use day 1 (full month)
+        let startDay = 1;
+        if (employee.startDate) {
+          const employeeStartPKT = this.convertEmployeeStartDateToPKT(employee.startDate);
+          // Only prorate if employee started in the target month
+          if (employeeStartPKT.year === targetYear && employeeStartPKT.month === targetMonth) {
+            startDay = employeeStartPKT.day;
+            this.logger.log(`Employee ${employee.id} started on day ${startDay} of ${calculationMonth} - prorating`);
+          }
+          // If employee started after target month, skip (shouldn't be calculated yet)
+          if (employeeStartPKT.year > targetYear || 
+              (employeeStartPKT.year === targetYear && employeeStartPKT.month > targetMonth)) {
+            this.logger.log(`Employee ${employee.id} started after ${calculationMonth} - skipping`);
+            continue;
+          }
+        }
+
+        // Use last day of month as endDay for full month calculation
+        const endDay = lastDayOfMonth;
+        const daysWorked = endDay - startDay + 1;
+        const proportionalSalary = baseSalary.mul(daysWorked).div(DAYS_IN_CYCLE);
+        const netSalary = proportionalSalary.plus(commission).plus(totalBonus);
+
+        // Calculate deductions
+        const attendanceSummary = attendanceMap.get(employee.id);
+        const totalAbsent = attendanceSummary?.totalAbsent || 0;
+        const totalLateDays = attendanceSummary?.totalLateDays || 0;
+        const totalHalfDays = halfDayCountMap.get(employee.id) || 0;
+
+        const perDaySalary = Number(baseSalary) / 30;
+        const absentDeduction = this.calculateAbsentDeduction(totalAbsent, perDaySalary);
+        const lateDeduction = this.calculateLateDeduction(totalLateDays, monthlyLatesDays, perDaySalary);
+        const halfDayDeduction = this.calculateHalfDayDeduction(totalHalfDays, perDaySalary);
+        const chargebackDeduction = Number(salesDept?.chargebackDeductions || 0);
+        const refundDeduction = Number(salesDept?.refundDeductions || 0);
+        const totalDeduction = absentDeduction + lateDeduction + halfDayDeduction + chargebackDeduction + refundDeduction;
+
+        // Prepare salary log data
+        const pktTime = TimeStorageUtil.getCurrentPKTTimeForStorage();
+        const existingLogId = existingLogMap.get(employee.id);
+        if (existingLogId) {
+          logUpdates.push({
+            id: existingLogId,
+            data: {
+              netSalary: netSalary,
+              deductions: Math.round(totalDeduction),
+              updatedAt: pktTime,
+            },
+          });
+        } else {
+          logCreates.push({
+            employeeId: employee.id,
+            month: calculationMonth,
+            netSalary: netSalary,
+            deductions: Math.round(totalDeduction),
+            status: 'unpaid',
+            createdAt: pktTime,
+            updatedAt: pktTime,
+          });
+        }
+
+        results.push({
+          employeeId: employee.id,
+          employeeName: this.formatEmployeeName(employee.firstName, employee.lastName),
+          status: 'success',
+          logId: existingLogId || null,
+          startDay,
+          endDay,
+          daysWorked,
+        });
+        successCount++;
+      } catch (error) {
+        this.logger.error(`Failed to process employee ${employee.id}: ${error.message}`);
+        results.push({
+          employeeId: employee.id,
+          employeeName: this.formatEmployeeName(employee.firstName, employee.lastName),
+          status: 'error',
+          error: error.message,
+        });
+        errorCount++;
+      }
+    }
+
+    // STEP 6: Batch update/create salary logs in transaction
     this.logger.log(`💾 Batch saving ${logUpdates.length} updates and ${logCreates.length} creates...`);
     await this.prisma.$transaction(async (tx) => {
       // Batch update existing logs
@@ -674,10 +1120,11 @@ export class FinanceSalaryService {
       }
     });
 
-    this.logger.log(`📈 Salary calculation summary: ${successCount} successful, ${errorCount} failed`);
-    this.logger.log(`✅ Optimized bulk calculation completed - Reduced from ~${employees.length * 7} queries to ~8 queries`);
+    this.logger.log(`Salary calculation summary for ${calculationMonth}: ${successCount} successful, ${errorCount} failed`);
+    this.logger.log(`Monthly salary calculation completed for ${calculationMonth}`);
 
     return {
+      month: calculationMonth,
       totalEmployees: employees.length,
       successful: successCount,
       failed: errorCount,
@@ -694,10 +1141,7 @@ export class FinanceSalaryService {
    */
   public async calculateEmployeeDeductions(employeeId: number, month: string) {
     // Validate month format
-    const monthRegex = /^\d{4}-\d{2}$/;
-    if (!monthRegex.test(month)) {
-      throw new BadRequestException('Invalid month format. Must be in YYYY-MM format (e.g., 2025-01).');
-    }
+    this.validateMonthFormat(month);
 
     // Batch fetch all required data in parallel (reduces from 5 sequential queries to 1 parallel batch)
     const [company, employee, attendanceSummary, account, salesDepartment, halfDayCount] = await Promise.all([
@@ -785,12 +1229,10 @@ export class FinanceSalaryService {
     startDate?: string,
     endDate?: string,
   ) {
-    this.logger.log(`🔍 calculateSalaryInternal called with employeeId: ${employeeId}, startDate: ${startDate}, endDate: ${endDate}`);
+    this.logger.log(`calculateSalaryInternal called with employeeId: ${employeeId}, startDate: ${startDate}, endDate: ${endDate}`);
     
     // Validate employeeId
-    if (!employeeId || isNaN(employeeId)) {
-      throw new BadRequestException(`Invalid employee ID in calculateSalaryInternal: ${employeeId}`);
-    }
+    this.validateEmployeeId(employeeId);
     
     // Fetch required information - employee with joined accounts (optimized)
     const [employee, salesDept] = await Promise.all([
@@ -831,18 +1273,19 @@ export class FinanceSalaryService {
     const employeeBonus: Prisma.Decimal = (employee.bonus ?? new Prisma.Decimal(0)) as Prisma.Decimal;
     const totalBonus = salesBonus.plus(employeeBonus);
 
-    // Determine calculation month (year-month string) using PKT date components
-    const pktDate = this.getPKTDateComponents();
-    const referenceDate = startDate
-      ? new Date(startDate)
-      : endDate
-      ? new Date(endDate)
-      : new Date();
+    // Determine calculation date - use endDate if provided, otherwise use current date
+    const calculationDate = endDate ? new Date(endDate) : new Date();
     
-    // Use PKT date components for accurate month/year calculation
+    // Convert calculation date to PKT timezone components
+    const pktDate = endDate 
+      ? this.convertDateToPKT(calculationDate)
+      : this.getPKTDateComponents();
+    
     const year = pktDate.year;
     const month = pktDate.month; // 0-based (0 = Jan)
     const endDay = pktDate.day;
+
+    this.logger.log(`Calculating salary for period: year=${year}, month=${month + 1}, endDay=${endDay}${endDate ? ` (endDate=${endDate})` : ' (current date)'}`);
 
     // Always use 30 days for salary calculation (standard practice)
     const DAYS_IN_CYCLE = 30;
@@ -850,24 +1293,32 @@ export class FinanceSalaryService {
     let startDay = 1; // Default start day (1st of month)
     let daysWorked: number;
     
-    // Determine start day based on employee type
-    if (employee.startDate) {
-      const employeeStartDate = new Date(employee.startDate);
-      // Convert to PKT for accurate comparison
-      const employeeStartPKT = new Date(employeeStartDate.getTime() + (5 * 60 * 60 * 1000));
-      const employeeStartYear = employeeStartPKT.getUTCFullYear();
-      const employeeStartMonth = employeeStartPKT.getUTCMonth();
-      const employeeStartDay = employeeStartPKT.getUTCDate();
-      
+    // Determine start day based on employee type and startDate parameter
+    if (startDate) {
+      // If startDate is provided, use it
+      const startDatePKT = this.convertDateToPKT(startDate);
+      if (startDatePKT.year === year && startDatePKT.month === month) {
+        startDay = startDatePKT.day;
+        this.logger.log(`Using provided startDate: day ${startDay}`);
+      }
+    } else if (employee.startDate) {
+      // Otherwise, check employee start date
+      const employeeStartPKT = this.convertEmployeeStartDateToPKT(employee.startDate);
       // If employee started this month, use start day
-      if (employeeStartYear === year && employeeStartMonth === month) {
-        startDay = employeeStartDay;
+      if (employeeStartPKT.year === year && employeeStartPKT.month === month) {
+        startDay = employeeStartPKT.day;
         this.logger.log(`New employee ${employeeId} started on day ${startDay} - calculating from start date`);
       }
     }
     
-    // Calculate days worked
+    // Calculate days worked (inclusive of both start and end day)
     daysWorked = endDay - startDay + 1;
+    
+    // Ensure daysWorked is at least 1
+    if (daysWorked < 1) {
+      this.logger.warn(`Invalid daysWorked calculation: ${daysWorked}, setting to 1`);
+      daysWorked = 1;
+    }
     
     // Calculate proportional salary (only base salary is prorated)
     const proportionalSalary = baseSalary.mul(daysWorked).div(DAYS_IN_CYCLE);
@@ -904,26 +1355,44 @@ export class FinanceSalaryService {
   ): Promise<number> {
     try {
       // Determine the calculation period using PKT
-      const pktDate = this.getPKTDateComponents();
-      const referenceDate = startDate
-        ? new Date(startDate)
-        : endDate
-        ? new Date(endDate)
-        : new Date(pktDate.date);
+      // Use endDate if provided, otherwise use current date
+      const calculationDate = endDate ? new Date(endDate) : new Date();
+      const pktDate = endDate 
+        ? this.convertDateToPKT(calculationDate)
+        : this.getPKTDateComponents();
 
       const year = pktDate.year;
-      const month = pktDate.month + 1; // Convert to 1-based
+      const month = pktDate.month + 1; // Convert to 1-based for calculation
       const calculationMonth = `${year}-${String(month).padStart(2, '0')}`;
+
+      this.logger.log(`Calculating deductions for period: ${calculationMonth}${endDate ? ` (endDate=${endDate})` : ' (current date)'}`);
 
       // Calculate deductions for this month using optimized method
       const deductionResult = await this.calculateEmployeeDeductions(employeeId, calculationMonth);
       
       // If we have specific start/end dates, we need to prorate the deductions
       if (startDate || endDate) {
-        const startDay = startDate ? new Date(startDate).getDate() : 1;
-        const endDay = endDate ? new Date(endDate).getDate() : new Date(year, month, 0).getDate();
+        // Convert dates to PKT for accurate day calculation
+        const startDayPKT = startDate ? this.convertDateToPKT(startDate) : null;
+        const endDayPKT = endDate ? this.convertDateToPKT(endDate) : null;
+        
+        // Ensure we're in the same month/year as calculation
+        let startDay = 1; // Default to 1st of month
+        if (startDayPKT && startDayPKT.year === year && startDayPKT.month === month - 1) {
+          startDay = startDayPKT.day;
+        }
+        
+        let endDay = endDayPKT ? endDayPKT.day : pktDate.day;
+        
+        // Get total days in the month
+        const daysInMonth = new Date(year, month, 0).getDate(); // month is 1-based here, so this gets last day
         const daysInPeriod = endDay - startDay + 1;
-        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        // Ensure valid period
+        if (daysInPeriod < 1 || daysInPeriod > daysInMonth) {
+          this.logger.warn(`Invalid deduction period: ${daysInPeriod} days (startDay=${startDay}, endDay=${endDay}, daysInMonth=${daysInMonth})`);
+          return Math.round(deductionResult.totalDeduction);
+        }
         
         // Prorate attendance-based deductions (absent, late, half-day)
         const attendanceDeductions = deductionResult.absentDeduction + deductionResult.lateDeduction + deductionResult.halfDayDeduction;
@@ -956,26 +1425,44 @@ export class FinanceSalaryService {
   ): Promise<any> {
     try {
       // Determine the calculation period using PKT
-      const pktDate = this.getPKTDateComponents();
-      const referenceDate = startDate
-        ? new Date(startDate)
-        : endDate
-        ? new Date(endDate)
-        : new Date(pktDate.date);
+      // Use endDate if provided, otherwise use current date
+      const calculationDate = endDate ? new Date(endDate) : new Date();
+      const pktDate = endDate 
+        ? this.convertDateToPKT(calculationDate)
+        : this.getPKTDateComponents();
 
       const year = pktDate.year;
-      const month = pktDate.month + 1; // Convert to 1-based
+      const month = pktDate.month + 1; // Convert to 1-based for calculation
       const calculationMonth = `${year}-${String(month).padStart(2, '0')}`;
+
+      this.logger.log(`Calculating detailed deductions for period: ${calculationMonth}${endDate ? ` (endDate=${endDate})` : ' (current date)'}`);
 
       // Get detailed deduction breakdown for this month (optimized)
       const detailedBreakdown = await this.getDetailedDeductionBreakdown(employeeId, calculationMonth);
       
       // If we have specific start/end dates, we need to prorate the deductions
       if (startDate || endDate) {
-        const startDay = startDate ? new Date(startDate).getDate() : 1;
-        const endDay = endDate ? new Date(endDate).getDate() : new Date(year, month, 0).getDate();
+        // Convert dates to PKT for accurate day calculation
+        const startDayPKT = startDate ? this.convertDateToPKT(startDate) : null;
+        const endDayPKT = endDate ? this.convertDateToPKT(endDate) : null;
+        
+        // Ensure we're in the same month/year as calculation
+        let startDay = 1; // Default to 1st of month
+        if (startDayPKT && startDayPKT.year === year && startDayPKT.month === month - 1) {
+          startDay = startDayPKT.day;
+        }
+        
+        let endDay = endDayPKT ? endDayPKT.day : pktDate.day;
+        
+        // Get total days in the month
+        const daysInMonth = new Date(year, month, 0).getDate(); // month is 1-based here, so this gets last day
         const daysInPeriod = endDay - startDay + 1;
-        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        // Ensure valid period
+        if (daysInPeriod < 1 || daysInPeriod > daysInMonth) {
+          this.logger.warn(`Invalid detailed deduction period: ${daysInPeriod} days (startDay=${startDay}, endDay=${endDay}, daysInMonth=${daysInMonth})`);
+          return detailedBreakdown;
+        }
         
         // Prorate the attendance-based deductions (absent, late, half-day)
         const attendanceDeductions = detailedBreakdown.absentDeduction + detailedBreakdown.lateDeduction + detailedBreakdown.halfDayDeduction;
@@ -1049,9 +1536,7 @@ export class FinanceSalaryService {
    */
   private async getCommissionBreakdown(employeeId: number, month: string): Promise<any[]> {
     // Parse month to get start and end dates
-    const [year, monthNum] = month.split('-').map(Number);
-    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
-    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999)); // Last day of the month
+    const { startDate, endDate } = this.parseMonthToDateRange(month);
 
     // Get projects where this employee was the sales rep and were completed in this month
     // Single optimized query with includes
@@ -1199,9 +1684,7 @@ export class FinanceSalaryService {
    */
   private async getHalfDayCount(employeeId: number, month: string): Promise<number> {
     // Parse month to get start and end dates
-    const [year, monthNum] = month.split('-').map(Number);
-    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
-    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999)); // Last day of the month
+    const { startDate, endDate } = this.parseMonthToDateRange(month);
 
     // Count half-day attendance records
     const halfDayCount = await this.prisma.attendanceLog.count({
@@ -1223,9 +1706,7 @@ export class FinanceSalaryService {
    */
   private async getHalfDayDetails(employeeId: number, month: string): Promise<any[]> {
     // Parse month to get start and end dates
-    const [year, monthNum] = month.split('-').map(Number);
-    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
-    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999)); // Last day of the month
+    const { startDate, endDate } = this.parseMonthToDateRange(month);
 
     // Get half-day attendance records
     const halfDayLogs = await this.prisma.attendanceLog.findMany({
@@ -1287,72 +1768,118 @@ export class FinanceSalaryService {
    * 
    * This endpoint retrieves sales employees from the sales department who have
    * sales amount greater than 3000, ordered alphabetically by name.
+   * Supports pagination and filtering by sales amount and bonus amount.
    * 
-   * @returns Array of sales employees with id, name, and sales amount
+   * @param page - Page number (defaults to 1)
+   * @param limit - Number of records per page (defaults to 20, max 100)
+   * @param minSales - Minimum sales amount filter
+   * @param maxSales - Maximum sales amount filter
+   * @param minBonus - Minimum bonus amount filter
+   * @param maxBonus - Maximum bonus amount filter
+   * @returns Paginated array of sales employees with id, name, sales amount, and bonus amount
    */
-  public async getSalesEmployeesBonusDisplay() {
-    this.logger.log('⏳ Fetching sales employees with sales amount > 3000');
+  public async getSalesEmployeesBonusDisplay(
+    page: number = 1,
+    limit: number = 20,
+    minSales?: number,
+    maxSales?: number,
+    minBonus?: number,
+    maxBonus?: number,
+  ) {
+    this.logger.log(`Fetching sales employees with sales amount > 3000${minSales !== undefined || maxSales !== undefined || minBonus !== undefined || maxBonus !== undefined ? ' (with filters)' : ''}`);
 
-    // First, let's debug by getting all sales employees to see what data exists
-    const allSalesEmployees = await this.prisma.salesDepartment.findMany({
-      include: {
+    // Build where clause for sales amount filters
+    const salesAmountFilter: any = {
+      not: null,
+      gte: new Prisma.Decimal(3000), // Default minimum sales amount
+    };
+
+    // Apply custom sales amount filters if provided
+    if (minSales !== undefined) {
+      salesAmountFilter.gte = new Prisma.Decimal(minSales);
+    }
+    if (maxSales !== undefined) {
+      salesAmountFilter.lte = new Prisma.Decimal(maxSales);
+    }
+
+    // Build the main where clause
+    const whereClause: any = {
+      AND: [
+        {
+          salesAmount: {
+            not: null,
+          },
+        },
+        {
+          salesAmount: salesAmountFilter,
+        },
+      ],
+    };
+
+    // Fetch all sales employees matching the criteria
+    const salesEmployees = await this.prisma.salesDepartment.findMany({
+      where: whereClause,
+      select: {
+        salesAmount: true,
+        salesBonus: true,
         employee: {
           select: {
             id: true,
             firstName: true,
-            lastName: true
-          }
-        }
-      }
-    });
-
-    this.logger.log(`🔍 Found ${allSalesEmployees.length} total sales employees`);
-    allSalesEmployees.forEach(emp => {
-      this.logger.log(`Employee: ${emp.employee.firstName} ${emp.employee.lastName}, Sales Amount: ${emp.salesAmount}`);
-    });
-
-              const salesEmployees = await this.prisma.salesDepartment.findMany({
-       where: {
-         AND: [
-           {
-             salesAmount: {
-               not: null
-             }
-           },
-           {
-             salesAmount: {
-               gte: new Prisma.Decimal(3000)
-             }
-           }
-         ]
-       },
-       select: {
-         salesAmount: true,
-         salesBonus: true,
-         employee: {
-           select: {
-             id: true,
-             firstName: true,
-             lastName: true
-           }
-         }
-       },
+            lastName: true,
+          },
+        },
+      },
       orderBy: {
         employee: {
-          firstName: 'asc'
-        }
-      }
+          firstName: 'asc',
+        },
+      },
     });
 
-         const result = salesEmployees.map(record => ({
-       id: record.employee.id,
-       name: `${record.employee.firstName} ${record.employee.lastName}`,
-       salesAmount: Number(record.salesAmount),
-       bonusAmount: Number(record.salesBonus || 0)
-     }));
+    // Map to result format and apply bonus filters
+    let result = salesEmployees.map(record => ({
+      id: record.employee.id,
+      name: `${record.employee.firstName} ${record.employee.lastName}`,
+      salesAmount: Number(record.salesAmount),
+      bonusAmount: Number(record.salesBonus || 0),
+    }));
 
-    this.logger.log(`✅ Found ${result.length} sales employees with sales amount > 3000`);
-    return result;
+    // Apply bonus filters if provided
+    if (minBonus !== undefined || maxBonus !== undefined) {
+      result = result.filter(record => {
+        const meetsMin = minBonus === undefined || record.bonusAmount >= minBonus;
+        const meetsMax = maxBonus === undefined || record.bonusAmount <= maxBonus;
+        return meetsMin && meetsMax;
+      });
+    }
+
+    // Validate pagination parameters
+    const validatedPage = Math.max(1, Math.floor(page) || 1);
+    const validatedLimit = Math.max(1, Math.min(100, Math.floor(limit) || 20)); // Max 100 per page
+    const skip = (validatedPage - 1) * validatedLimit;
+
+    // Calculate total before pagination (for pagination metadata)
+    const total = result.length;
+    const totalPages = Math.ceil(total / validatedLimit);
+
+    // Apply pagination to results
+    const paginatedResults = result.slice(skip, skip + validatedLimit);
+
+    this.logger.log(
+      `Found ${total} sales employees (after filters), showing page ${validatedPage} (${paginatedResults.length} records)`,
+    );
+
+    return {
+      employees: paginatedResults,
+      pagination: {
+        page: validatedPage,
+        limit: validatedLimit,
+        total: total,
+        totalPages: totalPages,
+        retrieved: paginatedResults.length,
+      },
+    };
   }
 
   /**
@@ -1366,12 +1893,10 @@ export class FinanceSalaryService {
    * @returns Updated employee data with success message
    */
   public async updateSalesEmployeeBonus(employeeId: number, bonusAmount: number) {
-    this.logger.log(`⏳ Updating bonus for employee ${employeeId} to ${bonusAmount}`);
+    this.logger.log(`Updating bonus for employee ${employeeId} to ${bonusAmount}`);
 
     // Validate employeeId
-    if (!employeeId || employeeId <= 0) {
-      throw new BadRequestException('Invalid employeeId. Must be a positive number.');
-    }
+    this.validateEmployeeId(employeeId);
 
     // Validate bonusAmount
     if (bonusAmount < 0) {
@@ -1441,7 +1966,7 @@ export class FinanceSalaryService {
       message: `Bonus updated successfully for ${updatedSalesEmployee.employee.firstName} ${updatedSalesEmployee.employee.lastName}`
     };
 
-    this.logger.log(`✅ Bonus updated for employee ${employeeId} to ${bonusAmount}`);
+    this.logger.log(`Bonus updated for employee ${employeeId} to ${bonusAmount}`);
     return result;
   }
 
@@ -1461,22 +1986,10 @@ export class FinanceSalaryService {
     processedBy: number,
     processedByRole?: 'Employee' | 'Admin',
   ) {
-    // Validate employeeId
-    if (!employeeId || employeeId <= 0) {
-      throw new BadRequestException('Invalid employeeId. Must be a positive number.');
-    }
-
-    // Get PKT date components for accurate month calculation
-    const pktDate = this.getPKTDateComponents();
-    const calculationMonth = month || `${pktDate.year}-${String(pktDate.month + 1).padStart(2, '0')}`;
-
-    // Validate month format if provided
-    if (month) {
-      const monthRegex = /^\d{4}-\d{2}$/;
-      if (!monthRegex.test(month)) {
-        throw new BadRequestException('Invalid month format. Must be in YYYY-MM format (e.g., 2025-01).');
-      }
-    }
+    // Validate inputs
+    this.validateEmployeeId(employeeId);
+    this.validateMonthFormat(month);
+    const calculationMonth = this.getCalculationMonth(month);
 
     // Check if employee exists
     const employee = await this.prisma.employee.findUnique({
@@ -1489,17 +2002,11 @@ export class FinanceSalaryService {
     }
 
     // Get the latest salary log for this employee and month
-    const salaryLog = await this.prisma.netSalaryLog.findFirst({
-      where: {
-        employeeId,
-        month: calculationMonth,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const salaryLog = await this.getLatestSalaryLog(employeeId, calculationMonth);
 
     if (!salaryLog) {
       throw new NotFoundException(
-        `No salary record found for employee ${employee.firstName} ${employee.lastName} (ID: ${employeeId}) for month ${calculationMonth}. Please calculate salary first.`,
+        `No salary record found for employee ${this.formatEmployeeName(employee.firstName, employee.lastName)} (ID: ${employeeId}) for month ${calculationMonth}. Please calculate salary first.`,
       );
     }
 
@@ -1510,7 +2017,7 @@ export class FinanceSalaryService {
       );
       return {
         employeeId,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
+        employeeName: this.formatEmployeeName(employee.firstName, employee.lastName),
         month: calculationMonth,
         status: 'paid',
         paidOn: salaryLog.paidOn,
@@ -1533,12 +2040,12 @@ export class FinanceSalaryService {
     });
 
     this.logger.log(
-      `✅ Salary marked as paid for employee ${employeeId} (${employee.firstName} ${employee.lastName}) for month ${calculationMonth}`,
+      `Salary marked as paid for employee ${employeeId} (${employee.firstName} ${employee.lastName}) for month ${calculationMonth}`,
     );
 
     return {
       employeeId,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
+      employeeName: this.formatEmployeeName(employee.firstName, employee.lastName),
       month: calculationMonth,
       status: updatedSalaryLog.status,
       paidOn: updatedSalaryLog.paidOn,
@@ -1564,7 +2071,7 @@ export class FinanceSalaryService {
     processedBy: number,
     processedByRole?: 'Employee' | 'Admin',
   ) {
-    // Validate employeeIds
+    // Validate inputs
     if (!employeeIds || employeeIds.length === 0) {
       throw new BadRequestException('Employee IDs array cannot be empty.');
     }
@@ -1573,20 +2080,11 @@ export class FinanceSalaryService {
       throw new BadRequestException('Employee IDs must be an array.');
     }
 
-    // Get PKT date components for accurate month calculation
-    const pktDate = this.getPKTDateComponents();
-    const calculationMonth = month || `${pktDate.year}-${String(pktDate.month + 1).padStart(2, '0')}`;
-
-    // Validate month format if provided
-    if (month) {
-      const monthRegex = /^\d{4}-\d{2}$/;
-      if (!monthRegex.test(month)) {
-        throw new BadRequestException('Invalid month format. Must be in YYYY-MM format (e.g., 2025-01).');
-      }
-    }
+    this.validateMonthFormat(month);
+    const calculationMonth = this.getCalculationMonth(month);
 
     this.logger.log(
-      `💰 Starting bulk mark as paid for ${employeeIds.length} employees (month: ${calculationMonth})`,
+      `Starting bulk mark as paid for ${employeeIds.length} employees (month: ${calculationMonth})`,
     );
 
     // Fetch all employees to validate they exist
@@ -1668,7 +2166,7 @@ export class FinanceSalaryService {
     const results = employeeIds.map(employeeId => {
       const employee = employeeMap.get(employeeId);
       const log = salaryLogMap.get(employeeId);
-      const employeeName = employee ? `${employee.firstName} ${employee.lastName}` : `Unknown (ID: ${employeeId})`;
+      const employeeName = employee ? this.formatEmployeeName(employee.firstName, employee.lastName) : `Unknown (ID: ${employeeId})`;
 
       if (employeesWithoutLogs.includes(employeeId)) {
         return {
@@ -1699,7 +2197,7 @@ export class FinanceSalaryService {
     });
 
     this.logger.log(
-      `✅ Bulk mark as paid completed: ${updatedCount} updated, ${alreadyPaid.length} already paid, ${employeesWithoutLogs.length} without salary records`,
+      `Bulk mark as paid completed: ${updatedCount} updated, ${alreadyPaid.length} already paid, ${employeesWithoutLogs.length} without salary records`,
     );
 
     return {

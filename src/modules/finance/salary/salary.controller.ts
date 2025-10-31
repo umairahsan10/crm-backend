@@ -134,10 +134,16 @@ export class FinanceSalaryController {
   @Get('display-all')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Get comprehensive salary display for all employees with pagination' })
+  @ApiOperation({ summary: 'Get comprehensive salary display for all employees with pagination and filters' })
   @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
   @ApiQuery({ name: 'page', description: 'Page number (defaults to 1)', required: false, type: Number })
   @ApiQuery({ name: 'limit', description: 'Number of records per page (defaults to 20, max 100)', required: false, type: Number })
+  @ApiQuery({ name: 'departments', description: 'Comma-separated department IDs (e.g., "1,2,3")', required: false })
+  @ApiQuery({ name: 'status', description: 'Employee status filter (active, inactive, terminated)', required: false })
+  @ApiQuery({ name: 'minSalary', description: 'Minimum final salary filter', required: false, type: Number })
+  @ApiQuery({ name: 'maxSalary', description: 'Maximum final salary filter', required: false, type: Number })
+  @ApiQuery({ name: 'fromDate', description: 'Filter by salary log creation date from (YYYY-MM-DD)', required: false })
+  @ApiQuery({ name: 'toDate', description: 'Filter by salary log creation date to (YYYY-MM-DD)', required: false })
   @ApiResponse({
     status: 200,
     description: 'All salaries display returned successfully',
@@ -198,10 +204,30 @@ export class FinanceSalaryController {
     @Query('month') month?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('departments') departments?: string,
+    @Query('status') status?: string,
+    @Query('minSalary') minSalary?: string,
+    @Query('maxSalary') maxSalary?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;
-    const result = await this.financeSalaryService.getAllSalariesDisplay(month, pageNum, limitNum);
+    const minSalaryNum = minSalary ? parseFloat(minSalary) : undefined;
+    const maxSalaryNum = maxSalary ? parseFloat(maxSalary) : undefined;
+    const departmentIds = departments ? departments.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) : undefined;
+    
+    const result = await this.financeSalaryService.getAllSalariesDisplay(
+      month,
+      pageNum,
+      limitNum,
+      departmentIds,
+      status,
+      minSalaryNum,
+      maxSalaryNum,
+      fromDate,
+      toDate,
+    );
     return result;
   }
 
@@ -244,18 +270,82 @@ export class FinanceSalaryController {
    * 
    * This endpoint retrieves sales employees from the sales department who have
    * sales amount greater than 3000, ordered alphabetically by name.
+   * Includes pagination and filtering support for sales amount and bonus.
    * 
-   * @returns Array of sales employees with id, name, and sales amount
+   * @param page - Page number (defaults to 1)
+   * @param limit - Number of records per page (defaults to 20, max 100)
+   * @param minSales - Minimum sales amount filter
+   * @param maxSales - Maximum sales amount filter
+   * @param minBonus - Minimum bonus amount filter
+   * @param maxBonus - Maximum bonus amount filter
+   * @returns Paginated array of sales employees with id, name, sales amount, and bonus amount
    * 
    * Required Permissions: salary_permission
    */
   @Get('bonus-display')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Get sales employees with sales amount > 3000' })
-  @ApiResponse({ status: 200, description: 'Sales employees bonus display returned successfully' })
-  async getSalesEmployeesBonusDisplay() {
-    const result = await this.financeSalaryService.getSalesEmployeesBonusDisplay();
+  @ApiOperation({ summary: 'Get sales employees with sales amount > 3000 (paginated with filters)' })
+  @ApiQuery({ name: 'page', description: 'Page number (defaults to 1)', required: false, type: Number })
+  @ApiQuery({ name: 'limit', description: 'Number of records per page (defaults to 20, max 100)', required: false, type: Number })
+  @ApiQuery({ name: 'minSales', description: 'Minimum sales amount filter', required: false, type: Number })
+  @ApiQuery({ name: 'maxSales', description: 'Maximum sales amount filter', required: false, type: Number })
+  @ApiQuery({ name: 'minBonus', description: 'Minimum bonus amount filter', required: false, type: Number })
+  @ApiQuery({ name: 'maxBonus', description: 'Maximum bonus amount filter', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Sales employees bonus display returned successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        employees: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'number' },
+              name: { type: 'string' },
+              salesAmount: { type: 'number' },
+              bonusAmount: { type: 'number' },
+            },
+          },
+        },
+        pagination: {
+          type: 'object',
+          properties: {
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            total: { type: 'number' },
+            totalPages: { type: 'number' },
+            retrieved: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async getSalesEmployeesBonusDisplay(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('minSales') minSales?: string,
+    @Query('maxSales') maxSales?: string,
+    @Query('minBonus') minBonus?: string,
+    @Query('maxBonus') maxBonus?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    const minSalesNum = minSales ? parseFloat(minSales) : undefined;
+    const maxSalesNum = maxSales ? parseFloat(maxSales) : undefined;
+    const minBonusNum = minBonus ? parseFloat(minBonus) : undefined;
+    const maxBonusNum = maxBonus ? parseFloat(maxBonus) : undefined;
+    
+    const result = await this.financeSalaryService.getSalesEmployeesBonusDisplay(
+      pageNum,
+      limitNum,
+      minSalesNum,
+      maxSalesNum,
+      minBonusNum,
+      maxBonusNum,
+    );
     return result;
   }
 

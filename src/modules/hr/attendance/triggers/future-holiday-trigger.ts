@@ -30,10 +30,11 @@ export class FutureHolidayTrigger {
   }
 
   /**
-   * Cron job that runs every 30 minutes to check for holidays and mark employees present
-   * This trigger activates when a holiday date arrives and it's time for employee shifts to start
+   * Cron job that runs once a day at 9:30 PM PKT (21:30)
+   * Checks for holidays and marks employees present on holiday dates
+   * Cron: '30 21 * * *' = At 21:30 (9:30 PM) every day
    */
-  @Cron('*/30 * * * *', { name: 'future-holiday-trigger', timeZone: 'Asia/Karachi' })
+  @Cron('30 21 * * *', { name: 'future-holiday-trigger', timeZone: 'Asia/Karachi' })
   async checkAndMarkHolidayAttendance(): Promise<void> {
     try {
       // Check database connection first

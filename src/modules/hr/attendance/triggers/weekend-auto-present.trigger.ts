@@ -30,10 +30,11 @@ export class WeekendAutoPresentTrigger {
   }
 
   /**
-   * Trigger that runs every 30 minutes to check for weekend shifts
+   * Trigger that runs once a day at 10:00 PM PKT (22:00)
    * Automatically marks employees as present on weekends when their shift starts
+   * Cron: '0 22 * * *' = At 22:00 (10:00 PM) every day
    */
-  @Cron('*/30 * * * *', {
+  @Cron('0 22 * * *', {
     name: 'weekend-auto-present',
     timeZone: 'Asia/Karachi' // PKT timezone
   })
