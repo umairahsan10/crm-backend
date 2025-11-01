@@ -526,7 +526,7 @@ export class PaymentsService {
                 console.warn(`Revenue creation failed for transaction ${transactionId}: ${revenueResult.message}`);
             }
 
-            // 6. Update project payment stage based on current phase
+            // 6. Update project payment stage and liveProgress based on current phase
             if (transaction.invoice?.leadId) {
                 const updatedCrackedLead = await this.prisma.crackedLead.findFirst({
                     where: { leadId: transaction.invoice.leadId }
@@ -540,23 +540,62 @@ export class PaymentsService {
 
                     if (project) {
                         let paymentStage: string;
+                        let liveProgress: number;
+                        
+                        // Get phase information (with null safety)
+                        const currentPhase = updatedCrackedLead.currentPhase || 1;
+                        const totalPhases = updatedCrackedLead.totalPhases;
                         
                         // Determine payment stage based on current phase
-                        if (updatedCrackedLead.currentPhase === updatedCrackedLead.totalPhases) {
+                        if (currentPhase === totalPhases) {
                             paymentStage = 'final';
-                        } else if (updatedCrackedLead.currentPhase === 1) {
+                        } else if (currentPhase === 1) {
                             paymentStage = 'initial';
                         } else {
                             paymentStage = 'in_between';
                         }
 
-                        // Update project payment stage
+                        // Calculate liveProgress based on completed phases
+                        // When payment for phase N is received, phases 1 to (N-1) are completed
+                        // Formula: ((currentPhase - 1) / totalPhases) * 100, capped at 75%
+                        // Phase 1 → 0%, Phase 2 → 25%, Phase 3 → 50%, Phase 4 → 75%
+                        
+                        if (totalPhases && totalPhases > 0) {
+                            if (currentPhase === 1) {
+                                // Special case: Phase 1 payment = project just created, no work done
+                                liveProgress = 0;
+                            } else {
+                                // Calculate completed phases: when payment for phase N, phases 1 to (N-1) are done
+                                const completedPhases = currentPhase - 1;
+                                // Calculate percentage: (completed phases / total phases) * 100
+                                liveProgress = Math.round((completedPhases / totalPhases) * 100);
+                                // Cap at 75% (100% only when project is marked completed)
+                                liveProgress = Math.min(liveProgress, 75);
+                            }
+                        } else {
+                            // Fallback: use payment stage if totalPhases not available
+                            if (paymentStage === 'initial') {
+                                liveProgress = 0;
+                            } else if (paymentStage === 'in_between') {
+                                liveProgress = 50; // Default middle progress
+                            } else if (paymentStage === 'final') {
+                                liveProgress = 75;
+                            } else {
+                                liveProgress = project.liveProgress ? Number(project.liveProgress) : 0; // Keep existing
+                            }
+                        }
+
+                        // Update project payment stage and liveProgress
                         await this.prisma.project.update({
                             where: { id: project.id },
-                            data: { paymentStage: paymentStage as any }
+                            data: { 
+                                paymentStage: paymentStage as any,
+                                liveProgress: liveProgress
+                            }
                         });
 
-                        console.log(`Updated project ${project.id} payment stage to: ${paymentStage} (Phase: ${updatedCrackedLead.currentPhase}/${updatedCrackedLead.totalPhases})`);
+                        const completedPhases = currentPhase > 1 ? currentPhase - 1 : 0;
+                        console.log(`Updated project ${project.id} - payment stage: ${paymentStage}, live progress: ${liveProgress}% (Phase: ${currentPhase}/${totalPhases}, Completed phases: ${completedPhases})`);
                     }
                 }
             }
