@@ -96,13 +96,47 @@ export class ProjectsService {
           liveProgress: 0,
           paymentStage: 'initial' // Set payment stage to initial
         },
-        include: {
-          crackedLead: {
-            include: { lead: true }
-          },
-          client: true,
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
           salesRep: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          unitHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              teamLead: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
           }
         }
       });
@@ -196,34 +230,127 @@ export class ProjectsService {
         whereClause.unitHeadId = query.unitHeadId;
       }
 
-      const projects = await this.prisma.project.findMany({
-        where: whereClause,
-        include: {
-          crackedLead: {
-            include: { lead: true }
-          },
-          client: true,
-          salesRep: {
-            include: { role: true }
-          },
-          unitHead: {
-            include: { role: true }
-          },
-          team: {
-            include: {
-              teamLead: {
-                include: { role: true }
+      // Pagination
+      const skip = query.page ? (query.page - 1) * (query.limit || 10) : 0;
+      const take = query.limit || 10;
+
+      // Sorting
+      const orderBy: any = {};
+      if (query.sortBy) {
+        orderBy[query.sortBy] = query.sortOrder || 'desc';
+      } else {
+        orderBy['createdAt'] = 'desc';
+      }
+
+      // Fetch projects and total count (minimal data for list view)
+      const [projects, total] = await Promise.all([
+        this.prisma.project.findMany({
+          where: whereClause,
+          select: {
+            // Core project fields only
+            id: true,
+            status: true,
+            difficultyLevel: true,
+            paymentStage: true,
+            deadline: true,
+            liveProgress: true,
+            createdAt: true,
+            updatedAt: true,
+            // Minimal related data (just names/IDs)
+            salesRep: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            },
+            unitHead: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true
+              }
+            },
+            team: {
+              select: {
+                id: true,
+                name: true,
+                teamLead: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true
+                  }
+                }
               }
             }
-          }
-        },
-        orderBy: { createdAt: 'desc' }
-      });
+          },
+          orderBy,
+          skip,
+          take
+        }),
+        this.prisma.project.count({ where: whereClause })
+      ]);
+
+      // Calculate counts for each project
+      const projectsWithCounts = await Promise.all(
+        projects.map(async (project) => {
+          const [
+            tasksCount,
+            logsCount,
+            chatParticipantsCount,
+            teamMembersCount
+          ] = await Promise.all([
+            // Tasks count
+            this.prisma.projectTask.count({
+              where: { projectId: project.id }
+            }),
+            // Logs count
+            this.prisma.projectLog.count({
+              where: { projectId: project.id }
+            }),
+            // Chat participants count
+            this.prisma.chatParticipant.count({
+              where: {
+                chat: {
+                  projectId: project.id
+                }
+              }
+            }).catch(() => 0),
+            // Team members count (if team assigned)
+            project.team?.teamLead?.id ? (() => {
+              const teamLeadId = project.team.teamLead.id;
+              return this.prisma.employee.count({
+                where: {
+                  OR: [
+                    { id: teamLeadId },
+                    { teamLeadId: teamLeadId }
+                  ]
+                }
+              });
+            })() : Promise.resolve(0)
+          ]);
+
+          return {
+            ...project,
+            tasksCount,
+            logsCount,
+            chatParticipantsCount,
+            teamMembersCount
+          };
+        })
+      );
 
       return {
         success: true,
-        data: projects,
-        count: projects.length
+        data: projectsWithCounts,
+        total,
+        pagination: {
+          page: query.page || 1,
+          limit: query.limit || 10,
+          totalPages: Math.ceil(total / (query.limit || 10))
+        },
+        message: projectsWithCounts.length > 0 ? 'Projects retrieved successfully' : 'No projects found'
       };
     } catch (error) {
       if (error instanceof ForbiddenException) {
@@ -233,39 +360,52 @@ export class ProjectsService {
     }
   }
 
-  // 3. Get Project Details
+  // 3. Get Project Details (Full Details with All Relations)
   async getProjectById(id: number, user: any) {
     try {
+      // Normalize user object
+      const normalizedUser = this.normalizeUser(user);
+      if (!normalizedUser || !normalizedUser.roleId) {
+        throw new ForbiddenException('User authentication required');
+      }
+
       const project = await this.prisma.project.findUnique({
         where: { id },
         include: {
-          crackedLead: {
-            include: { lead: true }
-          },
-          client: true,
           salesRep: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
           },
           unitHead: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
           },
           team: {
             include: {
               teamLead: {
-                include: { role: true }
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              },
+              productionUnit: {
+                select: {
+                  id: true,
+                  name: true
+                }
               }
             }
           },
-          projectTasks: {
-            include: {
-              assigner: {
-                include: { role: true }
-              },
-              assignee: {
-                include: { role: true }
-              }
-            }
-          }
         }
       });
 
@@ -274,14 +414,160 @@ export class ProjectsService {
       }
 
       // Check access permissions
-      const hasAccess = await this.checkProjectAccess(user, project);
+      const hasAccess = await this.checkProjectAccess(normalizedUser, project);
       if (!hasAccess) {
         throw new ForbiddenException('Access denied to this project');
       }
 
+      // Get all employees related to this project
+      const [
+        projectLogsEmployees,
+        teamMembers
+      ] = await Promise.all([
+        // Employees from project logs (get unique developers)
+        this.prisma.projectLog.findMany({
+          where: { projectId: id },
+          select: {
+            developerId: true,
+            developer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                role: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true
+                  }
+                },
+                department: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            }
+          },
+          distinct: ['developerId']
+        }),
+        // Team members (if team assigned)
+        project.teamId && project.team?.teamLeadId ? (() => {
+          const teamLeadId = project.team.teamLeadId;
+          return this.prisma.employee.findMany({
+            where: {
+              OR: [
+                { id: teamLeadId },
+                { teamLeadId: teamLeadId }
+              ]
+            },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            },
+            department: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+          });
+        })() : Promise.resolve([])
+      ]);
+
+      // Extract unique employees from logs
+      const logsEmployees = projectLogsEmployees
+        .map(log => log.developer)
+        .filter((emp, index, self) => emp && index === self.findIndex(e => e?.id === emp.id));
+
+      // Combine all employees and get unique list
+      const allEmployeesMap = new Map();
+      
+      // Add sales rep
+      if (project.salesRep) {
+        allEmployeesMap.set(project.salesRep.id, project.salesRep);
+      }
+      
+      // Add unit head
+      if (project.unitHead) {
+        allEmployeesMap.set(project.unitHead.id, project.unitHead);
+      }
+      
+      // Add team lead
+      if (project.team?.teamLead) {
+        allEmployeesMap.set(project.team.teamLead.id, project.team.teamLead);
+      }
+      
+      // Add team members
+      if (Array.isArray(teamMembers)) {
+        teamMembers.forEach((emp: any) => {
+          if (emp && emp.id) {
+            allEmployeesMap.set(emp.id, emp);
+          }
+        });
+      }
+      
+      // Add employees from logs
+      logsEmployees.forEach(emp => {
+        if (emp) {
+          allEmployeesMap.set(emp.id, emp);
+        }
+      });
+
+      const allRelatedEmployeesList = Array.from(allEmployeesMap.values());
+
+      // Calculate counts
+      const [
+        tasksCount,
+        logsCount,
+        chatParticipantsCount,
+        teamMembersCount
+      ] = await Promise.all([
+        this.prisma.projectTask.count({ where: { projectId: id } }),
+        this.prisma.projectLog.count({ where: { projectId: id } }),
+        this.prisma.chatParticipant.count({
+          where: {
+            chat: { projectId: id }
+          }
+        }),
+        project.teamId && project.team?.teamLeadId ? (() => {
+          const teamLeadId = project.team.teamLeadId;
+          return this.prisma.employee.count({
+            where: {
+              OR: [
+                { id: teamLeadId },
+                { teamLeadId: teamLeadId }
+              ]
+            }
+          });
+        })() : Promise.resolve(0)
+      ]);
+
       return {
         success: true,
-        data: project
+        data: {
+          ...project,
+          // All related employees
+          relatedEmployees: allRelatedEmployeesList,
+          // Calculated counts
+          tasksCount,
+          logsCount,
+          chatParticipantsCount,
+          teamMembersCount
+        }
       };
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
@@ -328,13 +614,47 @@ export class ProjectsService {
           unitHeadId: dto.unitHeadId,
           status: 'in_progress'
         },
-        include: {
-          unitHead: {
-            include: { role: true }
-          },
-          client: true,
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
           salesRep: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          unitHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              teamLead: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
           }
         }
       });
@@ -414,20 +734,47 @@ export class ProjectsService {
       const updatedProject = await this.prisma.project.update({
         where: { id },
         data: updateData,
-        include: {
-          unitHead: {
-            include: { role: true }
-          },
-          team: {
-            include: {
-              teamLead: {
-                include: { role: true }
-              }
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
+          salesRep: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
             }
           },
-          client: true,
-          salesRep: {
-            include: { role: true }
+          unitHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              teamLead: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
           }
         }
       });
@@ -475,20 +822,47 @@ export class ProjectsService {
         const finalUpdatedProject = await this.prisma.project.update({
           where: { id },
           data: finalUpdateData,
-          include: {
-            unitHead: {
-              include: { role: true }
-            },
-            team: {
-              include: {
-                teamLead: {
-                  include: { role: true }
-                }
+          select: {
+            // Core project fields only
+            id: true,
+            status: true,
+            difficultyLevel: true,
+            paymentStage: true,
+            deadline: true,
+            liveProgress: true,
+            description: true,
+            createdAt: true,
+            updatedAt: true,
+            // Minimal related data
+            salesRep: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
               }
             },
-            client: true,
-            salesRep: {
-              include: { role: true }
+            unitHead: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            },
+            team: {
+              select: {
+                id: true,
+                name: true,
+                teamLead: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true
+                  }
+                }
+              }
             }
           }
         });
@@ -539,21 +913,41 @@ export class ProjectsService {
 
       const projects = await this.prisma.project.findMany({
         where: { teamId },
-        include: {
-          crackedLead: {
-            include: { lead: true }
-          },
-          client: true,
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
           salesRep: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
           },
           unitHead: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
           },
           team: {
-            include: {
+            select: {
+              id: true,
+              name: true,
               teamLead: {
-                include: { role: true }
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true
+                }
               }
             }
           }
@@ -640,21 +1034,41 @@ export class ProjectsService {
 
       const projects = await this.prisma.project.findMany({
         where: whereClause,
-        include: {
-          crackedLead: {
-            include: { lead: true }
-          },
-          client: true,
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
           salesRep: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
           },
           unitHead: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
           },
           team: {
-            include: {
+            select: {
+              id: true,
+              name: true,
               teamLead: {
-                include: { role: true }
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true
+                }
               }
             }
           }
@@ -707,21 +1121,41 @@ export class ProjectsService {
 
       const projects = await this.prisma.project.findMany({
         where: whereClause,
-        include: {
-          crackedLead: {
-            include: { lead: true }
-          },
-          client: true,
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
           salesRep: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
           },
           unitHead: {
-            include: { role: true }
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
           },
           team: {
-            include: {
+            select: {
+              id: true,
+              name: true,
               teamLead: {
-                include: { role: true }
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true
+                }
               }
             }
           }
@@ -745,24 +1179,28 @@ export class ProjectsService {
 
   // Helper Methods
   private async checkProjectAccess(user: any, project: any): Promise<boolean> {
-    // Manager (Role 1) - Access to all projects
-    if (user.roleId === 1) {
+    // Normalize user if not already normalized (defensive check)
+    const normalizedUser = this.normalizeUser(user) || user;
+    
+    // Manager (Role 1 or 'dep_manager') - Access to all projects
+    if (normalizedUser.roleId === 1 || normalizedUser.role === 'dep_manager') {
       return true;
     }
 
-    // Unit Head (Role 2) - Access to assigned projects
-    if (user.roleId === 2) {
-      return project.unitHeadId === user.id;
+    // Unit Head (Role 2 or 'unit_head') - Access to assigned projects
+    if (normalizedUser.roleId === 2 || normalizedUser.role === 'unit_head') {
+      return project.unitHeadId === normalizedUser.id;
     }
 
-    // Team Lead (Role 3) and Employee - Access to team projects
-    if (user.roleId === 3 || user.roleId === 4) {
+    // Team Lead (Role 3 or 'team_lead') and Employee - Access to team projects
+    if ((normalizedUser.roleId === 3 || normalizedUser.roleId === 4) || 
+        (normalizedUser.role === 'team_lead' || normalizedUser.role === 'senior' || normalizedUser.role === 'junior')) {
       if (!project.teamId) {
         return false;
       }
 
       const userEmployee = await this.prisma.employee.findUnique({
-        where: { id: user.id },
+        where: { id: normalizedUser.id },
         select: { teamLeadId: true }
       });
 
@@ -771,8 +1209,8 @@ export class ProjectsService {
       }
 
       // For team lead, check if they lead the assigned team
-      if (user.roleId === 3) {
-        return project.team?.teamLeadId === user.id;
+      if (normalizedUser.roleId === 3 || normalizedUser.role === 'team_lead') {
+        return project.team?.teamLeadId === normalizedUser.id;
       }
 
       // For employee, check if they are in the assigned team
@@ -817,24 +1255,25 @@ export class ProjectsService {
       return { allowed: true };
     }
 
-    // Unit Head (unit_head) - Can update status, difficulty, deadline, liveProgress, teamId
+    // Unit Head (unit_head) - Can update status, difficulty, deadline, teamId
+    // liveProgress is now automatic (cannot be manually updated)
     if (user.role === 'unit_head') {
       if (project.unitHeadId !== user.id) {
         return { allowed: false, reason: 'Only assigned unit head can update this project' };
       }
       
       // Check if trying to update restricted fields
-      const restrictedFields = ['description', 'paymentStage'];
+      const restrictedFields = ['description', 'paymentStage', 'liveProgress'];
       for (const field of restrictedFields) {
         if (dto[field] !== undefined) {
-          return { allowed: false, reason: `Unit heads cannot update ${field}` };
+          return { allowed: false, reason: `Unit heads cannot update ${field}. Live progress is automatically updated based on payment phases.` };
         }
       }
       
       return { allowed: true };
     }
 
-    // Team Lead (team_lead) - Can only update liveProgress
+    // Team Lead (team_lead) - Read-only access (liveProgress is automatic)
     if (user.role === 'team_lead') {
       if (!project.teamId) {
         return { allowed: false, reason: 'Project not assigned to a team' };
@@ -849,15 +1288,12 @@ export class ProjectsService {
         return { allowed: false, reason: 'Only the team lead can update this project' };
       }
       
-      // Check if only updating liveProgress
-      const allowedFields = ['liveProgress'];
-      for (const [key, value] of Object.entries(dto)) {
-        if (value !== undefined && !allowedFields.includes(key)) {
-          return { allowed: false, reason: 'Team leads can only update liveProgress' };
-        }
+      // Team leads have read-only access - liveProgress is automatically updated based on payment phases
+      if (Object.keys(dto).some(key => dto[key] !== undefined)) {
+        return { allowed: false, reason: 'Team leads have read-only access. Live progress is automatically updated when payment phases are completed.' };
       }
       
-      return { allowed: true };
+      return { allowed: false, reason: 'Team leads have read-only access' };
     }
 
     return { allowed: false, reason: 'Insufficient permissions' };
