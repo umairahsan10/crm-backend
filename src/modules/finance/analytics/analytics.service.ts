@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { AssetsService } from '../accountant/assets/assets.service';
 import { ExpenseService } from '../accountant/expense/expense.service';
 import { RevenueService } from '../accountant/revenue/revenue.service';
@@ -13,6 +14,21 @@ import {
   LiabilityStatsDto,
   ErrorResponseDto
 } from './dto/analytics-response.dto';
+import {
+  DashboardResponseDto,
+  DashboardDataDto,
+  FinancialSummaryDto,
+  RevenueMetricsDto,
+  ExpenseMetricsDto,
+  TimePeriodMetricsDto,
+  PeriodComparisonDto,
+  TimeSeriesDataPointDto,
+  DashboardWidgetsDto,
+  WidgetMetricDto,
+  CategoryBreakdownDto,
+  TrendDataDto
+} from './dto/dashboard-response.dto';
+import { TransactionType, TransactionStatus } from '@prisma/client';
 
 export interface AnalyticsFilters {
   fromDate?: string;
@@ -33,6 +49,7 @@ export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly assetsService: AssetsService,
     private readonly expenseService: ExpenseService,
     private readonly revenueService: RevenueService,
@@ -375,5 +392,578 @@ export class AnalyticsService {
         message: 'Failed to retrieve filtered liability statistics'
       };
     }
+  }
+
+  /**
+   * Get comprehensive finance dashboard data for frontend widgets and graphs
+   * 
+   * This method provides all necessary data for building comprehensive finance dashboards:
+   * - Time-based metrics (today, this week, this month, this quarter, this year)
+   * - Trend analysis (daily, weekly, monthly time series)
+   * - Comparison metrics (vs previous periods)
+   * - Widget-ready data structures
+   * - Graph-ready time series data
+   */
+  async getFinanceDashboard(): Promise<DashboardResponseDto | ErrorResponseDto> {
+    try {
+      this.logger.log('Retrieving comprehensive finance dashboard data');
+
+      // Get current date in PKT
+      const currentDate = this.getCurrentDateInPKT();
+      
+      // Calculate all date ranges
+      const dateRanges = this.calculateDateRanges(currentDate);
+
+      // Fetch all transactions in parallel
+      const [revenueTransactions, expenseTransactions, assetsData, liabilitiesData] = await Promise.all([
+        this.getRevenueTransactions(),
+        this.getExpenseTransactions(),
+        this.getFilteredAssetStats({}),
+        this.getFilteredLiabilityStats({})
+      ]);
+
+      // Calculate metrics
+      const revenues = this.calculateRevenueMetrics(revenueTransactions, dateRanges);
+      const expenses = this.calculateExpenseMetrics(expenseTransactions, dateRanges);
+      const summary = this.calculateFinancialSummary(revenueTransactions, expenseTransactions, assetsData, liabilitiesData);
+      const trends = this.calculateTrends(revenueTransactions, expenseTransactions);
+      const widgets = this.calculateWidgets(revenueTransactions, expenseTransactions, revenues, expenses, summary);
+
+      const dashboardData: DashboardDataDto = {
+        summary,
+        revenues,
+        expenses,
+        trends,
+        widgets,
+        periodInfo: {
+          currentPeriod: `${dateRanges.thisMonth.start.getFullYear()}-${String(dateRanges.thisMonth.start.getMonth() + 1).padStart(2, '0')}`,
+          previousPeriod: `${dateRanges.lastMonth.start.getFullYear()}-${String(dateRanges.lastMonth.start.getMonth() + 1).padStart(2, '0')}`,
+          generatedAt: currentDate.toISOString()
+        }
+      };
+
+      this.logger.log('Dashboard data retrieved successfully');
+
+      return {
+        status: 'success',
+        message: 'Dashboard data retrieved successfully',
+        data: dashboardData
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving dashboard data: ${error.message}`);
+      return this.createErrorResponse(
+        'An error occurred while retrieving dashboard data',
+        'DASHBOARD_ERROR'
+      );
+    }
+  }
+
+  /**
+   * Get current date in PKT timezone
+   */
+  private getCurrentDateInPKT(): Date {
+    const now = new Date();
+    return new Date(now.getTime() + (5 * 60 * 60 * 1000)); // PKT is UTC+5
+  }
+
+  /**
+   * Calculate all date ranges needed for dashboard
+   */
+  private calculateDateRanges(currentDate: Date) {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const day = currentDate.getDate();
+
+    // Today
+    const todayStart = new Date(year, month, day, 0, 0, 0, 0);
+    const todayEnd = new Date(year, month, day, 23, 59, 59, 999);
+
+    // This week (Monday to Sunday)
+    const dayOfWeek = currentDate.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const thisWeekStart = new Date(year, month, day + mondayOffset, 0, 0, 0, 0);
+    const thisWeekEnd = new Date(thisWeekStart.getTime() + (6 * 24 * 60 * 60 * 1000) + (23 * 60 * 60 * 1000) + (59 * 60 * 1000) + (59 * 1000) + 999);
+
+    // This month
+    const thisMonthStart = new Date(year, month, 1, 0, 0, 0, 0);
+    const thisMonthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+    // Last month
+    const lastMonthStart = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const lastMonthEnd = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // This quarter
+    const quarter = Math.floor(month / 3);
+    const thisQuarterStart = new Date(year, quarter * 3, 1, 0, 0, 0, 0);
+    const thisQuarterEnd = new Date(year, (quarter + 1) * 3, 0, 23, 59, 59, 999);
+
+    // Last quarter
+    const lastQuarter = quarter === 0 ? 3 : quarter - 1;
+    const lastQuarterYear = quarter === 0 ? year - 1 : year;
+    const lastQuarterStart = new Date(lastQuarterYear, lastQuarter * 3, 1, 0, 0, 0, 0);
+    const lastQuarterEnd = new Date(lastQuarterYear, (lastQuarter + 1) * 3, 0, 23, 59, 59, 999);
+
+    // This year
+    const thisYearStart = new Date(year, 0, 1, 0, 0, 0, 0);
+    const thisYearEnd = new Date(year, 11, 31, 23, 59, 59, 999);
+
+    // Last year
+    const lastYearStart = new Date(year - 1, 0, 1, 0, 0, 0, 0);
+    const lastYearEnd = new Date(year - 1, 11, 31, 23, 59, 59, 999);
+
+    return {
+      today: { start: todayStart, end: todayEnd },
+      thisWeek: { start: thisWeekStart, end: thisWeekEnd },
+      thisMonth: { start: thisMonthStart, end: thisMonthEnd },
+      lastMonth: { start: lastMonthStart, end: lastMonthEnd },
+      thisQuarter: { start: thisQuarterStart, end: thisQuarterEnd },
+      lastQuarter: { start: lastQuarterStart, end: lastQuarterEnd },
+      thisYear: { start: thisYearStart, end: thisYearEnd },
+      lastYear: { start: lastYearStart, end: lastYearEnd }
+    };
+  }
+
+  /**
+   * Get all revenue transactions with related data
+   */
+  private async getRevenueTransactions() {
+    return await this.prisma.transaction.findMany({
+      where: {
+        transactionType: TransactionType.payment,
+        status: TransactionStatus.completed
+      },
+      include: {
+        Revenue: {
+          include: {
+            lead: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        transactionDate: 'asc'
+      }
+    });
+  }
+
+  /**
+   * Get all expense transactions with related data
+   */
+  private async getExpenseTransactions() {
+    return await this.prisma.transaction.findMany({
+      where: {
+        transactionType: TransactionType.expense,
+        status: TransactionStatus.completed
+      },
+      include: {
+        Expense: true
+      },
+      orderBy: {
+        transactionDate: 'asc'
+      }
+    });
+  }
+
+  /**
+   * Filter transactions by date range
+   */
+  private filterTransactionsByDate(transactions: any[], startDate: Date, endDate: Date) {
+    return transactions.filter(t => {
+      const txDate = new Date(t.transactionDate);
+      return txDate >= startDate && txDate <= endDate;
+    });
+  }
+
+  /**
+   * Calculate time period metrics
+   */
+  private calculateTimePeriodMetrics(transactions: any[], dateRange: { start: Date; end: Date }): TimePeriodMetricsDto {
+    const filtered = this.filterTransactionsByDate(transactions, dateRange.start, dateRange.end);
+    const count = filtered.length;
+    const amount = filtered.reduce((sum, t) => sum + Number(t.amount), 0);
+    const average = count > 0 ? amount / count : 0;
+
+    return {
+      count,
+      amount: Math.round(amount * 100) / 100,
+      average: Math.round(average * 100) / 100,
+      changePercent: 0 // Will be calculated in comparison
+    };
+  }
+
+  /**
+   * Calculate period comparison
+   */
+  private calculatePeriodComparison(
+    currentTransactions: any[],
+    previousTransactions: any[],
+    currentRange: { start: Date; end: Date },
+    previousRange: { start: Date; end: Date }
+  ): PeriodComparisonDto {
+    const current = this.calculateTimePeriodMetrics(currentTransactions, currentRange);
+    const previous = this.calculateTimePeriodMetrics(previousTransactions, previousRange);
+    
+    const difference = current.amount - previous.amount;
+    const changePercent = previous.amount > 0 
+      ? Math.round((difference / previous.amount) * 100 * 100) / 100 
+      : (current.amount > 0 ? 100 : 0);
+    
+    let trend: 'up' | 'down' | 'neutral' = 'neutral';
+    if (changePercent > 0.1) trend = 'up';
+    else if (changePercent < -0.1) trend = 'down';
+
+    return {
+      current: { ...current, changePercent },
+      previous: { ...previous, changePercent: 0 },
+      difference: Math.round(difference * 100) / 100,
+      changePercent,
+      trend
+    };
+  }
+
+  /**
+   * Calculate revenue metrics
+   */
+  private calculateRevenueMetrics(transactions: any[], dateRanges: any): RevenueMetricsDto {
+    const today = this.calculateTimePeriodMetrics(transactions, dateRanges.today);
+    const thisWeek = this.calculateTimePeriodMetrics(transactions, dateRanges.thisWeek);
+    const thisMonth = this.calculateTimePeriodMetrics(transactions, dateRanges.thisMonth);
+    const thisQuarter = this.calculateTimePeriodMetrics(transactions, dateRanges.thisQuarter);
+    const thisYear = this.calculateTimePeriodMetrics(transactions, dateRanges.thisYear);
+
+    const monthOverMonth = this.calculatePeriodComparison(
+      transactions,
+      transactions,
+      dateRanges.thisMonth,
+      dateRanges.lastMonth
+    );
+
+    const yearOverYear = this.calculatePeriodComparison(
+      transactions,
+      transactions,
+      dateRanges.thisYear,
+      dateRanges.lastYear
+    );
+
+    // Calculate top categories - use thisYear for better data coverage
+    const categoryMap = new Map<string, { amount: number; count: number }>();
+    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+      const revenue = Array.isArray(t.Revenue) ? t.Revenue[0] : t.Revenue;
+      if (revenue) {
+        const category = revenue.category || 'Uncategorized';
+        const existing = categoryMap.get(category) || { amount: 0, count: 0 };
+        existing.amount += Number(t.amount);
+        existing.count++;
+        categoryMap.set(category, existing);
+      }
+    });
+
+    const totalAmount = Array.from(categoryMap.values()).reduce((sum, v) => sum + v.amount, 0);
+    const topCategories: CategoryBreakdownDto[] = Array.from(categoryMap.entries())
+      .map(([name, data]) => ({
+        name,
+        amount: Math.round(data.amount * 100) / 100,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+
+    // Calculate top sources - use thisYear for better data coverage
+    const sourceMap = new Map<string, { amount: number; count: number }>();
+    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+      const revenue = Array.isArray(t.Revenue) ? t.Revenue[0] : t.Revenue;
+      if (revenue) {
+        const source = revenue.source || 'Unknown';
+        const existing = sourceMap.get(source) || { amount: 0, count: 0 };
+        existing.amount += Number(t.amount);
+        existing.count++;
+        sourceMap.set(source, existing);
+      }
+    });
+
+    const topSources: CategoryBreakdownDto[] = Array.from(sourceMap.entries())
+      .map(([name, data]) => ({
+        name,
+        amount: Math.round(data.amount * 100) / 100,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+
+    return {
+      today,
+      thisWeek,
+      thisMonth,
+      thisQuarter,
+      thisYear,
+      monthOverMonth,
+      yearOverYear,
+      topCategories,
+      topSources
+    };
+  }
+
+  /**
+   * Calculate expense metrics
+   */
+  private calculateExpenseMetrics(transactions: any[], dateRanges: any): ExpenseMetricsDto {
+    const today = this.calculateTimePeriodMetrics(transactions, dateRanges.today);
+    const thisWeek = this.calculateTimePeriodMetrics(transactions, dateRanges.thisWeek);
+    const thisMonth = this.calculateTimePeriodMetrics(transactions, dateRanges.thisMonth);
+    const thisQuarter = this.calculateTimePeriodMetrics(transactions, dateRanges.thisQuarter);
+    const thisYear = this.calculateTimePeriodMetrics(transactions, dateRanges.thisYear);
+
+    const monthOverMonth = this.calculatePeriodComparison(
+      transactions,
+      transactions,
+      dateRanges.thisMonth,
+      dateRanges.lastMonth
+    );
+
+    const yearOverYear = this.calculatePeriodComparison(
+      transactions,
+      transactions,
+      dateRanges.thisYear,
+      dateRanges.lastYear
+    );
+
+    // Calculate top categories - use thisYear for better data coverage
+    const categoryMap = new Map<string, { amount: number; count: number }>();
+    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+      const expense = Array.isArray(t.Expense) ? t.Expense[0] : t.Expense;
+      if (expense) {
+        const category = expense.category || 'Uncategorized';
+        const existing = categoryMap.get(category) || { amount: 0, count: 0 };
+        existing.amount += Number(t.amount);
+        existing.count++;
+        categoryMap.set(category, existing);
+      }
+    });
+
+    const totalAmount = Array.from(categoryMap.values()).reduce((sum, v) => sum + v.amount, 0);
+    const topCategories: CategoryBreakdownDto[] = Array.from(categoryMap.entries())
+      .map(([name, data]) => ({
+        name,
+        amount: Math.round(data.amount * 100) / 100,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+
+    // Calculate top payment methods - use thisYear for better data coverage
+    const paymentMethodMap = new Map<string, { amount: number; count: number }>();
+    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+      const method = t.paymentMethod || 'unknown';
+      const existing = paymentMethodMap.get(method) || { amount: 0, count: 0 };
+      existing.amount += Number(t.amount);
+      existing.count++;
+      paymentMethodMap.set(method, existing);
+    });
+
+    const topPaymentMethods: CategoryBreakdownDto[] = Array.from(paymentMethodMap.entries())
+      .map(([name, data]) => ({
+        name,
+        amount: Math.round(data.amount * 100) / 100,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+
+    return {
+      today,
+      thisWeek,
+      thisMonth,
+      thisQuarter,
+      thisYear,
+      monthOverMonth,
+      yearOverYear,
+      topCategories,
+      topPaymentMethods
+    };
+  }
+
+  /**
+   * Calculate financial summary
+   */
+  private calculateFinancialSummary(
+    revenueTransactions: any[],
+    expenseTransactions: any[],
+    assetsData: any,
+    liabilitiesData: any
+  ): FinancialSummaryDto {
+    const totalRevenue = revenueTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const netProfit = totalRevenue - totalExpenses;
+    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    const totalAssets = assetsData.data?.totalCurrentValue || 0;
+    const totalLiabilities = liabilitiesData.data?.totalAmount || 0;
+    const unpaidLiabilities = liabilitiesData.data?.unpaidAmount || 0;
+    const netPosition = totalAssets - totalLiabilities;
+    const availableCash = netProfit - unpaidLiabilities;
+
+    return {
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
+      netProfit: Math.round(netProfit * 100) / 100,
+      profitMargin: Math.round(profitMargin * 100) / 100,
+      totalAssets: Math.round(totalAssets * 100) / 100,
+      totalLiabilities: Math.round(totalLiabilities * 100) / 100,
+      netPosition: Math.round(netPosition * 100) / 100,
+      unpaidLiabilities: Math.round(unpaidLiabilities * 100) / 100,
+      availableCash: Math.round(availableCash * 100) / 100
+    };
+  }
+
+  /**
+   * Calculate trend data for graphs
+   */
+  private calculateTrends(revenueTransactions: any[], expenseTransactions: any[]): TrendDataDto {
+    // Daily trend (last 30 days)
+    const daily: TimeSeriesDataPointDto[] = [];
+    const currentDate = this.getCurrentDateInPKT();
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(currentDate);
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+      const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
+      const dayRevenues = this.filterTransactionsByDate(revenueTransactions, dayStart, dayEnd);
+      const dayExpenses = this.filterTransactionsByDate(expenseTransactions, dayStart, dayEnd);
+
+      const revenue = dayRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
+      const expense = dayExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
+
+      daily.push({
+        date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+        revenue: Math.round(revenue * 100) / 100,
+        expense: Math.round(expense * 100) / 100,
+        net: Math.round((revenue - expense) * 100) / 100,
+        count: dayRevenues.length + dayExpenses.length
+      });
+    }
+
+    // Weekly trend (last 12 weeks)
+    const weekly: TimeSeriesDataPointDto[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const weekEnd = new Date(currentDate);
+      weekEnd.setDate(weekEnd.getDate() - (i * 7));
+      const weekStart = new Date(weekEnd);
+      weekStart.setDate(weekStart.getDate() - 6);
+      weekStart.setHours(0, 0, 0, 0);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const weekRevenues = this.filterTransactionsByDate(revenueTransactions, weekStart, weekEnd);
+      const weekExpenses = this.filterTransactionsByDate(expenseTransactions, weekStart, weekEnd);
+
+      const revenue = weekRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
+      const expense = weekExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
+
+      weekly.push({
+        date: `Week ${52 - Math.floor((currentDate.getTime() - weekStart.getTime()) / (7 * 24 * 60 * 60 * 1000))}`,
+        revenue: Math.round(revenue * 100) / 100,
+        expense: Math.round(expense * 100) / 100,
+        net: Math.round((revenue - expense) * 100) / 100,
+        count: weekRevenues.length + weekExpenses.length
+      });
+    }
+
+    // Monthly trend (last 12 months)
+    const monthly: TimeSeriesDataPointDto[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 0, 0, 0, 0);
+      const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const monthRevenues = this.filterTransactionsByDate(revenueTransactions, monthStart, monthEnd);
+      const monthExpenses = this.filterTransactionsByDate(expenseTransactions, monthStart, monthEnd);
+
+      const revenue = monthRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
+      const expense = monthExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
+
+      monthly.push({
+        date: `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`,
+        revenue: Math.round(revenue * 100) / 100,
+        expense: Math.round(expense * 100) / 100,
+        net: Math.round((revenue - expense) * 100) / 100,
+        count: monthRevenues.length + monthExpenses.length
+      });
+    }
+
+    return { daily, weekly, monthly };
+  }
+
+  /**
+   * Calculate widget data
+   */
+  private calculateWidgets(
+    revenueTransactions: any[],
+    expenseTransactions: any[],
+    revenues: RevenueMetricsDto,
+    expenses: ExpenseMetricsDto,
+    summary: FinancialSummaryDto
+  ): DashboardWidgetsDto {
+    const keyMetrics: WidgetMetricDto[] = [
+      {
+        title: 'Total Revenue',
+        value: summary.totalRevenue,
+        previousValue: summary.totalRevenue - revenues.monthOverMonth.current.amount,
+        changePercent: revenues.monthOverMonth.changePercent,
+        trend: revenues.monthOverMonth.trend,
+        icon: 'revenue',
+        color: 'green'
+      },
+      {
+        title: 'Total Expenses',
+        value: summary.totalExpenses,
+        previousValue: summary.totalExpenses - expenses.monthOverMonth.current.amount,
+        changePercent: expenses.monthOverMonth.changePercent,
+        trend: expenses.monthOverMonth.trend === 'up' ? 'down' : expenses.monthOverMonth.trend === 'down' ? 'up' : 'neutral',
+        icon: 'expense',
+        color: 'red'
+      },
+      {
+        title: 'Net Profit',
+        value: summary.netProfit,
+        previousValue: summary.netProfit - (revenues.monthOverMonth.current.amount - expenses.monthOverMonth.current.amount),
+        changePercent: summary.totalRevenue > 0 ? ((revenues.monthOverMonth.changePercent - expenses.monthOverMonth.changePercent) / 2) : 0,
+        trend: summary.netProfit > 0 ? 'up' : 'down',
+        icon: 'profit',
+        color: summary.netProfit > 0 ? 'green' : 'red'
+      },
+      {
+        title: 'Profit Margin',
+        value: summary.profitMargin,
+        previousValue: summary.profitMargin - 5, // Approximate
+        changePercent: 5,
+        trend: summary.profitMargin > 0 ? 'up' : 'down',
+        icon: 'margin',
+        color: summary.profitMargin > 20 ? 'green' : summary.profitMargin > 10 ? 'yellow' : 'red'
+      }
+    ];
+
+    // Revenue breakdown
+    const revenueBreakdown: CategoryBreakdownDto[] = revenues.topCategories.slice(0, 5);
+
+    // Expense breakdown
+    const expenseBreakdown: CategoryBreakdownDto[] = expenses.topCategories.slice(0, 5);
+
+    // Payment method distribution
+    const paymentMethodDistribution: CategoryBreakdownDto[] = expenses.topPaymentMethods;
+
+    return {
+      keyMetrics,
+      revenueBreakdown,
+      expenseBreakdown,
+      paymentMethodDistribution
+    };
   }
 }

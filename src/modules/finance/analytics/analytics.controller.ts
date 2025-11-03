@@ -12,6 +12,9 @@ import {
   FinanceAnalyticsResponseDto, 
   ErrorResponseDto 
 } from './dto/analytics-response.dto';
+import {
+  DashboardResponseDto
+} from './dto/dashboard-response.dto';
 
 @ApiTags('Finance Analytics')
 @ApiBearerAuth()
@@ -386,5 +389,55 @@ export class AnalyticsController {
 
     const date = new Date(dateString);
     return date instanceof Date && !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString;
+  }
+
+  /**
+   * Get comprehensive finance dashboard data for frontend widgets and graphs
+   * 
+   * This endpoint provides all necessary data for building comprehensive finance dashboards:
+   * - Time-based metrics (today, this week, this month, this quarter, this year)
+   * - Trend analysis (daily, weekly, monthly time series)
+   * - Comparison metrics (vs previous periods)
+   * - Widget-ready data structures
+   * - Graph-ready time series data
+   * 
+   * @returns Comprehensive dashboard data with metrics, widgets, and graphs
+   * 
+   * Required Permissions: revenues_permission
+   * Required Department: Accounts
+   */
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('Accounts')
+  @Permissions(PermissionName.revenues_permission)
+  @ApiOperation({ 
+    summary: 'Get comprehensive finance dashboard data',
+    description: 'Retrieves all necessary data for building finance dashboards including metrics, widgets, and graph-ready time series data'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Dashboard data retrieved successfully', 
+    type: DashboardResponseDto
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized - JWT token required' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - Accounts department and revenues_permission required' 
+  })
+  @ApiResponse({ 
+    status: 500, 
+    description: 'Internal server error', 
+    type: ErrorResponseDto 
+  })
+  async getFinanceDashboard(): Promise<DashboardResponseDto | ErrorResponseDto> {
+    try {
+      const result = await this.analyticsService.getFinanceDashboard();
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 }
