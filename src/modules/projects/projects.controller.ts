@@ -15,6 +15,7 @@ import {
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { CreateProjectFromPaymentDto } from './dto/create-project-from-payment.dto';
+import { CreateCompanyProjectDto } from './dto/create-company-project.dto';
 import { AssignUnitHeadDto } from './dto/assign-unit-head.dto';
 import { UpdateProjectDetailsDto } from './dto/update-project-details.dto';
 import { AssignProjectTeamDto } from './dto/assign-team.dto';
@@ -42,6 +43,16 @@ export class ProjectsController {
   @HttpCode(HttpStatus.CREATED)
   async createFromPayment(@Body() dto: CreateProjectFromPaymentDto, @Request() req) {
     return this.projectsService.createFromPayment(dto, req.user);
+  }
+
+  // 1.5. Create Company-Owned Project (Internal projects without client/payment)
+  @Post('create-company-project')
+  @UseGuards(JwtAuthGuard, DepartmentsGuard, RolesGuard)
+  @Departments('Production')
+  @Roles('dep_manager', 'unit_head') // Manager and Unit Head can create projects
+  @HttpCode(HttpStatus.CREATED)
+  async createCompanyProject(@Body() dto: CreateCompanyProjectDto, @Request() req) {
+    return this.projectsService.createCompanyProject(dto, req.user);
   }
 
   // 2. Get Projects (Unified with multiple filtering options)

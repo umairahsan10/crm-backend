@@ -131,15 +131,35 @@ export class PrismaService
 
   /** Ensures DB is reachable, reconnects if not */
   async ensureConnected(): Promise<boolean> {
-    this.logger.log('Checking Prisma connection...');
+    // If already marked as connected, verify with a quick query
+    if (PrismaService.isConnected) {
+      try {
+        // Use a simple query to verify connection is still alive
+        await this.employee.findFirst({ select: { id: true } });
+        return true;
+      } catch (error) {
+        // Connection lost, reset flag and reconnect
+        this.logger.warn('Connection lost during check — reconnecting...');
+        PrismaService.isConnected = false;
+      }
+    }
+
+    // Not connected or connection lost, establish connection
+    this.logger.log('Ensuring Prisma connection...');
     try {
-      // Use a simple query instead of raw query to avoid prepared statement conflicts
+      // Try to connect directly first
+      if (!PrismaService.isConnected) {
+        await this.connectWithRetry();
+      }
+      
+      // Verify connection with a test query
       await this.employee.findFirst({ select: { id: true } });
       PrismaService.isConnected = true;
       this.logger.log('Prisma connection is healthy');
       return true;
     } catch (error) {
-      this.logger.warn('Connection not healthy — attempting reconnect...');
+      // If connection fails, try one more time
+      this.logger.warn('Connection check failed — attempting reconnect...');
       PrismaService.isConnected = false;
       await this.connectWithRetry();
       return PrismaService.isConnected;

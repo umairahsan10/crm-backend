@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProjectFromPaymentDto } from './dto/create-project-from-payment.dto';
+import { CreateCompanyProjectDto } from './dto/create-company-project.dto';
 import { AssignUnitHeadDto } from './dto/assign-unit-head.dto';
 import { UpdateProjectDetailsDto, ProjectStatus } from './dto/update-project-details.dto';
 import { AssignProjectTeamDto } from './dto/assign-team.dto';
@@ -157,6 +158,196 @@ export class ProjectsService {
         throw error;
       }
       throw new BadRequestException(`Failed to create project: ${error.message}`);
+    }
+  }
+
+  // 1.5. Create Company-Owned Project (Internal projects without client/payment)
+  async createCompanyProject(dto: CreateCompanyProjectDto, user?: any) {
+    try {
+      // Validate user permissions
+      if (user) {
+        const normalizedUser = this.normalizeUser(user);
+        if (normalizedUser.roleId !== 1 && normalizedUser.roleId !== 2) {
+          throw new ForbiddenException('Only managers and unit heads can create projects');
+        }
+      }
+
+      // Validate unit head if provided
+      if (dto.unitHeadId) {
+        // First, check if employee exists and get their role name via join
+        const unitHead = await this.prisma.employee.findUnique({
+          where: { id: dto.unitHeadId },
+          include: { 
+            role: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        });
+        
+        if (!unitHead) {
+          throw new NotFoundException('Unit head not found');
+        }
+
+        // Check if employee has unit_head role (via role relation/join)
+        const hasUnitHeadRole = unitHead.role?.name === 'unit_head';
+
+        // Check if employee is assigned as head of any ProductionUnit (query ProductionUnit table)
+        const productionUnitAsHead = await this.prisma.productionUnit.findFirst({
+          where: { headId: dto.unitHeadId }
+        });
+        const isProductionUnitHead = !!productionUnitAsHead;
+        
+        // Employee must be either: 1) have unit_head role, OR 2) be assigned as head of a ProductionUnit
+        if (!hasUnitHeadRole && !isProductionUnitHead) {
+          throw new BadRequestException('The specified employee is not a unit head. Employee must either have unit_head role or be assigned as head of a ProductionUnit.');
+        }
+      }
+
+      // Validate team if provided
+      if (dto.teamId) {
+        const team = await this.prisma.team.findUnique({
+          where: { id: dto.teamId }
+        });
+        if (!team) {
+          throw new NotFoundException('Team not found');
+        }
+      }
+
+      // Create company-owned project
+      const project = await this.prisma.project.create({
+        data: {
+          // NO crackedLeadId, clientId, salesRepId
+          description: dto.description,
+          difficultyLevel: dto.difficultyLevel,
+          deadline: dto.deadline ? new Date(dto.deadline) : null,
+          unitHeadId: dto.unitHeadId || null,
+          teamId: dto.teamId || null,
+          status: null, // pending_assignment
+          paymentStage: null, // No payment stage for company projects
+          liveProgress: 0,
+        },
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
+          unitHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              teamLead: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Automatically create project chat WITHOUT sales manager/rep (only HR and Production managers)
+      await this.createCompanyProjectChat(project.id);
+
+      // If unit head is assigned, add to chat and logs
+      if (dto.unitHeadId) {
+        await this.addUnitHeadToProjectChat(project.id, dto.unitHeadId);
+        await this.autoLogService.addEmployeeToProject(project.id, dto.unitHeadId);
+      }
+
+      // If team is assigned, add team members to chat and logs
+      if (dto.teamId) {
+        // Update team's current_project_id (important for team tracking)
+        await this.prisma.team.update({
+          where: { id: dto.teamId },
+          data: { currentProjectId: project.id }
+        });
+
+        // Add all team members to project chat as participants
+        await this.addTeamMembersToProjectChat(project.id, dto.teamId);
+
+        // Add all team members to project logs
+        await this.addTeamMembersToProjectLogs(project.id, dto.teamId);
+      }
+
+      // If both unit head and team are assigned, auto-update status to 'in_progress'
+      if (dto.unitHeadId && dto.teamId) {
+        await this.prisma.project.update({
+          where: { id: project.id },
+          data: { status: 'in_progress' }
+        });
+        // Update the project object for response
+        project.status = 'in_progress';
+      }
+
+      // Fetch updated project with all relations for response
+      const finalProject = await this.prisma.project.findUnique({
+        where: { id: project.id },
+        select: {
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          unitHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              teamLead: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Company project created successfully',
+        data: finalProject
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Failed to create company project: ${error.message}`);
     }
   }
 
@@ -706,8 +897,10 @@ export class ProjectsService {
         }
 
         // Special validation for completed status
+        // Only check payment stage for CLIENT projects (paymentStage is not null)
+        // Company projects (paymentStage is null) can be completed directly
         if (dto.status === 'completed') {
-          if (project.paymentStage !== 'final') {
+          if (project.paymentStage !== null && project.paymentStage !== 'final') {
             throw new BadRequestException('Project can only be marked as completed when payment stage is final');
           }
         }
@@ -725,9 +918,15 @@ export class ProjectsService {
 
       // Auto-update logic when status is set to completed
       if (dto.status === 'completed') {
-        updateData.paymentStage = 'approved';
         updateData.liveProgress = 100;
-        console.log(`Project ${id} marked as completed - auto-updating payment stage to 'approved' and live progress to 100%`);
+        // Only update payment stage for CLIENT projects (if paymentStage exists)
+        // Company projects (paymentStage is null) should remain null
+        if (project.paymentStage !== null) {
+          updateData.paymentStage = 'approved';
+          console.log(`Project ${id} marked as completed - auto-updating payment stage to 'approved' and live progress to 100%`);
+        } else {
+          console.log(`Company project ${id} marked as completed - auto-updating live progress to 100%`);
+        }
       }
 
       // First, update the project with all fields except teamId
@@ -1497,6 +1696,62 @@ export class ProjectsService {
     } catch (error) {
       console.error(`Failed to create project chat for project ${projectId}:`, error);
       throw new BadRequestException(`Failed to create project chat: ${error.message}`);
+    }
+  }
+
+  // Helper method to create project chat for company-owned projects (without sales manager/rep)
+  private async createCompanyProjectChat(projectId: number) {
+    try {
+      // Find HR manager (dep_manager role in HR department)
+      const hrManager = await this.prisma.employee.findFirst({
+        where: {
+          role: { name: 'dep_manager' },
+          department: { name: 'HR' }
+        }
+      });
+
+      // Find Production manager (dep_manager role in Production department)
+      const productionManager = await this.prisma.employee.findFirst({
+        where: {
+          role: { name: 'dep_manager' },
+          department: { name: 'Production' }
+        }
+      });
+
+      if (!hrManager || !productionManager) {
+        throw new BadRequestException('HR Manager or Production Manager not found. Cannot create project chat.');
+      }
+
+      // Create project chat
+      const projectChat = await this.prisma.projectChat.create({
+        data: {
+          projectId: projectId,
+          participants: 2 // Initially 2 participants (HR and Production managers)
+        }
+      });
+
+      // Add HR manager as owner
+      await this.prisma.chatParticipant.create({
+        data: {
+          chatId: projectChat.id,
+          employeeId: hrManager.id,
+          memberType: 'owner'
+        }
+      });
+
+      // Add Production manager as owner
+      await this.prisma.chatParticipant.create({
+        data: {
+          chatId: projectChat.id,
+          employeeId: productionManager.id,
+          memberType: 'owner'
+        }
+      });
+
+      console.log(`Company project chat created for project ${projectId} with HR manager (${hrManager.id}) and Production manager (${productionManager.id}) as owners`);
+    } catch (error) {
+      console.error(`Failed to create company project chat for project ${projectId}:`, error);
+      throw new BadRequestException(`Failed to create company project chat: ${error.message}`);
     }
   }
 
