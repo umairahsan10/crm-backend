@@ -23,12 +23,27 @@
 The Projects module manages the complete lifecycle of projects from creation (when first payment is received) to completion. It implements a hierarchical access control system where projects flow through: **Manager → Unit Head → Team → Team Members**.
 
 ### Key Features
-- **Automatic Project Creation**: Projects are created automatically when first phase payment is completed
+- **Automatic Project Creation**: Projects are created automatically when first phase payment is completed (for client projects)
+- **Company-Owned Projects**: Support for internal projects without client/payment dependencies
 - **Hierarchical Assignment**: Manager assigns Unit Head, Unit Head assigns Team
 - **Role-Based Access Control**: Multi-layered guards ensure proper access
 - **Status Management**: Enforced status transitions with validation
 - **Automatic Updates**: Completion triggers automatic field updates
 - **Project Chat Integration**: Automatic chat creation with managers
+
+### Project Types
+
+1. **Client Projects**: Created from sales leads and payments
+   - Requires: `crackedLeadId`, `clientId`, `salesRepId`
+   - Has payment tracking: `paymentStage` (initial → final)
+   - Auto-updates `liveProgress` based on payment phases
+   - Chat includes: HR, Production, Sales Managers + Sales Rep
+
+2. **Company-Owned Projects**: Internal projects without client/payment
+   - Requires only: `description`
+   - No payment tracking: `paymentStage: null`
+   - Manual `liveProgress` updates
+   - Chat includes: HR, Production Managers only (no Sales)
 
 ---
 
@@ -146,7 +161,7 @@ if (crackedLead && crackedLead.currentPhase === 1) {
 ```
 
 **Service Method**: `ProjectsService.createFromPayment()`
-**Location**: `src/modules/projects/projects.service.ts:41-127`
+**Location**: `src/modules/projects/projects.service.ts:41-161`
 
 **Validations**:
 - User must be Manager or Unit Head
@@ -186,13 +201,138 @@ if (crackedLead && crackedLead.currentPhase === 1) {
 
 ---
 
+### 3. Create Company-Owned Project (Internal Projects)
+
+**Endpoint**: `POST /projects/create-company-project`
+
+**Access Control**:
+- **Guards**: `JwtAuthGuard`, `DepartmentsGuard`, `RolesGuard`
+- **Required Department**: `Production`
+- **Required Roles**: `dep_manager` OR `unit_head`
+- **Location**: `src/modules/projects/projects.controller.ts:48-56`
+
+**Request Body** (`CreateCompanyProjectDto`):
+```typescript
+{
+  description: string;        // Required - Project description
+  difficultyLevel?: string;  // Optional - 'very_easy' | 'easy' | 'medium' | 'hard' | 'difficult'
+  deadline?: string;         // Optional - ISO date string (e.g., "2024-12-31")
+  unitHeadId?: number;       // Optional - Unit head employee ID
+  teamId?: number;           // Optional - Team ID
+}
+```
+
+**Service Method**: `ProjectsService.createCompanyProject()`
+**Location**: `src/modules/projects/projects.service.ts:163-332`
+
+**Validations**:
+- User must be Manager or Unit Head
+- `description` is required
+- If `unitHeadId` provided:
+  - Employee must exist
+  - Employee must have `unit_head` role **OR** be assigned as head of a ProductionUnit (checked via `ProductionUnit.headId`)
+- If `teamId` provided:
+  - Team must exist
+- If both `unitHeadId` and `teamId` provided:
+  - Status auto-updates to `'in_progress'`
+  - Team's `currentProjectId` is updated
+  - All team members added to chat and logs
+
+**Example Request (Minimal)**:
+```json
+{
+  "description": "Internal tooling project - Build new employee dashboard"
+}
+```
+
+**Example Request (Complete)**:
+```json
+{
+  "description": "Internal tooling project - Build new employee dashboard",
+  "difficultyLevel": "medium",
+  "deadline": "2024-12-31",
+  "unitHeadId": 5,
+  "teamId": 12
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Company project created successfully",
+  "data": {
+    "id": 128,
+    "status": "in_progress",
+    "difficultyLevel": "medium",
+    "paymentStage": null,
+    "deadline": "2024-12-31T00:00:00.000Z",
+    "liveProgress": 0,
+    "description": "Internal tooling project - Build new employee dashboard",
+    "createdAt": "2024-11-20T10:30:00.000Z",
+    "updatedAt": "2024-11-20T10:30:00.000Z",
+    "unitHead": {
+      "id": 5,
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john.doe@company.com"
+    },
+    "team": {
+      "id": 12,
+      "name": "Frontend Team",
+      "teamLead": {
+        "id": 15,
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "email": "jane.smith@company.com"
+      }
+    }
+  }
+}
+```
+
+**What Happens on Creation**:
+1. Creates project with:
+   - `status: null` (pending_assignment) - unless both unitHeadId and teamId provided, then `'in_progress'`
+   - `paymentStage: null` (no payment tracking)
+   - `liveProgress: 0`
+   - No `crackedLeadId`, `clientId`, or `salesRepId`
+
+2. Creates project chat with:
+   - HR Manager (owner)
+   - Production Manager (owner)
+   - **No Sales Manager or Sales Rep** (unlike client projects)
+
+3. If `unitHeadId` provided:
+   - Adds unit head to chat as owner
+   - Adds unit head to project logs
+
+4. If `teamId` provided:
+   - Updates team's `currentProjectId` to this project
+   - Adds all team members to chat as participants
+   - Adds all team members to project logs
+
+**Key Differences from Client Projects**:
+- No payment tracking (`paymentStage: null`)
+- No sales rep assignment
+- Chat excludes Sales Manager and Sales Rep
+- Can be completed without payment stage requirement
+- `liveProgress` is manual (not auto-updated from payments)
+- Unit head validation: accepts employees with `unit_head` role OR assigned as ProductionUnit head
+
+**DTO Location**: `src/modules/projects/dto/create-company-project.dto.ts`
+
+---
+
 ## Project Completion Flow
 
 ### Prerequisites for Completion
 
-1. **Payment Stage Must Be `'final'`**
-   - Project cannot be marked complete if `paymentStage !== 'final'`
-   - Validation happens in `ProjectsService.updateProject()`:389-393
+1. **Payment Stage Must Be `'final'` (For Client Projects Only)**
+   - Client projects: Cannot be marked complete if `paymentStage !== 'final'`
+   - Company projects: Can be completed directly (no payment stage requirement)
+   - Validation happens in `ProjectsService.updateProject()`:823-830
+   - Code checks: `if (project.paymentStage !== null && project.paymentStage !== 'final')`
 
 2. **Valid Status Transition**
    - Can only transition from: `'in_progress'` OR `'onhold'`
@@ -201,11 +341,13 @@ if (crackedLead && crackedLead.currentPhase === 1) {
 
 ### Step-by-Step Completion Process
 
-#### Step 1: Verify Payment Stage
+#### Step 1: Verify Payment Stage (Client Projects Only)
 ```typescript
 // In ProjectsService.updateProject()
+// Only check payment stage for CLIENT projects (paymentStage is not null)
+// Company projects (paymentStage is null) can be completed directly
 if (dto.status === 'completed') {
-  if (project.paymentStage !== 'final') {
+  if (project.paymentStage !== null && project.paymentStage !== 'final') {
     throw new BadRequestException(
       'Project can only be marked as completed when payment stage is final'
     );
@@ -231,8 +373,12 @@ if (!isValidTransition) {
 When status is set to `'completed'`, these fields are automatically updated:
 ```typescript
 if (dto.status === 'completed') {
-  updateData.paymentStage = 'approved';  // Auto-update
-  updateData.liveProgress = 100;         // Auto-update
+  updateData.liveProgress = 100;  // Auto-update for all projects
+  // Only update payment stage for CLIENT projects (if paymentStage exists)
+  // Company projects (paymentStage is null) should remain null
+  if (project.paymentStage !== null) {
+    updateData.paymentStage = 'approved';  // Auto-update for client projects only
+  }
 }
 ```
 
@@ -382,6 +528,7 @@ Team (team_lead + team members)
 | Operation | Manager | Unit Head | Team Lead | Senior/Junior |
 |-----------|---------|-----------|-----------|---------------|
 | **Create Project** | ✅ (Auto/Manual) | ✅ (Manual only) | ❌ | ❌ |
+| **Create Company Project** | ✅ | ✅ | ❌ | ❌ |
 | **View All Projects** | ✅ | ❌ | ❌ | ❌ |
 | **View Assigned Projects** | ✅ | ✅ | ❌ | ❌ |
 | **View Team Projects** | ✅ | ✅ | ✅ | ✅ (Read-only) |
@@ -472,7 +619,35 @@ POST /projects/create-from-payment
 
 ---
 
-### 2. Get All Projects (With Filtering)
+### 2. Create Company-Owned Project
+
+```
+POST /projects/create-company-project
+```
+
+**Guards**: `JwtAuthGuard`, `DepartmentsGuard`, `RolesGuard`
+**Department**: `Production`
+**Roles**: `dep_manager`, `unit_head`
+
+**Request**:
+```json
+{
+  "description": "Internal tooling project - Build new employee dashboard",
+  "difficultyLevel": "medium",
+  "deadline": "2024-12-31",
+  "unitHeadId": 5,
+  "teamId": 12
+}
+```
+
+**Controller**: `ProjectsController.createCompanyProject()`:54
+**Service**: `ProjectsService.createCompanyProject()`:163
+
+**Response**: See [Create Company-Owned Project](#3-create-company-owned-project-internal-projects) section above for full details.
+
+---
+
+### 3. Get All Projects (With Filtering)
 ```
 GET /projects?filterBy=all&status=in_progress&difficulty=medium&page=1&limit=10
 ```
