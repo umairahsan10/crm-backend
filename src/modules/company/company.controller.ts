@@ -38,7 +38,7 @@ export class CompanyController {
    */
   @Get()
   @Roles(RoleName.dep_manager, RoleName.unit_head)
-  @Departments('HR')
+  @Departments('HR', 'Sales')
   @ApiOperation({ summary: 'Get all companies with search and filtering' })
   @ApiQuery({ name: 'search', required: false, description: 'Search term to filter companies by name, country, or status' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
@@ -59,7 +59,7 @@ export class CompanyController {
    */
   @Get('statistics')
   @Roles(RoleName.dep_manager, RoleName.unit_head)
-  @Departments('HR')
+  @Departments('HR', 'Sales')
   @ApiOperation({ summary: 'Get company statistics' })
   @ApiResponse({ 
     status: 200, 
