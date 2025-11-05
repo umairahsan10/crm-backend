@@ -52,8 +52,14 @@ export class TimeSeriesDataPointDto {
   @ApiProperty({ description: 'Expense amount for this period', example: 3000 })
   expense: number;
 
+  @ApiProperty({ description: 'Liability amount for this period', example: 2000 })
+  liability: number;
+
   @ApiProperty({ description: 'Net amount (revenue - expense)', example: 2000 })
   net: number;
+
+  @ApiProperty({ description: 'Net profit amount (revenue - expense)', example: 2000 })
+  netProfit: number;
 
   @ApiProperty({ description: 'Transaction count', example: 12 })
   count: number;
@@ -154,6 +160,32 @@ export class ExpenseMetricsDto {
   topPaymentMethods: CategoryBreakdownDto[];
 }
 
+export class LiabilityMetricsDto {
+  @ApiProperty({ description: 'Today metrics', type: TimePeriodMetricsDto })
+  today: TimePeriodMetricsDto;
+
+  @ApiProperty({ description: 'This week metrics', type: TimePeriodMetricsDto })
+  thisWeek: TimePeriodMetricsDto;
+
+  @ApiProperty({ description: 'This month metrics', type: TimePeriodMetricsDto })
+  thisMonth: TimePeriodMetricsDto;
+
+  @ApiProperty({ description: 'This quarter metrics', type: TimePeriodMetricsDto })
+  thisQuarter: TimePeriodMetricsDto;
+
+  @ApiProperty({ description: 'This year metrics', type: TimePeriodMetricsDto })
+  thisYear: TimePeriodMetricsDto;
+
+  @ApiProperty({ description: 'Month over month comparison', type: PeriodComparisonDto })
+  monthOverMonth: PeriodComparisonDto;
+
+  @ApiProperty({ description: 'Year over year comparison', type: PeriodComparisonDto })
+  yearOverYear: PeriodComparisonDto;
+
+  @ApiProperty({ description: 'Top categories breakdown', type: [CategoryBreakdownDto] })
+  topCategories: CategoryBreakdownDto[];
+}
+
 export class FinancialSummaryDto {
   @ApiProperty({ description: 'Total revenue (all time)', example: 1500000 })
   totalRevenue: number;
@@ -181,6 +213,12 @@ export class FinancialSummaryDto {
 
   @ApiProperty({ description: 'Available cash (revenue - expenses - unpaid liabilities)', example: 730000 })
   availableCash: number;
+
+  @ApiProperty({ description: 'Monthly net profit (revenue - expenses for this month)', example: 75000 })
+  monthlyNetProfit: number;
+
+  @ApiProperty({ description: 'Monthly profit margin percentage', example: 50.0 })
+  monthlyProfitMargin: number;
 }
 
 export class TrendDataDto {
@@ -190,7 +228,7 @@ export class TrendDataDto {
   @ApiProperty({ description: 'Weekly trend data (last 12 weeks)', type: [TimeSeriesDataPointDto] })
   weekly: TimeSeriesDataPointDto[];
 
-  @ApiProperty({ description: 'Monthly trend data (last 12 months)', type: [TimeSeriesDataPointDto] })
+  @ApiProperty({ description: 'Monthly trend data (January to current month of current year)', type: [TimeSeriesDataPointDto] })
   monthly: TimeSeriesDataPointDto[];
 }
 
@@ -217,6 +255,9 @@ export class DashboardDataDto {
 
   @ApiProperty({ description: 'Expense metrics by time period', type: ExpenseMetricsDto })
   expenses: ExpenseMetricsDto;
+
+  @ApiProperty({ description: 'Liability metrics by time period', type: LiabilityMetricsDto })
+  liabilities: LiabilityMetricsDto;
 
   @ApiProperty({ description: 'Trend data for graphs', type: TrendDataDto })
   trends: TrendDataDto;

@@ -20,6 +20,7 @@ import {
   FinancialSummaryDto,
   RevenueMetricsDto,
   ExpenseMetricsDto,
+  LiabilityMetricsDto,
   TimePeriodMetricsDto,
   PeriodComparisonDto,
   TimeSeriesDataPointDto,
@@ -415,9 +416,10 @@ export class AnalyticsService {
       const dateRanges = this.calculateDateRanges(currentDate);
 
       // Fetch all transactions in parallel
-      const [revenueTransactions, expenseTransactions, assetsData, liabilitiesData] = await Promise.all([
+      const [revenueTransactions, expenseTransactions, liabilityTransactions, assetsData, liabilitiesData] = await Promise.all([
         this.getRevenueTransactions(),
         this.getExpenseTransactions(),
+        this.getLiabilityTransactions(),
         this.getFilteredAssetStats({}),
         this.getFilteredLiabilityStats({})
       ]);
@@ -425,14 +427,16 @@ export class AnalyticsService {
       // Calculate metrics
       const revenues = this.calculateRevenueMetrics(revenueTransactions, dateRanges);
       const expenses = this.calculateExpenseMetrics(expenseTransactions, dateRanges);
-      const summary = this.calculateFinancialSummary(revenueTransactions, expenseTransactions, assetsData, liabilitiesData);
-      const trends = this.calculateTrends(revenueTransactions, expenseTransactions);
+      const liabilities = this.calculateLiabilityMetrics(liabilityTransactions, dateRanges);
+      const summary = this.calculateFinancialSummary(revenueTransactions, expenseTransactions, assetsData, liabilitiesData, dateRanges);
+      const trends = this.calculateTrends(revenueTransactions, expenseTransactions, liabilityTransactions);
       const widgets = this.calculateWidgets(revenueTransactions, expenseTransactions, revenues, expenses, summary);
 
       const dashboardData: DashboardDataDto = {
         summary,
         revenues,
         expenses,
+        liabilities,
         trends,
         widgets,
         periodInfo: {
@@ -566,6 +570,26 @@ export class AnalyticsService {
         transactionDate: 'asc'
       }
     });
+  }
+
+  /**
+   * Get all liability transactions with related data
+   */
+  private async getLiabilityTransactions() {
+    const liabilities = await this.prisma.liability.findMany({
+      include: {
+        transaction: true
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
+    
+    // Map to transaction-like structure for consistency with other methods
+    return liabilities.map(liability => ({
+      ...liability.transaction,
+      Liability: [liability]
+    }));
   }
 
   /**
@@ -791,18 +815,95 @@ export class AnalyticsService {
   }
 
   /**
+   * Calculate liability metrics
+   */
+  private calculateLiabilityMetrics(transactions: any[], dateRanges: any): LiabilityMetricsDto {
+    const today = this.calculateTimePeriodMetrics(transactions, dateRanges.today);
+    const thisWeek = this.calculateTimePeriodMetrics(transactions, dateRanges.thisWeek);
+    const thisMonth = this.calculateTimePeriodMetrics(transactions, dateRanges.thisMonth);
+    const thisQuarter = this.calculateTimePeriodMetrics(transactions, dateRanges.thisQuarter);
+    const thisYear = this.calculateTimePeriodMetrics(transactions, dateRanges.thisYear);
+
+    const monthOverMonth = this.calculatePeriodComparison(
+      transactions,
+      transactions,
+      dateRanges.thisMonth,
+      dateRanges.lastMonth
+    );
+
+    const yearOverYear = this.calculatePeriodComparison(
+      transactions,
+      transactions,
+      dateRanges.thisYear,
+      dateRanges.lastYear
+    );
+
+    // Calculate top categories - use thisYear for better data coverage
+    const categoryMap = new Map<string, { amount: number; count: number }>();
+    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+      const liability = Array.isArray(t.Liability) ? t.Liability[0] : t.Liability;
+      if (liability) {
+        const category = liability.category || 'Uncategorized';
+        const existing = categoryMap.get(category) || { amount: 0, count: 0 };
+        existing.amount += Number(t.amount);
+        existing.count++;
+        categoryMap.set(category, existing);
+      }
+    });
+
+    const totalAmount = Array.from(categoryMap.values()).reduce((sum, v) => sum + v.amount, 0);
+    const topCategories: CategoryBreakdownDto[] = Array.from(categoryMap.entries())
+      .map(([name, data]) => ({
+        name,
+        amount: Math.round(data.amount * 100) / 100,
+        count: data.count,
+        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+
+    return {
+      today,
+      thisWeek,
+      thisMonth,
+      thisQuarter,
+      thisYear,
+      monthOverMonth,
+      yearOverYear,
+      topCategories
+    };
+  }
+
+  /**
    * Calculate financial summary
    */
   private calculateFinancialSummary(
     revenueTransactions: any[],
     expenseTransactions: any[],
     assetsData: any,
-    liabilitiesData: any
+    liabilitiesData: any,
+    dateRanges: any
   ): FinancialSummaryDto {
     const totalRevenue = revenueTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    // Calculate monthly metrics
+    const monthlyRevenueTransactions = this.filterTransactionsByDate(
+      revenueTransactions,
+      dateRanges.thisMonth.start,
+      dateRanges.thisMonth.end
+    );
+    const monthlyExpenseTransactions = this.filterTransactionsByDate(
+      expenseTransactions,
+      dateRanges.thisMonth.start,
+      dateRanges.thisMonth.end
+    );
+    const monthlyRevenue = monthlyRevenueTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const monthlyExpenses = monthlyExpenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const monthlyNetProfit = monthlyRevenue - monthlyExpenses;
+    const monthlyProfitMargin = monthlyRevenue > 0 ? (monthlyNetProfit / monthlyRevenue) * 100 : 0;
 
     const totalAssets = assetsData.data?.totalCurrentValue || 0;
     const totalLiabilities = liabilitiesData.data?.totalAmount || 0;
@@ -819,14 +920,16 @@ export class AnalyticsService {
       totalLiabilities: Math.round(totalLiabilities * 100) / 100,
       netPosition: Math.round(netPosition * 100) / 100,
       unpaidLiabilities: Math.round(unpaidLiabilities * 100) / 100,
-      availableCash: Math.round(availableCash * 100) / 100
+      availableCash: Math.round(availableCash * 100) / 100,
+      monthlyNetProfit: Math.round(monthlyNetProfit * 100) / 100,
+      monthlyProfitMargin: Math.round(monthlyProfitMargin * 100) / 100
     };
   }
 
   /**
    * Calculate trend data for graphs
    */
-  private calculateTrends(revenueTransactions: any[], expenseTransactions: any[]): TrendDataDto {
+  private calculateTrends(revenueTransactions: any[], expenseTransactions: any[], liabilityTransactions: any[]): TrendDataDto {
     // Daily trend (last 30 days)
     const daily: TimeSeriesDataPointDto[] = [];
     const currentDate = this.getCurrentDateInPKT();
@@ -838,16 +941,20 @@ export class AnalyticsService {
 
       const dayRevenues = this.filterTransactionsByDate(revenueTransactions, dayStart, dayEnd);
       const dayExpenses = this.filterTransactionsByDate(expenseTransactions, dayStart, dayEnd);
+      const dayLiabilities = this.filterTransactionsByDate(liabilityTransactions, dayStart, dayEnd);
 
       const revenue = dayRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
       const expense = dayExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
+      const liability = dayLiabilities.reduce((sum, t) => sum + Number(t.amount), 0);
 
       daily.push({
         date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         revenue: Math.round(revenue * 100) / 100,
         expense: Math.round(expense * 100) / 100,
+        liability: Math.round(liability * 100) / 100,
         net: Math.round((revenue - expense) * 100) / 100,
-        count: dayRevenues.length + dayExpenses.length
+        netProfit: Math.round((revenue - expense) * 100) / 100,
+        count: dayRevenues.length + dayExpenses.length + dayLiabilities.length
       });
     }
 
@@ -863,38 +970,49 @@ export class AnalyticsService {
 
       const weekRevenues = this.filterTransactionsByDate(revenueTransactions, weekStart, weekEnd);
       const weekExpenses = this.filterTransactionsByDate(expenseTransactions, weekStart, weekEnd);
+      const weekLiabilities = this.filterTransactionsByDate(liabilityTransactions, weekStart, weekEnd);
 
       const revenue = weekRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
       const expense = weekExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
+      const liability = weekLiabilities.reduce((sum, t) => sum + Number(t.amount), 0);
 
       weekly.push({
         date: `Week ${52 - Math.floor((currentDate.getTime() - weekStart.getTime()) / (7 * 24 * 60 * 60 * 1000))}`,
         revenue: Math.round(revenue * 100) / 100,
         expense: Math.round(expense * 100) / 100,
+        liability: Math.round(liability * 100) / 100,
         net: Math.round((revenue - expense) * 100) / 100,
-        count: weekRevenues.length + weekExpenses.length
+        netProfit: Math.round((revenue - expense) * 100) / 100,
+        count: weekRevenues.length + weekExpenses.length + weekLiabilities.length
       });
     }
 
-    // Monthly trend (last 12 months)
+    // Monthly trend (January to current month of current year)
     const monthly: TimeSeriesDataPointDto[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 0, 0, 0, 0);
-      const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth(); // 0-11 (0 = January)
+    
+    // Loop from January (0) to current month
+    for (let month = 0; month <= currentMonth; month++) {
+      const monthStart = new Date(currentYear, month, 1, 0, 0, 0, 0);
+      const monthEnd = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
 
       const monthRevenues = this.filterTransactionsByDate(revenueTransactions, monthStart, monthEnd);
       const monthExpenses = this.filterTransactionsByDate(expenseTransactions, monthStart, monthEnd);
+      const monthLiabilities = this.filterTransactionsByDate(liabilityTransactions, monthStart, monthEnd);
 
       const revenue = monthRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
       const expense = monthExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
+      const liability = monthLiabilities.reduce((sum, t) => sum + Number(t.amount), 0);
 
       monthly.push({
-        date: `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`,
+        date: `${currentYear}-${String(month + 1).padStart(2, '0')}`,
         revenue: Math.round(revenue * 100) / 100,
         expense: Math.round(expense * 100) / 100,
+        liability: Math.round(liability * 100) / 100,
         net: Math.round((revenue - expense) * 100) / 100,
-        count: monthRevenues.length + monthExpenses.length
+        netProfit: Math.round((revenue - expense) * 100) / 100,
+        count: monthRevenues.length + monthExpenses.length + monthLiabilities.length
       });
     }
 
