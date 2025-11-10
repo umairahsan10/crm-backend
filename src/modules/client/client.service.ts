@@ -198,6 +198,36 @@ export class ClientService {
     }
   }
 
+  async findByEmail(email: string): Promise<ClientResponseDto> {
+    try {
+      const client = await this.prisma.client.findFirst({
+        where: { email },
+        include: {
+          industry: true,
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          }
+        }
+      });
+
+      if (!client) {
+        throw new NotFoundException('Client not found with the provided email');
+      }
+
+      return this.mapToResponseDto(client);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to fetch client by email');
+    }
+  }
+
   async update(id: number, updateClientDto: UpdateClientDto): Promise<ClientResponseDto> {
     try {
       // Check if client exists
