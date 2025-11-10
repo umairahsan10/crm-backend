@@ -19,6 +19,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { DepartmentsModule } from './modules/Departments/departments.module';
 import { RolesModule } from './modules/Roles/roles.module';
 import { IndustryModule } from './modules/industry/industry.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { setPrismaService } from './common/constants/department-name.enum';
 
 @Global() // Make this module global so PrismaService is available everywhere
@@ -46,6 +47,7 @@ import { setPrismaService } from './common/constants/department-name.enum';
     DepartmentsModule,
     RolesModule,
     IndustryModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [PrismaService],
