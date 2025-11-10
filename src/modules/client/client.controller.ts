@@ -19,6 +19,7 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { ClientQueryDto } from './dto/client-query.dto';
 import { ClientResponseDto, ClientListResponseDto } from './dto/client-response.dto';
+import { FindByEmailDto } from './dto/find-by-email.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { BlockProductionGuard } from '../../common/guards/block-production.guard';
@@ -82,6 +83,23 @@ export class ClientController {
       status: 'success',
       message: 'Client statistics retrieved successfully',
       data: stats,
+    };
+  }
+
+  @Post('by-email')
+  @Roles(RoleName.dep_manager, RoleName.unit_head, RoleName.team_lead, RoleName.senior, RoleName.junior)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Retrieve a specific client by email address' })
+  @ApiResponse({ status: 200, description: 'Client retrieved successfully', type: ClientResponseDto })
+  @ApiResponse({ status: 404, description: 'Client not found with the provided email' })
+  async findByEmail(
+    @Body() findByEmailDto: FindByEmailDto,
+  ): Promise<{ status: string; message: string; data: { client: ClientResponseDto } }> {
+    const client = await this.clientService.findByEmail(findByEmailDto.email);
+    return {
+      status: 'success',
+      message: 'Client retrieved successfully',
+      data: { client },
     };
   }
 
