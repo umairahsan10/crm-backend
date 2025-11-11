@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
 import { MetricGridResponseDto } from './dto/metric-grid-response.dto';
 import { ActivityFeedResponseDto } from './dto/activity-feed-response.dto';
+import { HrRequestsResponseDto } from './dto/hr-request.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -33,6 +34,25 @@ export class DashboardController {
     
     // Use JWT token data directly - no database query needed!
     return await this.dashboardService.getActivityFeed(
+      req.user.id,
+      req.user.department,  // From JWT token
+      req.user.role,         // From JWT token
+      limitNum
+    );
+  }
+
+  @Get('hr-requests')
+  @ApiOperation({ summary: 'Get HR requests - Returns recent HR requests based on user role and department' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of requests to return (default: 10)' })
+  @ApiResponse({ status: 200, description: 'HR requests retrieved successfully', type: HrRequestsResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getHrRequests(
+    @Request() req: any,
+    @Query('limit') limit?: number
+  ): Promise<HrRequestsResponseDto> {
+    const limitNum = limit ? parseInt(limit.toString()) : 10;
+    
+    return await this.dashboardService.getHrRequests(
       req.user.id,
       req.user.department,  // From JWT token
       req.user.role,         // From JWT token
