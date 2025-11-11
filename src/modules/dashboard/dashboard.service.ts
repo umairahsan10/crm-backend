@@ -524,5 +524,498 @@ export class DashboardService {
     if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`;
     return `$${n.toFixed(0)}`;
   }
+
+  private formatActionType(actionType: string | null): string {
+    if (!actionType) return '';
+    // Convert underscore to space and capitalize each word
+    return actionType
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  private extractBulkMarkPresentReason(description: string | null): string {
+    if (!description) return '';
+    
+    // New format: "{count} employees - {reason}" or "{count} employees"
+    const newFormatMatch = description.match(/^(\d+)\s+employees(?:\s+-\s+(.+))?$/);
+    if (newFormatMatch) {
+      const count = newFormatMatch[1];
+      const reason = newFormatMatch[2]?.trim() || '';
+      return reason ? `${count} employees - ${reason}` : `${count} employees`;
+    }
+    
+    // Old format: Extract count and reason from old descriptions
+    // Pattern 1: "Bulk checkin: {count} employee(s) ... - Reason: {reason}"
+    const oldFormatMatch1 = description.match(/Bulk checkin:\s*(\d+)\s+employee\(s\).*?-\s+Reason:\s*(.+)$/);
+    if (oldFormatMatch1) {
+      const count = oldFormatMatch1[1];
+      const reason = oldFormatMatch1[2].trim();
+      return `${count} employees - ${reason}`;
+    }
+    
+    // Pattern 2: "Bulk marked {count} employee(s) ... - Reason: {reason}"
+    const oldFormatMatch2 = description.match(/Bulk marked\s+(\d+)\s+employee\(s\).*?-\s+Reason:\s*(.+)$/);
+    if (oldFormatMatch2) {
+      const count = oldFormatMatch2[1];
+      const reason = oldFormatMatch2[2].trim();
+      return `${count} employees - ${reason}`;
+    }
+    
+    // Pattern 3: Just extract reason if count pattern not found
+    const reasonMatch = description.match(/- Reason:\s*(.+)$/);
+    if (reasonMatch && reasonMatch[1]) {
+      return reasonMatch[1].trim();
+    }
+    
+    // If no pattern matches, return as-is
+    return description;
+  }
+
+  // ACTIVITY FEED
+  async getActivityFeed(userId: number, department: string, role: string, limit: number = 20) {
+    // Get activities based on department - using JWT token data directly
+    let activities: any[] = [];
+    
+    if (department === 'HR') activities = await this.getHrActivitiesOptimized(userId, role, limit);
+    else if (department === 'Sales') activities = await this.getSalesActivitiesOptimized(userId, role, limit);
+    else if (department === 'Production') activities = await this.getProductionActivitiesOptimized(userId, role, limit);
+    else if (department === 'Marketing') activities = await this.getMarketingActivitiesOptimized(userId, role, limit);
+    else if (department === 'Accounts') activities = await this.getAccountantActivitiesOptimized(userId, role, limit);
+
+    return {
+      department,
+      role,
+      activities: activities.slice(0, limit),
+      total: activities.length
+    };
+  }
+
+  // OPTIMIZED HR Activities - Direct department filtering, no user lookup
+  // Only includes activities PERFORMED BY HR employees (HR Logs), not HR Requests
+  private async getHrActivitiesOptimized(userId: number, role: string, limit: number) {
+    // Only fetch HR Logs - activities performed by HR employees
+    const hrLogs = await this.prisma.hRLog.findMany({
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      where: {
+        hr: {
+          employee: {
+            department: { name: 'HR' }
+          }
+        }
+      },
+      select: {
+        id: true,
+        actionType: true,
+        description: true,
+        createdAt: true,
+        hr: {
+          select: {
+            employee: {
+              select: { firstName: true, lastName: true, id: true }
+            }
+          }
+        },
+        affectedEmployee: {
+          select: { firstName: true, lastName: true, id: true }
+        }
+      }
+    });
+
+    const activities: any[] = [];
+
+    // Process HR Logs - only activities performed by HR employees
+    hrLogs.forEach(log => {
+      // For bulk_mark_present, extract only the reason from description
+      const isBulkMarkPresent = log.actionType === 'bulk_mark_present';
+      const description = isBulkMarkPresent 
+        ? this.extractBulkMarkPresentReason(log.description)
+        : (log.description || `${log.hr.employee.firstName} ${log.hr.employee.lastName} performed ${this.formatActionType(log.actionType)}`);
+      
+      activities.push({
+        id: `hr_log_${log.id}`,
+        type: 'HR Activity',
+        title: this.formatActionType(log.actionType) || 'HR Action',
+        description,
+        createdAt: log.createdAt,
+        actor: `${log.hr.employee.firstName} ${log.hr.employee.lastName}`,
+        relatedEntity: log.affectedEmployee ? {
+          type: 'employee',
+          id: log.affectedEmployee.id,
+          name: `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}`
+        } : null
+      });
+    });
+
+    // Sort and limit
+    return activities
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+
+  // OPTIMIZED Sales Activities - Direct department filtering
+  private async getSalesActivitiesOptimized(userId: number, role: string, limit: number) {
+    // Build where clause based on role
+    let leadWhere: any = {
+      OR: [
+        { assignedTo: { department: { name: 'Sales' } } },
+        { crackedBy: { department: { name: 'Sales' } } },
+        { startedBy: { department: { name: 'Sales' } } },
+        { closedBy: { department: { name: 'Sales' } } }
+      ]
+    };
+
+    if (role === 'unit_head') {
+      leadWhere = { ...leadWhere, salesUnit: { headId: userId } };
+    } else if (role === 'team_lead') {
+      leadWhere = { ...leadWhere, assignedTo: { teamLeadId: userId } };
+    } else if (role !== 'dep_manager') {
+      leadWhere = { ...leadWhere, assignedToId: userId };
+    }
+
+    // Single parallel query for leads and cracked leads
+    const [leads, crackedLeads] = await Promise.all([
+      // Leads - Direct department filter
+      this.prisma.lead.findMany({
+        where: leadWhere,
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+          updatedAt: true,
+          assignedTo: {
+            select: { firstName: true, lastName: true, id: true }
+          },
+          crackedBy: {
+            select: { firstName: true, lastName: true, id: true }
+          },
+          startedBy: {
+            select: { firstName: true, lastName: true, id: true }
+          },
+          closedBy: {
+            select: { firstName: true, lastName: true, id: true }
+          }
+        }
+      }),
+
+      // Cracked Leads - Direct department filter
+      this.prisma.crackedLead.findMany({
+        where: {
+          employee: { department: { name: 'Sales' } },
+          lead: role === 'unit_head' ? { salesUnit: { headId: userId } } :
+                role === 'team_lead' ? { assignedTo: { teamLeadId: userId } } :
+                role !== 'dep_manager' ? { assignedToId: userId } : {}
+        },
+        take: limit,
+        orderBy: { crackedAt: 'desc' },
+        select: {
+          id: true,
+          amount: true,
+          crackedAt: true,
+          employee: {
+            select: { firstName: true, lastName: true, id: true }
+          },
+          lead: {
+            select: { name: true, email: true }
+          }
+        }
+      })
+    ]);
+
+    const activities: any[] = [];
+
+    // Process Leads
+    leads.forEach(lead => {
+      const actor = lead.crackedBy || lead.assignedTo || lead.startedBy || lead.closedBy;
+      if (actor) {
+        activities.push({
+          id: `lead_${lead.id}`,
+          type: 'Lead Activity',
+          title: lead.status === 'cracked' ? 'Lead Converted' : `Lead ${lead.status}`,
+          description: `Lead "${lead.name || lead.email}" was ${lead.status === 'cracked' ? 'converted' : lead.status} by ${actor.firstName} ${actor.lastName}`,
+          createdAt: lead.updatedAt,
+          actor: `${actor.firstName} ${actor.lastName}`,
+          relatedEntity: { type: 'lead', id: lead.id, name: lead.name || lead.email }
+        });
+      }
+    });
+
+    // Process Cracked Leads
+    crackedLeads.forEach(cracked => {
+      activities.push({
+        id: `cracked_lead_${cracked.id}`,
+        type: 'Deal Closed',
+        title: 'Deal Closed',
+        description: `Deal closed for $${cracked.amount} by ${cracked.employee.firstName} ${cracked.employee.lastName}`,
+        createdAt: cracked.crackedAt,
+        actor: `${cracked.employee.firstName} ${cracked.employee.lastName}`,
+        relatedEntity: { type: 'cracked_lead', id: cracked.id }
+      });
+    });
+
+    return activities
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+
+  // OPTIMIZED Production Activities
+  private async getProductionActivitiesOptimized(userId: number, role: string, limit: number) {
+    // Get team IDs if needed (only for team_lead role)
+    let teamIds: number[] = [];
+    if (role === 'team_lead') {
+      const teams = await this.prisma.team.findMany({
+        where: { teamLeadId: userId },
+        select: { id: true }
+      });
+      teamIds = teams.map(t => t.id);
+    }
+
+    // Build project where clause
+    let projectWhere: any = {
+      projectLogs: {
+        some: {
+          developer: { department: { name: 'Production' } }
+        }
+      }
+    };
+
+    if (role === 'unit_head') {
+      projectWhere = { ...projectWhere, unitHeadId: userId };
+    } else if (role === 'team_lead' && teamIds.length > 0) {
+      projectWhere = { ...projectWhere, teamId: { in: teamIds } };
+    } else if (role !== 'dep_manager') {
+      projectWhere = { ...projectWhere, projectLogs: { some: { developerId: userId } } };
+    }
+
+    // Single query for projects only (no tasks)
+    const projects = await this.prisma.project.findMany({
+      where: projectWhere,
+      take: limit,
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+        projectLogs: {
+          where: {
+            developer: { department: { name: 'Production' } }
+          },
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            developer: {
+              select: { firstName: true, lastName: true, id: true }
+            }
+          }
+        }
+      }
+    });
+
+    const activities: any[] = [];
+
+    // Process Projects
+    projects.forEach(project => {
+      const latestLog = project.projectLogs[0];
+      if (latestLog) {
+        activities.push({
+          id: `project_${project.id}`,
+          type: 'Project Activity',
+          title: `Project ${project.status}`,
+          description: `Project status changed to ${project.status} by ${latestLog.developer.firstName} ${latestLog.developer.lastName}`,
+          createdAt: project.updatedAt,
+          actor: `${latestLog.developer.firstName} ${latestLog.developer.lastName}`,
+          relatedEntity: { type: 'project', id: project.id }
+        });
+      }
+    });
+
+    return activities
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+
+  // OPTIMIZED Marketing Activities
+  private async getMarketingActivitiesOptimized(userId: number, role: string, limit: number) {
+    // Build campaign where clause
+    let campaignWhere: any = {
+      marketingUnit: {
+        marketingEmployees: {
+          some: {
+            employee: { department: { name: 'Marketing' } }
+          }
+        }
+      }
+    };
+
+    if (role === 'unit_head') {
+      campaignWhere = {
+        ...campaignWhere,
+        marketingUnit: {
+          ...campaignWhere.marketingUnit,
+          headId: userId
+        }
+      };
+    }
+
+    // Single query for campaigns
+    const campaigns = await this.prisma.campaignLog.findMany({
+      where: campaignWhere,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        campaignName: true,
+        status: true,
+        createdAt: true,
+        marketingUnit: {
+          select: {
+            marketingEmployees: {
+              where: {
+                employee: { department: { name: 'Marketing' } }
+              },
+              take: 1,
+              select: {
+                employee: {
+                  select: { firstName: true, lastName: true, id: true }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const activities: any[] = [];
+
+    campaigns.forEach(campaign => {
+      const employee = campaign.marketingUnit.marketingEmployees[0]?.employee;
+      if (employee) {
+        activities.push({
+          id: `campaign_${campaign.id}`,
+          type: 'Campaign Activity',
+          title: `Campaign ${campaign.status}`,
+          description: `Campaign "${campaign.campaignName}" ${campaign.status === 'Running' ? 'launched' : campaign.status.toLowerCase()} by ${employee.firstName} ${employee.lastName}`,
+          createdAt: campaign.createdAt,
+          actor: `${employee.firstName} ${employee.lastName}`,
+          relatedEntity: { type: 'campaign', id: campaign.id, name: campaign.campaignName }
+        });
+      }
+    });
+
+    return activities;
+  }
+
+  // OPTIMIZED Accountant Activities - Single parallel query
+  private async getAccountantActivitiesOptimized(userId: number, role: string, limit: number) {
+    // Single parallel query for all financial activities
+    const [transactions, revenues, expenses] = await Promise.all([
+      // Transactions
+      this.prisma.transaction.findMany({
+        where: {
+          employee: { department: { name: 'Accounts' } }
+        },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          transactionType: true,
+          amount: true,
+          createdAt: true,
+          employee: {
+            select: { firstName: true, lastName: true, id: true }
+          }
+        }
+      }),
+
+      // Revenues
+      this.prisma.revenue.findMany({
+        where: {
+          employee: { department: { name: 'Accounts' } }
+        },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          amount: true,
+          createdAt: true,
+          employee: {
+            select: { firstName: true, lastName: true, id: true }
+          }
+        }
+      }),
+
+      // Expenses
+      this.prisma.expense.findMany({
+        where: {
+          employee: { department: { name: 'Accounts' } }
+        },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          amount: true,
+          createdAt: true,
+          employee: {
+            select: { firstName: true, lastName: true, id: true }
+          }
+        }
+      })
+    ]);
+
+    const activities: any[] = [];
+
+    // Process Transactions
+    transactions.forEach(transaction => {
+      if (transaction.employee) {
+        activities.push({
+          id: `transaction_${transaction.id}`,
+          type: 'Transaction',
+          title: `${transaction.transactionType} Transaction`,
+          description: `${transaction.transactionType} transaction of $${transaction.amount} processed by ${transaction.employee.firstName} ${transaction.employee.lastName}`,
+          createdAt: transaction.createdAt,
+          actor: `${transaction.employee.firstName} ${transaction.employee.lastName}`,
+          relatedEntity: { type: 'transaction', id: transaction.id }
+        });
+      }
+    });
+
+    // Process Revenues
+    revenues.forEach(revenue => {
+      if (revenue.employee) {
+        activities.push({
+          id: `revenue_${revenue.id}`,
+          type: 'Revenue',
+          title: 'Revenue Recorded',
+          description: `Revenue of $${revenue.amount} recorded by ${revenue.employee.firstName} ${revenue.employee.lastName}`,
+          createdAt: revenue.createdAt,
+          actor: `${revenue.employee.firstName} ${revenue.employee.lastName}`,
+          relatedEntity: { type: 'revenue', id: revenue.id }
+        });
+      }
+    });
+
+    // Process Expenses
+    expenses.forEach(expense => {
+      if (expense.employee) {
+        activities.push({
+          id: `expense_${expense.id}`,
+          type: 'Expense',
+          title: 'Expense Recorded',
+          description: `Expense of $${expense.amount} recorded by ${expense.employee.firstName} ${expense.employee.lastName}`,
+          createdAt: expense.createdAt,
+          actor: `${expense.employee.firstName} ${expense.employee.lastName}`,
+          relatedEntity: { type: 'expense', id: expense.id }
+        });
+      }
+    });
+
+    return activities
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
 }
 

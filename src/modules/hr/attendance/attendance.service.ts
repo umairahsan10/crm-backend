@@ -3559,12 +3559,17 @@ export class AttendanceService {
     console.log(`Bulk checkin operation completed. Marked: ${markedPresent} (${markedLate} late, ${markedHalfDay} half-day), Errors: ${errors}, Skipped: ${skipped}`);
     
     // Create a single HR log entry for the entire bulk operation
+    // Format: "{count} employees - {reason}" or just "{count} employees" if no reason
+    const description = reason 
+      ? `${markedPresent} employees - ${reason}`
+      : `${markedPresent} employees`;
+    
     await this.prisma.hRLog.create({
       data: {
         hrId: 1, // TODO: Get from authenticated user
         actionType: 'bulk_mark_present',
         affectedEmployeeId: null,
-        description: `Bulk checkin: ${markedPresent} employee(s) for ${dateStr}${employee_ids ? ` (IDs: ${employee_ids.join(', ')})` : ''} - Status: ${markedPresent - markedLate - markedHalfDay} present, ${markedLate} late, ${markedHalfDay} half-day${reason ? ` - Reason: ${reason}` : ''}`
+        description
       }
     });
 
