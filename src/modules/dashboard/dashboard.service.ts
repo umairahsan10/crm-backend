@@ -1017,5 +1017,149 @@ export class DashboardService {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, limit);
   }
+
+  // HR REQUESTS - Optimized with single query and direct Prisma relations
+  async getHrRequests(userId: number, department: string, role: string, limit: number = 10) {
+    // Only for HR department
+    if (department !== 'HR') {
+      return {
+        department,
+        role,
+        requests: [],
+        total: 0
+      };
+    }
+
+    // Build where clause based on role - using direct Prisma relations (NO extra queries!)
+    let where: any = {};
+
+    if (role === 'unit_head') {
+      // Unit head: See requests from employees in their unit
+      // Handle both Sales and Production units - using direct Prisma relations
+      where = {
+        OR: [
+          // Sales unit employees (through salesDepartment)
+          { 
+            employee: { 
+              salesDepartment: { 
+                salesUnit: { headId: userId } 
+              } 
+            } 
+          },
+          // Production unit employees (through production)
+          { 
+            employee: { 
+              production: { 
+                productionUnit: { headId: userId } 
+              } 
+            } 
+          }
+        ]
+      };
+    } else if (role === 'team_lead') {
+      // Team lead: See requests from their team members (direct relation - NO query needed!)
+      where = {
+        employee: { teamLeadId: userId }
+      };
+    }
+    // For dep_manager, where remains empty (all requests)
+
+    // Single optimized query - fetches everything in one go
+    const hrRequests = await this.prisma.hrRequest.findMany({
+      where,
+      take: limit,
+      orderBy: { requestedOn: 'desc' },
+      select: {
+        id: true,
+        requestType: true,
+        subject: true,
+        description: true,
+        priority: true,
+        status: true,
+        requestedOn: true,
+        employee: {
+          select: {
+            firstName: true,
+            lastName: true,
+            department: {
+              select: { name: true }
+            }
+          }
+        }
+      }
+    });
+
+    // Transform to frontend format
+    const requests = hrRequests.map(request => ({
+      id: request.id.toString(),
+      title: request.subject || request.requestType || 'HR Request',
+      employee: `${request.employee.firstName} ${request.employee.lastName}`,
+      department: request.employee.department?.name || 'Unknown',
+      type: this.mapRequestType(request.requestType),
+      status: this.mapRequestStatus(request.status),
+      priority: this.mapRequestPriority(request.priority),
+      submittedDate: this.getRelativeTime(request.requestedOn),
+      description: request.description || ''
+    }));
+
+    return {
+      department,
+      role,
+      requests,
+      total: requests.length
+    };
+  }
+
+  // Helper methods for HR Requests
+  private mapRequestType(requestType: string | null): 'Leave' | 'Salary' | 'Training' | 'Complaint' | 'Other' {
+    if (!requestType) return 'Other';
+    
+    const type = requestType.toLowerCase();
+    if (type.includes('leave')) return 'Leave';
+    if (type.includes('salary') || type.includes('payroll') || type.includes('pay')) return 'Salary';
+    if (type.includes('training')) return 'Training';
+    if (type.includes('complaint')) return 'Complaint';
+    return 'Other';
+  }
+
+  private mapRequestStatus(status: any): 'Pending' | 'Approved' | 'Rejected' | 'Under Review' {
+    if (!status) return 'Pending';
+    
+    const statusStr = status.toString();
+    if (statusStr === 'Pending') return 'Pending';
+    if (statusStr === 'Resolved') return 'Approved';
+    if (statusStr === 'Rejected') return 'Rejected';
+    if (statusStr === 'In_Progress' || statusStr === 'In Progress') return 'Under Review';
+    return 'Pending';
+  }
+
+  private mapRequestPriority(priority: any): 'Low' | 'Medium' | 'High' | 'Urgent' {
+    if (!priority) return 'Low';
+    
+    const priorityStr = priority.toString();
+    if (priorityStr === 'Urgent') return 'Urgent';
+    if (priorityStr === 'High') return 'High';
+    if (priorityStr === 'Medium') return 'Medium';
+    return 'Low';
+  }
+
+  private getRelativeTime(date: Date): string {
+    const now = new Date();
+    const diffMs = now.getTime() - new Date(date).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks < 4) return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
+    
+    const diffMonths = Math.floor(diffDays / 30);
+    return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+  }
 }
 
