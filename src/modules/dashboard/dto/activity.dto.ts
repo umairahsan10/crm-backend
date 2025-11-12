@@ -30,6 +30,9 @@ export class ActivityDto {
   @ApiProperty({ description: 'Who performed the activity', example: 'John Doe' })
   actor: string;
 
+  @ApiProperty({ description: 'Department this activity belongs to (for Admin view)', example: 'Sales', required: false })
+  department?: string;
+
   @ApiProperty({ description: 'Related entity info', type: RelatedEntityDto, required: false })
   relatedEntity?: RelatedEntityDto;
 }

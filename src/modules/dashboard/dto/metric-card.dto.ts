@@ -18,5 +18,8 @@ export class MetricCardDto {
 
   @ApiProperty({ description: 'Type of change: positive, negative, or neutral', example: 'positive', enum: ['positive', 'negative', 'neutral'], required: false })
   changeType?: 'positive' | 'negative' | 'neutral';
+
+  @ApiProperty({ description: 'Department this card belongs to (for Admin view)', example: 'Sales', required: false })
+  department?: string;
 }
 
