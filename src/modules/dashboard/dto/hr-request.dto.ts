@@ -48,8 +48,21 @@ export class HrRequestsResponseDto {
   @ApiProperty({ description: 'User role', example: 'dep_manager' })
   role: string;
 
-  @ApiProperty({ description: 'List of HR requests', type: [HrRequestDto] })
-  requests: HrRequestDto[];
+  @ApiProperty({ description: 'List of HR requests (for HR users)', type: [HrRequestDto], required: false })
+  requests?: HrRequestDto[];
+
+  @ApiProperty({ 
+    description: 'Separated requests for Admin users', 
+    required: false,
+    example: {
+      employeeToHr: [],
+      hrToAdmin: []
+    }
+  })
+  requestsByType?: {
+    employeeToHr: HrRequestDto[];
+    hrToAdmin: HrRequestDto[];
+  };
 
   @ApiProperty({ description: 'Total requests count', example: 15 })
   total: number;
