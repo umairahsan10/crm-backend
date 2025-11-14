@@ -85,50 +85,162 @@ export class WeekendAutoPresentTrigger {
       let markedPresent = 0;
       let errors = 0;
 
-      for (const employee of employees) {
+      // OPTIMIZATION: Filter employees whose shift is starting now
+      const employeesToMark = employees.filter(emp => 
+        this.isShiftStartTime(currentTime, emp.shiftStart!)
+      );
+      
+      if (employeesToMark.length === 0) {
+        this.logger.debug('No employees have shifts starting now');
+        return { marked_present: 0, errors: 0 };
+      }
+      
+      const employeeIds = employeesToMark.map(emp => emp.id);
+      
+      // OPTIMIZATION: Pre-fetch all existing logs in ONE query
+      const existingLogs = await this.prisma.attendanceLog.findMany({
+        where: {
+          employeeId: { in: employeeIds },
+          date: pktDate
+        }
+      });
+      
+      const existingLogsMap = new Map<number, typeof existingLogs[0]>();
+      for (const log of existingLogs) {
+        existingLogsMap.set(log.employeeId, log);
+      }
+      
+      // Group operations
+      const logsToCreate: Array<{
+        employeeId: number;
+        date: Date;
+        checkin: Date;
+        checkout: Date;
+        mode: 'onsite';
+        status: 'present';
+      }> = [];
+      
+      const employeesToUpdateCounters: number[] = [];
+      
+      // Process all employees and group operations
+      for (const employee of employeesToMark) {
         try {
-          // Check if current time matches shift start time (with 5-minute grace period)
-          if (this.isShiftStartTime(currentTime, employee.shiftStart!)) {
-            // Check if attendance log already exists for today
-            const existingLog = await this.prisma.attendanceLog.findFirst({
-              where: {
-                employeeId: employee.id,
-                date: pktDate
-              }
+          const existingLog = existingLogsMap.get(employee.id);
+          
+          if (!existingLog) {
+            // Create attendance log for weekend with shift times
+            const shiftStartDateTime = this.createShiftDateTime(pktDate, employee.shiftStart!);
+            const shiftEndDateTime = this.createShiftDateTime(pktDate, employee.shiftEnd!);
+            
+            logsToCreate.push({
+              employeeId: employee.id,
+              date: pktDate,
+              checkin: shiftStartDateTime,
+              checkout: shiftEndDateTime,
+              mode: 'onsite',
+              status: 'present'
             });
-
-            if (!existingLog) {
-              // Create attendance log for weekend with shift times
-              const shiftStartDateTime = this.createShiftDateTime(pktDate, employee.shiftStart!);
-              const shiftEndDateTime = this.createShiftDateTime(pktDate, employee.shiftEnd!);
-              
-              // Calculate total hours for the shift
-              const totalHours = this.calculateShiftHours(shiftStartDateTime, shiftEndDateTime);
-              
-              // Create attendance log for weekend
-              await this.prisma.attendanceLog.create({
-                data: {
-                  employeeId: employee.id,
-                  date: pktDate,
-                  checkin: shiftStartDateTime,
-                  checkout: shiftEndDateTime,
-                  mode: 'onsite',
-                  status: 'present'
-                }
-              });
-
-              // Update attendance summary
-              await this.updateAttendanceSummary(employee.id, pktDate);
-
-              this.logger.log(`Auto-marked present: ${employee.firstName} ${employee.lastName} (ID: ${employee.id}) on weekend - Shift: ${employee.shiftStart}-${employee.shiftEnd}, Hours: ${totalHours}`);
-              markedPresent++;
-            } else {
-              this.logger.debug(`Attendance log already exists for ${employee.firstName} ${employee.lastName} on ${pktDate.toDateString()}`);
-            }
+            
+            employeesToUpdateCounters.push(employee.id);
+            markedPresent++;
+            
+            const totalHours = this.calculateShiftHours(shiftStartDateTime, shiftEndDateTime);
+            this.logger.log(`Auto-marked present: ${employee.firstName} ${employee.lastName} (ID: ${employee.id}) on weekend - Shift: ${employee.shiftStart}-${employee.shiftEnd}, Hours: ${totalHours}`);
+          } else {
+            this.logger.debug(`Attendance log already exists for ${employee.firstName} ${employee.lastName} on ${pktDate.toDateString()}`);
           }
         } catch (error) {
           this.logger.error(`Error processing employee ${employee.id}:`, error);
           errors++;
+        }
+      }
+      
+      // OPTIMIZATION: Execute all bulk operations in a single transaction
+      if (logsToCreate.length > 0) {
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            // Bulk create new logs
+            await tx.attendanceLog.createMany({
+              data: logsToCreate,
+              skipDuplicates: true
+            });
+            
+            // Update attendance counters (parallel execution)
+            // Pre-fetch all attendance records
+            const attendanceRecords = await tx.attendance.findMany({
+              where: { employeeId: { in: employeesToUpdateCounters } }
+            });
+            const attendanceMap = new Map(attendanceRecords.map(att => [att.employeeId, att]));
+            
+            // Pre-fetch all monthly summaries
+            const monthKey = `${pktDate.getFullYear()}-${String(pktDate.getMonth() + 1).padStart(2, '0')}`;
+            const monthlySummaries = await tx.monthlyAttendanceSummary.findMany({
+              where: {
+                empId: { in: employeesToUpdateCounters },
+                month: monthKey
+              }
+            });
+            const summaryMap = new Map(monthlySummaries.map(sum => [sum.empId, sum]));
+            
+            await Promise.all(
+              employeesToUpdateCounters.map(async (empId) => {
+                // Update attendance record
+                const attendance = attendanceMap.get(empId);
+                if (attendance) {
+                  await tx.attendance.update({
+                    where: { id: attendance.id },
+                    data: {
+                      presentDays: { increment: 1 }
+                    }
+                  });
+                } else {
+                  await tx.attendance.create({
+                    data: {
+                      employeeId: empId,
+                      presentDays: 1,
+                      absentDays: 0,
+                      lateDays: 0,
+                      leaveDays: 0,
+                      remoteDays: 0,
+                      quarterlyLeaves: 0,
+                      monthlyLates: 0,
+                      halfDays: 0
+                    }
+                  });
+                }
+                
+                // Update monthly summary
+                const summary = summaryMap.get(empId);
+                if (summary) {
+                  await tx.monthlyAttendanceSummary.update({
+                    where: { id: summary.id },
+                    data: {
+                      totalPresent: { increment: 1 }
+                    }
+                  });
+                } else {
+                  await tx.monthlyAttendanceSummary.create({
+                    data: {
+                      empId: empId,
+                      month: monthKey,
+                      totalPresent: 1,
+                      totalAbsent: 0,
+                      totalLeaveDays: 0,
+                      totalLateDays: 0,
+                      totalHalfDays: 0,
+                      totalRemoteDays: 0
+                    }
+                  });
+                }
+              })
+            );
+          }, {
+            timeout: 60000,
+            maxWait: 15000
+          });
+        } catch (transactionError) {
+          this.logger.error(`Error in bulk transaction: ${transactionError.message}`);
+          errors += employeesToUpdateCounters.length;
         }
       }
 

@@ -81,59 +81,202 @@ export class FutureHolidayTrigger {
       let skipped = 0;
       let errors = 0;
 
-      for (const employee of activeEmployees) {
+      // OPTIMIZATION: Filter employees whose shift is starting now
+      const employeesToMark = activeEmployees.filter(emp => 
+        emp.shiftStart && this.isShiftStartTime(currentTime, emp.shiftStart)
+      );
+      
+      if (employeesToMark.length === 0) {
+        this.logger.debug('No employees have shifts starting now');
+        return;
+      }
+      
+      const employeeIds = employeesToMark.map(emp => emp.id);
+      
+      // OPTIMIZATION: Pre-fetch all existing logs in ONE query
+      const existingLogs = await this.prisma.attendanceLog.findMany({
+        where: {
+          employeeId: { in: employeeIds },
+          date: currentDate
+        }
+      });
+      
+      const existingLogsMap = new Map<number, typeof existingLogs[0]>();
+      for (const log of existingLogs) {
+        existingLogsMap.set(log.employeeId, log);
+      }
+      
+      // Group operations
+      const logsToCreate: Array<{
+        employeeId: number;
+        date: Date;
+        status: 'present';
+        checkin: Date;
+        checkout: Date;
+        mode: 'onsite';
+      }> = [];
+      
+      const logsToUpdate: Array<{
+        id: number;
+        status: 'present';
+        checkin: Date;
+        checkout: Date;
+        mode: 'onsite';
+      }> = [];
+      
+      const employeesToUpdateCounters: number[] = [];
+      
+      // Process all employees and group operations
+      for (const employee of employeesToMark) {
         try {
-          // Check if this employee's shift is starting now (within 5-minute window)
-          if (employee.shiftStart && this.isShiftStartTime(currentTime, employee.shiftStart)) {
-            // Check if attendance log already exists for today
-            const existingLog = await this.prisma.attendanceLog.findFirst({
-              where: {
-                employeeId: employee.id,
-                date: currentDate
-              }
+          const existingLog = existingLogsMap.get(employee.id);
+          const checkinTime = this.createShiftDateTime(currentDate, employee.shiftStart!);
+          const checkoutTime = this.createShiftDateTime(currentDate, employee.shiftEnd!);
+          
+          if (existingLog) {
+            // Update existing log
+            logsToUpdate.push({
+              id: existingLog.id,
+              status: 'present',
+              checkin: checkinTime,
+              checkout: checkoutTime,
+              mode: 'onsite'
             });
-
-            if (existingLog) {
-              // Update existing log to mark as present
-              await this.prisma.attendanceLog.update({
-                where: { id: existingLog.id },
-                data: {
-                  status: 'present',
-                  checkin: this.createShiftDateTime(currentDate, employee.shiftStart!),
-                  checkout: this.createShiftDateTime(currentDate, employee.shiftEnd!),
-                  mode: 'onsite'
-                }
-              });
-            } else {
-              // Create new attendance log
-              await this.prisma.attendanceLog.create({
-                data: {
-                  employeeId: employee.id,
-                  date: currentDate,
-                  status: 'present',
-                  checkin: this.createShiftDateTime(currentDate, employee.shiftStart!),
-                  checkout: this.createShiftDateTime(currentDate, employee.shiftEnd!),
-                  mode: 'onsite'
-                }
-              });
-            }
-
-            // Update attendance record
-            await this.updateAttendanceRecord(employee.id, currentDate);
-
-            // Update monthly attendance summary
-            await this.updateMonthlyAttendanceSummary(employee.id, currentDate);
-
-            markedPresent++;
-            this.logger.debug(`Marked employee ${employee.firstName} ${employee.lastName} as present for holiday: ${todayHoliday.holidayName}`);
           } else {
-            skipped++;
+            // Create new log
+            logsToCreate.push({
+              employeeId: employee.id,
+              date: currentDate,
+              status: 'present',
+              checkin: checkinTime,
+              checkout: checkoutTime,
+              mode: 'onsite'
+            });
           }
+          
+          employeesToUpdateCounters.push(employee.id);
+          markedPresent++;
         } catch (error) {
-          this.logger.error(`Failed to mark employee ${employee.id} as present: ${error.message}`);
+          this.logger.error(`Failed to process employee ${employee.id}: ${error.message}`);
           errors++;
         }
       }
+      
+      // OPTIMIZATION: Execute all bulk operations in a single transaction
+      if (logsToCreate.length > 0 || logsToUpdate.length > 0) {
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            // Bulk create new logs
+            if (logsToCreate.length > 0) {
+              await tx.attendanceLog.createMany({
+                data: logsToCreate,
+                skipDuplicates: true
+              });
+            }
+            
+            // Bulk update existing logs (parallel execution)
+            if (logsToUpdate.length > 0) {
+              await Promise.all(
+                logsToUpdate.map(log =>
+                  tx.attendanceLog.update({
+                    where: { id: log.id },
+                    data: {
+                      status: log.status,
+                      checkin: log.checkin,
+                      checkout: log.checkout,
+                      mode: log.mode
+                    }
+                  })
+                )
+              );
+            }
+            
+            // Update attendance counters (parallel execution)
+            // Pre-fetch all attendance records
+            const attendanceRecords = await tx.attendance.findMany({
+              where: { employeeId: { in: employeesToUpdateCounters } }
+            });
+            const attendanceMap = new Map(attendanceRecords.map(att => [att.employeeId, att]));
+            
+            // Pre-fetch all monthly summaries
+            const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+            const monthlySummaries = await tx.monthlyAttendanceSummary.findMany({
+              where: {
+                empId: { in: employeesToUpdateCounters },
+                month: monthKey
+              }
+            });
+            const summaryMap = new Map(monthlySummaries.map(sum => [sum.empId, sum]));
+            
+            await Promise.all(
+              employeesToUpdateCounters.map(async (empId) => {
+                // Update attendance record
+                const attendance = attendanceMap.get(empId);
+                if (attendance) {
+                  await tx.attendance.update({
+                    where: { id: attendance.id },
+                    data: {
+                      presentDays: { increment: 1 },
+                      absentDays: attendance.absentDays && attendance.absentDays > 0 
+                        ? { decrement: 1 } 
+                        : undefined
+                    }
+                  });
+                } else {
+                  await tx.attendance.create({
+                    data: {
+                      employeeId: empId,
+                      presentDays: 1,
+                      absentDays: 0,
+                      lateDays: 0,
+                      leaveDays: 0,
+                      remoteDays: 0,
+                      quarterlyLeaves: 0,
+                      monthlyLates: 0,
+                      halfDays: 0
+                    }
+                  });
+                }
+                
+                // Update monthly summary
+                const summary = summaryMap.get(empId);
+                if (summary) {
+                  await tx.monthlyAttendanceSummary.update({
+                    where: { id: summary.id },
+                    data: {
+                      totalPresent: { increment: 1 },
+                      totalAbsent: summary.totalAbsent && summary.totalAbsent > 0
+                        ? { decrement: 1 }
+                        : undefined
+                    }
+                  });
+                } else {
+                  await tx.monthlyAttendanceSummary.create({
+                    data: {
+                      empId: empId,
+                      month: monthKey,
+                      totalPresent: 1,
+                      totalAbsent: 0,
+                      totalLeaveDays: 0,
+                      totalLateDays: 0,
+                      totalHalfDays: 0,
+                      totalRemoteDays: 0
+                    }
+                  });
+                }
+              })
+            );
+          }, {
+            timeout: 60000,
+            maxWait: 15000
+          });
+        } catch (transactionError) {
+          this.logger.error(`Error in bulk transaction: ${transactionError.message}`);
+          errors += employeesToUpdateCounters.length;
+        }
+      }
+      
+      skipped = activeEmployees.length - employeesToMark.length;
 
       if (markedPresent > 0) {
         this.logger.log(`Holiday attendance marked: ${markedPresent} employees marked present, ${skipped} skipped, ${errors} errors for holiday: ${todayHoliday.holidayName}`);
