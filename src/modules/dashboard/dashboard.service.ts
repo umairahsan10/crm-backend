@@ -3013,7 +3013,8 @@ export class DashboardService {
   async getCurrentProjects(userId: number, role: string, department: string, userType?: string) {
     // Handle Admin users - they can see all Production projects
     if (userType === 'admin') {
-      const projectWhere = { team: { productionUnitId: { not: null } } };
+      // Admin sees all Production projects (same as manager) - no filter needed
+      const projectWhere = {};
       
       // Get running projects (in_progress, onhold, or null/pending_assignment)
       const runningProjects = await this.prisma.project.findMany({
