@@ -26,6 +26,7 @@ import { CreateLeaveLogDto } from './dto/create-leave-log.dto';
 import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { ProcessLeaveActionDto } from './dto/process-leave-action.dto';
 import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
+import { BulkCheckoutDto } from './dto/bulk-checkout.dto';
 import { UpdateAttendanceLogStatusDto } from './dto/update-attendance-log-status.dto';
 import { ExportLeaveLogsDto } from './dto/export-leave-logs.dto';
 import { LeaveLogsStatsDto, LeaveLogsStatsResponseDto } from './dto/leave-logs-stats.dto';
@@ -530,6 +531,17 @@ export class AttendanceController {
   @Permissions(PermissionName.attendance_permission)
   async bulkMarkPresent(@Body() bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
     return this.attendanceService.bulkMarkAllEmployeesPresent(bulkMarkData);
+  }
+
+  @Post('bulk-checkout')
+  @ApiOperation({ summary: 'Bulk checkout employees with active check-ins' })
+  @ApiBody({ type: BulkCheckoutDto })
+  @ApiResponse({ status: 200, description: 'Bulk checkout processed', schema: { type: 'object', properties: { message: { type: 'string' }, checked_out: { type: 'number' }, errors: { type: 'number' }, skipped: { type: 'number' } } } })
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async bulkCheckout(@Body() bulkCheckoutData: BulkCheckoutDto): Promise<{ message: string; checked_out: number; errors: number; skipped: number }> {
+    return this.attendanceService.bulkCheckoutEmployees(bulkCheckoutData);
   }
 
   /**
