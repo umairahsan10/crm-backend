@@ -8,9 +8,34 @@ export class EmployeeService {
   async getMyProfile(userId: number) {
     const employee = await this.prisma.employee.findUnique({
       where: { id: userId },
-      include: {
-        department: true,
-        role: true,
+      select: {
+        // Basic Information
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        status: true,
+        address: true,
+        dob: true, // dateOfBirth
+        
+        // Department
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        
+        // Role
+        role: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        
+        // Manager (name and email)
         manager: {
           select: {
             id: true,
@@ -19,6 +44,8 @@ export class EmployeeService {
             email: true,
           },
         },
+        
+        // Team Lead (name and email)
         teamLead: {
           select: {
             id: true,
@@ -34,7 +61,12 @@ export class EmployeeService {
       throw new Error('Employee not found');
     }
 
-    return employee;
+    // Transform dob to dateOfBirth for consistent naming
+    const { dob, ...rest } = employee;
+    return {
+      ...rest,
+      dateOfBirth: dob,
+    };
   }
 
   async getDepartmentEmployees(departmentId: number) {

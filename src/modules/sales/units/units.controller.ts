@@ -3,7 +3,7 @@ import { UnitsService } from './units.service';
 import { CreateSalesUnitDto } from './dto/create-unit.dto';
 import { UpdateSalesUnitDto } from './dto/update-unit.dto';
 import { SalesUnitsQueryDto } from './dto/units-query.dto';
-import { AddTeamDto } from './dto/add-team.dto';
+import { AddTeamToSalesUnitDto } from './dto/add-team.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
 import { Departments } from '../../../common/decorators/departments.decorator';
@@ -100,13 +100,13 @@ export class UnitsController {
   @Departments('Sales')
   @ApiOperation({ summary: 'Add a team to a sales unit' })
   @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
-  @ApiBody({ type: AddTeamDto })
+  @ApiBody({ type: AddTeamToSalesUnitDto })
   @ApiResponse({ status: 200, description: 'Team successfully assigned to unit' })
   @ApiResponse({ status: 400, description: 'Team already assigned or validation error' })
   @ApiResponse({ status: 404, description: 'Unit or team not found' })
   async addTeamToUnit(
     @Param('id', ParseIntPipe) unitId: number,
-    @Body() addTeamDto: AddTeamDto
+    @Body() addTeamDto: AddTeamToSalesUnitDto
   ) {
     return this.unitsService.addTeamToUnit(unitId, addTeamDto.teamId);
   }
