@@ -342,7 +342,7 @@ curl -H "Authorization: Bearer <JWT>" "/sales/units/deleted/completed-leads"
 
 ## Backend Notes
 - Guards: `JwtAuthGuard`, `RolesWithServiceGuard`, `DepartmentsGuard` on controller.
-- DTOs: `SalesUnitsQueryDto`, `AddTeamDto` handle validation and Swagger metadata.
+- DTOs: `SalesUnitsQueryDto`, `AddTeamToSalesUnitDto` handle validation and Swagger metadata.
 - Enforce no-query on POST/PATCH/DELETE (controller already throws 400 if present).
 - Counts and conversion rates are computed server-side; do not rely on client computation.
 - Deletion returns dependency details to orchestrate reassignment flows safely.

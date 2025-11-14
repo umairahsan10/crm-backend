@@ -1,12 +1,15 @@
 import { Controller, Get, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DepartmentsGuard } from '../../common/guards/departments.guard';
+import { Departments } from '../../common/decorators/departments.decorator';
 import { DashboardService } from './dashboard.service';
 import { MetricGridResponseDto } from './dto/metric-grid-response.dto';
 import { ActivityFeedResponseDto } from './dto/activity-feed-response.dto';
 import { HrRequestsResponseDto } from './dto/hr-request.dto';
 import { AttendanceTrendsResponseDto } from './dto/attendance-trends-response.dto';
 import { EmployeeCountByDepartmentResponseDto } from './dto/employee-count-by-department.dto';
+import { ProjectsResponseDto } from './dto/project-response.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -93,6 +96,22 @@ export class DashboardController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getEmployeeCountByDepartment(): Promise<EmployeeCountByDepartmentResponseDto> {
     return await this.dashboardService.getEmployeeCountByDepartment();
+  }
+
+  @Get('current-projects')
+  @UseGuards(DepartmentsGuard)
+  @Departments('Production')
+  @ApiOperation({ summary: 'Get current projects - Returns up to 5 projects: running projects first, then completed projects to fill remaining slots. Accessible by Production department and Admin only.' })
+  @ApiResponse({ status: 200, description: 'Projects retrieved successfully', type: ProjectsResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Only Production department and Admin can access this endpoint' })
+  async getCurrentProjects(@Request() req: any): Promise<ProjectsResponseDto> {
+    return await this.dashboardService.getCurrentProjects(
+      req.user.id,
+      req.user.role,
+      req.user.department,
+      req.user.type
+    );
   }
 }
 

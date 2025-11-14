@@ -3,7 +3,7 @@ import { UnitsService } from './units.service';
 import { CreateProductionUnitDto } from './dto/create-unit.dto';
 import { UpdateProductionUnitDto } from './dto/update-unit.dto';
 import { UnitsQueryDto } from './dto/units-query.dto';
-import { AddTeamDto } from './dto/add-team.dto';
+import { AddTeamToProductionUnitDto } from './dto/add-team.dto';
 import { RemoveTeamDto } from './dto/remove-team.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesWithServiceGuard } from '../../../common/guards/roles-with-service.guard';
@@ -149,11 +149,11 @@ export class UnitsController {
   @Departments('Production')
   @ApiOperation({ summary: 'Add team to production unit' })
   @ApiParam({ name: 'id', type: Number, description: 'Unit ID' })
-  @ApiBody({ type: AddTeamDto })
+  @ApiBody({ type: AddTeamToProductionUnitDto })
   @ApiResponse({ status: 201, description: 'Team added to unit successfully' })
   async addTeamToUnit(
     @Param('id', ParseIntPipe) unitId: number,
-    @Body() addTeamDto: AddTeamDto
+    @Body() addTeamDto: AddTeamToProductionUnitDto
   ) {
     return this.unitsService.addTeamToUnit(unitId, addTeamDto.teamId);
   }

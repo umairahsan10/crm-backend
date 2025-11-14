@@ -3009,5 +3009,218 @@ export class DashboardService {
       total
     };
   }
+
+  async getCurrentProjects(userId: number, role: string, department: string, userType?: string) {
+    // Handle Admin users - they can see all Production projects
+    if (userType === 'admin') {
+      const projectWhere = { team: { productionUnitId: { not: null } } };
+      
+      // Get running projects (in_progress, onhold, or null/pending_assignment)
+      const runningProjects = await this.prisma.project.findMany({
+        where: {
+          ...projectWhere,
+          OR: [
+            { status: { in: ['in_progress', 'onhold'] } },
+            { status: null } // Include pending_assignment projects as running
+          ]
+        } as any,
+        select: {
+          id: true,
+          description: true,
+          liveProgress: true,
+          status: true,
+          deadline: true,
+          team: {
+            select: {
+              name: true
+            }
+          }
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+
+      // Get completed projects if needed
+      const remainingSlots = 5 - runningProjects.length;
+      let completedProjects: any[] = [];
+      if (remainingSlots > 0) {
+        completedProjects = await this.prisma.project.findMany({
+          where: {
+            ...projectWhere,
+            status: 'completed'
+          },
+          select: {
+            id: true,
+            description: true,
+            liveProgress: true,
+            status: true,
+            deadline: true,
+            team: {
+              select: {
+                name: true
+              }
+            }
+          },
+          take: remainingSlots,
+          orderBy: { updatedAt: 'desc' }
+        });
+      }
+
+      const allProjects = [...runningProjects, ...completedProjects].slice(0, 5);
+      return this.mapProjectsToResponse(allProjects);
+    }
+
+    // Only Production department has projects
+    if (department !== 'Production') {
+      return { projects: [] };
+    }
+
+    let runningProjects: any[] = [];
+    let completedProjects: any[] = [];
+
+    // Build where clause based on role
+    let projectWhere: any = {};
+
+    if (role === 'unit_head') {
+      projectWhere = { unitHeadId: userId };
+    } else if (role === 'team_lead') {
+      const teams = await this.prisma.team.findMany({
+        where: { teamLeadId: userId },
+        select: { id: true }
+      });
+      const teamIds = teams.map(t => t.id);
+      projectWhere = teamIds.length > 0 ? { teamId: { in: teamIds } } : { teamId: -1 };
+    } else if (role === 'dep_manager') {
+      // Department manager can see all Production projects (with or without teams)
+      // No filter needed - they see all Production projects
+      projectWhere = {};
+    } else if (role === 'senior' || role === 'junior') {
+      // For senior/junior: Get their team's current project or projects they're working on
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: userId },
+        select: { teamLeadId: true }
+      });
+
+      if (employee?.teamLeadId) {
+        const team = await this.prisma.team.findFirst({
+          where: { teamLeadId: employee.teamLeadId },
+          select: { id: true }
+        });
+        if (team) {
+          projectWhere = { teamId: team.id };
+        } else {
+          projectWhere = { projectLogs: { some: { developerId: userId } } };
+        }
+      } else {
+        projectWhere = { projectLogs: { some: { developerId: userId } } };
+      }
+    } else {
+      // For other roles, return empty
+      return { projects: [] };
+    }
+
+    // Get running projects (in_progress, onhold, or null/pending_assignment)
+    runningProjects = await this.prisma.project.findMany({
+      where: {
+        ...projectWhere,
+        OR: [
+          { status: { in: ['in_progress', 'onhold'] } },
+          { status: null } // Include pending_assignment projects as running
+        ]
+      } as any,
+      select: {
+        id: true,
+        description: true,
+        liveProgress: true,
+        status: true,
+        deadline: true,
+        team: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // If we have less than 5 running projects, get completed projects to fill up to 5
+    const remainingSlots = 5 - runningProjects.length;
+    if (remainingSlots > 0) {
+      completedProjects = await this.prisma.project.findMany({
+        where: {
+          ...projectWhere,
+          status: 'completed'
+        },
+        select: {
+          id: true,
+          description: true,
+          liveProgress: true,
+          status: true,
+          deadline: true,
+          team: {
+            select: {
+              name: true
+            }
+          }
+        },
+        take: remainingSlots,
+        orderBy: { updatedAt: 'desc' } // Most recent completed first
+      });
+    }
+
+    // Combine: running projects first, then completed projects
+    const allProjects = [...runningProjects, ...completedProjects].slice(0, 5);
+
+    return this.mapProjectsToResponse(allProjects);
+  }
+
+  private mapProjectsToResponse(projects: any[]): { projects: any[] } {
+    const mappedProjects = projects.map(project => {
+      const progress = project.liveProgress ? Number(project.liveProgress) : 0;
+      const deadline = project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '';
+      
+      // Determine status based on progress and deadline
+      let status: 'on-track' | 'ahead' | 'delayed' = 'on-track';
+      
+      // For completed projects, set status based on completion
+      if (project.status === 'completed') {
+        status = 'on-track'; // Completed projects are considered on-track
+      } else if (project.deadline) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const deadlineDate = new Date(project.deadline);
+        deadlineDate.setHours(0, 0, 0, 0);
+        const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Calculate expected progress (assuming 30 days project timeline as baseline)
+        const daysSinceStart = 30 - daysUntilDeadline;
+        const expectedProgress = Math.max(0, Math.min(100, (daysSinceStart / 30) * 100));
+        
+        if (progress >= expectedProgress + 10) {
+          status = 'ahead';
+        } else if (progress < expectedProgress - 10 || daysUntilDeadline < 0) {
+          status = 'delayed';
+        } else {
+          status = 'on-track';
+        }
+      } else {
+        // If no deadline, use database status as fallback
+        if (project.status === 'onhold') {
+          status = 'delayed';
+        } else {
+          status = 'on-track';
+        }
+      }
+
+      return {
+        name: project.description || `Project ${project.id}`,
+        progress: project.status === 'completed' ? 100 : Math.round(progress),
+        status,
+        deadline,
+        team: project.team?.name || 'Unassigned Team'
+      };
+    });
+
+    return { projects: mappedProjects };
+  }
 }
 

@@ -42,10 +42,30 @@ export class EmployeeController {
           firstName: 'John',
           lastName: 'Doe',
           email: 'john.doe@example.com',
-          department: { id: 2, name: 'Engineering' },
-          role: { id: 3, name: 'dep_manager' },
-          manager: { id: 5, firstName: 'Jane', lastName: 'Smith', email: 'jane.smith@example.com' },
-          teamLead: { id: 6, firstName: 'Mark', lastName: 'Taylor', email: 'mark.taylor@example.com' }
+          phone: '+1234567890',
+          status: 'active',
+          address: '123 Main St, City, State',
+          dateOfBirth: '1990-01-15T00:00:00.000Z',
+          department: { 
+            id: 2, 
+            name: 'Production' 
+          },
+          role: { 
+            id: 3, 
+            name: 'dep_manager' 
+          },
+          manager: { 
+            id: 5, 
+            firstName: 'Jane', 
+            lastName: 'Smith', 
+            email: 'jane.smith@example.com' 
+          },
+          teamLead: { 
+            id: 6, 
+            firstName: 'Mark', 
+            lastName: 'Taylor', 
+            email: 'mark.taylor@example.com' 
+          }
         }
       }
     }
