@@ -597,6 +597,12 @@ export class ProjectsService {
               }
             }
           },
+          crackedLead: {
+            select: {
+              currentPhase: true,
+              totalPhases: true
+            }
+          }
         }
       });
 
@@ -747,10 +753,53 @@ export class ProjectsService {
         })() : Promise.resolve(0)
       ]);
 
+      // Calculate phase-related fields
+      const overallProgress = project.liveProgress ? Number(project.liveProgress) : 0;
+      let currentPhase = 1;
+      let currentPhaseProgress = overallProgress; // Default for company projects
+
+      // Check if it's a client project (has crackedLead)
+      if (project.crackedLeadId && project.crackedLead) {
+        currentPhase = project.crackedLead.currentPhase || 1;
+        const totalPhases = project.crackedLead.totalPhases;
+
+        if (totalPhases && totalPhases > 0 && overallProgress > 0) {
+          // Reverse calculate current phase progress from total project progress
+          // Formula: totalProgress = completedPhases% + (currentPhaseProgress/100) * phaseWeight
+          // So: currentPhaseProgress = ((totalProgress - completedPhases%) / phaseWeight) * 100
+
+          const completedPhases = Math.max(0, currentPhase - 1);
+          const completedPhasesContribution = (completedPhases / totalPhases) * 100;
+          const phaseWeight = (1 / totalPhases) * 100;
+
+          // Calculate what portion of progress belongs to current phase
+          // Use Math.max(0, ...) to handle edge case where overall < base (shouldn't happen but safety)
+          const currentPhaseContribution = Math.max(0, overallProgress - completedPhasesContribution);
+
+          // Convert to current phase progress percentage
+          if (phaseWeight > 0) {
+            currentPhaseProgress = Math.max(0, Math.min(100, (currentPhaseContribution / phaseWeight) * 100));
+          } else {
+            currentPhaseProgress = 0;
+          }
+        } else {
+          // No phase info or zero progress
+          currentPhaseProgress = 0;
+        }
+      } else {
+        // Company project: treat as 1 phase, overall progress = current phase progress
+        currentPhase = 1;
+        currentPhaseProgress = overallProgress;
+      }
+
       return {
         success: true,
         data: {
           ...project,
+          // Phase-related fields
+          currentPhase,
+          currentPhaseProgress,
+          liveProgress: overallProgress, // Total project progress
           // All related employees
           relatedEmployees: allRelatedEmployeesList,
           // Calculated counts
@@ -875,7 +924,16 @@ export class ProjectsService {
     try {
       const project = await this.prisma.project.findUnique({
         where: { id },
-        include: { unitHead: true, team: true }
+        include: { 
+          unitHead: true, 
+          team: true,
+          crackedLead: {
+            select: {
+              currentPhase: true,
+              totalPhases: true
+            }
+          }
+        }
       });
 
       if (!project) {
@@ -886,6 +944,11 @@ export class ProjectsService {
       const canUpdate = await this.checkUnifiedUpdatePermission(user, project, dto);
       if (!canUpdate.allowed) {
         throw new ForbiddenException(canUpdate.reason);
+      }
+
+      // Prevent updates to completed projects (except status changes)
+      if (project.status === 'completed' && dto.liveProgress !== undefined) {
+        throw new BadRequestException('Cannot update live progress for completed projects');
       }
 
       // If status is being updated, validate status transition
@@ -912,7 +975,54 @@ export class ProjectsService {
       if (dto.description !== undefined) updateData.description = dto.description;
       if (dto.difficulty !== undefined) updateData.difficultyLevel = dto.difficulty;
       if (dto.paymentStage !== undefined) updateData.paymentStage = dto.paymentStage;
-      if (dto.liveProgress !== undefined) updateData.liveProgress = dto.liveProgress;
+      
+      // Handle liveProgress: treat incoming value as current phase progress and calculate total project progress
+      if (dto.liveProgress !== undefined) {
+        // Validate range
+        if (dto.liveProgress < 0 || dto.liveProgress > 100) {
+          throw new BadRequestException('Live progress must be between 0 and 100');
+        }
+
+        const currentPhaseProgress = dto.liveProgress; // This is the progress of current phase (0-100%)
+
+        // Check if it's a company project (no crackedLead, treat as 1 phase)
+        if (!project.crackedLeadId || !project.crackedLead) {
+          // Company project: treat as 1 phase, direct value
+          updateData.liveProgress = currentPhaseProgress;
+          console.log(`Company project ${id} - Live progress updated to ${currentPhaseProgress}%`);
+        } else {
+          // Client project: phase-based calculation
+          const currentPhase = project.crackedLead.currentPhase || 1;
+          const totalPhases = project.crackedLead.totalPhases;
+
+          // Validate phase data
+          if (!totalPhases || totalPhases <= 0) {
+            throw new BadRequestException('Invalid total phases. Cannot calculate phase-based progress.');
+          }
+
+          if (currentPhase < 1 || currentPhase > totalPhases) {
+            throw new BadRequestException(`Invalid current phase (${currentPhase}). Must be between 1 and ${totalPhases}.`);
+          }
+
+          // Calculate total project progress
+          // Base: completed phases contribution = ((currentPhase - 1) / totalPhases) * 100
+          const completedPhases = Math.max(0, currentPhase - 1);
+          const completedPhasesContribution = (completedPhases / totalPhases) * 100;
+
+          // Current phase contribution: (currentPhaseProgress / 100) * (1 / totalPhases) * 100
+          const phaseWeight = (1 / totalPhases) * 100;
+          const currentPhaseContribution = (currentPhaseProgress / 100) * phaseWeight;
+
+          // Total project progress
+          const totalProjectProgress = completedPhasesContribution + currentPhaseContribution;
+
+          // Cap at 100% (though it should naturally be capped)
+          updateData.liveProgress = Math.min(100, Math.max(0, totalProjectProgress));
+
+          console.log(`Project ${id} - Phase ${currentPhase}/${totalPhases}, Current phase progress: ${currentPhaseProgress}%, Total project progress: ${updateData.liveProgress}%`);
+        }
+      }
+      
       if (dto.deadline !== undefined) updateData.deadline = new Date(dto.deadline);
       if (dto.status !== undefined) updateData.status = dto.status;
 
@@ -1472,7 +1582,7 @@ export class ProjectsService {
       return { allowed: true };
     }
 
-    // Team Lead (team_lead) - Read-only access (liveProgress is automatic)
+    // Team Lead (team_lead) - Can ONLY update liveProgress
     if (user.role === 'team_lead') {
       if (!project.teamId) {
         return { allowed: false, reason: 'Project not assigned to a team' };
@@ -1484,15 +1594,24 @@ export class ProjectsService {
       });
       
       if (!team || team.teamLeadId !== user.id) {
-        return { allowed: false, reason: 'Only the team lead can update this project' };
+        return { allowed: false, reason: 'Only the team lead of the assigned team can update live progress' };
       }
       
-      // Team leads have read-only access - liveProgress is automatically updated based on payment phases
-      if (Object.keys(dto).some(key => dto[key] !== undefined)) {
-        return { allowed: false, reason: 'Team leads have read-only access. Live progress is automatically updated when payment phases are completed.' };
+      // Team leads can ONLY update liveProgress, no other fields
+      const allowedFields = ['liveProgress'];
+      const requestedFields = Object.keys(dto).filter(key => dto[key] !== undefined);
+      const disallowedFields = requestedFields.filter(field => !allowedFields.includes(field));
+      
+      if (disallowedFields.length > 0) {
+        return { allowed: false, reason: `Team leads can only update liveProgress. Cannot update: ${disallowedFields.join(', ')}` };
       }
       
-      return { allowed: false, reason: 'Team leads have read-only access' };
+      // If only liveProgress is being updated, allow it
+      if (dto.liveProgress !== undefined) {
+        return { allowed: true };
+      }
+      
+      return { allowed: false, reason: 'Team leads can only update liveProgress field' };
     }
 
     return { allowed: false, reason: 'Insufficient permissions' };
