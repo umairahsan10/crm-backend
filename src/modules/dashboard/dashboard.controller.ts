@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DepartmentsGuard } from '../../common/guards/departments.guard';
@@ -10,6 +10,8 @@ import { HrRequestsResponseDto } from './dto/hr-request.dto';
 import { AttendanceTrendsResponseDto } from './dto/attendance-trends-response.dto';
 import { EmployeeCountByDepartmentResponseDto } from './dto/employee-count-by-department.dto';
 import { ProjectsResponseDto } from './dto/project-response.dto';
+import { SalesTrendsResponseDto } from './dto/sales-trends-response.dto';
+import { TopPerformersResponseDto } from './dto/top-performers-response.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -111,6 +113,120 @@ export class DashboardController {
       req.user.role,
       req.user.department,
       req.user.type
+    );
+  }
+
+  @Get('sales-trends')
+  @ApiOperation({ 
+    summary: 'Get sales trends - Returns monthly sales trend data based on user role and department',
+    description: 'Fetches sales trend data with role-based access control. Sales department managers see all data, unit heads see their unit, team leads see their team, and employees see only their own data.'
+  })
+  @ApiQuery({ name: 'period', required: false, type: String, description: 'Time period: daily, weekly, monthly, quarterly, yearly (default: monthly)', enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Start date in ISO 8601 format (YYYY-MM-DD). Default: last 12 months for monthly period' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'End date in ISO 8601 format (YYYY-MM-DD). Default: current date' })
+  @ApiQuery({ name: 'unit', required: false, type: String, description: 'Filter by specific sales unit name (only for department managers)' })
+  @ApiResponse({ status: 200, description: 'Sales trends retrieved successfully', type: SalesTrendsResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid query parameters' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - JWT token required' })
+  @ApiResponse({ status: 403, description: 'Forbidden - User does not have access to sales data' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getSalesTrends(
+    @Request() req: any,
+    @Query('period') period?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('unit') unit?: string
+  ): Promise<SalesTrendsResponseDto> {
+    // Validate period
+    const validPeriods = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+    const periodType = (period && validPeriods.includes(period) ? period : 'monthly') as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+    // Validate date range if provided
+    if (fromDate && toDate) {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+        throw new BadRequestException('Invalid date format. Dates must be in ISO 8601 format (YYYY-MM-DD)');
+      }
+      if (from > to) {
+        throw new BadRequestException('fromDate must be before toDate');
+      }
+    }
+
+    return await this.dashboardService.getSalesTrends(
+      req.user.id,
+      req.user.department,
+      req.user.role,
+      req.user.type,
+      periodType,
+      fromDate,
+      toDate,
+      unit
+    );
+  }
+
+  @Get('top-performers')
+  @ApiOperation({ 
+    summary: 'Get top performers - Returns top performing team members based on user role and department',
+    description: 'Fetches top performing employees with role-based access control. Sales department managers see top performers across all units, unit heads see their unit, team leads see their team, and employees see only their own performance.'
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of top performers to return (default: 5, max: 20)' })
+  @ApiQuery({ name: 'period', required: false, type: String, description: 'Time period: daily, weekly, monthly, quarterly, yearly (default: monthly)', enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Start date in ISO 8601 format (YYYY-MM-DD). Default: current period start' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'End date in ISO 8601 format (YYYY-MM-DD). Default: current date' })
+  @ApiQuery({ name: 'unit', required: false, type: String, description: 'Filter by specific sales unit name (only for department managers)' })
+  @ApiQuery({ name: 'metric', required: false, type: String, description: 'Performance metric for ranking: deals, revenue, conversion_rate, leads (default: deals)', enum: ['deals', 'revenue', 'conversion_rate', 'leads'] })
+  @ApiResponse({ status: 200, description: 'Top performers retrieved successfully', type: TopPerformersResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid query parameters' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - JWT token required' })
+  @ApiResponse({ status: 403, description: 'Forbidden - User does not have access to sales performance data' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getTopPerformers(
+    @Request() req: any,
+    @Query('limit') limit?: number,
+    @Query('period') period?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('unit') unit?: string,
+    @Query('metric') metric?: string
+  ): Promise<TopPerformersResponseDto> {
+    // Validate and parse limit
+    const limitNum = limit ? parseInt(limit.toString()) : 5;
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 20) {
+      throw new BadRequestException('Limit must be a number between 1 and 20');
+    }
+
+    // Validate period
+    const validPeriods = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+    const periodType = (period && validPeriods.includes(period) ? period : 'monthly') as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+    // Validate metric
+    const validMetrics = ['deals', 'revenue', 'conversion_rate', 'leads'];
+    const metricType = (metric && validMetrics.includes(metric) ? metric : 'deals') as 'deals' | 'revenue' | 'conversion_rate' | 'leads';
+
+    // Validate date range if provided
+    if (fromDate && toDate) {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+        throw new BadRequestException('Invalid date format. Dates must be in ISO 8601 format (YYYY-MM-DD)');
+      }
+      if (from > to) {
+        throw new BadRequestException('fromDate must be before toDate');
+      }
+    }
+
+    return await this.dashboardService.getTopPerformers(
+      req.user.id,
+      req.user.department,
+      req.user.role,
+      req.user.type,
+      limitNum,
+      periodType,
+      fromDate,
+      toDate,
+      unit,
+      metricType
     );
   }
 }
