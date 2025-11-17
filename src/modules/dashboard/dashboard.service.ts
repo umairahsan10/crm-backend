@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
@@ -3221,6 +3221,984 @@ export class DashboardService {
     });
 
     return { projects: mappedProjects };
+  }
+
+  // SALES TRENDS
+  async getSalesTrends(
+    userId: number,
+    department: string,
+    role: string,
+    userType: string | undefined,
+    period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly',
+    fromDate?: string,
+    toDate?: string,
+    unit?: string
+  ) {
+    // Check if user is in Sales department
+    if (department !== 'Sales' && userType !== 'admin') {
+      throw new ForbiddenException('Access denied. Only Sales department users can access sales trends.');
+    }
+
+    // Get user's sales department info for hierarchical filtering
+    const userSalesDept = await this.prisma.salesDepartment.findFirst({
+      where: { employeeId: userId },
+      include: {
+        salesUnit: {
+          select: {
+            id: true,
+            name: true,
+            headId: true,
+            teams: {
+              select: {
+                id: true,
+                teamLeadId: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Build hierarchical filters based on role
+    const leadFilters = await this.getSalesHierarchicalFilters(role, userId, userSalesDept, unit);
+
+    // Calculate date range
+    const dateRange = this.calculateSalesDateRange(period, fromDate, toDate);
+    const { startDate, endDate, prevStartDate, prevEndDate } = dateRange;
+
+    // Get all leads in the date range for conversion rate calculation
+    const allLeadsWhere = {
+      ...leadFilters,
+      createdAt: { gte: startDate, lte: endDate }
+    };
+
+    // Get cracked leads (closed/won deals) in the date range
+    const crackedLeadsWhere = {
+      lead: {
+        ...leadFilters
+      },
+      crackedAt: { gte: startDate, lte: endDate }
+    };
+
+    // Fetch data
+    const [allLeads, crackedLeads, prevAllLeads, prevCrackedLeads] = await Promise.all([
+      this.prisma.lead.findMany({
+        where: allLeadsWhere,
+        select: { id: true, createdAt: true }
+      }),
+      this.prisma.crackedLead.findMany({
+        where: crackedLeadsWhere,
+        select: {
+          id: true,
+          amount: true,
+          crackedAt: true,
+          lead: {
+            select: {
+              createdAt: true
+            }
+          }
+        }
+      }),
+      // Previous period data
+      this.prisma.lead.findMany({
+        where: {
+          ...leadFilters,
+          createdAt: { gte: prevStartDate, lte: prevEndDate }
+        },
+        select: { id: true }
+      }),
+      this.prisma.crackedLead.findMany({
+        where: {
+          lead: {
+            ...leadFilters
+          },
+          crackedAt: { gte: prevStartDate, lte: prevEndDate }
+        },
+        select: {
+          id: true,
+          amount: true
+        }
+      })
+    ]);
+
+    // Group data by period
+    const data = this.groupSalesDataByPeriod(
+      crackedLeads,
+      allLeads,
+      period,
+      startDate,
+      endDate
+    );
+
+    // Calculate summary statistics
+    const currentRevenue = crackedLeads.reduce((sum, cl) => sum + Number(cl.amount || 0), 0);
+    const currentDeals = crackedLeads.length;
+    const currentTotalLeads = allLeads.length;
+    const currentConversionRate = currentTotalLeads > 0 ? (currentDeals / currentTotalLeads) * 100 : 0;
+    const currentAvgDealSize = currentDeals > 0 ? currentRevenue / currentDeals : 0;
+
+    const prevRevenue = prevCrackedLeads.reduce((sum, cl) => sum + Number(cl.amount || 0), 0);
+    const prevDeals = prevCrackedLeads.length;
+    const prevTotalLeads = prevAllLeads.length;
+    const prevConversionRate = prevTotalLeads > 0 ? (prevDeals / prevTotalLeads) * 100 : 0;
+    const prevAvgDealSize = prevDeals > 0 ? prevRevenue / prevDeals : 0;
+
+    // Find best and worst periods
+    let bestPeriod: { date: string; revenue: number; label: string } | undefined;
+    let worstPeriod: { date: string; revenue: number; label: string } | undefined;
+
+    data.forEach(point => {
+      if (!bestPeriod || point.revenue > bestPeriod.revenue) {
+        bestPeriod = {
+          date: point.date,
+          revenue: point.revenue,
+          label: point.fullLabel
+        };
+      }
+      if (!worstPeriod || point.revenue < worstPeriod.revenue) {
+        worstPeriod = {
+          date: point.date,
+          revenue: point.revenue,
+          label: point.fullLabel
+        };
+      }
+    });
+
+    // Calculate changes
+    const revenueChange = currentRevenue - prevRevenue;
+    const revenueChangePercent = prevRevenue > 0 ? (revenueChange / prevRevenue) * 100 : 0;
+    const dealsChange = currentDeals - prevDeals;
+    const dealsChangePercent = prevDeals > 0 ? (dealsChange / prevDeals) * 100 : 0;
+    const trend = revenueChange > 0 ? 'up' as const : revenueChange < 0 ? 'down' as const : 'neutral' as const;
+
+    // Build metadata
+    const metadata = this.buildSalesMetadata(period, startDate, endDate, data.length);
+
+    return {
+      status: 'success',
+      department: 'Sales',
+      role,
+      period,
+      summary: {
+        currentPeriod: {
+          totalRevenue: Math.round(currentRevenue),
+          totalDeals: currentDeals,
+          averageDealSize: Math.round(currentAvgDealSize),
+          conversionRate: Math.round(currentConversionRate * 100) / 100,
+          bestMonth: bestPeriod,
+          worstMonth: worstPeriod
+        },
+        previousPeriod: {
+          totalRevenue: Math.round(prevRevenue),
+          totalDeals: prevDeals,
+          averageDealSize: Math.round(prevAvgDealSize),
+          conversionRate: Math.round(prevConversionRate * 100) / 100
+        },
+        change: {
+          revenue: Math.round(revenueChange),
+          revenuePercentage: Math.round(revenueChangePercent * 100) / 100,
+          deals: dealsChange,
+          dealsPercentage: Math.round(dealsChangePercent * 100) / 100,
+          trend
+        }
+      },
+      data,
+      metadata
+    };
+  }
+
+  private async getSalesHierarchicalFilters(
+    role: string,
+    userId: number,
+    userSalesDept: any,
+    unitFilter?: string
+  ): Promise<any> {
+    // Admin and dep_manager can see all (unless unit filter is specified)
+    if (role === 'dep_manager' || role === 'admin') {
+      if (unitFilter) {
+        // Find unit by name
+        const unit = await this.prisma.salesUnit.findFirst({
+          where: { name: unitFilter }
+        });
+        if (unit) {
+          return { salesUnitId: unit.id };
+        }
+      }
+      return {}; // No restrictions
+    }
+
+    if (!userSalesDept) {
+      return { id: -1 }; // No access if not in sales department
+    }
+
+    const { salesUnitId, salesUnit } = userSalesDept;
+
+    switch (role) {
+      case 'unit_head':
+        return { salesUnitId };
+
+      case 'team_lead':
+        // Get team members
+        const teamMembers = await this.prisma.employee.findMany({
+          where: { teamLeadId: userId },
+          select: { id: true }
+        });
+        const teamMemberIds = teamMembers.map(m => m.id);
+        return {
+          salesUnitId,
+          assignedToId: { in: [...teamMemberIds, userId] }
+        };
+
+      case 'senior':
+      case 'junior':
+        return {
+          salesUnitId,
+          assignedToId: userId
+        };
+
+      default:
+        return { id: -1 }; // No access
+    }
+  }
+
+  private calculateSalesDateRange(
+    period: string,
+    fromDate?: string,
+    toDate?: string
+  ): { startDate: Date; endDate: Date; prevStartDate: Date; prevEndDate: Date } {
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+
+    let startDate: Date;
+    let endDate: Date = now;
+
+    if (fromDate && toDate) {
+      startDate = new Date(fromDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(toDate);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Default ranges based on period
+      switch (period) {
+        case 'daily':
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 29); // Last 30 days
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'weekly':
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - (11 * 7)); // Last 12 weeks
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'monthly':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1); // Last 12 months
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'quarterly':
+          const currentQuarter = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear() - 1, currentQuarter * 3, 1); // Last 4 quarters
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'yearly':
+          startDate = new Date(now.getFullYear() - 4, 0, 1); // Last 5 years
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+          startDate.setHours(0, 0, 0, 0);
+      }
+    }
+
+    // Calculate previous period (same duration before startDate)
+    const duration = endDate.getTime() - startDate.getTime();
+    const prevEndDate = new Date(startDate.getTime() - 1);
+    const prevStartDate = new Date(prevEndDate.getTime() - duration);
+
+    return { startDate, endDate, prevStartDate, prevEndDate };
+  }
+
+  private groupSalesDataByPeriod(
+    crackedLeads: any[],
+    allLeads: any[],
+    period: string,
+    startDate: Date,
+    endDate: Date
+  ): any[] {
+    const dataMap = new Map<string, { revenue: number; deals: number; leads: number }>();
+
+    // Initialize data map with all periods
+    const periods = this.generatePeriods(period, startDate, endDate);
+    periods.forEach(p => {
+      dataMap.set(p.key, { revenue: 0, deals: 0, leads: 0 });
+    });
+
+    // Aggregate cracked leads (deals)
+    crackedLeads.forEach(cl => {
+      if (!cl.crackedAt) return;
+      const periodKey = this.getPeriodKey(cl.crackedAt, period);
+      const data = dataMap.get(periodKey);
+      if (data) {
+        data.revenue += Number(cl.amount || 0);
+        data.deals += 1;
+      }
+    });
+
+    // Aggregate all leads for conversion rate
+    allLeads.forEach(lead => {
+      if (!lead.createdAt) return;
+      const periodKey = this.getPeriodKey(lead.createdAt, period);
+      const data = dataMap.get(periodKey);
+      if (data) {
+        data.leads += 1;
+      }
+    });
+
+    // Convert to array and format
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const data: any[] = [];
+
+    periods.forEach(periodInfo => {
+      const periodData = dataMap.get(periodInfo.key);
+      if (!periodData) return;
+
+      const revenue = periodData.revenue;
+      const deals = periodData.deals;
+      const leads = periodData.leads;
+      const conversionRate = leads > 0 ? (deals / leads) * 100 : 0;
+      const avgDealSize = deals > 0 ? revenue / deals : 0;
+
+      data.push({
+        date: periodInfo.key,
+        label: periodInfo.label,
+        fullLabel: periodInfo.fullLabel,
+        revenue: Math.round(revenue),
+        deals,
+        conversionRate: Math.round(conversionRate * 100) / 100,
+        averageDealSize: Math.round(avgDealSize),
+        chartValue: revenue,
+        monthNumber: periodInfo.monthNumber,
+        year: periodInfo.year,
+        weekNumber: periodInfo.weekNumber,
+        quarterNumber: periodInfo.quarterNumber
+      });
+    });
+
+    return data;
+  }
+
+  private generatePeriods(period: string, startDate: Date, endDate: Date): any[] {
+    const periods: any[] = [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    switch (period) {
+      case 'daily':
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const dateKey = d.toISOString().split('T')[0];
+          const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+          const monthName = monthNames[d.getMonth()];
+          periods.push({
+            key: dateKey,
+            label: `${dayName.substring(0, 3)}`,
+            fullLabel: `${dayName}, ${monthName} ${d.getDate()}`,
+            monthNumber: d.getMonth() + 1,
+            year: d.getFullYear()
+          });
+        }
+        break;
+
+      case 'weekly':
+        let currentWeek = new Date(startDate);
+        while (currentWeek <= endDate) {
+          const weekStart = new Date(currentWeek);
+          weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week (Sunday)
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+          
+          const year = weekStart.getFullYear();
+          const weekNumber = this.getWeekNumber(weekStart);
+          const key = `${year}-W${String(weekNumber).padStart(2, '0')}`;
+          
+          periods.push({
+            key,
+            label: `W${weekNumber}`,
+            fullLabel: `Week ${weekNumber}, ${year}`,
+            weekNumber,
+            year
+          });
+          
+          currentWeek.setDate(currentWeek.getDate() + 7);
+        }
+        break;
+
+      case 'monthly':
+        let currentMonth = new Date(startDate);
+        currentMonth.setDate(1); // Start of month
+        while (currentMonth <= endDate) {
+          const year = currentMonth.getFullYear();
+          const month = currentMonth.getMonth() + 1;
+          const key = `${year}-${String(month).padStart(2, '0')}`;
+          periods.push({
+            key,
+            label: monthNames[month - 1],
+            fullLabel: `${monthNames[month - 1]} ${year}`,
+            monthNumber: month,
+            year
+          });
+          // Move to next month
+          currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+        }
+        break;
+
+      case 'quarterly':
+        let currentQuarter = new Date(startDate);
+        currentQuarter.setDate(1); // Start of month
+        // Align to quarter start
+        const startQuarter = Math.floor(currentQuarter.getMonth() / 3);
+        currentQuarter.setMonth(startQuarter * 3);
+        while (currentQuarter <= endDate) {
+          const year = currentQuarter.getFullYear();
+          const quarter = Math.floor(currentQuarter.getMonth() / 3) + 1;
+          const key = `${year}-Q${quarter}`;
+          periods.push({
+            key,
+            label: `Q${quarter}`,
+            fullLabel: `Q${quarter} ${year}`,
+            quarterNumber: quarter,
+            year
+          });
+          // Move to next quarter
+          currentQuarter = new Date(currentQuarter.getFullYear(), currentQuarter.getMonth() + 3, 1);
+        }
+        break;
+
+      case 'yearly':
+        for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
+          const key = `${year}`;
+          periods.push({
+            key,
+            label: `${year}`,
+            fullLabel: `${year}`,
+            year
+          });
+        }
+        break;
+    }
+
+    return periods;
+  }
+
+  private getPeriodKey(date: Date, period: string): string {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+
+    switch (period) {
+      case 'daily':
+        return d.toISOString().split('T')[0];
+      case 'weekly':
+        const weekNumber = this.getWeekNumber(d);
+        return `${year}-W${String(weekNumber).padStart(2, '0')}`;
+      case 'monthly':
+        return `${year}-${String(month).padStart(2, '0')}`;
+      case 'quarterly':
+        const quarter = Math.floor(d.getMonth() / 3) + 1;
+        return `${year}-Q${quarter}`;
+      case 'yearly':
+        return `${year}`;
+      default:
+        return `${year}-${String(month).padStart(2, '0')}`;
+    }
+  }
+
+  private getWeekNumber(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
+
+  private buildSalesMetadata(
+    period: string,
+    startDate: Date,
+    endDate: Date,
+    dataLength: number
+  ): any {
+    const metadata: any = {
+      dateRange: {
+        start: startDate.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0]
+      },
+      generatedAt: new Date().toISOString()
+    };
+
+    switch (period) {
+      case 'daily':
+        metadata.totalDays = dataLength;
+        break;
+      case 'weekly':
+        metadata.totalWeeks = dataLength;
+        break;
+      case 'monthly':
+        metadata.totalMonths = dataLength;
+        break;
+      case 'quarterly':
+        metadata.totalQuarters = dataLength;
+        break;
+      case 'yearly':
+        metadata.totalYears = dataLength;
+        break;
+    }
+
+    return metadata;
+  }
+
+  // TOP PERFORMERS
+  async getTopPerformers(
+    userId: number,
+    department: string,
+    role: string,
+    userType: string | undefined,
+    limit: number = 5,
+    period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly',
+    fromDate?: string,
+    toDate?: string,
+    unit?: string,
+    metric: 'deals' | 'revenue' | 'conversion_rate' | 'leads' = 'deals'
+  ) {
+    // Check if user is in Sales department
+    if (department !== 'Sales' && userType !== 'admin') {
+      throw new ForbiddenException('Access denied. Only Sales department users can access top performers.');
+    }
+
+    // Validate limit
+    if (limit < 1 || limit > 20) {
+      throw new BadRequestException('Limit must be between 1 and 20');
+    }
+
+    // Get user's sales department info for hierarchical filtering
+    const userSalesDept = await this.prisma.salesDepartment.findFirst({
+      where: { employeeId: userId },
+      include: {
+        salesUnit: {
+          select: {
+            id: true,
+            name: true,
+            headId: true,
+            teams: {
+              select: {
+                id: true,
+                teamLeadId: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Build hierarchical filters to get employees in scope
+    const employeeFilters = await this.getTopPerformersEmployeeFilters(role, userId, userSalesDept, unit);
+
+    // Calculate date range
+    const dateRange = this.calculateSalesDateRange(period, fromDate, toDate);
+    const { startDate, endDate, prevStartDate, prevEndDate } = dateRange;
+
+    // Get all employees in scope
+    const employees = await this.getEmployeesInScope(employeeFilters, userSalesDept);
+
+    if (employees.length === 0) {
+      return {
+        status: 'success',
+        department: 'Sales',
+        role,
+        period,
+        metric,
+        summary: {
+          totalTeamMembers: 0,
+          periodStart: startDate.toISOString().split('T')[0],
+          periodEnd: endDate.toISOString().split('T')[0],
+          averagePerformance: 0
+        },
+        data: [],
+        metadata: {
+          generatedAt: new Date().toISOString()
+        }
+      };
+    }
+
+    const employeeIds = employees.map(e => e.id);
+
+    // Get performance data for current period
+    const [crackedLeads, allLeads, prevCrackedLeads, prevAllLeads] = await Promise.all([
+      // Current period cracked leads
+      this.prisma.crackedLead.findMany({
+        where: {
+          closedBy: { in: employeeIds },
+          crackedAt: { gte: startDate, lte: endDate }
+        },
+        select: {
+          id: true,
+          amount: true,
+          closedBy: true,
+          crackedAt: true
+        }
+      }),
+      // Current period all leads
+      this.prisma.lead.findMany({
+        where: {
+          assignedToId: { in: employeeIds },
+          createdAt: { gte: startDate, lte: endDate }
+        },
+        select: {
+          id: true,
+          assignedToId: true,
+          createdAt: true
+        }
+      }),
+      // Previous period cracked leads
+      this.prisma.crackedLead.findMany({
+        where: {
+          closedBy: { in: employeeIds },
+          crackedAt: { gte: prevStartDate, lte: prevEndDate }
+        },
+        select: {
+          id: true,
+          amount: true,
+          closedBy: true
+        }
+      }),
+      // Previous period all leads
+      this.prisma.lead.findMany({
+        where: {
+          assignedToId: { in: employeeIds },
+          createdAt: { gte: prevStartDate, lte: prevEndDate }
+        },
+        select: {
+          id: true,
+          assignedToId: true
+        }
+      })
+    ]);
+
+    // Calculate performance metrics for each employee
+    const performanceData = this.calculateEmployeePerformance(
+      employees,
+      crackedLeads,
+      allLeads,
+      prevCrackedLeads,
+      prevAllLeads
+    );
+
+    // Rank by selected metric
+    const rankedData = this.rankEmployeesByMetric(performanceData, metric);
+
+    // Get top N performers
+    const topPerformers = rankedData.slice(0, limit);
+
+    // Calculate average performance
+    const averagePerformance = rankedData.length > 0
+      ? rankedData.reduce((sum, emp) => sum + emp.value, 0) / rankedData.length
+      : 0;
+
+    return {
+      status: 'success',
+      department: 'Sales',
+      role,
+      period,
+      metric,
+      summary: {
+        totalTeamMembers: employees.length,
+        periodStart: startDate.toISOString().split('T')[0],
+        periodEnd: endDate.toISOString().split('T')[0],
+        averagePerformance: Math.round(averagePerformance * 100) / 100
+      },
+      data: topPerformers,
+      metadata: {
+        generatedAt: new Date().toISOString()
+      }
+    };
+  }
+
+  private async getTopPerformersEmployeeFilters(
+    role: string,
+    userId: number,
+    userSalesDept: any,
+    unitFilter?: string
+  ): Promise<any> {
+    // Admin and dep_manager can see all employees (unless unit filter is specified)
+    if (role === 'dep_manager' || role === 'admin') {
+      if (unitFilter) {
+        // Find unit by name and return employees in that unit
+        const unit = await this.prisma.salesUnit.findFirst({
+          where: { name: unitFilter },
+          include: {
+            salesEmployees: {
+              select: { employeeId: true }
+            }
+          }
+        });
+        if (unit) {
+          return { salesUnitId: unit.id };
+        }
+      }
+      return {}; // No restrictions - all employees
+    }
+
+    if (!userSalesDept) {
+      return { id: -1 }; // No access
+    }
+
+    const { salesUnitId } = userSalesDept;
+
+    switch (role) {
+      case 'unit_head':
+        return { salesUnitId };
+
+      case 'team_lead':
+        // Get team members
+        const teamMembers = await this.prisma.employee.findMany({
+          where: { teamLeadId: userId },
+          select: { id: true }
+        });
+        const teamMemberIds = teamMembers.map(m => m.id);
+        return {
+          salesUnitId,
+          id: { in: [...teamMemberIds, userId] }
+        };
+
+      case 'senior':
+      case 'junior':
+        return {
+          salesUnitId,
+          id: userId
+        };
+
+      default:
+        return { id: -1 }; // No access
+    }
+  }
+
+  private async getEmployeesInScope(filters: any, userSalesDept: any): Promise<any[]> {
+    // Build where clause for employees
+    const where: any = {
+      status: 'active',
+      department: { name: 'Sales' }
+    };
+
+    // Apply filters
+    if (filters.salesUnitId) {
+      where.salesDepartment = {
+        some: {
+          salesUnitId: filters.salesUnitId
+        }
+      };
+    }
+
+    if (filters.id) {
+      if (typeof filters.id === 'object' && filters.id.in) {
+        where.id = { in: filters.id.in };
+      } else {
+        where.id = filters.id;
+      }
+    }
+
+    if (filters.id === -1) {
+      return []; // No access
+    }
+
+    const employees = await this.prisma.employee.findMany({
+      where,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true
+      }
+    });
+
+    return employees;
+  }
+
+  private calculateEmployeePerformance(
+    employees: any[],
+    crackedLeads: any[],
+    allLeads: any[],
+    prevCrackedLeads: any[],
+    prevAllLeads: any[]
+  ): any[] {
+    const performanceMap = new Map<number, {
+      employeeId: number;
+      employeeName: string;
+      deals: number;
+      revenue: number;
+      leads: number;
+      conversionRate: number;
+      averageDealSize: number;
+      prevDeals: number;
+      prevRevenue: number;
+      prevLeads: number;
+      prevConversionRate: number;
+      prevAverageDealSize: number;
+    }>();
+
+    // Initialize map
+    employees.forEach(emp => {
+      performanceMap.set(emp.id, {
+        employeeId: emp.id,
+        employeeName: `${emp.firstName} ${emp.lastName}`.trim(),
+        deals: 0,
+        revenue: 0,
+        leads: 0,
+        conversionRate: 0,
+        averageDealSize: 0,
+        prevDeals: 0,
+        prevRevenue: 0,
+        prevLeads: 0,
+        prevConversionRate: 0,
+        prevAverageDealSize: 0
+      });
+    });
+
+    // Aggregate current period data
+    crackedLeads.forEach(cl => {
+      const perf = performanceMap.get(cl.closedBy);
+      if (perf) {
+        perf.deals += 1;
+        perf.revenue += Number(cl.amount || 0);
+      }
+    });
+
+    allLeads.forEach(lead => {
+      if (!lead.assignedToId) return;
+      const perf = performanceMap.get(lead.assignedToId);
+      if (perf) {
+        perf.leads += 1;
+      }
+    });
+
+    // Aggregate previous period data
+    prevCrackedLeads.forEach(cl => {
+      const perf = performanceMap.get(cl.closedBy);
+      if (perf) {
+        perf.prevDeals += 1;
+        perf.prevRevenue += Number(cl.amount || 0);
+      }
+    });
+
+    prevAllLeads.forEach(lead => {
+      if (!lead.assignedToId) return;
+      const perf = performanceMap.get(lead.assignedToId);
+      if (perf) {
+        perf.prevLeads += 1;
+      }
+    });
+
+    // Calculate derived metrics
+    const performanceData: any[] = [];
+    performanceMap.forEach(perf => {
+      // Current period metrics
+      perf.conversionRate = perf.leads > 0 ? (perf.deals / perf.leads) * 100 : 0;
+      perf.averageDealSize = perf.deals > 0 ? perf.revenue / perf.deals : 0;
+
+      // Previous period metrics
+      perf.prevConversionRate = perf.prevLeads > 0 ? (perf.prevDeals / perf.prevLeads) * 100 : 0;
+      perf.prevAverageDealSize = perf.prevDeals > 0 ? perf.prevRevenue / perf.prevDeals : 0;
+
+      performanceData.push(perf);
+    });
+
+    return performanceData;
+  }
+
+  private rankEmployeesByMetric(
+    performanceData: any[],
+    metric: 'deals' | 'revenue' | 'conversion_rate' | 'leads'
+  ): any[] {
+    // Map metric to value
+    const getValue = (emp: any) => {
+      switch (metric) {
+        case 'deals':
+          return emp.deals;
+        case 'revenue':
+          return emp.revenue;
+        case 'conversion_rate':
+          return emp.conversionRate;
+        case 'leads':
+          return emp.leads;
+        default:
+          return emp.deals;
+      }
+    };
+
+    const getPrevValue = (emp: any) => {
+      switch (metric) {
+        case 'deals':
+          return emp.prevDeals;
+        case 'revenue':
+          return emp.prevRevenue;
+        case 'conversion_rate':
+          return emp.prevConversionRate;
+        case 'leads':
+          return emp.prevLeads;
+        default:
+          return emp.prevDeals;
+      }
+    };
+
+    // Sort by primary metric (descending), then by revenue (if not primary), then by name
+    const sorted = performanceData.sort((a, b) => {
+      const aValue = getValue(a);
+      const bValue = getValue(b);
+
+      // Primary sort by metric value
+      if (bValue !== aValue) {
+        return bValue - aValue;
+      }
+
+      // Secondary sort by revenue (if not primary metric)
+      if (metric !== 'revenue') {
+        if (b.revenue !== a.revenue) {
+          return b.revenue - a.revenue;
+        }
+      }
+
+      // Tertiary sort by deals (if not primary metric)
+      if (metric !== 'deals') {
+        if (b.deals !== a.deals) {
+          return b.deals - a.deals;
+        }
+      }
+
+      // Final sort by name (alphabetically)
+      return a.employeeName.localeCompare(b.employeeName);
+    });
+
+    // Add rank and format response
+    return sorted.map((emp, index) => {
+      const value = getValue(emp);
+      const prevValue = getPrevValue(emp);
+      const change = value - prevValue;
+      const changePercent = prevValue > 0 ? (change / prevValue) * 100 : (value > 0 ? 100 : 0);
+      const trend = change > 0 ? 'up' as const : change < 0 ? 'down' as const : 'neutral' as const;
+
+      return {
+        employeeId: emp.employeeId,
+        employeeName: emp.employeeName,
+        value: Math.round(value * 100) / 100,
+        metric,
+        additionalMetrics: {
+          revenue: Math.round(emp.revenue),
+          leads: emp.leads,
+          conversionRate: Math.round(emp.conversionRate * 100) / 100,
+          averageDealSize: Math.round(emp.averageDealSize)
+        },
+        rank: index + 1,
+        change: {
+          value: Math.round(change * 100) / 100,
+          percentage: Math.round(changePercent * 100) / 100,
+          trend
+        }
+      };
+    });
   }
 }
 
