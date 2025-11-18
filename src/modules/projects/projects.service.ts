@@ -21,6 +21,15 @@ export class ProjectsService {
   private normalizeUser(user: any) {
     if (!user) return null;
     
+    // Admin users - return as is with type flag
+    if (user.type === 'admin') {
+      return {
+        ...user,
+        type: 'admin',
+        id: user.id
+      };
+    }
+    
     // Map role names to numeric IDs for backward compatibility
     const roleMap: { [key: string]: number } = {
       'dep_manager': 1,
@@ -356,7 +365,13 @@ export class ProjectsService {
     try {
       // Normalize user object
       const normalizedUser = this.normalizeUser(user);
-      if (!normalizedUser || !normalizedUser.roleId) {
+      if (!normalizedUser) {
+        throw new ForbiddenException('User authentication required');
+      }
+
+      // Admin users have full access - skip roleId check
+      const isAdmin = normalizedUser.type === 'admin';
+      if (!isAdmin && !normalizedUser.roleId) {
         throw new ForbiddenException('User authentication required');
       }
 
@@ -372,8 +387,8 @@ export class ProjectsService {
       }
 
       // Default role-based filtering for 'all' or no filterBy specified
-      if (normalizedUser.roleId === 1) {
-        // Manager - gets all projects (assigned and unassigned)
+      if (isAdmin || normalizedUser.roleId === 1) {
+        // Admin and Manager - gets all projects (assigned and unassigned)
         // No additional filtering needed
       } else if (normalizedUser.roleId === 2) {
         // Unit Head - gets projects assigned to them
@@ -556,7 +571,13 @@ export class ProjectsService {
     try {
       // Normalize user object
       const normalizedUser = this.normalizeUser(user);
-      if (!normalizedUser || !normalizedUser.roleId) {
+      if (!normalizedUser) {
+        throw new ForbiddenException('User authentication required');
+      }
+
+      // Admin users have full access - skip roleId check
+      const isAdmin = normalizedUser.type === 'admin';
+      if (!isAdmin && !normalizedUser.roleId) {
         throw new ForbiddenException('User authentication required');
       }
 
@@ -610,10 +631,12 @@ export class ProjectsService {
         throw new NotFoundException('Project not found');
       }
 
-      // Check access permissions
-      const hasAccess = await this.checkProjectAccess(normalizedUser, project);
-      if (!hasAccess) {
-        throw new ForbiddenException('Access denied to this project');
+      // Check access permissions (admins bypass this check)
+      if (!isAdmin) {
+        const hasAccess = await this.checkProjectAccess(normalizedUser, project);
+        if (!hasAccess) {
+          throw new ForbiddenException('Access denied to this project');
+        }
       }
 
       // Get all employees related to this project
@@ -1491,6 +1514,11 @@ export class ProjectsService {
     // Normalize user if not already normalized (defensive check)
     const normalizedUser = this.normalizeUser(user) || user;
     
+    // Admin users - Full access to all projects
+    if (normalizedUser.type === 'admin' || user.type === 'admin') {
+      return true;
+    }
+    
     // Manager (Role 1 or 'dep_manager') - Access to all projects
     if (normalizedUser.roleId === 1 || normalizedUser.role === 'dep_manager') {
       return true;
@@ -2049,6 +2077,59 @@ export class ProjectsService {
     } catch (error) {
       console.error(`Failed to add team members to project chat for project ${projectId}:`, error);
       throw new BadRequestException(`Failed to add team members to project chat: ${error.message}`);
+    }
+  }
+
+  // Get Available Teams for Project Assignment
+  // Returns production teams that are assigned to a production unit but do not have any projects
+  async getAvailableTeams() {
+    try {
+      const teams = await this.prisma.team.findMany({
+        where: {
+          // Check 1: Team must be assigned to a production unit
+          productionUnitId: { not: null },
+          // Check 2: Team must not have any projects
+          projects: {
+            none: {}
+          }
+        },
+        include: {
+          teamLead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          productionUnit: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: [
+          { name: 'asc' }
+        ]
+      });
+
+      return {
+        success: true,
+        data: teams.map(team => ({
+          id: team.id,
+          name: team.name,
+          employeeCount: team.employeeCount,
+          teamLead: team.teamLead,
+          productionUnit: team.productionUnit
+        })),
+        total: teams.length,
+        message: teams.length > 0 
+          ? 'Available teams retrieved successfully' 
+          : 'No available teams found'
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to retrieve available teams: ${error.message}`);
     }
   }
 }

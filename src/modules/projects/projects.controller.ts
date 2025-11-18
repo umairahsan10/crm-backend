@@ -97,4 +97,13 @@ export class ProjectsController {
     return this.projectsService.updateProject(id, dto, req.user);
   }
 
+  // 6. Get Available Teams for Project Assignment
+  @Get('available-teams')
+  @UseGuards(JwtAuthGuard, DepartmentsGuard, RolesGuard)
+  @Departments('Production')
+  @Roles('dep_manager', 'unit_head') // Manager and Unit Head can view available teams
+  async getAvailableTeams() {
+    return this.projectsService.getAvailableTeams();
+  }
+
 }

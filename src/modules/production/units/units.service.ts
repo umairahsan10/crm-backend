@@ -789,16 +789,21 @@ export class UnitsService {
   async getAvailableTeams(assigned?: boolean) {
     const whereClause: any = {};
 
+    // Base filter: Only show Production teams (exclude Sales and Marketing teams)
+    // Teams must have salesUnitId = null AND marketingUnitId = null
+    whereClause.salesUnitId = null;
+    whereClause.marketingUnitId = null;
+
     if (assigned === true) {
       // Show teams assigned to production units
       whereClause.productionUnitId = { not: null };
     } else if (assigned === false) {
-      // Show orphan teams (not assigned to any unit)
+      // Show orphan teams (all three unit IDs must be null)
       whereClause.productionUnitId = null;
-      whereClause.salesUnitId = null;
-      whereClause.marketingUnitId = null;
+      // salesUnitId and marketingUnitId already set to null above
     }
-    // If assigned is undefined, show all teams (no additional filter)
+    // If assigned is undefined, show all production teams
+    // (productionUnitId can be null or not null, but salesUnitId and marketingUnitId must be null)
 
     const teams = await this.prisma.team.findMany({
       where: whereClause,
