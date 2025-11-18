@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UpdateAdminDto } from './dto/update-admin.dto';
+import { CreateAdminDto } from './dto/create-admin.dto';
 import { AdminResponseDto, AdminListResponseDto } from './dto/admin-response.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -9,20 +10,6 @@ export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
   constructor(private readonly prisma: PrismaService) {}
-
-  /**
-   * Verify that the user is an admin
-   */
-  private async verifyAdminAccess(adminId: number): Promise<void> {
-    const admin = await this.prisma.admin.findUnique({
-      where: { id: adminId },
-      select: { id: true, role: true }
-    });
-
-    if (!admin) {
-      throw new NotFoundException('Admin not found');
-    }
-  }
 
   /**
    * Get all admins with pagination
@@ -83,30 +70,6 @@ export class AdminService {
 
     if (!admin) {
       throw new NotFoundException(`Admin with ID ${id} not found`);
-    }
-
-    return admin;
-  }
-
-  /**
-   * Get admin by email
-   */
-  async getAdminByEmail(email: string): Promise<AdminResponseDto> {
-    const admin = await this.prisma.admin.findFirst({
-      where: { email },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!admin) {
-      throw new NotFoundException(`Admin with email ${email} not found`);
     }
 
     return admin;
@@ -176,16 +139,83 @@ export class AdminService {
   }
 
   /**
-   * Get current admin profile (for authenticated admin)
+   * Create a new admin user
    */
-  async getMyProfile(adminId: number): Promise<AdminResponseDto> {
-    return this.getAdminById(adminId);
+  async createAdmin(dto: CreateAdminDto): Promise<AdminResponseDto> {
+    // Check if email already exists
+    const existingAdmin = await this.prisma.admin.findFirst({
+      where: { email: dto.email },
+    });
+
+    if (existingAdmin) {
+      throw new BadRequestException(`Admin with email ${dto.email} already exists`);
+    }
+
+    try {
+      // Hash password
+      const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+      const admin = await this.prisma.admin.create({
+        data: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          email: dto.email,
+          password: hashedPassword,
+          role: dto.role || 'admin',
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      this.logger.log(`Admin ${admin.id} created successfully`);
+      return admin;
+    } catch (error) {
+      this.logger.error(`Failed to create admin: ${error.message}`);
+      throw new BadRequestException(`Failed to create admin: ${error.message}`);
+    }
   }
 
   /**
-   * Update current admin profile (for authenticated admin)
+   * Delete an admin user
    */
-  async updateMyProfile(adminId: number, dto: UpdateAdminDto): Promise<AdminResponseDto> {
-    return this.updateAdmin(adminId, dto);
+  async deleteAdmin(id: number, currentAdminId: number): Promise<{ message: string }> {
+    // Prevent self-deletion
+    if (id === currentAdminId) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+
+    // Check if admin exists
+    const admin = await this.prisma.admin.findUnique({
+      where: { id },
+    });
+
+    if (!admin) {
+      throw new NotFoundException(`Admin with ID ${id} not found`);
+    }
+
+    // Check if this is the last admin (prevent deleting the last admin)
+    const adminCount = await this.prisma.admin.count();
+    if (adminCount <= 1) {
+      throw new BadRequestException('Cannot delete the last admin. At least one admin must exist.');
+    }
+
+    try {
+      await this.prisma.admin.delete({
+        where: { id },
+      });
+
+      this.logger.log(`Admin ${id} deleted successfully`);
+      return { message: `Admin with ID ${id} deleted successfully` };
+    } catch (error) {
+      this.logger.error(`Failed to delete admin ${id}: ${error.message}`);
+      throw new BadRequestException(`Failed to delete admin: ${error.message}`);
+    }
   }
 }

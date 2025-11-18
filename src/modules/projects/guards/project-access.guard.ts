@@ -18,6 +18,26 @@ export class ProjectAccessGuard implements CanActivate {
       throw new ForbiddenException('Project ID is required');
     }
 
+    // Admin bypass - admins have full access to all projects
+    if (user.type === 'admin') {
+      // Still fetch project to attach to request, but skip access check
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          unitHead: true,
+          team: true,
+          salesRep: true
+        }
+      });
+
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
+
+      request.project = project;
+      return true;
+    }
+
     // Get project with related data
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
