@@ -12,6 +12,7 @@ import { EmployeeCountByDepartmentResponseDto } from './dto/employee-count-by-de
 import { ProjectsResponseDto } from './dto/project-response.dto';
 import { SalesTrendsResponseDto } from './dto/sales-trends-response.dto';
 import { TopPerformersResponseDto } from './dto/top-performers-response.dto';
+import { CrossDepartmentTopPerformersResponseDto } from './dto/cross-department-top-performers-response.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -227,6 +228,47 @@ export class DashboardController {
       toDate,
       unit,
       metricType
+    );
+  }
+
+  @Get('cross-department-top-performers')
+  @ApiOperation({ 
+    summary: 'Get cross-department top performers - Returns top performer from each department',
+    description: 'Fetches the top performing employee from each department (Sales, Marketing, Production, HR, Accounting) based on department-specific metrics. Results are ranked by overall performance percentage.'
+  })
+  @ApiQuery({ name: 'period', required: false, type: String, description: 'Time period: daily, weekly, monthly, quarterly, yearly (default: monthly)', enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Start date in ISO 8601 format (YYYY-MM-DD). Default: current period start' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'End date in ISO 8601 format (YYYY-MM-DD). Default: current date' })
+  @ApiResponse({ status: 200, description: 'Cross-department top performers retrieved successfully', type: CrossDepartmentTopPerformersResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid query parameters' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - JWT token required' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async getCrossDepartmentTopPerformers(
+    @Request() req: any,
+    @Query('period') period?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string
+  ): Promise<CrossDepartmentTopPerformersResponseDto> {
+    // Validate period
+    const validPeriods = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+    const periodType = (period && validPeriods.includes(period) ? period : 'monthly') as 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+    // Validate date range if provided
+    if (fromDate && toDate) {
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+        throw new BadRequestException('Invalid date format. Dates must be in ISO 8601 format (YYYY-MM-DD)');
+      }
+      if (from > to) {
+        throw new BadRequestException('fromDate must be before toDate');
+      }
+    }
+
+    return await this.dashboardService.getCrossDepartmentTopPerformers(
+      periodType,
+      fromDate,
+      toDate
     );
   }
 }

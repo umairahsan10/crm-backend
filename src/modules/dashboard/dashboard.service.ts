@@ -4201,5 +4201,561 @@ export class DashboardService {
       };
     });
   }
+
+  // CROSS-DEPARTMENT TOP PERFORMERS
+  async getCrossDepartmentTopPerformers(
+    period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly',
+    fromDate?: string,
+    toDate?: string
+  ) {
+    // Calculate date range
+    const dateRange = this.calculateSalesDateRange(period, fromDate, toDate);
+    const { startDate, endDate } = dateRange;
+
+    // Run all department queries in parallel for maximum performance
+    const [salesPerformer, marketingPerformer, productionPerformer, hrPerformer, accountingPerformer] = await Promise.all([
+      this.getSalesTopPerformer(startDate, endDate),
+      this.getMarketingTopPerformer(startDate, endDate),
+      this.getProductionTopPerformer(startDate, endDate),
+      this.getHrTopPerformer(startDate, endDate),
+      this.getAccountingTopPerformer(startDate, endDate)
+    ]);
+
+    // Ensure we have at least one performer from each department
+    // If a department has no data, get a fallback employee with 0% performance
+    const allPerformers: any[] = [];
+    
+    // Collect departments that need fallbacks
+    const fallbackPromises: Promise<any>[] = [];
+    const fallbackDepartments: string[] = [];
+    
+    if (salesPerformer) {
+      allPerformers.push(salesPerformer);
+    } else {
+      fallbackPromises.push(this.getFallbackPerformer('Sales', startDate, endDate));
+      fallbackDepartments.push('Sales');
+    }
+
+    if (marketingPerformer) {
+      allPerformers.push(marketingPerformer);
+    } else {
+      fallbackPromises.push(this.getFallbackPerformer('Marketing', startDate, endDate));
+      fallbackDepartments.push('Marketing');
+    }
+
+    if (productionPerformer) {
+      allPerformers.push(productionPerformer);
+    } else {
+      fallbackPromises.push(this.getFallbackPerformer('Production', startDate, endDate));
+      fallbackDepartments.push('Production');
+    }
+
+    if (hrPerformer) {
+      allPerformers.push(hrPerformer);
+    } else {
+      fallbackPromises.push(this.getFallbackPerformer('HR', startDate, endDate));
+      fallbackDepartments.push('HR');
+    }
+
+    if (accountingPerformer) {
+      allPerformers.push(accountingPerformer);
+    } else {
+      fallbackPromises.push(this.getFallbackPerformer('Accounts', startDate, endDate));
+      fallbackDepartments.push('Accounts');
+    }
+
+    // Run all fallback queries in parallel if needed
+    if (fallbackPromises.length > 0) {
+      const fallbacks = await Promise.all(fallbackPromises);
+      fallbacks.forEach((fallback, index) => {
+        if (fallback) {
+          allPerformers.push(fallback);
+        }
+      });
+    }
+
+    // Sort by performance percentage (descending)
+    allPerformers.sort((a, b) => b.performancePercentage - a.performancePercentage);
+
+    // Assign ranks
+    allPerformers.forEach((performer, index) => {
+      performer.rank = index + 1;
+    });
+
+    // Calculate average performance
+    const averagePerformance = allPerformers.length > 0
+      ? allPerformers.reduce((sum, p) => sum + p.performancePercentage, 0) / allPerformers.length
+      : 0;
+
+    return {
+      status: 'success',
+      period,
+      summary: {
+        totalDepartments: allPerformers.length,
+        periodStart: startDate.toISOString().split('T')[0],
+        periodEnd: endDate.toISOString().split('T')[0],
+        averagePerformance: Math.round(averagePerformance * 100) / 100
+      },
+      data: allPerformers,
+      metadata: {
+        generatedAt: new Date().toISOString()
+      }
+    };
+  }
+
+  private async getSalesTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+    // Use database aggregation for better performance
+    const topPerformerData = await this.prisma.crackedLead.groupBy({
+      by: ['closedBy'],
+      where: {
+        crackedAt: { gte: startDate, lte: endDate },
+        employee: {
+          status: 'active',
+          department: { name: 'Sales' }
+        }
+      },
+      _count: { id: true },
+      _sum: { amount: true },
+      orderBy: {
+        _count: { id: 'desc' }
+      },
+      take: 1
+    });
+
+    if (topPerformerData.length === 0) return null;
+
+    const topEmployeeId = topPerformerData[0].closedBy;
+    const deals = topPerformerData[0]._count.id;
+    const revenue = Number(topPerformerData[0]._sum.amount || 0);
+
+    // Get employee info and leads count in parallel
+    const [employee, leadsCount] = await Promise.all([
+      this.prisma.employee.findUnique({
+        where: { id: topEmployeeId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          department: { select: { name: true } },
+          role: { select: { name: true } }
+        }
+      }),
+      this.prisma.lead.count({
+        where: {
+          assignedToId: topEmployeeId,
+          createdAt: { gte: startDate, lte: endDate }
+        }
+      })
+    ]);
+
+    if (!employee) return null;
+
+    const conversionRate = leadsCount > 0 ? (deals / leadsCount) * 100 : 0;
+    const targetDeals = 10;
+    const performancePercentage = targetDeals > 0 ? (deals / targetDeals) * 100 : 0;
+
+    return {
+      employeeId: employee.id,
+      employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+      department: employee.department.name,
+      role: employee.role.name,
+      performancePercentage: Math.round(performancePercentage * 100) / 100,
+      metrics: {
+        deals,
+        revenue: Math.round(revenue),
+        leads: leadsCount,
+        conversionRate: Math.round(conversionRate * 100) / 100
+      }
+    };
+  }
+
+  private async getMarketingTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+    // First get active marketing employees to filter campaigns
+    const marketingEmployeeIds = await this.prisma.employee.findMany({
+      where: {
+        status: 'active',
+        department: { name: 'Marketing' }
+      },
+      select: { id: true }
+    }).then(emps => emps.map(e => e.id));
+
+    if (marketingEmployeeIds.length === 0) return null;
+
+    // Get marketing units for these employees
+    const marketingUnits = await this.prisma.marketing.findMany({
+      where: {
+        employeeId: { in: marketingEmployeeIds }
+      },
+      select: { marketingUnitId: true }
+    }).then(units => units.map(u => u.marketingUnitId).filter(id => id !== null) as number[]);
+
+    if (marketingUnits.length === 0) return null;
+
+    // Get top performer by counting campaigns
+    const campaignCounts = await this.prisma.campaignLog.groupBy({
+      by: ['unitId'],
+      where: {
+        startDate: { gte: startDate, lte: endDate },
+        unitId: { in: marketingUnits }
+      },
+      _count: { id: true },
+      orderBy: {
+        _count: { id: 'desc' }
+      },
+      take: 1
+    });
+
+    if (campaignCounts.length === 0) return null;
+
+    const topUnitId = campaignCounts[0].unitId;
+    const campaignsRun = campaignCounts[0]._count.id;
+
+    // Get the employee from the top unit and get leads data in parallel
+    const [marketingEmployee, leadsData] = await Promise.all([
+      this.prisma.marketing.findFirst({
+        where: {
+          marketingUnitId: topUnitId,
+          employeeId: { in: marketingEmployeeIds }
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              department: { select: { name: true } },
+              role: { select: { name: true } }
+            }
+          }
+        }
+      }),
+      this.prisma.lead.findMany({
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          source: { in: ['PPC', 'SMM'] }
+        },
+        select: {
+          qualityRating: true
+        }
+      })
+    ]);
+
+    if (!marketingEmployee) return null;
+
+    const emp = marketingEmployee.employee;
+    const qualityMap: { [key: string]: number } = {
+      'excellent': 5,
+      'very_good': 4,
+      'good': 3,
+      'bad': 2,
+      'useless': 1
+    };
+    const totalQuality = leadsData.reduce((sum, lead) => {
+      const quality = lead.qualityRating ? qualityMap[lead.qualityRating] || 3 : 3;
+      return sum + quality;
+    }, 0);
+    const avgLeadQuality = leadsData.length > 0 ? totalQuality / leadsData.length : 3;
+
+    const targetCampaigns = 6;
+    const performancePercentage = targetCampaigns > 0 ? (campaignsRun / targetCampaigns) * 100 : 0;
+
+    return {
+      employeeId: emp.id,
+      employeeName: `${emp.firstName} ${emp.lastName}`.trim(),
+      department: emp.department.name,
+      role: emp.role.name,
+      performancePercentage: Math.round(performancePercentage * 100) / 100,
+      metrics: {
+        campaignsRun,
+        leadQualityScore: Math.round(avgLeadQuality * 10) / 10,
+        leadGeneration: leadsData.length
+      }
+    };
+  }
+
+  private async getProductionTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+    // Use aggregation to count projects by developer (from project logs)
+    const projectCounts = await this.prisma.projectLog.groupBy({
+      by: ['developerId'],
+      where: {
+        project: {
+          status: 'completed',
+          updatedAt: { gte: startDate, lte: endDate }
+        },
+        developer: {
+          status: 'active',
+          department: { name: 'Production' }
+        }
+      },
+      _count: { projectId: true },
+      orderBy: {
+        _count: { projectId: 'desc' }
+      },
+      take: 1
+    });
+
+    if (projectCounts.length === 0) return null;
+
+    const topEmployeeId = projectCounts[0].developerId;
+    const projectsCompleted = projectCounts[0]._count.projectId;
+
+    // Get employee info and task stats in parallel
+    const [employee, taskStats] = await Promise.all([
+      this.prisma.employee.findUnique({
+        where: { id: topEmployeeId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          department: { select: { name: true } },
+          role: { select: { name: true } }
+        }
+      }),
+      Promise.all([
+        this.prisma.projectTask.count({
+          where: {
+            assignedTo: topEmployeeId,
+            status: 'completed',
+            completedOn: { gte: startDate, lte: endDate }
+          }
+        }),
+        this.prisma.projectTask.count({
+          where: {
+            assignedTo: topEmployeeId,
+            createdAt: { lte: endDate }
+          }
+        })
+      ])
+    ]);
+
+    if (!employee) return null;
+
+    const [tasksCompleted, totalTasks] = taskStats;
+    const taskCompletionRate = totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0;
+
+    const targetProjects = 10;
+    const projectsPercentage = targetProjects > 0 ? (projectsCompleted / targetProjects) * 100 : 0;
+    const taskCompletionPercentage = taskCompletionRate / 90 * 100;
+    const performancePercentage = (projectsPercentage * 0.6 + taskCompletionPercentage * 0.4);
+
+    return {
+      employeeId: employee.id,
+      employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+      department: employee.department.name,
+      role: employee.role.name,
+      performancePercentage: Math.round(performancePercentage * 100) / 100,
+      metrics: {
+        projectsCompleted,
+        taskCompletion: Math.round(taskCompletionRate * 100) / 100,
+        tasksCompleted,
+        totalTasks
+      }
+    };
+  }
+
+  private async getHrTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+    // Use aggregation to find top HR performer by requests processed
+    const requestCounts = await this.prisma.hrRequest.groupBy({
+      by: ['assignedTo'],
+      where: {
+        status: { in: ['Resolved', 'In_Progress'] },
+        resolvedOn: { gte: startDate, lte: endDate },
+        assignedToEmployee: {
+          status: 'active',
+          department: { name: 'HR' }
+        }
+      },
+      _count: { id: true },
+      orderBy: {
+        _count: { id: 'desc' }
+      },
+      take: 1
+    });
+
+    if (requestCounts.length === 0 || !requestCounts[0].assignedTo) return null;
+
+    const topEmployeeId = requestCounts[0].assignedTo;
+    const requestsProcessed = requestCounts[0]._count.id;
+
+    // Get employee info and recruitments count in parallel
+    const [employee, recruitments] = await Promise.all([
+      this.prisma.employee.findUnique({
+        where: { id: topEmployeeId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          department: { select: { name: true } },
+          role: { select: { name: true } }
+        }
+      }),
+      this.prisma.employee.count({
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: 'active'
+        }
+      })
+    ]);
+
+    if (!employee) return null;
+
+    // Distribute recruitments (approximation - actual tracking would be better)
+    const hrCount = await this.prisma.employee.count({
+      where: {
+        status: 'active',
+        department: { name: 'HR' }
+      }
+    });
+    const recruitmentsPerHr = Math.ceil(recruitments / Math.max(hrCount, 1));
+
+    const targetRequests = 40;
+    const targetRecruitments = 6;
+    const requestsPercentage = targetRequests > 0 ? (requestsProcessed / targetRequests) * 100 : 0;
+    const recruitmentsPercentage = targetRecruitments > 0 ? (recruitmentsPerHr / targetRecruitments) * 100 : 0;
+    const performancePercentage = (requestsPercentage * 0.5 + recruitmentsPercentage * 0.5);
+
+    return {
+      employeeId: employee.id,
+      employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+      department: employee.department.name,
+      role: employee.role.name,
+      performancePercentage: Math.round(performancePercentage * 100) / 100,
+      metrics: {
+        recruitments: recruitmentsPerHr,
+        requestProcessing: requestsProcessed,
+        employeeSatisfaction: 4.3 // Placeholder - would need actual satisfaction data
+      }
+    };
+  }
+
+  private async getAccountingTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+    // Use aggregation to find top accountant by transactions processed
+    const transactionCounts = await this.prisma.transaction.groupBy({
+      by: ['employeeId'],
+      where: {
+        transactionDate: { gte: startDate, lte: endDate },
+        status: 'completed',
+        employee: {
+          status: 'active',
+          department: { name: 'Accounts' }
+        }
+      },
+      _count: { id: true },
+      _sum: { amount: true },
+      orderBy: {
+        _count: { id: 'desc' }
+      },
+      take: 1
+    });
+
+    if (transactionCounts.length === 0 || !transactionCounts[0].employeeId) return null;
+
+    const topEmployeeId = transactionCounts[0].employeeId;
+    const transactionsProcessed = transactionCounts[0]._count.id;
+    const transactionAmount = Number(transactionCounts[0]._sum.amount || 0);
+
+    // Get employee info and invoices count in parallel
+    const [employee, invoicesProcessed] = await Promise.all([
+      this.prisma.employee.findUnique({
+        where: { id: topEmployeeId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          department: { select: { name: true } },
+          role: { select: { name: true } }
+        }
+      }),
+      this.prisma.invoice.count({
+        where: {
+          createdAt: { gte: startDate, lte: endDate }
+        }
+      })
+    ]);
+
+    if (!employee) return null;
+
+    const targetTransactions = 50;
+    const performancePercentage = targetTransactions > 0 ? (transactionsProcessed / targetTransactions) * 100 : 0;
+
+    return {
+      employeeId: employee.id,
+      employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+      department: employee.department.name,
+      role: employee.role.name,
+      performancePercentage: Math.round(performancePercentage * 100) / 100,
+      metrics: {
+        transactionsProcessed,
+        transactionAmount: Math.round(transactionAmount),
+        invoicesProcessed
+      }
+    };
+  }
+
+  // Helper method to get a fallback performer when department has no data
+  private async getFallbackPerformer(departmentName: string, startDate: Date, endDate: Date): Promise<any | null> {
+    // Get any active employee from the department as fallback
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        status: 'active',
+        department: { name: departmentName }
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        department: { select: { name: true } },
+        role: { select: { name: true } }
+      },
+      orderBy: {
+        createdAt: 'desc' // Get most recently added employee
+      }
+    });
+
+    if (!employee) return null;
+
+    // Return with 0% performance and empty metrics
+    const emptyMetrics: any = {};
+    
+    // Set department-specific empty metrics
+    switch (departmentName) {
+      case 'Sales':
+        emptyMetrics.deals = 0;
+        emptyMetrics.revenue = 0;
+        emptyMetrics.leads = 0;
+        emptyMetrics.conversionRate = 0;
+        break;
+      case 'Marketing':
+        emptyMetrics.campaignsRun = 0;
+        emptyMetrics.leadQualityScore = 0;
+        emptyMetrics.leadGeneration = 0;
+        break;
+      case 'Production':
+        emptyMetrics.projectsCompleted = 0;
+        emptyMetrics.taskCompletion = 0;
+        emptyMetrics.tasksCompleted = 0;
+        emptyMetrics.totalTasks = 0;
+        break;
+      case 'HR':
+        emptyMetrics.recruitments = 0;
+        emptyMetrics.requestProcessing = 0;
+        emptyMetrics.employeeSatisfaction = 0;
+        break;
+      case 'Accounts':
+        emptyMetrics.transactionsProcessed = 0;
+        emptyMetrics.transactionAmount = 0;
+        emptyMetrics.invoicesProcessed = 0;
+        break;
+    }
+
+    return {
+      employeeId: employee.id,
+      employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+      department: employee.department.name,
+      role: employee.role.name,
+      performancePercentage: 0,
+      metrics: emptyMetrics
+    };
+  }
 }
 
