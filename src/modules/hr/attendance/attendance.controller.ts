@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Put, Query, Body, UseGuards, HttpCode, HttpStatus, Param, BadRequestException, Logger, Res } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Post, Put, Query, Body, UseGuards, HttpCode, HttpStatus, Param, BadRequestException, Logger, Res, Request } from '@nestjs/common';
+import { Response, Request as ExpressRequest } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { GetAttendanceLogsDto } from './dto/get-attendance-logs.dto';
+import { GetMyAttendanceLogsDto } from './dto/get-my-attendance-logs.dto';
 import { AttendanceLogResponseDto } from './dto/attendance-log-response.dto';
 import { CheckinDto } from './dto/checkin.dto';
 import { CheckinResponseDto } from './dto/checkin-response.dto';
@@ -43,6 +44,16 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
+interface AuthenticatedRequest extends ExpressRequest {
+  user: {
+    id: number;
+    role: string | number;
+    type: string;
+    department?: string;
+    permissions?: any;
+  };
+}
+
 @ApiTags('HR - Attendance')
 @ApiBearerAuth()
 @Controller('hr/attendance')
@@ -69,6 +80,21 @@ export class AttendanceController {
     @Query() query: GetAttendanceLogsDto
   ): Promise<AttendanceLogResponseDto[]> {
     return this.attendanceService.getAttendanceLogs(query);
+  }
+
+  @Get('my-logs')
+  @ApiOperation({ summary: 'Get my attendance logs (self-service)' })
+  @ApiQuery({ type: GetMyAttendanceLogsDto })
+  @ApiResponse({ status: 200, description: 'My attendance logs retrieved successfully', type: AttendanceLogResponseDto, isArray: true })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  async getMyAttendanceLogs(
+    @Request() req: AuthenticatedRequest,
+    @Query() query: GetMyAttendanceLogsDto
+  ): Promise<AttendanceLogResponseDto[]> {
+    // Get employee ID from JWT token
+    const employeeId = req.user.id;
+    return this.attendanceService.getMyAttendanceLogs(employeeId, query);
   }
 
   @Post('checkin')
