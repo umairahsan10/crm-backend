@@ -123,6 +123,87 @@ export class AttendanceService {
     }
   }
 
+  async getMyAttendanceLogs(employeeId: number, query: { start_date?: string; end_date?: string }): Promise<AttendanceLogResponseDto[]> {
+    try {
+      const { start_date, end_date } = query;
+
+      // Validate date range (within last 3 months)
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+      if (start_date && new Date(start_date) < threeMonthsAgo) {
+        throw new BadRequestException('Start date cannot be more than 3 months ago');
+      }
+
+      if (end_date && new Date(end_date) < threeMonthsAgo) {
+        throw new BadRequestException('End date cannot be more than 3 months ago');
+      }
+
+      // Validate that start_date is not less than end_date
+      if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
+        throw new BadRequestException('Start date cannot be greater than end date');
+      }
+
+      // Build where clause - always filter by employee_id
+      const where: any = {
+        employeeId: employeeId
+      };
+
+      if (start_date || end_date) {
+        where.date = {};
+        if (start_date) {
+          where.date.gte = new Date(start_date);
+        }
+        if (end_date) {
+          where.date.lte = new Date(end_date);
+        }
+      }
+
+      // If no date filters provided, default to last 3 months
+      if (!start_date && !end_date) {
+        where.date = {
+          gte: threeMonthsAgo
+        };
+      }
+
+      const attendanceLogs = await this.prisma.attendanceLog.findMany({
+        where,
+        orderBy: {
+          date: 'desc'
+        },
+        include: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      });
+
+      return attendanceLogs.map(log => ({
+        id: log.id,
+        employee_id: log.employeeId,
+        employee_first_name: log.employee.firstName,
+        employee_last_name: log.employee.lastName,
+        date: log.date?.toISOString().split('T')[0] || null,
+        checkin: log.checkin?.toISOString() || null,
+        checkout: log.checkout?.toISOString() || null,
+        mode: log.mode,
+        status: log.status,
+        created_at: log.createdAt.toISOString(),
+        updated_at: log.updatedAt.toISOString()
+      }));
+    } catch (error) {
+      console.error('Error in getMyAttendanceLogs:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(`Failed to fetch attendance logs: ${error.message}`);
+    }
+  }
+
   async checkin(checkinData: CheckinDto): Promise<CheckinResponseDto> {
     try {
       console.log('=== CHECKIN DEBUG START ===');
