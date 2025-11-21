@@ -92,22 +92,25 @@ export class AdminRequestsService {
      */
     async getAllAdminRequests(): Promise<AdminRequestListResponseDto> {
         try {
-            const adminRequests = await this.prisma.adminRequest.findMany({
-                include: {
+            const adminRequestsData = await this.prisma.adminRequest.findMany({
+                select: {
+                    id: true,
+                    description: true,
+                    type: true,
+                    status: true,
+                    hrId: true,
+                    hrLogId: true,
+                    createdAt: true,
+                    updatedAt: true,
                     hr: {
                         select: {
-                            id: true,
-                            employeeId: true,
-                        },
-                    },
-                    hrLog: {
-                        select: {
-                            id: true,
-                            hrId: true,
-                            actionType: true,
-                            affectedEmployeeId: true,
-                            description: true,
-                            createdAt: true,
+                            employee: {
+                                select: {
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                },
+                            },
                         },
                     },
                 },
@@ -115,6 +118,21 @@ export class AdminRequestsService {
                     createdAt: 'desc',
                 },
             });
+
+            // Map the data to include hrFirstName, hrLastName, and hrEmail
+            const adminRequests = adminRequestsData.map((request) => ({
+                id: request.id,
+                description: request.description,
+                type: request.type,
+                status: request.status,
+                hrId: request.hrId,
+                hrFirstName: request.hr?.employee?.firstName || null,
+                hrLastName: request.hr?.employee?.lastName || null,
+                hrEmail: request.hr?.employee?.email || null,
+                hrLogId: request.hrLogId,
+                createdAt: request.createdAt,
+                updatedAt: request.updatedAt,
+            }));
 
             const total = await this.prisma.adminRequest.count();
 
@@ -149,25 +167,28 @@ export class AdminRequestsService {
                 throw new BadRequestException(`Invalid status: ${status}. Valid statuses are: ${Object.values(AdminRequestStatus).join(', ')}`);
             }
 
-            const adminRequests = await this.prisma.adminRequest.findMany({
+            const adminRequestsData = await this.prisma.adminRequest.findMany({
                 where: {
                     status: status as AdminRequestStatus,
                 },
-                include: {
+                select: {
+                    id: true,
+                    description: true,
+                    type: true,
+                    status: true,
+                    hrId: true,
+                    hrLogId: true,
+                    createdAt: true,
+                    updatedAt: true,
                     hr: {
                         select: {
-                            id: true,
-                            employeeId: true,
-                        },
-                    },
-                    hrLog: {
-                        select: {
-                            id: true,
-                            hrId: true,
-                            actionType: true,
-                            affectedEmployeeId: true,
-                            description: true,
-                            createdAt: true,
+                            employee: {
+                                select: {
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                },
+                            },
                         },
                     },
                 },
@@ -175,6 +196,21 @@ export class AdminRequestsService {
                     createdAt: 'desc',
                 },
             });
+
+            // Map the data to include hrFirstName, hrLastName, and hrEmail
+            const adminRequests = adminRequestsData.map((request) => ({
+                id: request.id,
+                description: request.description,
+                type: request.type,
+                status: request.status,
+                hrId: request.hrId,
+                hrFirstName: request.hr?.employee?.firstName || null,
+                hrLastName: request.hr?.employee?.lastName || null,
+                hrEmail: request.hr?.employee?.email || null,
+                hrLogId: request.hrLogId,
+                createdAt: request.createdAt,
+                updatedAt: request.updatedAt,
+            }));
 
             const total = await this.prisma.adminRequest.count({
                 where: {
@@ -218,6 +254,29 @@ export class AdminRequestsService {
                         select: {
                             id: true,
                             employeeId: true,
+                            employee: {
+                                select: {
+                                    id: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                    phone: true,
+                                    department: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                            description: true,
+                                        },
+                                    },
+                                    role: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                            description: true,
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                     hrLog: {
@@ -228,6 +287,28 @@ export class AdminRequestsService {
                             affectedEmployeeId: true,
                             description: true,
                             createdAt: true,
+                            affectedEmployee: {
+                                select: {
+                                    id: true,
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                    phone: true,
+                                    status: true,
+                                    department: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                        },
+                                    },
+                                    role: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                 },
@@ -279,24 +360,27 @@ export class AdminRequestsService {
                 whereClause.status = status;
             }
 
-            const [adminRequests, total] = await Promise.all([
+            const [adminRequestsData, total] = await Promise.all([
                 this.prisma.adminRequest.findMany({
                     where: whereClause,
-                    include: {
+                    select: {
+                        id: true,
+                        description: true,
+                        type: true,
+                        status: true,
+                        hrId: true,
+                        hrLogId: true,
+                        createdAt: true,
+                        updatedAt: true,
                         hr: {
                             select: {
-                                id: true,
-                                employeeId: true,
-                            },
-                        },
-                        hrLog: {
-                            select: {
-                                id: true,
-                                hrId: true,
-                                actionType: true,
-                                affectedEmployeeId: true,
-                                description: true,
-                                createdAt: true,
+                                employee: {
+                                    select: {
+                                        firstName: true,
+                                        lastName: true,
+                                        email: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -310,6 +394,21 @@ export class AdminRequestsService {
                     where: whereClause,
                 }),
             ]);
+
+            // Map the data to include hrFirstName, hrLastName, and hrEmail
+            const adminRequests = adminRequestsData.map((request) => ({
+                id: request.id,
+                description: request.description,
+                type: request.type,
+                status: request.status,
+                hrId: request.hrId,
+                hrFirstName: request.hr?.employee?.firstName || null,
+                hrLastName: request.hr?.employee?.lastName || null,
+                hrEmail: request.hr?.employee?.email || null,
+                hrLogId: request.hrLogId,
+                createdAt: request.createdAt,
+                updatedAt: request.updatedAt,
+            }));
 
             const totalPages = Math.ceil(total / limit);
             const hasNextPage = page < totalPages;

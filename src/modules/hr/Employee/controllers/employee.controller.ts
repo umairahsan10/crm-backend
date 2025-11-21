@@ -43,16 +43,18 @@ export class EmployeeController {
   @Post('terminate')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
-  @Permissions(PermissionName.salary_permission)
+  @Permissions(PermissionName.terminations_handle, PermissionName.salary_permission)
   @ApiOperation({ summary: 'Terminate an employee and process final salary' })
   @ApiBody({ type: TerminateEmployeeDto })
   @ApiResponse({ status: 201, description: 'Employee terminated successfully' })
   async terminate(@Body() dto: TerminateEmployeeDto, @Request() req: AuthenticatedRequest) {
+    const isAdmin = req.user?.type === 'admin' || req.user?.role === 'admin';
     await this.hrService.terminateEmployee(
       dto.employee_id,
       dto.termination_date,
       req.user.id,
-      dto.description
+      dto.description,
+      isAdmin
     );
     return { message: 'Employee terminated and salary processed' };
   }

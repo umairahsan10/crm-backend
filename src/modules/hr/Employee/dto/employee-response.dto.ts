@@ -133,9 +133,63 @@ export class EmployeeResponseDto {
   } | null;
 }
 
+export class LimitedEmployeeResponseDto {
+  @ApiProperty({ description: 'Unique employee ID' })
+  id: number;
+
+  @ApiProperty({ description: 'First name of the employee' })
+  firstName: string;
+
+  @ApiProperty({ description: 'Last name of the employee' })
+  lastName: string;
+
+  @ApiProperty({ description: 'Official email of the employee' })
+  email: string;
+
+  @ApiProperty({ description: 'Department ID where the employee works' })
+  departmentId: number;
+
+  @ApiProperty({ description: 'Role ID assigned to the employee' })
+  roleId: number;
+
+  @ApiProperty({ description: 'Employment status (e.g., active, terminated, inactive)' })
+  status: string;
+
+  @ApiPropertyOptional({ description: 'Employment start date' })
+  startDate?: Date | null;
+
+  @ApiPropertyOptional({
+    type: () => Object,
+    description: 'Department details associated with the employee',
+    example: { name: 'Marketing' },
+  })
+  department?: {
+    name: string;
+  };
+
+  @ApiPropertyOptional({
+    type: () => Object,
+    description: 'Role details associated with the employee',
+    example: { name: 'Team Lead' },
+  })
+  role?: {
+    name: string;
+  };
+
+  @ApiPropertyOptional({
+    type: () => Object,
+    description: 'Manager details if assigned',
+    example: { firstName: 'Sarah', lastName: 'Ali' },
+  })
+  manager?: {
+    firstName: string;
+    lastName: string;
+  } | null;
+}
+
 export class EmployeesListResponseDto {
-  @ApiProperty({ type: [EmployeeResponseDto], description: 'List of employees in the current page' })
-  employees: EmployeeResponseDto[];
+  @ApiProperty({ type: [LimitedEmployeeResponseDto], description: 'List of employees in the current page' })
+  employees: LimitedEmployeeResponseDto[];
 
   @ApiProperty({ description: 'Total number of employees found' })
   total: number;
