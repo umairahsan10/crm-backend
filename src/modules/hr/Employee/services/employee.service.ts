@@ -887,11 +887,11 @@ export class EmployeeService {
       const [employees, total] = await Promise.all([
         this.prisma.employee.findMany({
           where,
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
             departmentId: true,
             roleId: true,
             status: true,

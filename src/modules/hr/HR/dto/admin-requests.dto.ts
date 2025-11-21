@@ -64,19 +64,88 @@ export class AdminRequestResponseDto {
 
   @ApiPropertyOptional({
     type: () => Object,
-    description: 'Related HR log details',
+    description: 'HR details who created the request',
     example: {
-      id: 1,
-      employeeId: 2
+      id: 5,
+      employeeId: 10,
+      employee: {
+        id: 10,
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane.smith@company.com',
+        phone: '+1234567890',
+        department: { id: 2, name: 'HR', description: 'Human Resources' },
+        role: { id: 3, name: 'dep_manager', description: 'Department Manager' }
+      }
     }
   })
-  hrLog: {
+  hr?: {
+    id: number;
+    employeeId: number;
+    employee?: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string | null;
+      department?: {
+        id: number;
+        name: string;
+        description: string | null;
+      };
+      role?: {
+        id: number;
+        name: string;
+        description: string | null;
+      };
+    };
+  } | null;
+
+  @ApiPropertyOptional({
+    type: () => Object,
+    description: 'Related HR log details with affected employee information',
+    example: {
+      id: 123,
+      hrId: 5,
+      actionType: 'HR_REQUEST_CREATE',
+      affectedEmployeeId: 789,
+      description: 'HR record created for employee John Doe',
+      createdAt: '2024-01-15T10:25:00.000Z',
+      affectedEmployee: {
+        id: 789,
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john.doe@company.com',
+        phone: '+1234567890',
+        status: 'active',
+        department: { id: 1, name: 'Development' },
+        role: { id: 2, name: 'senior' }
+      }
+    }
+  })
+  hrLog?: {
     id: number;
     hrId: number;
     actionType: string | null;
     affectedEmployeeId: number | null;
     description: string | null;
     createdAt: Date;
+    affectedEmployee?: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string | null;
+      status: string;
+      department?: {
+        id: number;
+        name: string;
+      };
+      role?: {
+        id: number;
+        name: string;
+      };
+    } | null;
   } | null;
 }
 
@@ -153,9 +222,44 @@ export class PaginationMetaDto {
   hasPreviousPage: boolean;
 }
 
+export class LimitedAdminRequestResponseDto {
+  @ApiProperty({ description: 'Admin request ID' })
+  id: number;
+
+  @ApiPropertyOptional({ description: 'Description of the admin request' })
+  description: string | null;
+
+  @ApiPropertyOptional({ enum: RequestType, description: 'Type of admin request' })
+  type: RequestType | null;
+
+  @ApiPropertyOptional({ enum: AdminRequestStatus, description: 'Current status of the request' })
+  status: AdminRequestStatus | null;
+
+  @ApiPropertyOptional({ description: 'Related HR ID' })
+  hrId: number | null;
+
+  @ApiPropertyOptional({ description: 'First name of HR employee who created the request' })
+  hrFirstName: string | null;
+
+  @ApiPropertyOptional({ description: 'Last name of HR employee who created the request' })
+  hrLastName: string | null;
+
+  @ApiPropertyOptional({ description: 'Email of HR employee who created the request' })
+  hrEmail: string | null;
+
+  @ApiPropertyOptional({ description: 'Related HR log ID' })
+  hrLogId: number | null;
+
+  @ApiProperty({ description: 'Record creation timestamp' })
+  createdAt: Date;
+
+  @ApiProperty({ description: 'Record last update timestamp' })
+  updatedAt: Date;
+}
+
 export class AdminRequestListResponseDto {
-  @ApiProperty({ type: [AdminRequestResponseDto], description: 'List of admin requests' })
-  adminRequests: AdminRequestResponseDto[];
+  @ApiProperty({ type: [LimitedAdminRequestResponseDto], description: 'List of admin requests' })
+  adminRequests: LimitedAdminRequestResponseDto[];
 
   @ApiProperty({ description: 'Total number of admin requests' })
   total: number;
