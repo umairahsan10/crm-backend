@@ -1,19 +1,32 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HrService } from '../../src/modules/hr/hr.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { FinanceService } from '../../src/modules/finance/finance.service';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('HrService', () => {
   let service: HrService;
   let prismaService: PrismaService;
+  let financeService: FinanceService;
 
   const mockPrismaService = {
-    hr: {
-      create: jest.fn(),
-      findMany: jest.fn(),
+    employee: {
       findUnique: jest.fn(),
       update: jest.fn(),
-      delete: jest.fn(),
     },
+    hR: {
+      findUnique: jest.fn(),
+    },
+    hRLog: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+    },
+  };
+
+  const mockFinanceService = {
+    calculateSalaryManual: jest.fn(),
+    calculateEmployeeDeductions: jest.fn(),
+    calculateAllEmployeesDeductions: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -24,152 +37,328 @@ describe('HrService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: FinanceService,
+          useValue: mockFinanceService,
+        },
       ],
     }).compile();
 
     service = module.get<HrService>(HrService);
     prismaService = module.get<PrismaService>(PrismaService);
+    financeService = module.get<FinanceService>(FinanceService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  describe('create', () => {
-    it('should create a new hr record', async () => {
-      const createHrDto = {
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Looking for a skilled software engineer',
-        status: 'ACTIVE',
-        department: 'Engineering',
-        managerId: 1,
-      };
+  describe('terminateEmployee', () => {
+    const employeeId = 1;
+    const hrEmployeeId = 2;
+    const terminationDate = '2025-07-31';
+    const description = 'Performance issues';
 
-      const expectedResult = {
-        id: 1,
-        ...createHrDto,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+    const mockEmployee = {
+      id: employeeId,
+      firstName: 'John',
+      lastName: 'Doe',
+      status: 'active',
+    };
 
-      mockPrismaService.hr.create.mockResolvedValue(expectedResult);
+    const mockHrEmployee = {
+      id: hrEmployeeId,
+      firstName: 'Jane',
+      lastName: 'Smith',
+    };
 
-      const result = await service.create(createHrDto);
+    const mockHrRecord = {
+      id: 1,
+      employeeId: hrEmployeeId,
+      terminationsHandle: true,
+      salaryPermission: true,
+    };
 
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.create).toHaveBeenCalledWith({
-        data: createHrDto,
+    it('should successfully terminate an employee and create HR log', async () => {
+      mockPrismaService.employee.findUnique
+        .mockResolvedValueOnce(mockEmployee) // First call for employee
+        .mockResolvedValueOnce(mockHrEmployee); // Second call for HR employee
+      mockPrismaService.hR.findUnique.mockResolvedValue(mockHrRecord);
+      mockPrismaService.employee.update.mockResolvedValue({});
+      mockFinanceService.calculateSalaryManual.mockResolvedValue({});
+      mockPrismaService.hRLog.create.mockResolvedValue({});
+
+      await service.terminateEmployee(employeeId, terminationDate, hrEmployeeId, description);
+
+      expect(mockPrismaService.employee.update).toHaveBeenCalledWith({
+        where: { id: employeeId },
+        data: {
+          endDate: new Date(terminationDate),
+          status: 'terminated',
+        },
       });
+
+      expect(mockFinanceService.calculateSalaryManual).toHaveBeenCalledWith(employeeId);
+
+      expect(mockPrismaService.hRLog.create).toHaveBeenCalledWith({
+        data: {
+          hrId: mockHrRecord.id,
+          actionType: 'employee_termination',
+          affectedEmployeeId: employeeId,
+          description: description,
+        },
+      });
+    });
+
+    it('should create HR log with automatic description when no description provided', async () => {
+      mockPrismaService.employee.findUnique
+        .mockResolvedValueOnce(mockEmployee)
+        .mockResolvedValueOnce(mockHrEmployee);
+      mockPrismaService.hR.findUnique.mockResolvedValue(mockHrRecord);
+      mockPrismaService.employee.update.mockResolvedValue({});
+      mockFinanceService.calculateSalaryManual.mockResolvedValue({});
+      mockPrismaService.hRLog.create.mockResolvedValue({});
+
+      await service.terminateEmployee(employeeId, terminationDate, hrEmployeeId);
+
+      const expectedDescription = `Employee ${mockEmployee.firstName} ${mockEmployee.lastName} (ID: ${employeeId}) was terminated on ${terminationDate} by HR ${mockHrEmployee.firstName} ${mockHrEmployee.lastName}`;
+
+      expect(mockPrismaService.hRLog.create).toHaveBeenCalledWith({
+        data: {
+          hrId: mockHrRecord.id,
+          actionType: 'employee_termination',
+          affectedEmployeeId: employeeId,
+          description: expectedDescription,
+        },
+      });
+    });
+
+    it('should throw BadRequestException for invalid date format', async () => {
+      await expect(
+        service.terminateEmployee(employeeId, 'invalid-date', hrEmployeeId)
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException for non-existent employee', async () => {
+      mockPrismaService.employee.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.terminateEmployee(employeeId, terminationDate, hrEmployeeId)
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException for already terminated employee', async () => {
+      const terminatedEmployee = { ...mockEmployee, status: 'terminated' };
+      mockPrismaService.employee.findUnique.mockResolvedValue(terminatedEmployee);
+
+      await expect(
+        service.terminateEmployee(employeeId, terminationDate, hrEmployeeId)
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('findAll', () => {
-    it('should return all hr records', async () => {
-      const expectedResult = [
-        {
+  describe('getHrLogs', () => {
+    const hrEmployeeId = 2;
+    const mockHrRecord = {
+      id: 1,
+      employeeId: hrEmployeeId,
+    };
+
+    const mockLogs = [
+      {
+        id: 1,
+        actionType: 'employee_termination',
+        affectedEmployeeId: 1,
+        description: 'Test termination',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        affectedEmployee: {
           id: 1,
-          type: 'RECRUITMENT',
-          title: 'Software Engineer Position',
-          description: 'Looking for a skilled software engineer',
-          status: 'ACTIVE',
-          department: 'Engineering',
-          managerId: 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'john@example.com',
         },
+        hr: {
+          id: 1,
+          employee: {
+            id: hrEmployeeId,
+            firstName: 'Jane',
+            lastName: 'Smith',
+            email: 'jane@example.com',
+          },
+        },
+      },
+    ];
+
+    it('should return HR logs for the authenticated HR employee', async () => {
+      mockPrismaService.hR.findUnique.mockResolvedValue(mockHrRecord);
+      mockPrismaService.hRLog.findMany.mockResolvedValue(mockLogs);
+
+      const result = await service.getHrLogs(hrEmployeeId);
+
+      expect(mockPrismaService.hR.findUnique).toHaveBeenCalledWith({
+        where: { employeeId: hrEmployeeId },
+      });
+
+      expect(mockPrismaService.hRLog.findMany).toHaveBeenCalledWith({
+        where: { hrId: mockHrRecord.id },
+        include: {
+          affectedEmployee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          hr: {
+            include: {
+              employee: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      expect(result).toEqual(mockLogs);
+    });
+
+    it('should throw NotFoundException for non-existent HR record', async () => {
+      mockPrismaService.hR.findUnique.mockResolvedValue(null);
+
+      await expect(service.getHrLogs(hrEmployeeId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('calculateSalaryDeductions', () => {
+    const mockDeductionResult = {
+      employeeId: 1,
+      baseSalary: 30000,
+      perDaySalary: 1000,
+      totalAbsent: 2,
+      totalLateDays: 5,
+      totalHalfDays: 1,
+      monthlyLatesDays: 3,
+      absentDeduction: 4000,
+      lateDeduction: 1500,
+      halfDayDeduction: 500,
+      chargebackDeduction: 1000,
+      refundDeduction: 500,
+      totalDeduction: 6000,
+      netSalary: 24000,
+    };
+
+    const mockEmployee = {
+      id: 1,
+      firstName: 'John',
+      lastName: 'Doe',
+    };
+
+    beforeEach(() => {
+      mockFinanceService.calculateEmployeeDeductions = jest.fn();
+      mockFinanceService.calculateAllEmployeesDeductions = jest.fn();
+      mockPrismaService.employee = {
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+      };
+    });
+
+    it('should calculate salary deductions for a specific employee using finance service', async () => {
+      mockFinanceService.calculateEmployeeDeductions.mockResolvedValue(mockDeductionResult);
+      mockPrismaService.employee.findUnique.mockResolvedValue(mockEmployee);
+
+      const dto = { employeeId: 1, month: '2025-01' };
+      const result = await service.calculateSalaryDeductions(dto);
+
+      expect(mockFinanceService.calculateEmployeeDeductions).toHaveBeenCalledWith(1, '2025-01');
+      expect(result.calculations).toHaveLength(1);
+      expect(result.calculations[0].employeeId).toBe(1);
+      expect(result.calculations[0].employeeName).toBe('John Doe');
+      expect(result.calculations[0].baseSalary).toBe(30000);
+      expect(result.calculations[0].totalDeduction).toBe(6000);
+      expect(result.calculations[0].netSalary).toBe(24000);
+    });
+
+    it('should calculate salary deductions for all employees using finance service', async () => {
+      const mockAllEmployeesResult = {
+        month: '2025-01',
+        totalEmployees: 2,
+        totalDeductions: 8000,
+        results: [
+          mockDeductionResult,
+          { ...mockDeductionResult, employeeId: 2, totalDeduction: 2000, netSalary: 28000 }
+        ],
+      };
+
+      const mockEmployees = [
+        mockEmployee,
+        { id: 2, firstName: 'Jane', lastName: 'Smith' }
       ];
 
-      mockPrismaService.hr.findMany.mockResolvedValue(expectedResult);
+      mockFinanceService.calculateAllEmployeesDeductions.mockResolvedValue(mockAllEmployeesResult);
+      mockPrismaService.employee.findMany.mockResolvedValue(mockEmployees);
 
-      const result = await service.findAll();
+      const dto = { month: '2025-01' };
+      const result = await service.calculateSalaryDeductions(dto);
 
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.findMany).toHaveBeenCalled();
+      expect(mockFinanceService.calculateAllEmployeesDeductions).toHaveBeenCalledWith('2025-01');
+      expect(result.calculations).toHaveLength(2);
+      expect(result.summary.totalEmployees).toBe(2);
+      expect(result.summary.totalDeductions).toBe(8000);
     });
-  });
 
-  describe('findOne', () => {
-    it('should return a single hr record', async () => {
-      const id = 1;
-      const expectedResult = {
-        id: 1,
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Looking for a skilled software engineer',
-        status: 'ACTIVE',
-        department: 'Engineering',
-        managerId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+    it('should use current month when no month is specified', async () => {
+      mockFinanceService.calculateEmployeeDeductions.mockResolvedValue(mockDeductionResult);
+      mockPrismaService.employee.findUnique.mockResolvedValue(mockEmployee);
 
-      mockPrismaService.hr.findUnique.mockResolvedValue(expectedResult);
+      const dto = { employeeId: 1 };
+      await service.calculateSalaryDeductions(dto);
 
-      const result = await service.findOne(id);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.findUnique).toHaveBeenCalledWith({
-        where: { id },
-      });
+      // Should call with current month format (YYYY-MM)
+      const currentDate = new Date();
+      const expectedMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      expect(mockFinanceService.calculateEmployeeDeductions).toHaveBeenCalledWith(1, expectedMonth);
     });
-  });
 
-  describe('update', () => {
-    it('should update an hr record', async () => {
-      const id = 1;
-      const updateHrDto = {
-        status: 'CLOSED',
-        description: 'Position has been filled',
+    it('should handle employee names correctly for all employees calculation', async () => {
+      const mockAllEmployeesResult = {
+        month: '2025-01',
+        totalEmployees: 1,
+        totalDeductions: 6000,
+        results: [mockDeductionResult],
       };
 
-      const expectedResult = {
-        id: 1,
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Position has been filled',
-        status: 'CLOSED',
-        department: 'Engineering',
-        managerId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      mockFinanceService.calculateAllEmployeesDeductions.mockResolvedValue(mockAllEmployeesResult);
+      mockPrismaService.employee.findMany.mockResolvedValue([mockEmployee]);
 
-      mockPrismaService.hr.update.mockResolvedValue(expectedResult);
+      const dto = { month: '2025-01' };
+      const result = await service.calculateSalaryDeductions(dto);
 
-      const result = await service.update(id, updateHrDto);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.update).toHaveBeenCalledWith({
-        where: { id },
-        data: updateHrDto,
-      });
+      expect(result.calculations[0].employeeName).toBe('John Doe');
     });
-  });
 
-  describe('remove', () => {
-    it('should remove an hr record', async () => {
-      const id = 1;
-      const expectedResult = {
-        id: 1,
-        type: 'RECRUITMENT',
-        title: 'Software Engineer Position',
-        description: 'Looking for a skilled software engineer',
-        status: 'ACTIVE',
-        department: 'Engineering',
-        managerId: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    it('should handle missing employee names gracefully', async () => {
+      const mockAllEmployeesResult = {
+        month: '2025-01',
+        totalEmployees: 1,
+        totalDeductions: 6000,
+        results: [mockDeductionResult],
       };
 
-      mockPrismaService.hr.delete.mockResolvedValue(expectedResult);
+      mockFinanceService.calculateAllEmployeesDeductions.mockResolvedValue(mockAllEmployeesResult);
+      mockPrismaService.employee.findMany.mockResolvedValue([]); // No employees found
 
-      const result = await service.remove(id);
+      const dto = { month: '2025-01' };
+      const result = await service.calculateSalaryDeductions(dto);
 
-      expect(result).toEqual(expectedResult);
-      expect(mockPrismaService.hr.delete).toHaveBeenCalledWith({
-        where: { id },
-      });
+      expect(result.calculations[0].employeeName).toBe('Employee 1'); // Default name
     });
   });
 });
