@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { FinanceService } from '../../../finance/finance.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
@@ -101,7 +101,7 @@ export class EmployeeService {
     }
   }
 
-  async terminateEmployee(employeeId: number, terminationDate: string, hrEmployeeId: number, description?: string) {
+  async terminateEmployee(employeeId: number, terminationDate: string, hrEmployeeId: number, description?: string, isAdmin: boolean = false) {
     // Validate date format
     const parsedDate = new Date(terminationDate);
     if (isNaN(parsedDate.getTime())) {
@@ -122,22 +122,30 @@ export class EmployeeService {
       throw new BadRequestException(`Employee ${employeeId} is already terminated`);
     }
 
-    // Get HR employee details for logging
-    const hrEmployee = await this.prisma.employee.findUnique({
-      where: { id: hrEmployeeId },
-    });
+    // For non-admin users, validate HR employee and HR record
+    if (!isAdmin) {
+      // Get HR employee details for logging
+      const hrEmployee = await this.prisma.employee.findUnique({
+        where: { id: hrEmployeeId },
+      });
 
-    if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
-    }
+      if (!hrEmployee) {
+        throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      }
 
-    // Get HR record
-    const hrRecord = await this.prisma.hR.findUnique({
-      where: { employeeId: hrEmployeeId },
-    });
+      // Get HR record - required for non-admin users
+      const hrRecord = await this.prisma.hR.findUnique({
+        where: { employeeId: hrEmployeeId },
+      });
 
-    if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      if (!hrRecord) {
+        throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}. Only HR employees with proper permissions can terminate employees.`);
+      }
+
+      // Verify HR employee has both required permissions
+      if (!hrRecord.terminationsHandle || !hrRecord.salaryPermission) {
+        throw new ForbiddenException(`HR employee ${hrEmployeeId} does not have both terminations_handle and salary_permission required to terminate employees.`);
+      }
     }
 
     try {
@@ -879,23 +887,29 @@ export class EmployeeService {
       const [employees, total] = await Promise.all([
         this.prisma.employee.findMany({
           where,
-          include: {
-            department: true,
-            role: true,
-            manager: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            departmentId: true,
+            roleId: true,
+            status: true,
+            startDate: true,
+            department: {
               select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
+                name: true,
               },
             },
-            teamLead: {
+            role: {
               select: {
-                id: true,
+                name: true,
+              },
+            },
+            manager: {
+              select: {
                 firstName: true,
                 lastName: true,
-                email: true,
               },
             },
           },

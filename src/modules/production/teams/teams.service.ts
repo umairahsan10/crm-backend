@@ -326,8 +326,8 @@ export class TeamsService {
       throw new NotFoundException(`Team with ID ${id} does not exist`);
     }
 
-    // Check if user belongs to this team (for all roles except dep_manager)
-    if (user && user.role !== 'dep_manager') {
+    // Check if user belongs to this team (for all roles except dep_manager and admin)
+    if (user && user.role !== 'dep_manager' && user.type !== 'admin' && user.role !== 'admin') {
       const belongsToTeam = await this.checkUserBelongsToTeam(user, team.id);
       if (!belongsToTeam) {
         throw new ForbiddenException('You do not have access to this team. You must be a member of this team to view its details.');
@@ -420,6 +420,11 @@ export class TeamsService {
   }
 
   private async checkUserBelongsToTeam(user: any, teamId: number): Promise<boolean> {
+    // Admin users have access to all teams
+    if (user?.type === 'admin' || user?.role === 'admin') {
+      return true;
+    }
+    
     switch (user.role) {
       case 'unit_head':
         // Check if team is in their unit
@@ -468,6 +473,20 @@ export class TeamsService {
   }
 
   private async buildRoleBasedWhereClause(user: any): Promise<any> {
+    // Admin users can see all teams
+    if (user?.type === 'admin' || user?.role === 'admin') {
+      return {
+        productionUnit: {
+          isNot: null // Only teams assigned to production units
+        }
+      };
+    }
+    
+    // If no user provided, deny access
+    if (!user || !user.role) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+    
     switch (user.role) {
       case 'dep_manager':
         // Department manager can see all teams in Production department
@@ -498,6 +517,14 @@ export class TeamsService {
           return { id: -1 }; // Return no teams if user has no team lead
         }
         return { teamLeadId: userTeamLeadId };
+        
+      case 'admin':
+        // Fallback case for admin role
+        return {
+          productionUnit: {
+            isNot: null // Only teams assigned to production units
+          }
+        };
         
       default:
         throw new ForbiddenException('Insufficient permissions');

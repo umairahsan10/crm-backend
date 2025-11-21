@@ -20,8 +20,8 @@ export class PermissionsGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
 
-    // Admin bypass
-    if (user?.type === 'admin') {
+    // Admin bypass - check both type and role
+    if (user?.type === 'admin' || user?.role === 'admin') {
       return true;
     }
 
@@ -35,7 +35,8 @@ export class PermissionsGuard implements CanActivate {
 
     const perms = user.permissions ?? {};
 
-    const hasPermission = requiredPerms.some((perm) => perms[perm] === true);
+    // Require ALL permissions when multiple are specified
+    const hasPermission = requiredPerms.every((perm) => perms[perm] === true);
 
     if (!hasPermission) {
       throw new ForbiddenException(

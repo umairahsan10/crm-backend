@@ -221,8 +221,8 @@ export class UnitsService {
       throw new NotFoundException(`Unit with ID ${id} does not exist`);
     }
 
-    // Check if user belongs to this unit (for all roles except dep_manager)
-    if (user && user.role !== 'dep_manager') {
+    // Check if user belongs to this unit (for all roles except dep_manager and admin)
+    if (user && user.role !== 'dep_manager' && user.type !== 'admin' && user.role !== 'admin') {
       const belongsToUnit = await this.checkUserBelongsToUnit(user, unit.id);
       if (!belongsToUnit) {
         throw new ForbiddenException('You do not have access to this unit. You must be a member of this unit to view its details.');
@@ -415,6 +415,11 @@ export class UnitsService {
 
 
   private async checkUserBelongsToUnit(user: any, unitId: number): Promise<boolean> {
+    // Admin users have access to all units
+    if (user?.type === 'admin' || user?.role === 'admin') {
+      return true;
+    }
+    
     switch (user.role) {
       case 'unit_head':
         // Check if user is the head of this unit
@@ -462,6 +467,16 @@ export class UnitsService {
   }
 
   private async buildRoleBasedWhereClause(user: any): Promise<any> {
+    // Admin users can see all units
+    if (user?.type === 'admin' || user?.role === 'admin') {
+      return {}; // Can see all units
+    }
+    
+    // If no user provided, deny access
+    if (!user || !user.role) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+    
     switch (user.role) {
       case 'dep_manager':
         return {}; // Can see all units
@@ -494,6 +509,9 @@ export class UnitsService {
             }
           }
         }; // Units where they belong to teams
+      case 'admin':
+        // Fallback case for admin role
+        return {}; // Can see all units
       default:
         throw new ForbiddenException('Insufficient permissions');
     }

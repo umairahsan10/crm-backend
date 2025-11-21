@@ -75,6 +75,8 @@ describe('HrService', () => {
     const mockHrRecord = {
       id: 1,
       employeeId: hrEmployeeId,
+      terminationsHandle: true,
+      salaryPermission: true,
     };
 
     it('should successfully terminate an employee and create HR log', async () => {
