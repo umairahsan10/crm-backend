@@ -1404,8 +1404,12 @@ export class TeamsService {
       whereClause.salesUnitId = { not: null };
     }
 
-    // Role-based filtering
-    if (user) {
+    // Admin users can see all Sales teams (respecting query filters)
+    // Skip role-based filtering for admins, but still apply query filters below
+    if (user?.type === 'admin' || user?.role === 'admin') {
+      // Admin bypass - continue to apply query filters below
+    } else if (user) {
+      // Role-based filtering
       switch (user.role) {
         case 'dep_manager':
           // Department managers can see all Sales teams (already filtered above)

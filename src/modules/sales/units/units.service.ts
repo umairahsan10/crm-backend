@@ -708,6 +708,11 @@ export class UnitsService {
   }
 
   private async checkUserBelongsToUnit(user: any, unitId: number): Promise<boolean> {
+    // Admin users have access to all units
+    if (user?.type === 'admin' || user?.role === 'admin') {
+      return true;
+    }
+    
     switch (user.role) {
       case 'unit_head':
         // Check if user is the head of this unit
@@ -746,6 +751,16 @@ export class UnitsService {
   }
 
   private async buildRoleBasedWhereClause(user: any): Promise<any> {
+    // Admin users can see all units
+    if (user?.type === 'admin' || user?.role === 'admin') {
+      return {}; // Can see all units
+    }
+    
+    // If no user provided, deny access
+    if (!user || !user.role) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+    
     switch (user.role) {
       case 'dep_manager':
         return {}; // Can see all units
