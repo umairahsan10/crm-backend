@@ -89,12 +89,9 @@ export class AttendanceController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   async getMyAttendanceLogs(
-    @Request() req: AuthenticatedRequest,
-    @Query() query: GetMyAttendanceLogsDto
+    @Query() query: GetAttendanceLogsDto
   ): Promise<AttendanceLogResponseDto[]> {
-    // Get employee ID from JWT token
-    const employeeId = req.user.id;
-    return this.attendanceService.getMyAttendanceLogs(employeeId, query);
+    return this.attendanceService.getAttendanceLogs(query);
   }
 
   @Post('checkin')
