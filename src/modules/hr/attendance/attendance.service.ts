@@ -35,8 +35,6 @@ import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto, EmployeeHalfDayStatsD
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) { }
 
-
-
   async getAttendanceLogs(query: GetAttendanceLogsDto): Promise<AttendanceLogResponseDto[]> {
     try {
       const { employee_id, start_date, end_date } = query;
@@ -123,107 +121,183 @@ export class AttendanceService {
     }
   }
 
-  async getMyAttendanceLogs(employeeId: number, query: { start_date?: string; end_date?: string }): Promise<AttendanceLogResponseDto[]> {
+  async checkin(checkinData: CheckinDto): Promise<CheckinResponseDto> {
     try {
-      const { start_date, end_date } = query;
+      const { employee_id, checkin, mode, timezone, offset_minutes } = checkinData;
 
-      // Validate date range (within last 3 months)
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
-      if (start_date && new Date(start_date) < threeMonthsAgo) {
-        throw new BadRequestException('Start date cannot be more than 3 months ago');
+      const employeeId = Number(employee_id);
+      if (!employeeId || isNaN(employeeId) || employeeId <= 0) {
+        throw new BadRequestException('Invalid employee ID');
       }
 
-      if (end_date && new Date(end_date) < threeMonthsAgo) {
-        throw new BadRequestException('End date cannot be more than 3 months ago');
-      }
+      // Fetch employee with shift info
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: employeeId, status: 'active' },
+        select: { departmentId: true, shiftStart: true, shiftEnd: true },
+      });
+      if (!employee) throw new BadRequestException('Employee not found');
 
-      // Validate that start_date is not less than end_date
-      if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
-        throw new BadRequestException('Start date cannot be greater than end date');
-      }
+      // Parse checkin as Date in employee's local timezone
+      const effectiveOffsetMinutes = Number.isFinite(offset_minutes as any)
+        ? Number(offset_minutes)
+        : 300; // default PKT UTC+5
 
-      // Build where clause - always filter by employee_id
-      const where: any = {
-        employeeId: employeeId
-      };
+      const checkinLocal = new Date(
+        new Date(checkin).toLocaleString("en-US", { timeZone: timezone || "Asia/Karachi" })
+      );
 
-      if (start_date || end_date) {
-        where.date = {};
-        if (start_date) {
-          where.date.gte = new Date(start_date);
+      // Normalize local date to midnight for business date calculations
+      const checkinDatePKT = new Date(checkinLocal);
+      checkinDatePKT.setHours(0, 0, 0, 0);
+
+      // Parse shift start/end from varchar 24-hour format
+      const [shiftStartHour, shiftStartMinute = 0] = (employee.shiftStart || '09:00').split(':').map(Number);
+      const [shiftEndHour, shiftEndMinute = 0] = (employee.shiftEnd || '17:00').split(':').map(Number);
+
+      const currentHour = checkinLocal.getHours();
+      const currentMinute = checkinLocal.getMinutes();
+
+      // Adjust business date for night shifts
+      if (shiftEndHour < shiftStartHour) {
+        if (currentHour < shiftEndHour || (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)) {
+          checkinDatePKT.setDate(checkinDatePKT.getDate() - 1);
+          console.log(`Night shift: using previous day for employee ${employeeId}`);
         }
-        if (end_date) {
-          where.date.lte = new Date(end_date);
-        }
       }
 
-      // If no date filters provided, default to last 3 months
-      if (!start_date && !end_date) {
-        where.date = {
-          gte: threeMonthsAgo
-        };
-      }
+      // Helper to format time as "HH:MM"
+      const formatTime = (date: Date) =>
+        `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 
-      const attendanceLogs = await this.prisma.attendanceLog.findMany({
-        where,
-        orderBy: {
-          date: 'desc'
+      // Compute expected shift start/end for the business date
+      const expectedShiftStart = new Date(checkinDatePKT);
+      expectedShiftStart.setHours(shiftStartHour, shiftStartMinute, 0, 0);
+      const expectedShiftEnd = new Date(checkinDatePKT);
+      expectedShiftEnd.setHours(shiftEndHour, shiftEndMinute, 0, 0);
+      if (shiftEndHour < shiftStartHour) expectedShiftEnd.setDate(expectedShiftEnd.getDate() + 1); // night shift
+
+      // Compute minutes late
+      let minutesLate = Math.floor((checkinLocal.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+      if (shiftEndHour < shiftStartHour && minutesLate < 0) minutesLate += 24 * 60; // night shift adjustment
+      if (minutesLate < 0) minutesLate = 0;
+
+      // Fetch company policy
+      const company = await this.prisma.company.findFirst({
+        select: {
+          lateTime: true,
+          halfTime: true,
+          absentTime: true,
         },
-        include: {
-          employee: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true
-            }
-          }
-        }
+      });
+      if (!company) throw new BadRequestException('Company policy not found');
+      const lateTime = company.lateTime || 30;
+      const halfTime = company.halfTime || 90;
+      const absentTime = company.absentTime || 180;
+
+      // Determine status based on minutes late
+      let status: 'present' | 'late' | 'half_day' | 'absent' = 'present';
+      let lateDetails: { minutes_late: number; requires_reason: boolean } | null = null;
+
+      if (minutesLate > 0) {
+        if (minutesLate <= lateTime) status = 'present';
+        else if (minutesLate <= halfTime) { status = 'late'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
+        else if (minutesLate <= absentTime) { status = 'half_day'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
+        else { status = 'absent'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
+      }
+
+      // Check if already checked in for this business date or night shift adjacent dates
+      const prevDate = new Date(checkinDatePKT); prevDate.setDate(prevDate.getDate() - 1);
+      const nextDate = new Date(checkinDatePKT); nextDate.setDate(nextDate.getDate() + 1);
+
+      const existingCheckin = await this.prisma.attendanceLog.findFirst({
+        where: { employeeId, OR: [{ date: checkinDatePKT }, { date: prevDate }, { date: nextDate }] }
       });
 
-      return attendanceLogs.map(log => ({
-        id: log.id,
-        employee_id: log.employeeId,
-        employee_first_name: log.employee.firstName,
-        employee_last_name: log.employee.lastName,
-        date: log.date?.toISOString().split('T')[0] || null,
-        checkin: log.checkin?.toISOString() || null,
-        checkout: log.checkout?.toISOString() || null,
-        mode: log.mode,
-        status: log.status,
-        created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
-      }));
-    } catch (error) {
-      console.error('Error in getMyAttendanceLogs:', error);
-      if (error instanceof BadRequestException) {
-        throw error;
+      if (existingCheckin && existingCheckin.checkin) throw new BadRequestException('Employee already checked in for this date');
+
+      // Create or update attendance log
+      const attendanceLog = await this.prisma.attendanceLog.upsert({
+        where: { id: existingCheckin?.id || 0 },
+        update: { checkin: checkinLocal, mode: mode || null, status, updatedAt: new Date() },
+        create: { employeeId, date: checkinDatePKT, checkin: checkinLocal, mode: mode || null, status }
+      });
+
+      // Update monthly summary & base attendance (methods remain unchanged)
+      await this.updateMonthlyAttendanceSummary(employeeId, checkinDatePKT, status);
+      await this.updateBaseAttendance(employeeId, status);
+
+      // Create late log if needed
+      if (status === 'late') {
+        await this.prisma.lateLog.create({
+          data: {
+            empId: employeeId,
+            date: checkinDatePKT,
+            scheduledTimeIn: employee.shiftStart || '09:00',
+            actualTimeIn: formatTime(checkinLocal),
+            minutesLate,
+            reason: null,
+            actionTaken: 'Created',
+            lateType: null,
+            justified: null
+          }
+        });
       }
-      throw new InternalServerErrorException(`Failed to fetch attendance logs: ${error.message}`);
+
+      // Create half-day log if needed
+      if (status === 'half_day') {
+        await this.prisma.halfDayLog.create({
+          data: {
+            empId: employeeId,
+            date: checkinDatePKT,
+            scheduledTimeIn: employee.shiftStart || '09:00',
+            actualTimeIn: formatTime(checkinLocal),
+            minutesLate,
+            reason: null,
+            actionTaken: 'Created',
+            halfDayType: null,
+            justified: null
+          }
+        });
+      }
+
+      return {
+        id: attendanceLog.id,
+        employee_id: attendanceLog.employeeId,
+        date: attendanceLog.date?.toISOString().split('T')[0] || null,
+        checkin: attendanceLog.checkin?.toISOString() || null,
+        checkin_local: checkinLocal?.toISOString() || null,
+        mode: attendanceLog.mode,
+        status: attendanceLog.status as 'present' | 'late' | 'half_day' | 'absent' | null,
+        late_details: lateDetails,
+        timezone: timezone || 'Asia/Karachi',
+        offset_minutes: effectiveOffsetMinutes,
+        local_date: checkinDatePKT.toISOString().split('T')[0],
+        created_at: attendanceLog.createdAt.toISOString(),
+        updated_at: attendanceLog.updatedAt.toISOString()
+      };
+    } catch (error) {
+      console.error('Error in checkin:', error);
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException(`Failed to record check-in: ${error.message}`);
     }
   }
 
-  async checkin(checkinData: CheckinDto): Promise<CheckinResponseDto> {
+  async checkin1(checkinData: CheckinDto): Promise<CheckinResponseDto> {
     try {
-      console.log('=== CHECKIN DEBUG START ===');
-      console.log('Input data:', checkinData);
-      
       const { employee_id, date, checkin, mode, timezone, offset_minutes } = checkinData;
 
-      // Ensure employee_id is a number
       const employeeId = Number(employee_id);
 
-      // Validate employee_id
       if (isNaN(employeeId) || employeeId <= 0) {
         throw new BadRequestException('Invalid employee ID');
       }
 
-      // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: employeeId },
-        include: {
-          department: true
+        where: { id: employeeId, status: 'active' },
+        select: {
+          departmentId: true,
+          shiftStart: true,
+          shiftEnd: true,
         }
       });
 
@@ -231,7 +305,6 @@ export class AttendanceService {
         throw new BadRequestException('Employee not found');
       }
 
-      // Compute local time using provided offset or default +300 (Asia/Karachi)
       const checkinUtc = new Date(checkin);
       if (isNaN(checkinUtc.getTime())) {
         throw new BadRequestException('Invalid checkin timestamp');
@@ -241,47 +314,33 @@ export class AttendanceService {
         ? Number(offset_minutes)
         : 300; // default PKT UTC+5
 
-      const checkinLocal = new Date(checkinUtc.getTime() + effectiveOffsetMinutes * 60 * 1000);
+      const checkinLocal = new Date(
+        checkinUtc.toLocaleString("en-US", {
+          timeZone: timezone || "Asia/Karachi",
+        })
+      );
 
-      // Derive initial business date (YYYY-MM-DD) from local time
-      const localDateStr = `${checkinLocal.getUTCFullYear()}-${String(checkinLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(checkinLocal.getUTCDate()).padStart(2, '0')}`;
-      let initialBusinessDate = new Date(localDateStr);
+      const checkinDatePKT = new Date(
+        checkinLocal.getFullYear(),
+        checkinLocal.getMonth(),
+        checkinLocal.getDate()
+      );
 
-      // Use computed local time for storage and calculations
-      const checkinTimeForStorage = checkinLocal;
-      const checkinTimeForCalculation = checkinLocal;
+      const [shiftStartHour, shiftStartMinute = 0] = (employee.shiftStart || '09:00').split(':').map(Number);
+      const [shiftEndHour, shiftEndMinute = 0] = (employee.shiftEnd || '17:00').split(':').map(Number);
 
-      // Get employee's shift times (default to 9:00 AM - 5:00 PM if not set)
-      const shiftStart = employee.shiftStart || '09:00';
-      const shiftEnd = employee.shiftEnd || '17:00';
-      console.log('Employee shift times:', { shiftStart, shiftEnd });
-      
-      // Handle shift times that might be stored as just hours (e.g., '21' instead of '21:00')
-      const shiftStartParts = shiftStart.split(':');
-      const shiftEndParts = shiftEnd.split(':');
-      
-      const shiftStartHour = parseInt(shiftStartParts[0], 10);
-      const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
-      
-      const shiftEndHour = parseInt(shiftEndParts[0], 10);
-      const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
-      
+
       console.log('Parsed shift times:', { shiftStartHour, shiftStartMinute, shiftEndHour, shiftEndMinute });
 
-      // Determine the correct business date for this employee (same logic as bulk-mark-present)
-      // For night shifts (shiftEnd < shiftStart), if current time is before shift end,
-      // the business date should be the previous day (when the shift started)
-      let checkinDatePKT = new Date(initialBusinessDate);
-      const currentHour = checkinTimeForCalculation.getUTCHours();
-      const currentMinute = checkinTimeForCalculation.getUTCMinutes();
-      
+      const currentHour = checkinLocal.getHours();
+      const currentMinute = checkinLocal.getMinutes();
+
       // If it's a night shift (crosses midnight)
       if (shiftEndHour < shiftStartHour) {
         // If current time is before shift end (e.g., 01:00 AM when shift end is 05:00 AM)
         // then this is the previous day's shift
         if (currentHour < shiftEndHour || (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)) {
           // Use previous day as business date
-          checkinDatePKT = new Date(initialBusinessDate);
           checkinDatePKT.setDate(checkinDatePKT.getDate() - 1);
           console.log(`Night shift: Using previous day (${checkinDatePKT.toISOString().split('T')[0]}) for employee ${employeeId}`);
         }
@@ -293,7 +352,7 @@ export class AttendanceService {
       prevDate.setDate(prevDate.getDate() - 1);
       const nextDate = new Date(checkinDatePKT);
       nextDate.setDate(nextDate.getDate() + 1);
-      
+
       const existingCheckin = await this.prisma.attendanceLog.findFirst({
         where: {
           employeeId,
@@ -308,7 +367,7 @@ export class AttendanceService {
       if (existingCheckin && existingCheckin.checkin) {
         throw new BadRequestException('Employee already checked in for this date');
       }
-      
+
       // Check if there's an absent log that needs to be converted to half-day
       // This happens when employee was marked absent by cron but checks in late (within half-time threshold)
       const wasAbsent = existingCheckin && existingCheckin.status === 'absent' && !existingCheckin.checkin;
@@ -325,8 +384,8 @@ export class AttendanceService {
       console.log('Expected shift end created:', expectedShiftEnd);
 
       // Calculate minutes late from shift start using local calculation time
-      let minutesLate = Math.floor((checkinTimeForCalculation.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
-      
+      let minutesLate = Math.floor((checkinLocal.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+
       // Handle night shifts that cross midnight (adjust calculation if needed)
       if (shiftEndHour < shiftStartHour) {
         // If we're using previous day's date and minutesLate is negative, add 24 hours
@@ -341,11 +400,11 @@ export class AttendanceService {
       if (minutesLate < 0) {
         minutesLate = 0;
       }
-      
+
       // Debug logging
       console.log(`Check-in Debug Info:`);
       console.log(`- Input UTC time: ${checkin}`);
-      console.log(`- Local time (offset ${effectiveOffsetMinutes}): ${checkinTimeForCalculation.toISOString()}`);
+      console.log(`- Local time (offset ${effectiveOffsetMinutes}): ${checkinLocal.toISOString()}`);
       console.log(`- Local business date: ${checkinDatePKT.toISOString().split('T')[0]}`);
       console.log(`- Shift start: ${expectedShiftStart.toISOString()}`);
       console.log(`- Minutes late: ${minutesLate}`);
@@ -408,44 +467,44 @@ export class AttendanceService {
       // This must be done in a transaction to ensure data consistency and handle night shifts correctly
       if (wasAbsent && status === 'half_day') {
         console.log(`Converting absent log to half-day for employee ${employeeId} on ${checkinDatePKT.toISOString().split('T')[0]}`);
-        
+
         return await this.prisma.$transaction(async (tx) => {
           // Delete the absent log (use the date from existingCheckin to handle night shifts correctly)
-          const absentLogDate = existingCheckin.date instanceof Date 
-            ? existingCheckin.date 
+          const absentLogDate = existingCheckin.date instanceof Date
+            ? existingCheckin.date
             : (existingCheckin.date ? new Date(existingCheckin.date) : checkinDatePKT);
-          
+
           await tx.attendanceLog.delete({
             where: { id: existingCheckin.id }
           });
-          
+
           // Update counters: decrement absent, increment half-day
           await this.updateAttendanceCountersForStatusChange(tx, employeeId, 'absent', 'half_day');
           await this.updateMonthlyAttendanceSummaryForStatusChange(tx, employeeId, absentLogDate, 'absent', 'half_day');
-          
+
           // Create new half-day log with check-in (use checkinDatePKT which is correctly calculated)
           const attendanceLog = await tx.attendanceLog.create({
             data: {
               employeeId,
               date: checkinDatePKT,
-              checkin: checkinTimeForStorage,
+              checkin: checkinLocal,
               mode: mode || null,
               status: 'half_day'
             }
           });
-          
+
           // Create half-day log entry
           const checkinTimeString = checkin.split('T')[1];
           const timeParts = checkinTimeString.split(':');
           const hours = parseInt(timeParts[0], 10);
           const minutes = parseInt(timeParts[1], 10);
           const actualTimeIn = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          
+
           await tx.halfDayLog.create({
             data: {
               empId: employeeId,
               date: checkinDatePKT,
-              scheduledTimeIn: shiftStart,
+              scheduledTimeIn: employee.shiftStart || '09:00',
               actualTimeIn: actualTimeIn,
               minutesLate: minutesLate,
               reason: null,
@@ -454,21 +513,21 @@ export class AttendanceService {
               justified: null
             }
           });
-          
+
           console.log(`Successfully converted absent to half-day for employee ${employeeId} on ${checkinDatePKT.toISOString().split('T')[0]}`);
-          
+
           return {
             id: attendanceLog.id,
             employee_id: attendanceLog.employeeId,
             date: attendanceLog.date?.toISOString().split('T')[0] || null,
             checkin: attendanceLog.checkin?.toISOString() || null,
-            checkin_local: checkinTimeForCalculation?.toISOString() || null,
+            checkin_local: checkinLocal?.toISOString() || null,
             mode: attendanceLog.mode,
             status: 'half_day' as const,
             late_details: lateDetails,
             timezone: timezone || 'Asia/Karachi',
             offset_minutes: effectiveOffsetMinutes,
-            local_date: localDateStr,
+            local_date: checkinDatePKT.toISOString().split('T')[0],
             created_at: attendanceLog.createdAt.toISOString(),
             updated_at: attendanceLog.updatedAt.toISOString()
           };
@@ -482,7 +541,7 @@ export class AttendanceService {
           id: existingCheckin?.id || 0
         },
         update: {
-          checkin: checkinTimeForStorage,
+          checkin: checkinLocal,
           mode: mode || null,
           status,
           updatedAt: new Date()
@@ -490,7 +549,7 @@ export class AttendanceService {
         create: {
           employeeId,
           date: checkinDatePKT,
-          checkin: checkinTimeForStorage,
+          checkin: checkinLocal,
           mode: mode || null,
           status
         }
@@ -516,7 +575,7 @@ export class AttendanceService {
           data: {
             empId: employeeId,
             date: checkinDatePKT, // Use the PKT date (which might be next day)
-            scheduledTimeIn: shiftStart,
+            scheduledTimeIn: employee.shiftStart || '09:00',
             actualTimeIn: actualTimeIn,
             minutesLate: minutesLate,
             reason: null, // Will be filled when employee submits reason
@@ -541,7 +600,7 @@ export class AttendanceService {
           data: {
             empId: employeeId,
             date: checkinDatePKT, // Use the PKT date (which might be next day)
-            scheduledTimeIn: shiftStart,
+            scheduledTimeIn: employee.shiftStart || '09:00',
             actualTimeIn: actualTimeIn,
             minutesLate: minutesLate,
             reason: null, // Will be filled when employee submits reason
@@ -557,13 +616,13 @@ export class AttendanceService {
         employee_id: attendanceLog.employeeId,
         date: attendanceLog.date?.toISOString().split('T')[0] || null,
         checkin: attendanceLog.checkin?.toISOString() || null,
-        checkin_local: checkinTimeForCalculation?.toISOString() || null,
+        checkin_local: checkinLocal?.toISOString() || null,
         mode: attendanceLog.mode,
         status: attendanceLog.status as 'present' | 'late' | 'half_day' | 'absent' | null,
         late_details: lateDetails,
         timezone: timezone || 'Asia/Karachi',
         offset_minutes: effectiveOffsetMinutes,
-        local_date: localDateStr,
+        local_date: checkinDatePKT.toISOString().split('T')[0],
         created_at: attendanceLog.createdAt.toISOString(),
         updated_at: attendanceLog.updatedAt.toISOString()
       };
@@ -603,7 +662,7 @@ export class AttendanceService {
         : 300;
 
       const checkoutLocal = new Date(checkoutUtc.getTime() + effectiveOffsetMinutes * 60 * 1000);
-      
+
       // Determine business date: use provided date if available, otherwise calculate from checkout time
       let businessDateLocal: Date;
       if (date) {
@@ -1283,38 +1342,38 @@ export class AttendanceService {
 
         // 4. Update attendance counters
         await this.updateAttendanceCountersForStatusChange(
-          tx, 
-          employeeId, 
-          oldStatus || 'absent', 
+          tx,
+          employeeId,
+          oldStatus || 'absent',
           newStatus
         );
 
         // 5. Update monthly attendance summary
         await this.updateMonthlyAttendanceSummaryForStatusChange(
-          tx, 
-          employeeId, 
-          logDate, 
-          oldStatus || 'absent', 
+          tx,
+          employeeId,
+          logDate,
+          oldStatus || 'absent',
           newStatus
         );
 
         // 6. Create specific logs if needed
         if (newStatus === 'late') {
           await this.createLateLogForStatusChange(
-            tx, 
-            employeeId, 
-            logDate, 
-            reason || 'Status changed to late', 
+            tx,
+            employeeId,
+            logDate,
+            reason || 'Status changed to late',
             reviewerId
           );
         }
 
         if (newStatus === 'half_day') {
           await this.createHalfDayLogForStatusChange(
-            tx, 
-            employeeId, 
-            logDate, 
-            reason || 'Status changed to half day', 
+            tx,
+            employeeId,
+            logDate,
+            reason || 'Status changed to half day',
             reviewerId
           );
         }
@@ -1663,10 +1722,10 @@ export class AttendanceService {
 
   // Get Late Logs for Export (similar to HR logs pattern)
   async getLateLogsForExport(query: any) {
-    const { 
-      employee_id, 
-      start_date, 
-      end_date 
+    const {
+      employee_id,
+      start_date,
+      end_date
     } = query;
 
     // Build where clause (same logic as getLateLogs but without pagination)
@@ -1783,7 +1842,7 @@ export class AttendanceService {
     try {
       // Build where clause
       const where: any = {};
-      
+
       if (query.employee_id) {
         where.empId = query.employee_id;
       }
@@ -1836,10 +1895,10 @@ export class AttendanceService {
         return acc;
       }, {} as Record<string, number>);
 
-      const mostCommonReason = Object.keys(reasonCounts).length > 0 
-        ? Object.keys(reasonCounts).reduce((a, b) => 
-            reasonCounts[a] > reasonCounts[b] ? a : b
-          )
+      const mostCommonReason = Object.keys(reasonCounts).length > 0
+        ? Object.keys(reasonCounts).reduce((a, b) =>
+          reasonCounts[a] > reasonCounts[b] ? a : b
+        )
         : 'N/A';
 
       // Generate period statistics
@@ -2148,10 +2207,10 @@ export class AttendanceService {
 
   // Get Half Day Logs for Export (similar to HR logs pattern)
   async getHalfDayLogsForExport(query: any) {
-    const { 
-      employee_id, 
-      start_date, 
-      end_date 
+    const {
+      employee_id,
+      start_date,
+      end_date
     } = query;
 
     // Build where clause (same logic as getHalfDayLogs but without pagination)
@@ -2268,7 +2327,7 @@ export class AttendanceService {
     try {
       // Build where clause
       const where: any = {};
-      
+
       if (query.employee_id) {
         where.empId = query.employee_id;
       }
@@ -2321,10 +2380,10 @@ export class AttendanceService {
         return acc;
       }, {} as Record<string, number>);
 
-      const mostCommonReason = Object.keys(reasonCounts).length > 0 
-        ? Object.keys(reasonCounts).reduce((a, b) => 
-            reasonCounts[a] > reasonCounts[b] ? a : b
-          )
+      const mostCommonReason = Object.keys(reasonCounts).length > 0
+        ? Object.keys(reasonCounts).reduce((a, b) =>
+          reasonCounts[a] > reasonCounts[b] ? a : b
+        )
         : 'N/A';
 
       // Generate period statistics
@@ -2797,10 +2856,10 @@ export class AttendanceService {
 
   // Get Leave Logs for Export (similar to HR logs pattern)
   async getLeaveLogsForExport(query: any) {
-    const { 
-      employee_id, 
-      start_date, 
-      end_date 
+    const {
+      employee_id,
+      start_date,
+      end_date
     } = query;
 
     // Build where clause (same logic as getLeaveLogs but without pagination)
@@ -3248,15 +3307,15 @@ export class AttendanceService {
       // Get current time in PKT (following checkin pattern)
       const now = new Date();
       const nowPkt = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
-      
+
       // Compute local time using PKT offset (+300 minutes = UTC+5)
       const effectiveOffsetMinutes = 300; // PKT UTC+5
       const currentTimeLocal = new Date(now.getTime() + effectiveOffsetMinutes * 60 * 1000);
-      
+
       // Determine target business date: use provided date or calculate based on current time
       let todayPKT: Date;
       let localDateStr: string;
-      
+
       if (targetDate) {
         // Use provided date
         const inputDate = new Date(targetDate + 'T00:00:00');
@@ -3271,13 +3330,13 @@ export class AttendanceService {
         localDateStr = `${currentTimeLocal.getUTCFullYear()}-${String(currentTimeLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(currentTimeLocal.getUTCDate()).padStart(2, '0')}`;
         todayPKT = new Date(localDateStr);
       }
-      
+
       // Get current time in HH:MM:SS format from PKT
       const currentHour = currentTimeLocal.getUTCHours();
       const currentMinute = currentTimeLocal.getUTCMinutes();
       const currentSecond = currentTimeLocal.getUTCSeconds();
       const currentTime = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}:${currentSecond.toString().padStart(2, '0')}`;
-      
+
       // Convert current time to minutes since midnight for comparison
       const currentTimeMinutes = currentHour * 60 + currentMinute;
 
@@ -3315,10 +3374,10 @@ export class AttendanceService {
         businessDate: Date;
         shouldMarkAbsent: boolean;
       }
-      
+
       const employeesToProcess: EmployeeAbsentData[] = [];
       const employeeIds: number[] = [];
-      
+
       for (const employee of employees) {
         if (!employee.shiftStart) {
           console.log(`Employee ${employee.id} has no shift start time, skipping`);
@@ -3330,7 +3389,7 @@ export class AttendanceService {
         const shiftStartParts = shiftStartTime.split(':');
         const shiftHours = parseInt(shiftStartParts[0], 10);
         let shiftMins = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
-        
+
         // Validate parsed values
         if (isNaN(shiftHours) || shiftHours < 0 || shiftHours > 23) {
           console.log(`Employee ${employee.id} has invalid shift start time: ${shiftStartTime}, skipping`);
@@ -3339,10 +3398,10 @@ export class AttendanceService {
         if (isNaN(shiftMins) || shiftMins < 0 || shiftMins > 59) {
           shiftMins = 0;
         }
-        
+
         // Calculate shift start in minutes since midnight
         const shiftStartMinutes = shiftHours * 60 + shiftMins;
-        
+
         // Calculate time since shift start (handles night shifts crossing midnight)
         let timeSinceShiftStart: number;
         if (currentTimeMinutes >= shiftStartMinutes) {
@@ -3351,17 +3410,17 @@ export class AttendanceService {
           // Shift started yesterday (night shift)
           timeSinceShiftStart = (1440 - shiftStartMinutes) + currentTimeMinutes;
         }
-        
+
         // Determine the business date for this employee
         let businessDate = new Date(todayPKT);
-        
+
         if (!targetDate) {
           // No target date provided - calculate based on current time and night shift logic
           const shiftEnd = employee.shiftEnd || '17:00';
           const shiftEndParts = shiftEnd.split(':');
           const shiftEndHour = parseInt(shiftEndParts[0], 10);
           const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
-          
+
           // If it's a night shift (crosses midnight)
           if (shiftEndHour < shiftHours) {
             const shiftEndMinutes = shiftEndHour * 60 + shiftEndMinute;
@@ -3377,7 +3436,7 @@ export class AttendanceService {
 
         // Determine if employee should be marked as absent
         const shouldMarkAbsent = timeSinceShiftStart >= absentTimeMinutes;
-        
+
         if (shouldMarkAbsent) {
           employeesToProcess.push({
             employee,
@@ -3387,7 +3446,7 @@ export class AttendanceService {
           employeeIds.push(employee.id);
         }
       }
-      
+
       if (employeesToProcess.length === 0) {
         console.log('No employees need to be marked absent');
         return {
@@ -3396,14 +3455,14 @@ export class AttendanceService {
           leave_applied: 0
         };
       }
-      
+
       // OPTIMIZATION: Pre-fetch all existing logs in ONE query
       const allBusinessDates = employeesToProcess.map(e => e.businessDate);
       const minDate = new Date(Math.min(...allBusinessDates.map(d => d.getTime())));
       const maxDate = new Date(Math.max(...allBusinessDates.map(d => d.getTime())));
       minDate.setHours(0, 0, 0, 0);
       maxDate.setHours(23, 59, 59, 999);
-      
+
       const existingLogs = await this.prisma.attendanceLog.findMany({
         where: {
           employeeId: { in: employeeIds },
@@ -3413,7 +3472,7 @@ export class AttendanceService {
           }
         }
       });
-      
+
       // Create map for quick lookup
       const existingLogsMap = new Map<string, typeof existingLogs[0]>();
       for (const log of existingLogs) {
@@ -3422,12 +3481,12 @@ export class AttendanceService {
           existingLogsMap.set(key, log);
         }
       }
-      
+
       // OPTIMIZATION: Pre-fetch all approved leaves in ONE query
       const allBusinessDatesForLeave = Array.from(new Set(allBusinessDates.map(d => d.getTime()))).map(t => new Date(t));
       const minLeaveDate = new Date(Math.min(...allBusinessDatesForLeave.map(d => d.getTime())));
       const maxLeaveDate = new Date(Math.max(...allBusinessDatesForLeave.map(d => d.getTime())));
-      
+
       const approvedLeaves = await this.prisma.leaveLog.findMany({
         where: {
           empId: { in: employeeIds },
@@ -3436,7 +3495,7 @@ export class AttendanceService {
           endDate: { gte: minLeaveDate }
         }
       });
-      
+
       // Create map for quick lookup (check if date falls within leave range)
       const employeeLeavesMap = new Map<number, typeof approvedLeaves>();
       for (const leave of approvedLeaves) {
@@ -3445,19 +3504,19 @@ export class AttendanceService {
         }
         employeeLeavesMap.get(leave.empId)!.push(leave);
       }
-      
+
       // OPTIMIZATION: Pre-fetch all attendance records for leave updates
       const attendanceRecords = await this.prisma.attendance.findMany({
         where: {
           employeeId: { in: employeeIds }
         }
       });
-      
+
       const attendanceMap = new Map<number, typeof attendanceRecords[0]>();
       for (const att of attendanceRecords) {
         attendanceMap.set(att.employeeId, att);
       }
-      
+
       // Group operations
       const absentLogsToCreate: Array<{
         employeeId: number;
@@ -3467,7 +3526,7 @@ export class AttendanceService {
         mode: 'onsite';
         status: 'absent';
       }> = [];
-      
+
       const leaveLogsToCreate: Array<{
         employeeId: number;
         date: Date;
@@ -3476,35 +3535,35 @@ export class AttendanceService {
         mode: 'onsite';
         status: 'leave';
       }> = [];
-      
+
       const leaveLogsToUpdate: Array<{
         id: number;
         status: 'leave';
       }> = [];
-      
+
       interface LeaveUpdateData {
         employeeId: number;
         businessDate: Date;
       }
       const leaveUpdates: LeaveUpdateData[] = [];
-      
+
       interface AbsentUpdateData {
         employeeId: number;
         businessDate: Date;
       }
       const absentUpdates: AbsentUpdateData[] = [];
-      
+
       // Process all employees and group operations
       for (const empData of employeesToProcess) {
         const { employee, businessDate } = empData;
         const logKey = `${employee.id}_${businessDate.getTime()}`;
         const existingLog = existingLogsMap.get(logKey);
-        
+
         if (existingLog) {
           console.log(`Employee ${employee.id} already has attendance log for ${businessDate.toISOString().split('T')[0]}, skipping`);
           continue;
         }
-        
+
         // Check if employee has approved leave for this date
         const employeeLeaves = employeeLeavesMap.get(employee.id) || [];
         const hasApprovedLeave = employeeLeaves.some(leave => {
@@ -3514,10 +3573,10 @@ export class AttendanceService {
           leaveEnd.setHours(23, 59, 59, 999);
           return businessDate >= leaveStart && businessDate <= leaveEnd;
         });
-        
+
         if (hasApprovedLeave) {
           console.log(`Employee ${employee.id} has approved leave for ${businessDate.toISOString().split('T')[0]}, applying leave instead of absent`);
-          
+
           // Check if there's an existing log to update (shouldn't happen, but just in case)
           const existingLogForLeave = existingLogsMap.get(logKey);
           if (existingLogForLeave) {
@@ -3535,12 +3594,12 @@ export class AttendanceService {
               status: 'leave'
             });
           }
-          
+
           leaveUpdates.push({ employeeId: employee.id, businessDate });
           leaveApplied++;
         } else {
           console.log(`Employee ${employee.id} has no approved leave, marking as absent for ${businessDate.toISOString().split('T')[0]}`);
-          
+
           absentLogsToCreate.push({
             employeeId: employee.id,
             date: businessDate,
@@ -3549,12 +3608,12 @@ export class AttendanceService {
             mode: 'onsite',
             status: 'absent'
           });
-          
+
           absentUpdates.push({ employeeId: employee.id, businessDate });
           absentMarked++;
         }
       }
-      
+
       // OPTIMIZATION: Execute all bulk operations in a single transaction
       await this.prisma.$transaction(async (tx) => {
         // Bulk create absent logs
@@ -3564,7 +3623,7 @@ export class AttendanceService {
             skipDuplicates: true
           });
         }
-        
+
         // Bulk create leave logs
         if (leaveLogsToCreate.length > 0) {
           await tx.attendanceLog.createMany({
@@ -3572,7 +3631,7 @@ export class AttendanceService {
             skipDuplicates: true
           });
         }
-        
+
         // Bulk update leave logs (if any existing logs need to be updated)
         if (leaveLogsToUpdate.length > 0) {
           await Promise.all(
@@ -3588,7 +3647,7 @@ export class AttendanceService {
             )
           );
         }
-        
+
         // Update attendance counters for leaves (batch parallel execution)
         if (leaveUpdates.length > 0) {
           await Promise.all(
@@ -3597,7 +3656,7 @@ export class AttendanceService {
               if (attendance) {
                 const currentLeaveDays = attendance.leaveDays || 0;
                 const currentQuarterlyLeaves = attendance.quarterlyLeaves || 0;
-                
+
                 await tx.attendance.update({
                   where: { id: attendance.id },
                   data: {
@@ -3605,7 +3664,7 @@ export class AttendanceService {
                     quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - 1)
                   }
                 });
-                
+
                 // Update monthly attendance summary
                 const monthKey = update.businessDate.toISOString().split('T')[0].substring(0, 7);
                 await tx.monthlyAttendanceSummary.updateMany({
@@ -3621,7 +3680,7 @@ export class AttendanceService {
             })
           );
         }
-        
+
         // Update attendance counters for absent (batch parallel execution)
         // Pre-fetch monthly summaries to avoid individual queries
         const uniqueMonths = Array.from(new Set(absentUpdates.map(u => u.businessDate.toISOString().slice(0, 7))));
@@ -3637,7 +3696,7 @@ export class AttendanceService {
           const key = `${summary.empId}_${summary.month}`;
           monthlySummaryMapForAbsent.set(key, summary);
         }
-        
+
         if (absentUpdates.length > 0) {
           await Promise.all(
             absentUpdates.map(async (update) => {
@@ -3666,12 +3725,12 @@ export class AttendanceService {
                   }
                 });
               }
-              
+
               // Update monthly attendance summary using pre-fetched data
               const month = update.businessDate.toISOString().slice(0, 7);
               const summaryKey = `${update.employeeId}_${month}`;
               let summary = monthlySummaryMapForAbsent.get(summaryKey);
-              
+
               if (!summary) {
                 summary = await tx.monthlyAttendanceSummary.create({
                   data: {
@@ -3726,15 +3785,15 @@ export class AttendanceService {
     // Get current time in PKT (following checkin pattern)
     const now = new Date();
     const nowPkt = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
-    
+
     // Compute local time using PKT offset (+300 minutes = UTC+5)
     const effectiveOffsetMinutes = 300; // PKT UTC+5
     const currentTimeLocal = new Date(now.getTime() + effectiveOffsetMinutes * 60 * 1000);
-    
+
     // Derive local business date (YYYY-MM-DD) from local time (following checkin pattern)
     const localDateStr = `${currentTimeLocal.getUTCFullYear()}-${String(currentTimeLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(currentTimeLocal.getUTCDate()).padStart(2, '0')}`;
     const businessDateLocal = new Date(localDateStr);
-    
+
     // Determine target date: use provided date or default to current PKT business date
     let targetBusinessDate: Date;
     if (date) {
@@ -3744,7 +3803,7 @@ export class AttendanceService {
       if (dateParts.length !== 3) {
         throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
       }
-      
+
       // Create date in UTC to avoid timezone conversion issues
       // This ensures "2025-11-14" stays as "2025-11-14" regardless of server timezone
       targetBusinessDate = new Date(Date.UTC(
@@ -3753,20 +3812,20 @@ export class AttendanceService {
         parseInt(dateParts[2], 10),
         0, 0, 0, 0
       ));
-      
+
       if (isNaN(targetBusinessDate.getTime())) {
         throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
       }
-      
+
       // Get today in PKT for validation
       const todayPKT = new Date(nowPkt);
       todayPKT.setHours(0, 0, 0, 0);
-      
+
       // Allow present and past dates, but not future dates (based on PKT)
       // Compare dates by their date components only (ignore time)
       const targetDateOnly = new Date(targetBusinessDate.getUTCFullYear(), targetBusinessDate.getUTCMonth(), targetBusinessDate.getUTCDate());
       const todayDateOnly = new Date(todayPKT.getFullYear(), todayPKT.getMonth(), todayPKT.getDate());
-      
+
       if (targetDateOnly.getTime() > todayDateOnly.getTime()) {
         throw new BadRequestException('Bulk mark present is not allowed for future dates.');
       }
@@ -3829,7 +3888,7 @@ export class AttendanceService {
     }
 
     // Format date for logging (use UTC date components to avoid timezone shift)
-    const logDateStr = date 
+    const logDateStr = date
       ? date // Use the original input date string
       : `${targetBusinessDate.getUTCFullYear()}-${String(targetBusinessDate.getUTCMonth() + 1).padStart(2, '0')}-${String(targetBusinessDate.getUTCDate()).padStart(2, '0')}`;
     console.log(`Bulk mark present: Using PKT date ${logDateStr} for ${employees.length} employee(s)`);
@@ -3839,22 +3898,22 @@ export class AttendanceService {
     let skipped = 0;
     let markedLate = 0;
     let markedHalfDay = 0;
-    
+
     // Format date string for logging and responses (use UTC date components to avoid timezone shift)
-    const dateStr = date 
+    const dateStr = date
       ? date // Use the original input date string
       : `${targetBusinessDate.getUTCFullYear()}-${String(targetBusinessDate.getUTCMonth() + 1).padStart(2, '0')}-${String(targetBusinessDate.getUTCDate()).padStart(2, '0')}`;
     // Use current PKT time as checkin time for bulk operations
     // Note: For past dates, this represents when the bulk mark operation is performed, not the actual checkin time
     const checkinTimeForStorage = currentTimeLocal;
-    
+
     console.log(`Starting bulk checkin operation for ${employees.length} employee(s) on ${dateStr} at ${checkinTimeForStorage.toISOString()}`);
-    
+
     // OPTIMIZATION: Pre-process all employees to calculate their data upfront
     const currentHour = checkinTimeForStorage.getUTCHours();
     const currentMinute = checkinTimeForStorage.getUTCMinutes();
     const employeeIds = employees.map(emp => emp.id);
-    
+
     // Pre-calculate all employee data (status, dates, minutes late)
     interface EmployeeProcessData {
       employee: typeof employees[0];
@@ -3864,14 +3923,14 @@ export class AttendanceService {
       shiftStart: string;
       actualTimeIn: string;
     }
-    
+
     const employeeDataMap = new Map<number, EmployeeProcessData>();
-    
+
     for (const employee of employees) {
       try {
         const shiftStart = employee.shiftStart || '09:00';
         const shiftEnd = employee.shiftEnd || '17:00';
-        
+
         // Handle shift times that might be stored as just hours
         const shiftStartParts = shiftStart.split(':');
         const shiftEndParts = shiftEnd.split(':');
@@ -3879,10 +3938,10 @@ export class AttendanceService {
         const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
         const shiftEndHour = parseInt(shiftEndParts[0], 10);
         const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
-        
+
         // Determine the correct business date for this employee
         let employeeBusinessDate = new Date(targetBusinessDate);
-        
+
         if (date) {
           // User provided an explicit date - use it as-is
           employeeBusinessDate = new Date(targetBusinessDate);
@@ -3898,24 +3957,24 @@ export class AttendanceService {
             }
           }
         }
-        
+
         // Create expected shift start for the employee's business date
         const expectedShiftStart = new Date(employeeBusinessDate);
         expectedShiftStart.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
-        
+
         // Calculate minutes late from shift start
         let minutesLate = Math.floor((checkinTimeForStorage.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
-        
+
         // Handle night shifts that cross midnight
         if (shiftEndHour < shiftStartHour && minutesLate < 0) {
           minutesLate = minutesLate + (24 * 60);
         }
-        
+
         // Normalize negative minutes
         if (minutesLate < 0) {
           minutesLate = 0;
         }
-        
+
         // Determine status based on company policy
         let status: 'present' | 'late' | 'half_day' | 'absent' = 'present';
         if (minutesLate === 0) {
@@ -3931,9 +3990,9 @@ export class AttendanceService {
             status = 'absent';
           }
         }
-        
+
         const actualTimeIn = `${checkinTimeForStorage.getUTCHours().toString().padStart(2, '0')}:${checkinTimeForStorage.getUTCMinutes().toString().padStart(2, '0')}`;
-        
+
         employeeDataMap.set(employee.id, {
           employee,
           businessDate: employeeBusinessDate,
@@ -3947,7 +4006,7 @@ export class AttendanceService {
         errors++;
       }
     }
-    
+
     // OPTIMIZATION: Pre-fetch all existing logs in ONE query instead of per-employee
     // Get all unique business dates to query (use date range to handle all dates)
     const allBusinessDates = Array.from(employeeDataMap.values()).map(d => d.businessDate);
@@ -3956,7 +4015,7 @@ export class AttendanceService {
     // Set to start and end of day to capture all dates
     minDate.setHours(0, 0, 0, 0);
     maxDate.setHours(23, 59, 59, 999);
-    
+
     const existingLogs = await this.prisma.attendanceLog.findMany({
       where: {
         employeeId: { in: employeeIds },
@@ -3966,7 +4025,7 @@ export class AttendanceService {
         }
       }
     });
-    
+
     // Create a map of existing logs by employeeId and date for quick lookup
     const existingLogsMap = new Map<string, typeof existingLogs[0]>();
     for (const log of existingLogs) {
@@ -3975,20 +4034,20 @@ export class AttendanceService {
         existingLogsMap.set(key, log);
       }
     }
-    
+
     // OPTIMIZATION: Pre-fetch monthly summaries in batch (for wasAbsent check only)
     const monthlySummariesForCheck = await this.prisma.monthlyAttendanceSummary.findMany({
       where: {
         empId: { in: employeeIds }
       }
     });
-    
+
     const monthlySummaryMapForCheck = new Map<string, typeof monthlySummariesForCheck[0]>();
     for (const summary of monthlySummariesForCheck) {
       const key = `${summary.empId}_${summary.month}`;
       monthlySummaryMapForCheck.set(key, summary);
     }
-    
+
     // Group operations: separates creates vs updates
     const logsToCreate: Array<{
       employeeId: number;
@@ -3998,13 +4057,13 @@ export class AttendanceService {
       mode: 'onsite' | 'remote';
       status: 'present' | 'late' | 'half_day' | 'absent';
     }> = [];
-    
+
     const logsToUpdate: Array<{
       id: number;
       checkin: Date;
       status: 'present' | 'late' | 'half_day' | 'absent';
     }> = [];
-    
+
     const lateLogsToCreate: Array<{
       empId: number;
       date: Date;
@@ -4016,7 +4075,7 @@ export class AttendanceService {
       lateType: null;
       justified: null;
     }> = [];
-    
+
     const halfDayLogsToCreate: Array<{
       empId: number;
       date: Date;
@@ -4028,7 +4087,7 @@ export class AttendanceService {
       halfDayType: null;
       justified: null;
     }> = [];
-    
+
     // Track which employees need counter updates
     interface CounterUpdateData {
       employeeId: number;
@@ -4037,27 +4096,27 @@ export class AttendanceService {
       status: 'present' | 'late' | 'half_day' | 'absent';
     }
     const counterUpdates: CounterUpdateData[] = [];
-    
+
     // Process all employees and group operations
     for (const [employeeId, empData] of employeeDataMap.entries()) {
       try {
         const logKey = `${employeeId}_${empData.businessDate.getTime()}`;
         const existingLog = existingLogsMap.get(logKey);
-        
+
         if (existingLog) {
           // Check if we should skip (already has checkin and same status)
           if (existingLog.checkin && existingLog.status === empData.status) {
             skipped++;
             continue;
           }
-          
+
           // Update existing log
           logsToUpdate.push({
             id: existingLog.id,
             checkin: checkinTimeForStorage,
             status: empData.status
           });
-          
+
           const wasAbsent = existingLog.status === 'absent';
           counterUpdates.push({
             employeeId,
@@ -4070,23 +4129,23 @@ export class AttendanceService {
           const monthYear = `${empData.businessDate.getFullYear()}-${String(empData.businessDate.getMonth() + 1).padStart(2, '0')}`;
           const summaryKey = `${employeeId}_${monthYear}`;
           const monthlySummary = monthlySummaryMapForCheck.get(summaryKey);
-          
+
           let wasAbsent = false;
           if (monthlySummary && monthlySummary.totalAbsent > 0) {
             // Check actual absent records for this month
-            const actualAbsentRecords = existingLogs.filter(log => 
+            const actualAbsentRecords = existingLogs.filter(log =>
               log.employeeId === employeeId &&
               log.status === 'absent' &&
               log.date &&
               log.date >= new Date(empData.businessDate.getFullYear(), empData.businessDate.getMonth(), 1) &&
               log.date < new Date(empData.businessDate.getFullYear(), empData.businessDate.getMonth() + 1, 1)
             ).length;
-            
+
             if (monthlySummary.totalAbsent > actualAbsentRecords) {
               wasAbsent = true;
             }
           }
-          
+
           // Create new log
           logsToCreate.push({
             employeeId,
@@ -4096,7 +4155,7 @@ export class AttendanceService {
             mode: 'onsite',
             status: empData.status
           });
-          
+
           counterUpdates.push({
             employeeId,
             businessDate: empData.businessDate,
@@ -4104,7 +4163,7 @@ export class AttendanceService {
             status: empData.status
           });
         }
-        
+
         // Add to late/half-day log creation lists
         if (empData.status === 'late') {
           lateLogsToCreate.push({
@@ -4133,29 +4192,29 @@ export class AttendanceService {
           });
           markedHalfDay++;
         }
-        
+
         markedPresent++;
       } catch (error) {
         console.error(`Error processing employee ${employeeId}:`, error);
         errors++;
       }
     }
-    
+
     // OPTIMIZATION: Pre-fetch all attendance records and monthly summaries to avoid per-employee queries
     const allEmployeeIdsForUpdates = counterUpdates.map(u => u.employeeId);
     const uniqueEmployeeIds = Array.from(new Set(allEmployeeIdsForUpdates));
-    
+
     const attendanceRecords = await this.prisma.attendance.findMany({
       where: { employeeId: { in: uniqueEmployeeIds } }
     });
     const attendanceMap = new Map(attendanceRecords.map(att => [att.employeeId, att]));
-    
+
     // Get all unique month keys
     const uniqueMonthKeys = Array.from(new Set(counterUpdates.map(u => {
       const date = u.businessDate;
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     })));
-    
+
     const monthlySummaries = await this.prisma.monthlyAttendanceSummary.findMany({
       where: {
         empId: { in: uniqueEmployeeIds },
@@ -4167,24 +4226,24 @@ export class AttendanceService {
       const key = `${summary.empId}_${summary.month}`;
       monthlySummaryMap.set(key, summary);
     }
-    
+
     // OPTIMIZATION: Process in batches to avoid transaction timeout
     // Group counter updates by employee ID for batching
     const batchSize = 15; // Process 15 employees per batch to avoid timeout
     const totalBatches = Math.ceil(counterUpdates.length / batchSize);
-    
+
     console.log(`Processing ${counterUpdates.length} employees in ${totalBatches} batches of ${batchSize}`);
-    
+
     for (let i = 0; i < counterUpdates.length; i += batchSize) {
       const batch = counterUpdates.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
-      
+
       // Get employee IDs in this batch
       const batchEmployeeIds = batch.map(update => update.employeeId);
-      
+
       // Filter logs and updates for this batch
       const batchLogsToCreate = logsToCreate.filter(log => batchEmployeeIds.includes(log.employeeId));
-      
+
       // Get the actual log IDs for this batch from existingLogs
       const batchLogIds = new Set<number>();
       for (const update of batch) {
@@ -4195,10 +4254,10 @@ export class AttendanceService {
         }
       }
       const batchLogsToUpdateFiltered = logsToUpdate.filter(log => batchLogIds.has(log.id));
-      
+
       const batchLateLogsToCreate = lateLogsToCreate.filter(log => batchEmployeeIds.includes(log.empId));
       const batchHalfDayLogsToCreate = halfDayLogsToCreate.filter(log => batchEmployeeIds.includes(log.empId));
-      
+
       try {
         await this.prisma.$transaction(async (tx) => {
           // Bulk create new attendance logs for this batch
@@ -4208,7 +4267,7 @@ export class AttendanceService {
               skipDuplicates: true
             });
           }
-          
+
           // Bulk update existing attendance logs for this batch
           if (batchLogsToUpdateFiltered.length > 0) {
             await Promise.all(
@@ -4225,7 +4284,7 @@ export class AttendanceService {
               )
             );
           }
-          
+
           // Bulk create late logs for this batch
           if (batchLateLogsToCreate.length > 0) {
             await tx.lateLog.createMany({
@@ -4233,7 +4292,7 @@ export class AttendanceService {
               skipDuplicates: true
             });
           }
-          
+
           // Bulk create half-day logs for this batch
           if (batchHalfDayLogsToCreate.length > 0) {
             await tx.halfDayLog.createMany({
@@ -4241,25 +4300,25 @@ export class AttendanceService {
               skipDuplicates: true
             });
           }
-          
+
           // Update attendance counters for this batch (parallel execution)
           // Use pre-fetched data to avoid individual queries
           await Promise.all(
             batch.map(update =>
               Promise.all([
                 this.updateMonthlyAttendanceForBulkMarkPresentOptimized(
-                  tx, 
-                  update.employeeId, 
-                  update.businessDate, 
-                  update.wasAbsent, 
+                  tx,
+                  update.employeeId,
+                  update.businessDate,
+                  update.wasAbsent,
                   update.status,
                   monthlySummaryMap
                 ),
                 this.updateAttendanceForBulkMarkPresentOptimized(
-                  tx, 
-                  update.employeeId, 
-                  update.businessDate, 
-                  update.wasAbsent, 
+                  tx,
+                  update.employeeId,
+                  update.businessDate,
+                  update.wasAbsent,
                   update.status,
                   attendanceMap
                 )
@@ -4270,27 +4329,27 @@ export class AttendanceService {
           timeout: 45000, // 45 seconds per batch
           maxWait: 10000
         });
-        
+
         console.log(`Batch ${batchNumber}/${totalBatches} completed successfully`);
       } catch (batchError) {
         console.error(`Error in batch ${batchNumber}/${totalBatches}:`, batchError);
         errors += batch.length;
       }
-      
+
       // Small delay between batches to prevent connection pool exhaustion
       if (i + batchSize < counterUpdates.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-    
+
     console.log(`Bulk checkin operation completed. Marked: ${markedPresent} (${markedLate} late, ${markedHalfDay} half-day), Errors: ${errors}, Skipped: ${skipped}`);
-    
+
     // Create a single HR log entry for the entire bulk operation
     // Format: "{count} employees - {reason}" or just "{count} employees" if no reason
-    const description = reason 
+    const description = reason
       ? `${markedPresent} employees - ${reason}`
       : `${markedPresent} employees`;
-    
+
     await this.prisma.hRLog.create({
       data: {
         hrId: 1, // TODO: Get from authenticated user
@@ -4321,13 +4380,13 @@ export class AttendanceService {
     const effectiveOffsetMinutes = Number.isFinite(offset_minutes as any)
       ? Number(offset_minutes)
       : 300; // Default to PKT UTC+5
-    
+
     const checkoutTimeLocal = new Date(now.getTime() + effectiveOffsetMinutes * 60 * 1000);
-    
+
     // Derive local business date (YYYY-MM-DD) from local time
     const localDateStr = `${checkoutTimeLocal.getUTCFullYear()}-${String(checkoutTimeLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(checkoutTimeLocal.getUTCDate()).padStart(2, '0')}`;
     const businessDateLocal = new Date(localDateStr);
-    
+
     // Determine target date: use provided date or default to current PKT business date
     let targetBusinessDate: Date;
     if (date) {
@@ -4350,7 +4409,7 @@ export class AttendanceService {
     dateStart.setHours(0, 0, 0, 0);
     const dateEnd = new Date(targetBusinessDate);
     dateEnd.setHours(23, 59, 59, 999);
-    
+
     const attendanceWhere: any = {
       checkin: { not: null },
       checkout: null,
@@ -4401,18 +4460,18 @@ export class AttendanceService {
     // OPTIMIZATION: Pre-fetch all attendance records and monthly summaries to avoid per-employee queries
     const allEmployeeIds = attendanceLogs.map(log => log.employeeId);
     const uniqueEmployeeIds = Array.from(new Set(allEmployeeIds));
-    
+
     const attendanceRecords = await this.prisma.attendance.findMany({
       where: { employeeId: { in: uniqueEmployeeIds } }
     });
     const attendanceMap = new Map(attendanceRecords.map(att => [att.employeeId, att]));
-    
+
     // Get all unique month keys
     const uniqueMonthKeys = Array.from(new Set(attendanceLogs.map(log => {
       const date = log.date || targetBusinessDate;
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     })));
-    
+
     const monthlySummaries = await this.prisma.monthlyAttendanceSummary.findMany({
       where: {
         empId: { in: uniqueEmployeeIds },
@@ -4439,191 +4498,191 @@ export class AttendanceService {
 
       try {
         await this.prisma.$transaction(async (tx) => {
-        for (const log of batch) {
-          try {
-            const employee = log.employee;
-            const initialStatus = log.status as 'present' | 'late' | 'half_day' | 'absent' | null;
-            const wasAbsent = initialStatus === 'absent';
+          for (const log of batch) {
+            try {
+              const employee = log.employee;
+              const initialStatus = log.status as 'present' | 'late' | 'half_day' | 'absent' | null;
+              const wasAbsent = initialStatus === 'absent';
 
-            // Get employee's shift times
-            const shiftStart = employee.shiftStart || '09:00';
-            const shiftEnd = employee.shiftEnd || '17:00';
+              // Get employee's shift times
+              const shiftStart = employee.shiftStart || '09:00';
+              const shiftEnd = employee.shiftEnd || '17:00';
 
-            // Parse shift times
-            const shiftStartParts = shiftStart.split(':');
-            const shiftEndParts = shiftEnd.split(':');
-            const shiftStartHour = parseInt(shiftStartParts[0], 10);
-            const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
-            const shiftEndHour = parseInt(shiftEndParts[0], 10);
-            const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
+              // Parse shift times
+              const shiftStartParts = shiftStart.split(':');
+              const shiftEndParts = shiftEnd.split(':');
+              const shiftStartHour = parseInt(shiftStartParts[0], 10);
+              const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
+              const shiftEndHour = parseInt(shiftEndParts[0], 10);
+              const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
 
-            // Calculate shift duration in hours
-            // Create shift start and end dates for calculation
-            const shiftStartDate = new Date(targetBusinessDate);
-            shiftStartDate.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
-            
-            const shiftEndDate = new Date(targetBusinessDate);
-            shiftEndDate.setUTCHours(shiftEndHour, shiftEndMinute, 0, 0);
-            
-            // Handle night shifts (crossing midnight)
-            if (shiftEndHour < shiftStartHour || (shiftEndHour === shiftStartHour && shiftEndMinute < shiftStartMinute)) {
-              shiftEndDate.setDate(shiftEndDate.getDate() + 1);
-            }
+              // Calculate shift duration in hours
+              // Create shift start and end dates for calculation
+              const shiftStartDate = new Date(targetBusinessDate);
+              shiftStartDate.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
 
-            const shiftDurationMs = shiftEndDate.getTime() - shiftStartDate.getTime();
-            const shiftDurationHours = shiftDurationMs / (1000 * 60 * 60);
+              const shiftEndDate = new Date(targetBusinessDate);
+              shiftEndDate.setUTCHours(shiftEndHour, shiftEndMinute, 0, 0);
 
-            // Calculate worked hours from checkin to checkout
-            const checkinTime = log.checkin!;
-            const checkoutTimeForStorage = checkoutTimeLocal;
-            const workedMs = checkoutTimeForStorage.getTime() - checkinTime.getTime();
-            const workedHours = workedMs / (1000 * 60 * 60);
+              // Handle night shifts (crossing midnight)
+              if (shiftEndHour < shiftStartHour || (shiftEndHour === shiftStartHour && shiftEndMinute < shiftStartMinute)) {
+                shiftEndDate.setDate(shiftEndDate.getDate() + 1);
+              }
 
-            // Format worked hours as hh:mm:ss
-            const totalSeconds = Math.floor(workedMs / 1000);
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = totalSeconds % 60;
-            const workedHoursFormatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+              const shiftDurationMs = shiftEndDate.getTime() - shiftStartDate.getTime();
+              const shiftDurationHours = shiftDurationMs / (1000 * 60 * 60);
 
-            // Determine new status
-            let newStatus: 'present' | 'late' | 'half_day' | 'absent' = initialStatus || 'present';
-            
-            if (wasAbsent) {
-              // If initially absent, remain absent regardless of worked hours
-              newStatus = 'absent';
-            } else {
-              // If worked_hours >= shift_time/2, mark as half_day
-              if (workedHours >= shiftDurationHours / 2) {
-                newStatus = 'half_day';
-                if (initialStatus !== 'half_day') {
-                  statusUpdated++;
-                }
+              // Calculate worked hours from checkin to checkout
+              const checkinTime = log.checkin!;
+              const checkoutTimeForStorage = checkoutTimeLocal;
+              const workedMs = checkoutTimeForStorage.getTime() - checkinTime.getTime();
+              const workedHours = workedMs / (1000 * 60 * 60);
+
+              // Format worked hours as hh:mm:ss
+              const totalSeconds = Math.floor(workedMs / 1000);
+              const hours = Math.floor(totalSeconds / 3600);
+              const minutes = Math.floor((totalSeconds % 3600) / 60);
+              const seconds = totalSeconds % 60;
+              const workedHoursFormatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+              // Determine new status
+              let newStatus: 'present' | 'late' | 'half_day' | 'absent' = initialStatus || 'present';
+
+              if (wasAbsent) {
+                // If initially absent, remain absent regardless of worked hours
+                newStatus = 'absent';
               } else {
-                // If worked_hours < shift_time/2
-                if (initialStatus === 'present' || initialStatus === null) {
-                  // If initial status was "present", mark as absent
-                  newStatus = 'absent';
-                  statusUpdated++;
+                // If worked_hours >= shift_time/2, mark as half_day
+                if (workedHours >= shiftDurationHours / 2) {
+                  newStatus = 'half_day';
+                  if (initialStatus !== 'half_day') {
+                    statusUpdated++;
+                  }
                 } else {
-                  // If initial status was "late" or "half_day", keep current status
-                  newStatus = initialStatus;
-                }
-              }
-            }
-
-            // Update attendance log
-            await tx.attendanceLog.update({
-              where: { id: log.id },
-              data: {
-                checkout: checkoutTimeForStorage,
-                status: newStatus,
-                updatedAt: new Date()
-              }
-            });
-
-            // Update attendance counters if status changed
-            if (newStatus !== initialStatus && !wasAbsent) {
-              // Status changed - need to update counters
-              const logDate = log.date || targetBusinessDate;
-              const monthKey = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}`;
-              const summaryKey = `${employee.id}_${monthKey}`;
-              
-              // Update attendance record using pre-fetched data
-              let attendance = attendanceMap.get(employee.id);
-              if (!attendance) {
-                attendance = await tx.attendance.create({
-                  data: {
-                    employeeId: employee.id,
-                    presentDays: 0,
-                    absentDays: 0,
-                    lateDays: 0,
-                    leaveDays: 0,
-                    remoteDays: 0,
-                    quarterlyLeaves: 0,
-                    monthlyLates: 0,
-                    halfDays: 0
+                  // If worked_hours < shift_time/2
+                  if (initialStatus === 'present' || initialStatus === null) {
+                    // If initial status was "present", mark as absent
+                    newStatus = 'absent';
+                    statusUpdated++;
+                  } else {
+                    // If initial status was "late" or "half_day", keep current status
+                    newStatus = initialStatus;
                   }
-                });
-                attendanceMap.set(employee.id, attendance);
-              }
-              
-              // Calculate counter changes
-              const updateData: any = {};
-              
-              if (newStatus === 'half_day') {
-                // Changed to half_day: increment halfDays, decrement presentDays if was present
-                if (initialStatus === 'present') {
-                  updateData.presentDays = { decrement: 1 };
                 }
-                updateData.halfDays = { increment: 1 };
-              } else if (newStatus === 'absent') {
-                // Changed to absent: decrement presentDays, increment absentDays
-                if (initialStatus === 'present') {
-                  updateData.presentDays = { decrement: 1 };
-                }
-                updateData.absentDays = { increment: 1 };
               }
-              
-              if (Object.keys(updateData).length > 0) {
-                await tx.attendance.update({
-                  where: { id: attendance.id },
-                  data: updateData
-                });
-              }
-              
-              // Update monthly summary using pre-fetched data
-              let monthlySummary = monthlySummaryMap.get(summaryKey);
-              if (!monthlySummary) {
-                monthlySummary = await tx.monthlyAttendanceSummary.create({
-                  data: {
-                    empId: employee.id,
-                    month: monthKey,
-                    totalPresent: 0,
-                    totalAbsent: 0,
-                    totalLeaveDays: 0,
-                    totalLateDays: 0,
-                    totalHalfDays: 0,
-                    totalRemoteDays: 0
-                  }
-                });
-                monthlySummaryMap.set(summaryKey, monthlySummary);
-              }
-              
-              const monthlyUpdateData: any = {};
-              
-              if (newStatus === 'half_day') {
-                if (initialStatus === 'present') {
-                  monthlyUpdateData.totalPresent = { decrement: 1 };
-                }
-                monthlyUpdateData.totalHalfDays = { increment: 1 };
-              } else if (newStatus === 'absent') {
-                if (initialStatus === 'present') {
-                  monthlyUpdateData.totalPresent = { decrement: 1 };
-                }
-                monthlyUpdateData.totalAbsent = { increment: 1 };
-              }
-              
-              if (Object.keys(monthlyUpdateData).length > 0) {
-                await tx.monthlyAttendanceSummary.update({
-                  where: { id: monthlySummary.id },
-                  data: monthlyUpdateData
-                });
-              }
-              
-              console.log(`Employee ${employee.id}: Status updated from ${initialStatus} to ${newStatus} based on worked hours (${workedHoursFormatted})`);
-            }
 
-            checkedOut++;
-          } catch (error) {
-            console.error(`Error processing checkout for employee ${log.employeeId} (${log.employee.firstName} ${log.employee.lastName}):`, error);
-            errors++;
+              // Update attendance log
+              await tx.attendanceLog.update({
+                where: { id: log.id },
+                data: {
+                  checkout: checkoutTimeForStorage,
+                  status: newStatus,
+                  updatedAt: new Date()
+                }
+              });
+
+              // Update attendance counters if status changed
+              if (newStatus !== initialStatus && !wasAbsent) {
+                // Status changed - need to update counters
+                const logDate = log.date || targetBusinessDate;
+                const monthKey = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}`;
+                const summaryKey = `${employee.id}_${monthKey}`;
+
+                // Update attendance record using pre-fetched data
+                let attendance = attendanceMap.get(employee.id);
+                if (!attendance) {
+                  attendance = await tx.attendance.create({
+                    data: {
+                      employeeId: employee.id,
+                      presentDays: 0,
+                      absentDays: 0,
+                      lateDays: 0,
+                      leaveDays: 0,
+                      remoteDays: 0,
+                      quarterlyLeaves: 0,
+                      monthlyLates: 0,
+                      halfDays: 0
+                    }
+                  });
+                  attendanceMap.set(employee.id, attendance);
+                }
+
+                // Calculate counter changes
+                const updateData: any = {};
+
+                if (newStatus === 'half_day') {
+                  // Changed to half_day: increment halfDays, decrement presentDays if was present
+                  if (initialStatus === 'present') {
+                    updateData.presentDays = { decrement: 1 };
+                  }
+                  updateData.halfDays = { increment: 1 };
+                } else if (newStatus === 'absent') {
+                  // Changed to absent: decrement presentDays, increment absentDays
+                  if (initialStatus === 'present') {
+                    updateData.presentDays = { decrement: 1 };
+                  }
+                  updateData.absentDays = { increment: 1 };
+                }
+
+                if (Object.keys(updateData).length > 0) {
+                  await tx.attendance.update({
+                    where: { id: attendance.id },
+                    data: updateData
+                  });
+                }
+
+                // Update monthly summary using pre-fetched data
+                let monthlySummary = monthlySummaryMap.get(summaryKey);
+                if (!monthlySummary) {
+                  monthlySummary = await tx.monthlyAttendanceSummary.create({
+                    data: {
+                      empId: employee.id,
+                      month: monthKey,
+                      totalPresent: 0,
+                      totalAbsent: 0,
+                      totalLeaveDays: 0,
+                      totalLateDays: 0,
+                      totalHalfDays: 0,
+                      totalRemoteDays: 0
+                    }
+                  });
+                  monthlySummaryMap.set(summaryKey, monthlySummary);
+                }
+
+                const monthlyUpdateData: any = {};
+
+                if (newStatus === 'half_day') {
+                  if (initialStatus === 'present') {
+                    monthlyUpdateData.totalPresent = { decrement: 1 };
+                  }
+                  monthlyUpdateData.totalHalfDays = { increment: 1 };
+                } else if (newStatus === 'absent') {
+                  if (initialStatus === 'present') {
+                    monthlyUpdateData.totalPresent = { decrement: 1 };
+                  }
+                  monthlyUpdateData.totalAbsent = { increment: 1 };
+                }
+
+                if (Object.keys(monthlyUpdateData).length > 0) {
+                  await tx.monthlyAttendanceSummary.update({
+                    where: { id: monthlySummary.id },
+                    data: monthlyUpdateData
+                  });
+                }
+
+                console.log(`Employee ${employee.id}: Status updated from ${initialStatus} to ${newStatus} based on worked hours (${workedHoursFormatted})`);
+              }
+
+              checkedOut++;
+            } catch (error) {
+              console.error(`Error processing checkout for employee ${log.employeeId} (${log.employee.firstName} ${log.employee.lastName}):`, error);
+              errors++;
+            }
           }
-        }
-      }, {
-        timeout: 30000, // 30 seconds timeout per batch
-        maxWait: 8000 // 8 seconds max wait (reduced from 10s)
-      });
+        }, {
+          timeout: 30000, // 30 seconds timeout per batch
+          maxWait: 8000 // 8 seconds max wait (reduced from 10s)
+        });
       } catch (batchError) {
         console.error(`Error processing batch ${batchNumber}/${totalBatches}:`, batchError);
         // Continue with next batch even if this one fails
@@ -4657,149 +4716,14 @@ export class AttendanceService {
     return { message, checked_out: checkedOut, errors, skipped };
   }
 
-  /**
-   * Helper method to update attendance table for bulk mark present
-   * Handles status-based updates and absent->present conversion
-   */
-  private async updateAttendanceForBulkMarkPresent(
-    tx: any, 
-    employeeId: number, 
-    date: Date, 
-    wasAbsent: boolean = false,
-    status: 'present' | 'late' | 'half_day' | 'absent' = 'present'
-  ): Promise<void> {
-    // Find existing attendance record or create new one
-    let attendance = await tx.attendance.findFirst({
-      where: { employeeId }
-    });
-
-    if (!attendance) {
-      // Create new attendance record
-      attendance = await tx.attendance.create({
-        data: {
-          employeeId,
-          presentDays: 0,
-          absentDays: 0,
-          lateDays: 0,
-          leaveDays: 0,
-          remoteDays: 0,
-          quarterlyLeaves: 0,
-          monthlyLates: 0,
-          halfDays: 0
-        }
-      });
-    }
-
-    // Update counters based on status
-    const updateData: any = {};
-
-    // Handle status-specific counters
-    if (status === 'absent') {
-      // If marking as absent, increment absent days
-      updateData.absentDays = (attendance.absentDays || 0) + 1;
-      // Don't increment present days for absent status
-    } else {
-      // For present/late/half_day, increment present days
-      updateData.presentDays = (attendance.presentDays || 0) + 1;
-      
-      if (status === 'late') {
-        updateData.lateDays = (attendance.lateDays || 0) + 1;
-        // Decrement monthly lates if available (following checkin pattern)
-        if ((attendance.monthlyLates ?? 0) > 0) {
-          updateData.monthlyLates = Math.max(0, (attendance.monthlyLates ?? 0) - 1);
-        }
-      } else if (status === 'half_day') {
-        updateData.halfDays = (attendance.halfDays || 0) + 1;
-      }
-      
-      // Only decrement absent days if the employee was actually marked absent for this date
-      // and we're now marking them as present/late/half_day
-      if (wasAbsent && attendance.absentDays && attendance.absentDays > 0) {
-        updateData.absentDays = Math.max(0, attendance.absentDays - 1);
-      }
-    }
-
-    await tx.attendance.update({
-      where: { id: attendance.id },
-      data: updateData
-    });
-  }
-
-  /**
-   * Helper method to update monthly attendance summary for bulk mark present
-   * Handles status-based updates and absent->present conversion
-   */
-  private async updateMonthlyAttendanceForBulkMarkPresent(
-    tx: any, 
-    employeeId: number, 
-    date: Date, 
-    wasAbsent: boolean = false,
-    status: 'present' | 'late' | 'half_day' | 'absent' = 'present'
-  ): Promise<void> {
-    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-    // Find existing monthly summary or create new one
-    let monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
-      where: {
-        empId: employeeId,
-        month: monthYear
-      }
-    });
-
-    if (!monthlySummary) {
-      // Create new monthly summary
-      monthlySummary = await tx.monthlyAttendanceSummary.create({
-        data: {
-          empId: employeeId,
-          month: monthYear,
-          totalPresent: 0,
-          totalAbsent: 0,
-          totalLeaveDays: 0,
-          totalLateDays: 0,
-          totalHalfDays: 0,
-          totalRemoteDays: 0
-        }
-      });
-    }
-
-    // Update monthly summary based on status
-    const updateData: any = {};
-
-    // Handle status-specific counters
-    if (status === 'absent') {
-      // If marking as absent, increment absent count
-      updateData.totalAbsent = (monthlySummary.totalAbsent || 0) + 1;
-      // Don't increment present count for absent status
-    } else {
-      // For present/late/half_day, increment present count
-      updateData.totalPresent = (monthlySummary.totalPresent || 0) + 1;
-      
-      if (status === 'late') {
-        updateData.totalLateDays = (monthlySummary.totalLateDays || 0) + 1;
-      } else if (status === 'half_day') {
-        updateData.totalHalfDays = (monthlySummary.totalHalfDays || 0) + 1;
-      }
-      
-      // Only decrement absent count if the employee was actually marked absent for this date
-      // and we're now marking them as present/late/half_day
-      if (wasAbsent && monthlySummary.totalAbsent && monthlySummary.totalAbsent > 0) {
-        updateData.totalAbsent = Math.max(0, monthlySummary.totalAbsent - 1);
-      }
-    }
-
-    await tx.monthlyAttendanceSummary.update({
-      where: { id: monthlySummary.id },
-      data: updateData
-    });
-  }
 
   /**
    * Optimized version that uses pre-fetched attendance records
    */
   private async updateAttendanceForBulkMarkPresentOptimized(
-    tx: any, 
-    employeeId: number, 
-    date: Date, 
+    tx: any,
+    employeeId: number,
+    date: Date,
     wasAbsent: boolean = false,
     status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
     attendanceMap: Map<number, any>
@@ -4834,7 +4758,7 @@ export class AttendanceService {
       updateData.absentDays = (attendance.absentDays || 0) + 1;
     } else {
       updateData.presentDays = (attendance.presentDays || 0) + 1;
-      
+
       if (status === 'late') {
         updateData.lateDays = (attendance.lateDays || 0) + 1;
         if ((attendance.monthlyLates ?? 0) > 0) {
@@ -4843,7 +4767,7 @@ export class AttendanceService {
       } else if (status === 'half_day') {
         updateData.halfDays = (attendance.halfDays || 0) + 1;
       }
-      
+
       if (wasAbsent && attendance.absentDays && attendance.absentDays > 0) {
         updateData.absentDays = Math.max(0, attendance.absentDays - 1);
       }
@@ -4859,9 +4783,9 @@ export class AttendanceService {
    * Optimized version that uses pre-fetched monthly summaries
    */
   private async updateMonthlyAttendanceForBulkMarkPresentOptimized(
-    tx: any, 
-    employeeId: number, 
-    date: Date, 
+    tx: any,
+    employeeId: number,
+    date: Date,
     wasAbsent: boolean = false,
     status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
     monthlySummaryMap: Map<string, any>
@@ -4897,13 +4821,13 @@ export class AttendanceService {
       updateData.totalAbsent = (monthlySummary.totalAbsent || 0) + 1;
     } else {
       updateData.totalPresent = (monthlySummary.totalPresent || 0) + 1;
-      
+
       if (status === 'late') {
         updateData.totalLateDays = (monthlySummary.totalLateDays || 0) + 1;
       } else if (status === 'half_day') {
         updateData.totalHalfDays = (monthlySummary.totalHalfDays || 0) + 1;
       }
-      
+
       if (wasAbsent && monthlySummary.totalAbsent && monthlySummary.totalAbsent > 0) {
         updateData.totalAbsent = Math.max(0, monthlySummary.totalAbsent - 1);
       }
@@ -4915,27 +4839,6 @@ export class AttendanceService {
     });
   }
 
-  /**
-   * Creates a shift datetime from date and time string, handling PKT timezone consistently
-   * with check-in logic. Uses UTC setters to ensure proper date/time handling.
-   */
-  private createShiftDateTime(date: Date, timeString: string): Date {
-    // Handle time strings that might be just hours (e.g., '21' instead of '21:00')
-    const timeParts = timeString.split(':');
-    const hours = parseInt(timeParts[0], 10);
-    const minutes = timeParts[1] ? parseInt(timeParts[1], 10) : 0;
-    
-    if (isNaN(hours) || hours < 0 || hours > 23 || isNaN(minutes) || minutes < 0 || minutes > 59) {
-      throw new Error(`Invalid time format: ${timeString}. Expected format: HH:MM or HH`);
-    }
-
-    // Create datetime using UTC setters for consistency with check-in logic
-    // This ensures the time is set correctly regardless of server timezone
-    const shiftDateTime = new Date(date);
-    shiftDateTime.setUTCHours(hours, minutes, 0, 0);
-
-    return shiftDateTime;
-  }
 
   // Helper method to update attendance counters for status changes
   private async updateAttendanceCountersForStatusChange(
@@ -5190,7 +5093,7 @@ export class AttendanceService {
     try {
       // Build where clause
       const where: any = {};
-      
+
       if (query.employee_id) {
         where.empId = query.employee_id;
       }
@@ -5243,10 +5146,10 @@ export class AttendanceService {
         return acc;
       }, {} as Record<string, number>);
 
-      const mostCommonLeaveType = Object.keys(leaveTypeCounts).length > 0 
-        ? Object.keys(leaveTypeCounts).reduce((a, b) => 
-            leaveTypeCounts[a] > leaveTypeCounts[b] ? a : b
-          )
+      const mostCommonLeaveType = Object.keys(leaveTypeCounts).length > 0
+        ? Object.keys(leaveTypeCounts).reduce((a, b) =>
+          leaveTypeCounts[a] > leaveTypeCounts[b] ? a : b
+        )
         : 'N/A';
 
       // Generate period statistics
