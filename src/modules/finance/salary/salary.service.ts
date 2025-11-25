@@ -2,6 +2,17 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
+import { MarkSalaryPaidDto } from './dto/mark-paid.dto';
+
+type GetAllSalariesParams = {
+  month?: string;
+  page?: string;
+  limit?: string;
+  departments?: string;
+  status?: string;
+  minSalary?: string;
+  maxSalary?: string;
+};
 
 @Injectable()
 export class FinanceSalaryService {
@@ -255,6 +266,43 @@ export class FinanceSalaryService {
       },
       deductionBreakdown: detailedDeductionBreakdown
     };
+  }
+
+  /**
+   * Wrapper for API to fetch paginated salaries list for table view.
+   */
+  public async getAllSalaries(params: GetAllSalariesParams) {
+    const parseNumber = (value?: string, fallback?: number) => {
+      if (value === undefined || value === null) {
+        return fallback;
+      }
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? fallback : parsed;
+    };
+
+    const month = params.month;
+    const pageNum = parseNumber(params.page, 1);
+    const limitNum = parseNumber(params.limit, 20);
+    const minSalaryNum = params.minSalary ? parseFloat(params.minSalary) : undefined;
+    const maxSalaryNum = params.maxSalary ? parseFloat(params.maxSalary) : undefined;
+    const departmentIds = params.departments
+      ? params.departments
+          .split(',')
+          .map(id => parseInt(id.trim(), 10))
+          .filter(id => !isNaN(id))
+      : undefined;
+
+    return await this.getAllSalariesDisplay(
+      month,
+      pageNum,
+      limitNum,
+      departmentIds,
+      params.status,
+      minSalaryNum,
+      maxSalaryNum,
+      undefined,
+      undefined,
+    );
   }
 
   /**
@@ -544,6 +592,34 @@ export class FinanceSalaryService {
         retrieved: paginatedResults.length,
       },
     };
+  }
+
+  /**
+   * Wrapper for API to fetch salary details of a specific employee with fallback to previous month.
+   */
+  public async getEmployeeSalary(employeeId: number, month?: string) {
+    this.validateEmployeeId(employeeId);
+    this.validateMonthFormat(month);
+    const requestedMonth = this.getCalculationMonth(month);
+
+    let salaryLog = await this.getLatestSalaryLog(employeeId, requestedMonth);
+    if (salaryLog) {
+      return await this.getDetailedSalaryBreakdown(employeeId, requestedMonth);
+    }
+
+    const previousMonth = this.getPreviousMonth(requestedMonth);
+    this.logger.log(
+      `No salary record found for employee ${employeeId} in ${requestedMonth}. Trying previous month ${previousMonth}`,
+    );
+
+    salaryLog = await this.getLatestSalaryLog(employeeId, previousMonth);
+    if (salaryLog) {
+      return await this.getDetailedSalaryBreakdown(employeeId, previousMonth);
+    }
+
+    throw new NotFoundException(
+      `No salary record found for employee ${employeeId} for ${requestedMonth} or ${previousMonth}. Please calculate salary first.`,
+    );
   }
 
   /**
@@ -1968,6 +2044,48 @@ export class FinanceSalaryService {
 
     this.logger.log(`Bonus updated for employee ${employeeId} to ${bonusAmount}`);
     return result;
+  }
+
+  /**
+   * Handle salary mark-as-paid requests supporting both single and bulk operations.
+   */
+  public async handleMarkSalaryPaidRequest(
+    dto: MarkSalaryPaidDto,
+    processedBy: number,
+    userType: string,
+  ) {
+    if (!processedBy) {
+      throw new BadRequestException('Processed by user is required.');
+    }
+
+    const processedByRole = userType === 'admin' ? 'Admin' : 'Employee';
+
+    if (dto.employeeIds && dto.employeeIds.length > 0) {
+      return await this.markSalariesAsPaidBulk(
+        dto.employeeIds,
+        dto.month,
+        processedBy,
+        processedByRole,
+      );
+    }
+
+    if (dto.employeeId) {
+      return await this.markSalaryAsPaid(
+        dto.employeeId,
+        dto.month,
+        processedBy,
+        processedByRole,
+      );
+    }
+
+    throw new BadRequestException('Either employeeId or employeeIds must be provided.');
+  }
+
+  /**
+   * Wrapper for API to calculate salary preview via query params.
+   */
+  public async calculateSalaryForPreview(employeeId: number, endDate?: string) {
+    return await this.calculateSalaryPreview(employeeId, endDate);
   }
 
   /**
