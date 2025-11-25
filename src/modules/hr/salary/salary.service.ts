@@ -18,7 +18,7 @@ export class SalaryService {
    * Helper method to get current date in PKT timezone
    */
   private getCurrentDateInPKT(): Date {
-    return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Karachi"}));
+    return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
   }
 
   async calculateSalaryDeductions(dto: SalaryDeductionDto): Promise<SalaryDeductionResponseDto> {
@@ -293,7 +293,7 @@ export class SalaryService {
         // 2. Find the latest unpaid salary log for the current month
         const currentDate = new Date();
         const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-        
+
         const salaryLog = await prisma.netSalaryLog.findFirst({
           where: {
             employeeId: employee_id,
@@ -318,7 +318,7 @@ export class SalaryService {
           where: { id: salaryLog.id },
           data: {
             paidOn: currentDate,
-            processedBy: currentUserId, // Set to admin ID or employee ID
+            processedBy: isAdmin ? 0 : currentUserId, // Set to zero for admin or employee ID
             processedByRole: (isAdmin ? 'Admin' : 'Employee') as any,
             status: SalaryStatus.paid,
             updatedAt: currentDate,
@@ -394,7 +394,7 @@ export class SalaryService {
             title: `${employee.firstName} ${employee.lastName} Salary`,
             category: 'salary',
             amount: salaryLog.netSalary,
-            createdBy: currentUserId, // Set to admin ID or employee ID
+            createdBy: isAdmin ? 0 : currentUserId, // Set to admin ID or employee ID
             processedByRole: (isAdmin ? 'Admin' : 'Employee') as any,
             paidOn: currentDate,
             transactionId: transaction.id,
