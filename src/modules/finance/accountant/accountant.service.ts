@@ -326,12 +326,17 @@ export class AccountantService {
   /**
    * Creates a new vendor record
    * Only accountants can perform this action
+   * Admin users can bypass all restrictions
    */
   async addVendor(
     dto: AddVendorDto,
-    currentUserId: number
+    currentUserId: number,
+    user?: any
   ): Promise<VendorResponseDto> {
     try {
+      // Admin bypass - check both type and role for defense in depth
+      const isAdmin = user?.type === 'admin' || user?.role === 'admin';
+
       // 1. Check if current user exists and is active
       const currentEmployee = await this.prisma.employee.findUnique({
         where: { id: currentUserId },
@@ -354,7 +359,7 @@ export class AccountantService {
         };
       }
 
-      if (currentEmployee.status !== 'active') {
+      if (!isAdmin && currentEmployee.status !== 'active') {
         return {
           status: 'error',
           message: `Access denied: Your account (${currentEmployee.firstName} ${currentEmployee.lastName}) is currently inactive. Please contact HR to reactivate your account.`,
@@ -362,8 +367,8 @@ export class AccountantService {
         };
       }
 
-      // 2. Check if employee is in Accounts department
-      if (currentEmployee.department?.name !== 'Accounts') {
+      // 2. Check if employee is in Accounts department (admin bypass)
+      if (!isAdmin && currentEmployee.department?.name !== 'Accounts') {
         return {
           status: 'error',
           message: `Permission denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are in the ${currentEmployee.department?.name || 'Unknown'} department. Only members of the Accounts department can add vendor records.`,
@@ -371,18 +376,20 @@ export class AccountantService {
         };
       }
 
-      // 3. Check if employee is an accountant
-      const accountant = await this.prisma.accountant.findUnique({
-        where: { employeeId: currentUserId },
-        select: { id: true },
-      });
+      // 3. Check if employee is an accountant (admin bypass)
+      if (!isAdmin) {
+        const accountant = await this.prisma.accountant.findUnique({
+          where: { employeeId: currentUserId },
+          select: { id: true },
+        });
 
-      if (!accountant) {
-        return {
-          status: 'error',
-          message: `Access denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are not authorized as an accountant. Only accountants can add vendor records. Please contact your department manager to request accountant privileges.`,
-          error_code: 'NOT_ACCOUNTANT'
-        };
+        if (!accountant) {
+          return {
+            status: 'error',
+            message: `Access denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are not authorized as an accountant. Only accountants can add vendor records. Please contact your department manager to request accountant privileges.`,
+            error_code: 'NOT_ACCOUNTANT'
+          };
+        }
       }
 
       // 4. Validate that at least one identifying field is provided
@@ -482,11 +489,16 @@ export class AccountantService {
   /**
    * Retrieves all vendor records
    * Only accountants can perform this action
+   * Admin users can bypass all restrictions
    */
   async getAllVendors(
-    currentUserId: number
+    currentUserId: number,
+    user?: any
   ): Promise<VendorListResponseDto> {
     try {
+      // Admin bypass - check both type and role for defense in depth
+      const isAdmin = user?.type === 'admin' || user?.role === 'admin';
+
       // 1. Check if current user exists and is active
       const currentEmployee = await this.prisma.employee.findUnique({
         where: { id: currentUserId },
@@ -509,7 +521,7 @@ export class AccountantService {
         };
       }
 
-      if (currentEmployee.status !== 'active') {
+      if (!isAdmin && currentEmployee.status !== 'active') {
         return {
           status: 'error',
           message: `Access denied: Your account (${currentEmployee.firstName} ${currentEmployee.lastName}) is currently inactive. Please contact HR to reactivate your account.`,
@@ -517,8 +529,8 @@ export class AccountantService {
         };
       }
 
-      // 2. Check if employee is in Accounts department
-      if (currentEmployee.department?.name !== 'Accounts') {
+      // 2. Check if employee is in Accounts department (admin bypass)
+      if (!isAdmin && currentEmployee.department?.name !== 'Accounts') {
         return {
           status: 'error',
           message: `Permission denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are in the ${currentEmployee.department?.name || 'Unknown'} department. Only members of the Accounts department can view vendor records.`,
@@ -526,18 +538,20 @@ export class AccountantService {
         };
       }
 
-      // 3. Check if employee is an accountant
-      const accountant = await this.prisma.accountant.findUnique({
-        where: { employeeId: currentUserId },
-        select: { id: true },
-      });
+      // 3. Check if employee is an accountant (admin bypass)
+      if (!isAdmin) {
+        const accountant = await this.prisma.accountant.findUnique({
+          where: { employeeId: currentUserId },
+          select: { id: true },
+        });
 
-      if (!accountant) {
-        return {
-          status: 'error',
-          message: `Access denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are not authorized as an accountant. Only accountants can view vendor records. Please contact your department manager to request accountant privileges.`,
-          error_code: 'NOT_ACCOUNTANT'
-        };
+        if (!accountant) {
+          return {
+            status: 'error',
+            message: `Access denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are not authorized as an accountant. Only accountants can view vendor records. Please contact your department manager to request accountant privileges.`,
+            error_code: 'NOT_ACCOUNTANT'
+          };
+        }
       }
 
       // 4. Retrieve all vendor records

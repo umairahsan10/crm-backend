@@ -67,6 +67,9 @@ export class LiabilityResponseDto {
   @ApiProperty({ example: false, description: 'Whether the liability is paid or not' })
   isPaid: boolean;
 
+  @ApiProperty({ example: 'Unpaid', description: 'Status of the liability (Paid or Unpaid)' })
+  status: string;
+
   @ApiPropertyOptional({ example: '2025-10-14', description: 'Date when the liability was paid' })
   paidOn?: Date;
 

@@ -605,6 +605,7 @@ export class LiabilitiesService {
       amount: Number(liability.amount),
       dueDate: liability.dueDate,
       isPaid: liability.isPaid,
+      status: liability.isPaid ? 'Paid' : 'Unpaid',
       paidOn: liability.paidOn,
       relatedVendorId: liability.relatedVendorId,
       createdBy: liability.createdBy,
