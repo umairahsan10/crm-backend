@@ -1,6 +1,26 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationDto } from '../../../../../common/dto/pagination.dto';
 
+export class ClientResponseDto {
+  @ApiProperty({ example: 22, description: 'Client ID' })
+  id: number;
+
+  @ApiPropertyOptional({ example: 'Acme Corporation', description: 'Company name of the client' })
+  companyName: string | null;
+
+  @ApiPropertyOptional({ example: 'John Doe', description: 'Full name of the client' })
+  clientName: string | null;
+
+  @ApiPropertyOptional({ example: 'john.doe@acme.com', description: 'Email address of the client' })
+  email: string | null;
+
+  @ApiPropertyOptional({ example: '+1-555-123-4567', description: 'Primary phone number of the client' })
+  phone: string | null;
+
+  @ApiProperty({ example: 'active', description: 'Account status of the client' })
+  accountStatus: string;
+}
+
 export class TransactionResponseDto {
   @ApiProperty({ example: 101, description: 'Unique transaction ID' })
   id: number;
@@ -40,6 +60,9 @@ export class TransactionResponseDto {
 
   @ApiProperty({ example: '2025-10-14T10:35:00Z', description: 'Last update timestamp' })
   updatedAt: string;
+
+  @ApiPropertyOptional({ type: () => ClientResponseDto, description: 'Client details if applicable' })
+  client: ClientResponseDto | null;
 }
 
 export class LeadResponseDto {

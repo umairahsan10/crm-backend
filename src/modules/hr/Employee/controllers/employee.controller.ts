@@ -100,7 +100,7 @@ export class EmployeeController {
    */
   @Get('employees')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
-  @Departments('HR')
+  @Departments('HR', 'Accounts')
   @ApiOperation({ summary: 'Get all employees with optional filters and pagination' })
   @ApiQuery({ name: 'departmentId', required: false, type: Number })
   @ApiQuery({ name: 'roleId', required: false, type: Number })
