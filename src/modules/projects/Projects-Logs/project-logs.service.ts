@@ -1,10 +1,12 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateProjectLogDto } from './dto/create-project-log.dto';
 import { UpdateProjectLogDto } from './dto/update-project-log.dto';
 import { ProjectLogQueryDto } from './dto/project-log-query.dto';
 import { AutoLogService } from './auto-log.service';
 import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
+import { ExportProjectLogsDto } from './dto/export-project-logs.dto';
+import { ProjectLogsStatsDto, ProjectLogsStatsResponseDto, StatsPeriod, PeriodStatsDto, DeveloperStatsDto, ProjectStatsDto } from './dto/project-logs-stats.dto';
 
 @Injectable()
 export class ProjectLogsService {
@@ -538,5 +540,328 @@ export class ProjectLogsService {
       }
       throw new BadRequestException(`Failed to fetch log statistics: ${error.message}`);
     }
+  }
+
+  // 8. Get Project Logs for Export
+  async getProjectLogsForExport(query: ExportProjectLogsDto) {
+    try {
+      const { 
+        project_id, 
+        developer_id, 
+        start_date, 
+        end_date 
+      } = query;
+
+      // Build where clause
+      const where: any = {};
+
+      if (project_id) {
+        where.projectId = project_id;
+      }
+
+      if (developer_id) {
+        where.developerId = developer_id;
+      }
+
+      if (start_date || end_date) {
+        where.createdAt = {};
+        if (start_date) {
+          where.createdAt.gte = new Date(start_date);
+        }
+        if (end_date) {
+          where.createdAt.lte = new Date(end_date);
+        }
+      }
+
+      return this.prisma.projectLog.findMany({
+        where,
+        include: {
+          project: {
+            include: {
+              client: {
+                select: {
+                  id: true,
+                  companyName: true,
+                  clientName: true,
+                  email: true
+                }
+              }
+            }
+          },
+          developer: {
+            include: {
+              role: {
+                select: {
+                  name: true
+                }
+              },
+              department: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+    } catch (error) {
+      console.error('Error in getProjectLogsForExport:', error);
+      throw new InternalServerErrorException(`Failed to get project logs for export: ${error.message}`);
+    }
+  }
+
+  // 9. Convert Project Logs to CSV
+  convertProjectLogsToCSV(projectLogs: any[], query: ExportProjectLogsDto): string {
+    const headers = [
+      'Project Log ID',
+      'Project ID',
+      'Developer ID',
+      'Developer Name',
+      'Developer Email',
+      'Created At',
+      'Updated At'
+    ];
+
+    if (query.include_project_details) {
+      headers.push('Project Name', 'Project Status', 'Client Name', 'Client Email');
+    }
+
+    if (query.include_developer_details) {
+      headers.push('Developer Role', 'Developer Department');
+    }
+
+    const csvRows = [headers.join(',')];
+
+    projectLogs.forEach(log => {
+      const row = [
+        log.id,
+        log.projectId,
+        log.developerId,
+        `"${log.developer.firstName} ${log.developer.lastName}"`,
+        log.developer.email,
+        log.createdAt.toISOString(),
+        log.updatedAt.toISOString()
+      ];
+
+      if (query.include_project_details) {
+        const clientName = log.project?.client?.companyName || log.project?.client?.clientName || 'N/A';
+        row.push(
+          `Project ${log.projectId}`,
+          'N/A', // Project status not available in current structure
+          `"${clientName}"`,
+          log.project?.client?.email || 'N/A'
+        );
+      }
+
+      if (query.include_developer_details) {
+        row.push(
+          log.developer.role?.name || 'N/A',
+          log.developer.department?.name || 'N/A'
+        );
+      }
+
+      csvRows.push(row.join(','));
+    });
+
+    return csvRows.join('\n');
+  }
+
+  // 10. Get Project Logs Statistics
+  async getProjectLogsStats(query: ProjectLogsStatsDto): Promise<ProjectLogsStatsResponseDto> {
+    try {
+      // Build where clause
+      const where: any = {};
+      
+      if (query.project_id) {
+        where.projectId = query.project_id;
+      }
+
+      if (query.developer_id) {
+        where.developerId = query.developer_id;
+      }
+
+      if (query.start_date && query.end_date) {
+        where.createdAt = {
+          gte: new Date(query.start_date),
+          lte: new Date(query.end_date)
+        };
+      } else if (query.start_date) {
+        where.createdAt = {
+          gte: new Date(query.start_date)
+        };
+      } else if (query.end_date) {
+        where.createdAt = {
+          lte: new Date(query.end_date)
+        };
+      }
+
+      // Get all project logs for statistics
+      const projectLogs = await this.prisma.projectLog.findMany({
+        where,
+        include: {
+          project: {
+            select: {
+              id: true
+            }
+          },
+          developer: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          }
+        }
+      });
+
+      // Calculate basic statistics
+      const totalProjectLogs = projectLogs.length;
+      const uniqueProjects = new Set(projectLogs.map(log => log.projectId)).size;
+      const uniqueDevelopers = new Set(projectLogs.map(log => log.developerId)).size;
+      const averageLogsPerProject = uniqueProjects > 0 ? totalProjectLogs / uniqueProjects : 0;
+      const averageLogsPerDeveloper = uniqueDevelopers > 0 ? totalProjectLogs / uniqueDevelopers : 0;
+
+      // Generate period statistics
+      const periodStats = this.generateProjectLogsPeriodStats(projectLogs, query.period || StatsPeriod.MONTHLY);
+
+      const response: ProjectLogsStatsResponseDto = {
+        total_project_logs: totalProjectLogs,
+        unique_projects: uniqueProjects,
+        unique_developers: uniqueDevelopers,
+        average_logs_per_project: Math.round(averageLogsPerProject * 100) / 100,
+        average_logs_per_developer: Math.round(averageLogsPerDeveloper * 100) / 100,
+        period_stats: periodStats
+      };
+
+      // Add breakdowns if requested
+      if (query.include_breakdown) {
+        response.developer_breakdown = this.generateProjectLogsDeveloperBreakdown(projectLogs);
+        response.project_breakdown = this.generateProjectLogsProjectBreakdown(projectLogs);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error in getProjectLogsStats:', error);
+      throw new InternalServerErrorException(`Failed to get project logs statistics: ${error.message}`);
+    }
+  }
+
+  // Generate period statistics for project logs
+  private generateProjectLogsPeriodStats(projectLogs: any[], period: StatsPeriod): PeriodStatsDto[] {
+    const stats: PeriodStatsDto[] = [];
+    const groupedLogs = this.groupProjectLogsByPeriod(projectLogs, period);
+
+    Object.keys(groupedLogs).forEach(periodKey => {
+      const logs = groupedLogs[periodKey];
+      const totalProjectLogs = logs.length;
+      const uniqueProjects = new Set(logs.map(log => log.projectId)).size;
+      const uniqueDevelopers = new Set(logs.map(log => log.developerId)).size;
+
+      stats.push({
+        period: periodKey,
+        total_project_logs: totalProjectLogs,
+        unique_projects: uniqueProjects,
+        unique_developers: uniqueDevelopers
+      });
+    });
+
+    return stats.sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  // Group project logs by period
+  private groupProjectLogsByPeriod(projectLogs: any[], period: StatsPeriod): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+
+    projectLogs.forEach(log => {
+      let periodKey: string;
+      const date = new Date(log.createdAt);
+
+      switch (period) {
+        case StatsPeriod.DAILY:
+          periodKey = date.toISOString().split('T')[0];
+          break;
+        case StatsPeriod.WEEKLY:
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          periodKey = `Week of ${weekStart.toISOString().split('T')[0]}`;
+          break;
+        case StatsPeriod.MONTHLY:
+          periodKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+          break;
+        case StatsPeriod.YEARLY:
+          periodKey = date.getFullYear().toString();
+          break;
+        default:
+          periodKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      }
+
+      if (!grouped[periodKey]) {
+        grouped[periodKey] = [];
+      }
+      grouped[periodKey].push(log);
+    });
+
+    return grouped;
+  }
+
+  // Generate developer breakdown
+  private generateProjectLogsDeveloperBreakdown(projectLogs: any[]): DeveloperStatsDto[] {
+    const developerMap = new Map<number, { logs: any[], developer: any }>();
+
+    projectLogs.forEach(log => {
+      if (!developerMap.has(log.developerId)) {
+        developerMap.set(log.developerId, {
+          logs: [],
+          developer: log.developer
+        });
+      }
+      developerMap.get(log.developerId)!.logs.push(log);
+    });
+
+    return Array.from(developerMap.entries()).map(([developerId, data]) => {
+      const uniqueProjects = new Set(data.logs.map(log => log.projectId)).size;
+      const totalProjectLogs = data.logs.length;
+      const averageLogsPerProject = uniqueProjects > 0 ? totalProjectLogs / uniqueProjects : 0;
+
+      return {
+        developer_id: developerId,
+        developer_name: `${data.developer.firstName} ${data.developer.lastName}`,
+        total_project_logs: totalProjectLogs,
+        unique_projects: uniqueProjects,
+        average_logs_per_project: Math.round(averageLogsPerProject * 100) / 100
+      };
+    }).sort((a, b) => b.total_project_logs - a.total_project_logs);
+  }
+
+  // Generate project breakdown
+  private generateProjectLogsProjectBreakdown(projectLogs: any[]): ProjectStatsDto[] {
+    const projectMap = new Map<number, { logs: any[], project: any }>();
+
+    projectLogs.forEach(log => {
+      if (!projectMap.has(log.projectId)) {
+        projectMap.set(log.projectId, {
+          logs: [],
+          project: log.project
+        });
+      }
+      projectMap.get(log.projectId)!.logs.push(log);
+    });
+
+      return Array.from(projectMap.entries()).map(([projectId, data]) => {
+        const uniqueDevelopers = new Set(data.logs.map(log => log.developerId)).size;
+        const totalProjectLogs = data.logs.length;
+        const averageLogsPerDeveloper = uniqueDevelopers > 0 ? totalProjectLogs / uniqueDevelopers : 0;
+
+        return {
+          project_id: projectId,
+          project_name: `Project ${projectId}`,
+          total_project_logs: totalProjectLogs,
+          unique_developers: uniqueDevelopers,
+          average_logs_per_developer: Math.round(averageLogsPerDeveloper * 100) / 100
+        };
+      }).sort((a, b) => b.total_project_logs - a.total_project_logs);
   }
 }

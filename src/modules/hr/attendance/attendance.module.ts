@@ -26,5 +26,6 @@ import { AutoMarkAbsentTrigger } from './triggers/auto-mark-absent.trigger';
           AutoCheckoutTrigger,
           AutoMarkAbsentTrigger
         ],
+  exports: [AttendanceService],
 })
 export class AttendanceModule {}
