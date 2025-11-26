@@ -234,15 +234,27 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
-    @MessageBody() data: { chatId: number; content: string },
+    @MessageBody() data: { 
+      chatId: number; 
+      content?: string; 
+      attachmentUrl?: string;
+      attachmentType?: string;
+      attachmentName?: string;
+      attachmentSize?: number;
+      imageData?: string; // Base64 image data for pasted screenshots
+    },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     try {
       const userId = client.data.user?.id;
-      const { chatId, content } = data;
+      const { chatId, content, attachmentUrl, attachmentType, attachmentName, attachmentSize, imageData } = data;
 
-      if (!userId || !chatId || !content) {
-        return { success: false, message: 'Invalid message data' };
+      if (!userId || !chatId) {
+        return { success: false, message: 'Invalid message data: chatId and userId are required' };
+      }
+
+      if (!content && !attachmentUrl && !imageData) {
+        return { success: false, message: 'Either message content, attachment URL, or image data is required' };
       }
 
       this.logger.log(`📨 User ${userId} sending message to chat ${chatId}`);
@@ -257,7 +269,15 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       // Create message in database
       const result = await this.chatMessagesService.createChatMessage(
-        { chatId, content },
+        { 
+          chatId, 
+          content: content || undefined,
+          attachmentUrl: attachmentUrl || undefined,
+          attachmentType: attachmentType || undefined,
+          attachmentName: attachmentName || undefined,
+          attachmentSize: attachmentSize || undefined,
+          imageData: imageData || undefined, // Support pasted screenshots
+        },
         userId,
       );
 

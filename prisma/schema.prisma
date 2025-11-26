@@ -898,14 +898,18 @@ model ChatParticipant {
 }
 
 model ChatMessage {
-  chatId    Int         @map("chat_id")
-  senderId  Int         @map("sender_id")
-  message   String?
-  createdAt DateTime    @default(now()) @map("created_at")
-  updatedAt DateTime    @updatedAt @map("updated_at")
-  id        Int         @id @default(autoincrement()) @map("chat_message_id")
-  chat      ProjectChat @relation(fields: [chatId], references: [id])
-  sender    Employee    @relation("MessageSender", fields: [senderId], references: [id])
+  chatId         Int         @map("chat_id")
+  senderId       Int         @map("sender_id")
+  message        String?
+  attachmentUrl String?     @map("attachment_url")
+  attachmentType String?     @map("attachment_type")
+  attachmentName String?     @map("attachment_name")
+  attachmentSize Int?        @map("attachment_size")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  id             Int         @id @default(autoincrement()) @map("chat_message_id")
+  chat           ProjectChat @relation(fields: [chatId], references: [id])
+  sender         Employee    @relation("MessageSender", fields: [senderId], references: [id])
 
   @@map("chat_messages")
 }

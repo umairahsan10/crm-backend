@@ -3,6 +3,7 @@ import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
 import { TimeStorageUtil } from '../../../../common/utils/time-storage.util';
+import { uploadBase64ImageToCloudinary } from './utils/file-upload.util';
 
 @Injectable()
 export class ChatMessagesService {
@@ -321,13 +322,57 @@ export class ChatMessagesService {
     }
   }
 
+  /**
+   * Validates that a user has access to a chat
+   */
+  async validateChatAccess(chatId: number, userId: number): Promise<void> {
+    const participant = await this.prisma.chatParticipant.findFirst({
+      where: {
+        chatId,
+        employeeId: userId,
+      },
+    });
+
+    if (!participant) {
+      throw new ForbiddenException(`You do not have access to chat ${chatId}. Only chat participants can upload files.`);
+    }
+  }
+
   async createChatMessage(createChatMessageDto: CreateChatMessageDto, senderId: number) {
     try {
       console.log('🔧 [SERVICE] createChatMessage - Starting...');
       console.log('📥 [SERVICE] Message Data:', createChatMessageDto);
       console.log('👤 [SERVICE] Sender ID:', senderId);
       
-      const { chatId, content, messageType, attachmentUrl } = createChatMessageDto;
+      const { chatId, content, messageType, attachmentUrl, attachmentType, attachmentName, attachmentSize, imageData } = createChatMessageDto;
+
+      // Handle base64 image data (pasted screenshots)
+      let finalAttachmentUrl = attachmentUrl;
+      let finalAttachmentType = attachmentType;
+      let finalAttachmentName = attachmentName;
+      let finalAttachmentSize = attachmentSize;
+
+      if (imageData) {
+        console.log('🖼️ [SERVICE] Processing pasted image data...');
+        try {
+          const uploadResult = await uploadBase64ImageToCloudinary(imageData, chatId);
+          finalAttachmentUrl = uploadResult.url;
+          finalAttachmentType = uploadResult.type;
+          finalAttachmentName = uploadResult.originalName;
+          finalAttachmentSize = uploadResult.size;
+          console.log('✅ [SERVICE] Image uploaded to Cloudinary:', uploadResult.url);
+        } catch (error) {
+          console.error('❌ [SERVICE] Failed to upload pasted image:', error);
+          throw new BadRequestException(
+            `Failed to upload pasted image: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      }
+
+      // Validate that either content, attachmentUrl, or imageData is provided
+      if (!content && !finalAttachmentUrl && !imageData) {
+        throw new BadRequestException('Either message content, attachment URL, or image data is required');
+      }
 
       // Validate if chat exists
       console.log('🔍 [SERVICE] Step 1: Validating chat exists...');
@@ -377,13 +422,21 @@ export class ChatMessagesService {
       // Create the message
       console.log('🔧 [SERVICE] Step 4: Creating chat message...');
       console.log('💬 [SERVICE] Message content:', content);
+      console.log('📎 [SERVICE] Attachment URL:', finalAttachmentUrl);
+      console.log('📎 [SERVICE] Attachment Type:', finalAttachmentType);
+      console.log('📎 [SERVICE] Attachment Name:', finalAttachmentName);
+      console.log('📎 [SERVICE] Attachment Size:', finalAttachmentSize);
       const pktTime = TimeStorageUtil.getCurrentPKTTimeForStorage();
       console.log('🕐 [SERVICE] Message timestamp (PKT):', pktTime.toISOString());
       const createdMessage = await this.prisma.chatMessage.create({
         data: {
           chatId,
           senderId,
-          message: content,
+          message: content || null,
+          attachmentUrl: finalAttachmentUrl || null,
+          attachmentType: finalAttachmentType || null,
+          attachmentName: finalAttachmentName || null,
+          attachmentSize: finalAttachmentSize || null,
           createdAt: pktTime,
           updatedAt: pktTime,
         },
