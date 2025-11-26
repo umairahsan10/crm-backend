@@ -958,6 +958,10 @@ export class LeadsService {
         if (query.status) {
             where.lead = { ...where.lead, status: query.status };
             console.log('🔍 Added status filter:', query.status);
+        } else {
+            // Exclude completed leads from cracked leads by default (they should be fetched via completed leads endpoint)
+            where.lead = { ...where.lead, status: { not: 'completed' } };
+            console.log('🔍 Excluding completed leads from cracked leads');
         }
         if (query.outcome) {
             where.lead = { ...where.lead, outcome: query.outcome };
@@ -1081,6 +1085,169 @@ export class LeadsService {
         console.log('🔍 ===== FINAL RESPONSE =====');
         console.log('🔍 Response pagination:', result.pagination);
         console.log('🔍 ===== GET CRACKED LEADS END =====');
+
+        return result;
+    }
+
+    async getCompletedLeads(query: any, employeeId: number) {
+        console.log('🔍 ===== GET COMPLETED LEADS START =====');
+        console.log('🔍 Employee ID:', employeeId);
+        console.log('🔍 Query params:', query);
+
+        // Get employee details to check role
+        const employee = await this.prisma.employee.findUnique({
+            where: { id: employeeId },
+            include: {
+                role: {
+                    select: {
+                        name: true
+                    }
+                }
+            }
+        });
+
+        if (!employee) {
+            throw new BadRequestException(`Employee with ID ${employeeId} not found`);
+        }
+
+        const userRole = employee.role?.name || '';
+        console.log('🔍 Employee role:', userRole);
+
+        const where: any = {
+            lead: {
+                status: 'completed'
+            }
+        };
+
+        // Role-based filtering
+        if (userRole === 'dep_manager' || userRole === 'unit_head') {
+            // Department managers and unit heads see all completed leads
+            console.log('🔍 User is manager/unit head - showing all completed leads');
+        } else {
+            // Other employees see only leads they cracked (check lead's crackedById field)
+            where.lead = {
+                ...where.lead,
+                crackedById: employeeId
+            };
+            console.log('🔍 User is regular employee - showing only leads cracked by them (crackedById:', employeeId, ')');
+        }
+
+        // Apply additional filters
+        if (query.search) {
+            where.lead = {
+                ...where.lead,
+                OR: [
+                    { name: { contains: query.search, mode: 'insensitive' } },
+                    { email: { contains: query.search, mode: 'insensitive' } },
+                    { phone: { contains: query.search } }
+                ]
+            };
+            console.log('🔍 Added search filter for:', query.search);
+        }
+
+        if (query.salesUnitId) {
+            where.lead = {
+                ...where.lead,
+                salesUnitId: parseInt(query.salesUnitId)
+            };
+            console.log('🔍 Added salesUnitId filter:', query.salesUnitId);
+        }
+
+        if (query.industryId) {
+            where.industryId = parseInt(query.industryId);
+            console.log('🔍 Added industryId filter:', query.industryId);
+        }
+
+        if (query.minAmount) {
+            where.amount = { ...where.amount, gte: parseFloat(query.minAmount) };
+            console.log('🔍 Added minAmount filter:', query.minAmount);
+        }
+
+        if (query.maxAmount) {
+            where.amount = { ...where.amount, lte: parseFloat(query.maxAmount) };
+            console.log('🔍 Added maxAmount filter:', query.maxAmount);
+        }
+
+        const page = parseInt(query.page) || 1;
+        const limit = parseInt(query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        // Flexible sorting - map invalid fields to valid ones
+        const validSortFields = ['id', 'crackedAt', 'createdAt', 'updatedAt', 'amount', 'commissionRate', 'totalPhases', 'currentPhase', 'remainingAmount', 'industryId', 'closedBy'];
+        let sortBy = query.sortBy || 'crackedAt';
+        
+        // Map closedAt to crackedAt (since closedAt doesn't exist on CrackedLead)
+        // If user wants to sort by when lead was closed, we can sort by crackedAt or use lead relation
+        if (sortBy === 'closedAt') {
+            sortBy = 'crackedAt'; // Use crackedAt as fallback
+            console.log('🔍 Mapped closedAt to crackedAt for sorting');
+        }
+        
+        // Validate sortBy field
+        if (!validSortFields.includes(sortBy)) {
+            sortBy = 'crackedAt'; // Default to crackedAt if invalid
+            console.log('🔍 Invalid sortBy field, defaulting to crackedAt');
+        }
+        
+        const sortOrder = query.sortOrder || 'desc';
+
+        console.log('🔍 Pagination - Page:', page, 'Limit:', limit, 'Skip:', skip);
+        console.log('🔍 Sorting - By:', sortBy, 'Order:', sortOrder);
+        console.log('🔍 Final WHERE clause for completed leads:', JSON.stringify(where, null, 2));
+
+        console.log('🔍 Executing database query for completed leads...');
+        const [completedLeads, total] = await Promise.all([
+            this.prisma.crackedLead.findMany({
+                where,
+                include: {
+                    lead: {
+                        include: {
+                            assignedTo: { select: { firstName: true, lastName: true } },
+                            startedBy: { select: { firstName: true, lastName: true } },
+                            salesUnit: { select: { name: true } },
+                            closedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+                            crackedBy: { select: { id: true, firstName: true, lastName: true, email: true } }
+                        }
+                    },
+                    employee: { 
+                        select: { 
+                            id: true,
+                            firstName: true, 
+                            lastName: true,
+                            email: true
+                        } 
+                    },
+                    industry: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
+                },
+                skip,
+                take: limit,
+                orderBy: { [sortBy]: sortOrder }
+            }),
+            this.prisma.crackedLead.count({ where })
+        ]);
+
+        console.log('🔍 ===== COMPLETED LEADS QUERY RESULTS =====');
+        console.log('🔍 Total completed leads found:', total);
+        console.log('🔍 Completed leads returned:', completedLeads.length);
+
+        const result = {
+            completedLeads,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
+
+        console.log('🔍 ===== FINAL RESPONSE =====');
+        console.log('🔍 Response pagination:', result.pagination);
+        console.log('🔍 ===== GET COMPLETED LEADS END =====');
 
         return result;
     }

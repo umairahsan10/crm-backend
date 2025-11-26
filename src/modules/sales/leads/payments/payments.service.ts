@@ -403,6 +403,30 @@ export class PaymentsService {
             }
             const amount = transaction.amount.toNumber();
 
+            // Validate payment amount for last phase
+            let crackedLead: any = null;
+            if (transaction.invoice?.leadId) {
+                crackedLead = await this.prisma.crackedLead.findFirst({
+                    where: { leadId: transaction.invoice.leadId }
+                });
+
+                if (crackedLead) {
+                    const currentPhase = crackedLead.currentPhase || 1;
+                    const totalPhases = crackedLead.totalPhases;
+                    const remainingAmount = crackedLead.remainingAmount;
+
+                    // Check if this is the last phase
+                    if (totalPhases && currentPhase === totalPhases && remainingAmount !== null) {
+                        // For last phase, payment amount cannot be less than remaining amount
+                        if (amount < remainingAmount) {
+                            throw new BadRequestException(
+                                `Payment amount (${amount}) for the last phase cannot be less than remaining amount (${remainingAmount})`
+                            );
+                        }
+                    }
+                }
+            }
+
             // 2. Complete transaction, subtract amount from remaining amount, and log client payment
             await this.prisma.$transaction(async (prisma) => {
                 // Update transaction status to completed
@@ -412,19 +436,12 @@ export class PaymentsService {
                 });
 
                 // Update remaining amount in cracked lead
-                let crackedLead: any = null;
-                if (transaction.invoice?.leadId) {
-                    crackedLead = await prisma.crackedLead.findFirst({
-                        where: { leadId: transaction.invoice.leadId }
+                if (crackedLead && crackedLead.remainingAmount !== null) {
+                    const newRemainingAmount = Math.max(0, crackedLead.remainingAmount - amount);
+                    await prisma.crackedLead.update({
+                        where: { id: crackedLead.id },
+                        data: { remainingAmount: newRemainingAmount }
                     });
-
-                    if (crackedLead && crackedLead.remainingAmount !== null) {
-                        const newRemainingAmount = Math.max(0, crackedLead.remainingAmount - amount);
-                        await prisma.crackedLead.update({
-                            where: { id: crackedLead.id },
-                            data: { remainingAmount: newRemainingAmount }
-                        });
-                    }
                 }
 
                 // Create client payment record

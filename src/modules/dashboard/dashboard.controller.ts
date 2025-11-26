@@ -103,11 +103,14 @@ export class DashboardController {
 
   @Get('current-projects')
   @UseGuards(DepartmentsGuard)
-  @Departments('Production')
-  @ApiOperation({ summary: 'Get current projects - Returns up to 5 projects: running projects first, then completed projects to fill remaining slots. Accessible by Production department and Admin only.' })
-  @ApiResponse({ status: 200, description: 'Projects retrieved successfully', type: ProjectsResponseDto })
+  @Departments('Production', 'Sales')
+  @ApiOperation({ 
+    summary: 'Get current projects - Returns up to 5 projects: running projects first, then completed projects to fill remaining slots',
+    description: 'Accessible by Production and Sales departments, and Admin. Role-based filtering applies: Production users see projects by team/unit assignment, Sales users see projects by salesRepId. Sales department manager sees all projects, unit heads see projects in their unit, team leads see projects for their team\'s sales reps, and employees see only their own projects.'
+  })
+  @ApiResponse({ status: 200, description: 'Projects retrieved successfully. For Sales users: filtered by salesRepId based on role. For Production users: filtered by team/unit assignment based on role.', type: ProjectsResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Only Production department and Admin can access this endpoint' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Only Production and Sales departments and Admin can access this endpoint' })
   async getCurrentProjects(@Request() req: any): Promise<ProjectsResponseDto> {
     return await this.dashboardService.getCurrentProjects(
       req.user.id,
