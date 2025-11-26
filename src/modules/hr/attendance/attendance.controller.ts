@@ -35,6 +35,10 @@ import { ExportLateLogsDto } from './dto/export-late-logs.dto';
 import { LateLogsStatsDto, LateLogsStatsResponseDto } from './dto/late-logs-stats.dto';
 import { ExportHalfDayLogsDto } from './dto/export-half-day-logs.dto';
 import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto } from './dto/half-day-logs-stats.dto';
+import { GetProjectLogsDto } from './dto/get-project-logs.dto';
+import { ProjectLogsListResponseDto } from './dto/project-logs-list-response.dto';
+import { ExportProjectLogsDto } from '../../projects/Projects-Logs/dto/export-project-logs.dto';
+import { ProjectLogsStatsDto, ProjectLogsStatsResponseDto } from '../../projects/Projects-Logs/dto/project-logs-stats.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
 import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
@@ -709,5 +713,68 @@ export class AttendanceController {
     @Query() query: HalfDayLogsStatsDto
   ): Promise<HalfDayLogsStatsResponseDto> {
     return this.attendanceService.getHalfDayLogsStats(query);
+  }
+
+  /**
+   * Get Project Logs
+   * GET /hr/attendance/project-logs
+   */
+  @Get('project-logs')
+  @ApiOperation({ summary: 'Get project logs with filtering' })
+  @ApiQuery({ type: GetProjectLogsDto })
+  @ApiResponse({ status: 200, description: 'Project logs retrieved successfully', type: ProjectLogsListResponseDto, isArray: true })
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getProjectLogs(
+    @Query() query: GetProjectLogsDto
+  ): Promise<ProjectLogsListResponseDto[]> {
+    return this.attendanceService.getProjectLogs(query);
+  }
+
+  /**
+   * Export Project Logs
+   * GET /hr/attendance/project-logs/export
+   */
+  @Get('project-logs/export')
+  @ApiOperation({ summary: 'Export project logs' })
+  @ApiQuery({ type: ExportProjectLogsDto })
+  @ApiResponse({ status: 200, description: 'Project logs exported successfully' })
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async exportProjectLogs(
+    @Res() res: Response,
+    @Query() query: ExportProjectLogsDto
+  ) {
+    const { format = 'csv', ...filterQuery } = query;
+    const data = await this.attendanceService.getProjectLogsForExportHR(filterQuery);
+    const filename = `project-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(this.attendanceService.convertProjectLogsToCSVHR(data, query));
+    } else if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.json(data);
+    } else {
+      res.status(400).json({ message: 'Unsupported format. Use csv or json.' });
+    }
+  }
+
+  /**
+   * Get Project Logs Statistics
+   * GET /hr/attendance/project-logs/stats
+   */
+  @Get('project-logs/stats')
+  @ApiOperation({ summary: 'Get project logs statistics' })
+  @ApiQuery({ type: ProjectLogsStatsDto })
+  @ApiResponse({ status: 200, description: 'Project logs statistics retrieved successfully', type: ProjectLogsStatsResponseDto })
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PermissionName.attendance_permission)
+  async getProjectLogsStats(
+    @Query() query: ProjectLogsStatsDto
+  ): Promise<ProjectLogsStatsResponseDto> {
+    return this.attendanceService.getProjectLogsStatsHR(query);
   }
 }
