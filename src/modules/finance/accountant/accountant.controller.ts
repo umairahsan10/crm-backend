@@ -92,7 +92,7 @@ export class AccountantController {
    * 
    * Required Permissions: Any accountant permission (for validation)
    * Required Department: Accounts
-   * Admin bypass: No (only accountants can add vendors)
+   * Admin bypass: Yes (admin users can bypass all restrictions)
    */
   @Post('vendor/create')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
@@ -109,7 +109,8 @@ export class AccountantController {
     
     const result = await this.accountantService.addVendor(
       dto,
-      currentUserId
+      currentUserId,
+      req.user
     );
 
     // Return the result directly (success or error response)
@@ -131,7 +132,7 @@ export class AccountantController {
    * 
    * Required Permissions: Any accountant permission (for validation)
    * Required Department: Accounts
-   * Admin bypass: No (only accountants can view vendors)
+   * Admin bypass: Yes (admin users can bypass all restrictions)
    */
   @Get('vendors/display')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
@@ -145,7 +146,8 @@ export class AccountantController {
     const currentUserId = req.user.id;
     
     const result = await this.accountantService.getAllVendors(
-      currentUserId
+      currentUserId,
+      req.user
     );
 
     // Return the result directly (success or error response)
