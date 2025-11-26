@@ -3011,9 +3011,9 @@ export class DashboardService {
   }
 
   async getCurrentProjects(userId: number, role: string, department: string, userType?: string) {
-    // Handle Admin users - they can see all Production projects
+    // Handle Admin users - they can see all projects (Production and Sales)
     if (userType === 'admin') {
-      // Admin sees all Production projects (same as manager) - no filter needed
+      // Admin sees all projects - no filter needed
       const projectWhere = {};
       
       // Get running projects (in_progress, onhold, or null/pending_assignment)
@@ -3070,11 +3070,155 @@ export class DashboardService {
       return this.mapProjectsToResponse(allProjects);
     }
 
-    // Only Production department has projects
-    if (department !== 'Production') {
+    // Handle Sales department users
+    if (department === 'Sales') {
+      return await this.getSalesProjects(userId, role);
+    }
+
+    // Handle Production department users
+    if (department === 'Production') {
+      return await this.getProductionProjects(userId, role);
+    }
+
+    // For other departments, return empty array
+    return { projects: [] };
+  }
+
+  private async getSalesProjects(userId: number, role: string) {
+    let runningProjects: any[] = [];
+    let completedProjects: any[] = [];
+
+    // Build where clause based on Sales role
+    let projectWhere: any = {};
+
+    // Get user's sales department info for hierarchical filtering
+    const userSalesDept = await this.prisma.salesDepartment.findFirst({
+      where: { employeeId: userId },
+      include: {
+        salesUnit: {
+          select: {
+            id: true,
+            name: true,
+            headId: true,
+            teams: {
+              select: {
+                id: true,
+                teamLeadId: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (role === 'dep_manager') {
+      // Sales department manager: all projects (no filter)
+      projectWhere = {};
+    } else if (role === 'unit_head') {
+      // Sales unit head: projects in their unit
+      // Get all sales reps in the unit
+      if (userSalesDept?.salesUnitId) {
+        const unitSalesReps = await this.prisma.salesDepartment.findMany({
+          where: { salesUnitId: userSalesDept.salesUnitId },
+          select: { employeeId: true }
+        });
+        const salesRepIds = unitSalesReps.map(sd => sd.employeeId);
+        projectWhere = salesRepIds.length > 0 
+          ? { salesRepId: { in: salesRepIds } } 
+          : { salesRepId: -1 }; // No access if no sales reps in unit
+      } else {
+        return { projects: [] }; // No sales unit assigned
+      }
+    } else if (role === 'team_lead') {
+      // Sales team lead: projects for their team's sales reps
+      if (userSalesDept?.salesUnitId) {
+        // Get team members (sales reps in the team)
+        const teamMembers = await this.prisma.employee.findMany({
+          where: { teamLeadId: userId },
+          select: { id: true }
+        });
+        const teamMemberIds = teamMembers.map(m => m.id);
+        
+        // Get sales departments for team members
+        const teamSalesDepts = await this.prisma.salesDepartment.findMany({
+          where: { 
+            employeeId: { in: [...teamMemberIds, userId] },
+            salesUnitId: userSalesDept.salesUnitId
+          },
+          select: { employeeId: true }
+        });
+        const teamSalesRepIds = teamSalesDepts.map(sd => sd.employeeId);
+        
+        projectWhere = teamSalesRepIds.length > 0 
+          ? { salesRepId: { in: teamSalesRepIds } } 
+          : { salesRepId: -1 }; // No access if no sales reps in team
+      } else {
+        return { projects: [] }; // No sales unit assigned
+      }
+    } else if (role === 'senior' || role === 'junior') {
+      // Sales employees: projects where salesRepId = userId
+      projectWhere = { salesRepId: userId };
+    } else {
+      // For other roles, return empty
       return { projects: [] };
     }
 
+    // Get running projects (in_progress, onhold, or null/pending_assignment)
+    runningProjects = await this.prisma.project.findMany({
+      where: {
+        ...projectWhere,
+        OR: [
+          { status: { in: ['in_progress', 'onhold'] } },
+          { status: null } // Include pending_assignment projects as running
+        ]
+      } as any,
+      select: {
+        id: true,
+        description: true,
+        liveProgress: true,
+        status: true,
+        deadline: true,
+        team: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // If we have less than 5 running projects, get completed projects to fill up to 5
+    const remainingSlots = 5 - runningProjects.length;
+    if (remainingSlots > 0) {
+      completedProjects = await this.prisma.project.findMany({
+        where: {
+          ...projectWhere,
+          status: 'completed'
+        },
+        select: {
+          id: true,
+          description: true,
+          liveProgress: true,
+          status: true,
+          deadline: true,
+          team: {
+            select: {
+              name: true
+            }
+          }
+        },
+        take: remainingSlots,
+        orderBy: { updatedAt: 'desc' } // Most recent completed first
+      });
+    }
+
+    // Combine: running projects first, then completed projects
+    const allProjects = [...runningProjects, ...completedProjects].slice(0, 5);
+
+    return this.mapProjectsToResponse(allProjects);
+  }
+
+  private async getProductionProjects(userId: number, role: string) {
     let runningProjects: any[] = [];
     let completedProjects: any[] = [];
 

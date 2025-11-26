@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
-import { Prisma, TransactionType, TransactionStatus, PaymentWays } from '@prisma/client';
+import { Prisma, TransactionType, TransactionStatus, PaymentWays, PaymentMethod } from '@prisma/client';
 import { CreateRevenueDto } from './dto/create-revenue.dto';
 import { UpdateRevenueDto } from './dto/update-revenue.dto';
 import { 
@@ -129,7 +129,7 @@ export class RevenueService {
             amount: new Prisma.Decimal(dto.amount),
             receivedFrom: finalReceivedFrom,
             receivedOn: receivedOn,
-            paymentMethod: dto.paymentMethod || 'bank',
+            paymentMethod: this.mapToPaymentMethod(dto.paymentMethod) || PaymentMethod.bank,
             relatedInvoiceId: finalRelatedInvoiceId,
             createdBy: currentUserId,
             transactionId: transaction.id,
@@ -416,7 +416,7 @@ export class RevenueService {
         if (dto.amount !== undefined) updateData.amount = new Prisma.Decimal(dto.amount);
         if (dto.receivedFrom !== undefined) updateData.receivedFrom = dto.receivedFrom;
         if (dto.receivedOn !== undefined) updateData.receivedOn = new Date(dto.receivedOn);
-        if (dto.paymentMethod !== undefined) updateData.paymentMethod = dto.paymentMethod;
+        if (dto.paymentMethod !== undefined) updateData.paymentMethod = this.mapToPaymentMethod(dto.paymentMethod);
         if (dto.relatedInvoiceId !== undefined) updateData.relatedInvoiceId = dto.relatedInvoiceId;
 
         // Update revenue
@@ -600,6 +600,35 @@ export class RevenueService {
         return PaymentWays.online;
       default:
         return PaymentWays.bank;
+    }
+  }
+
+  /**
+   * Maps string or PaymentMethod enum to PaymentMethod enum
+   * Handles both string values and enum values
+   */
+  private mapToPaymentMethod(paymentMethod?: PaymentMethod | string): PaymentMethod {
+    if (!paymentMethod) {
+      return PaymentMethod.bank;
+    }
+    
+    // If it's already a PaymentMethod enum value, return it
+    if (Object.values(PaymentMethod).includes(paymentMethod as PaymentMethod)) {
+      return paymentMethod as PaymentMethod;
+    }
+    
+    // Map string values to enum
+    const method = String(paymentMethod).toLowerCase();
+    switch (method) {
+      case 'cash':
+        return PaymentMethod.cash;
+      case 'bank':
+      case 'manual': // Map 'manual' to 'bank' as default
+        return PaymentMethod.bank;
+      case 'online':
+        return PaymentMethod.online;
+      default:
+        return PaymentMethod.bank;
     }
   }
 

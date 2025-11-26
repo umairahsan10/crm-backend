@@ -111,6 +111,24 @@ export class LeadsController {
     return this.leadsService.getCrackedLead(id, userRole, userId);
   }
 
+  @Get('completed')
+  @ApiOperation({ summary: 'Get completed leads - Returns leads with status "completed". Department managers and unit heads see all completed leads, other employees see only leads they cracked.' })
+  @ApiQuery({ name: 'employeeId', required: true, type: Number, description: 'Employee ID to filter by. Required parameter.' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search term to filter leads by name, email, or phone' })
+  @ApiQuery({ name: 'salesUnitId', required: false, type: Number, description: 'Filter by sales unit ID' })
+  @ApiQuery({ name: 'industryId', required: false, type: Number, description: 'Filter by industry ID' })
+  @ApiQuery({ name: 'minAmount', required: false, type: Number, description: 'Minimum deal amount' })
+  @ApiQuery({ name: 'maxAmount', required: false, type: Number, description: 'Maximum deal amount' })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Field to sort by (default: crackedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order (default: desc)' })
+  @ApiResponse({ status: 200, description: 'Returns completed leads with pagination.' })
+  @ApiResponse({ status: 400, description: 'Invalid employee ID or missing required parameter.' })
+  getCompletedLeads(@Query('employeeId', ParseIntPipe) employeeId: number, @Query() query: any) {
+    return this.leadsService.getCompletedLeads(query, employeeId);
+  }
+
   @Get('archived')
   @UseGuards(ArchivedLeadsAccessGuard)
   @ApiOperation({ summary: 'Get archived leads' })
