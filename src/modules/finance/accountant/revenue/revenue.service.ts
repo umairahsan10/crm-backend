@@ -137,7 +137,16 @@ export class RevenueService {
           include: {
             transaction: {
               include: {
-                client: true, // This will be the lead
+                client: {
+                  select: {
+                    id: true,
+                    companyName: true,
+                    clientName: true,
+                    email: true,
+                    phone: true,
+                    accountStatus: true,
+                  },
+                },
               },
             },
             lead: true,
@@ -262,7 +271,16 @@ export class RevenueService {
           include: {
             transaction: {
               include: {
-                client: true,
+                client: {
+                  select: {
+                    id: true,
+                    companyName: true,
+                    clientName: true,
+                    email: true,
+                    phone: true,
+                    accountStatus: true,
+                  },
+                },
               },
             },
             lead: true,
@@ -325,7 +343,16 @@ export class RevenueService {
         include: {
           transaction: {
             include: {
-              client: true,
+              client: {
+                select: {
+                  id: true,
+                  companyName: true,
+                  clientName: true,
+                  email: true,
+                  phone: true,
+                  accountStatus: true,
+                },
+              },
             },
           },
           lead: true,
@@ -426,7 +453,16 @@ export class RevenueService {
           include: {
             transaction: {
               include: {
-                client: true,
+                client: {
+                  select: {
+                    id: true,
+                    companyName: true,
+                    clientName: true,
+                    email: true,
+                    phone: true,
+                    accountStatus: true,
+                  },
+                },
               },
             },
             lead: true,
@@ -632,6 +668,18 @@ export class RevenueService {
     }
   }
 
+  private mapClientToResponse(client: any): any | null {
+    if (!client) return null;
+    return {
+      id: client.id,
+      companyName: client.companyName,
+      clientName: client.clientName,
+      email: client.email,
+      phone: client.phone,
+      accountStatus: client.accountStatus,
+    };
+  }
+
   private mapTransactionToResponse(transaction: any): TransactionResponseDto {
     return {
       id: transaction.id,
@@ -647,6 +695,7 @@ export class RevenueService {
       invoiceId: transaction.invoiceId,
       createdAt: transaction.createdAt.toISOString(),
       updatedAt: transaction.updatedAt.toISOString(),
+      client: transaction.client ? this.mapClientToResponse(transaction.client) : null,
     };
   }
 

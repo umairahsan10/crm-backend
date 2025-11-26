@@ -4984,12 +4984,16 @@ export class AttendanceService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
+              lastName: true,
+              email: true
             }
           },
           project: {
             select: {
-              id: true
+              id: true,
+              description: true,
+              deadline: true,
+              status: true
             }
           }
         },
@@ -5005,7 +5009,12 @@ export class AttendanceService {
         developer_id: log.developerId,
         developer_first_name: log.developer.firstName,
         developer_last_name: log.developer.lastName,
+        developer_name: `${log.developer.firstName} ${log.developer.lastName}`,
+        developer_email: log.developer.email,
         project_name: `Project ${log.projectId}`,
+        project_description: log.project.description,
+        project_deadline: log.project.deadline ? log.project.deadline.toISOString().split('T')[0] : null,
+        project_status: log.project.status,
         created_at: log.createdAt.toISOString(),
         updated_at: log.updatedAt.toISOString()
       }));
