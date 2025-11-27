@@ -258,7 +258,8 @@ export class RevenueService {
       if (query?.search) {
         whereClause.OR = [
           { source: { contains: query.search, mode: 'insensitive' } },
-          { category: { contains: query.search, mode: 'insensitive' } }
+          { category: { contains: query.search, mode: 'insensitive' } },
+          { transaction: { client: { companyName: { contains: query.search, mode: 'insensitive' } } } }
         ];
       }
 

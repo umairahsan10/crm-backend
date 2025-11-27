@@ -201,7 +201,8 @@ export class AssetsService {
       if (query?.search) {
         whereClause.OR = [
           { title: { contains: query.search, mode: 'insensitive' } },
-          { category: { contains: query.search, mode: 'insensitive' } }
+          { category: { contains: query.search, mode: 'insensitive' } },
+          { transaction: { vendor: { name: { contains: query.search, mode: 'insensitive' } } } }
         ];
       }
 

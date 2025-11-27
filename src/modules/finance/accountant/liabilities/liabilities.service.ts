@@ -192,7 +192,8 @@ export class LiabilitiesService {
       if (query?.search) {
         whereClause.OR = [
           { name: { contains: query.search, mode: 'insensitive' } },
-          { category: { contains: query.search, mode: 'insensitive' } }
+          { category: { contains: query.search, mode: 'insensitive' } },
+          // { transaction: { vendor: { name: { contains: query.search, mode: 'insensitive' } } } }
         ];
       }
 
