@@ -107,6 +107,7 @@ export class LiabilitiesService {
                 vendor: true,
               },
             },
+            vendor: true,
             employee: {
               select: {
                 id: true,
@@ -214,6 +215,7 @@ export class LiabilitiesService {
                 vendor: true,
               },
             },
+            vendor: true,
             employee: {
               select: {
                 id: true,
@@ -268,6 +270,7 @@ export class LiabilitiesService {
               vendor: true,
             },
           },
+          vendor: true,
           employee: {
             select: {
               id: true,
@@ -357,8 +360,8 @@ export class LiabilitiesService {
         };
       }
 
-      // 3. Validate vendor if provided
-      if (updateData.relatedVendorId) {
+      // 3. Validate vendor if provided (allow null to clear vendor)
+      if (updateData.relatedVendorId !== undefined && updateData.relatedVendorId !== null) {
         const vendor = await this.prisma.vendor.findUnique({
           where: { id: updateData.relatedVendorId },
         });
@@ -406,6 +409,7 @@ export class LiabilitiesService {
                 vendor: true,
               },
             },
+            vendor: true,
             employee: {
               select: {
                 id: true,
@@ -416,20 +420,55 @@ export class LiabilitiesService {
           },
         });
 
-        // Update transaction if amount changed
+        // Update transaction if amount or vendor changed
         let updatedTransaction: any = null;
+        const transactionUpdateData: any = {
+          updatedAt: this.getCurrentDateInPKT(),
+        };
+        let shouldUpdateTransaction = false;
+
         if (updateData.amount !== undefined && updateData.amount !== Number(existingLiability.amount)) {
+          transactionUpdateData.amount = new Prisma.Decimal(updateData.amount);
+          shouldUpdateTransaction = true;
+        }
+
+        // Handle vendor update - check if vendor actually changed (handles null/undefined cases)
+        const currentVendorId = existingLiability.relatedVendorId ?? null;
+        const newVendorId = updateData.relatedVendorId !== undefined ? (updateData.relatedVendorId ?? null) : currentVendorId;
+        if (updateData.relatedVendorId !== undefined && currentVendorId !== newVendorId) {
+          transactionUpdateData.vendorId = updateData.relatedVendorId; // Can be null to clear vendor
+          shouldUpdateTransaction = true;
+        }
+
+        if (shouldUpdateTransaction) {
+          transactionUpdateData.notes = `Liability: ${updatedLiability.name} - ${updatedLiability.category} (Updated)`;
           updatedTransaction = await prisma.transaction.update({
             where: { id: existingLiability.transactionId },
-            data: {
-              amount: new Prisma.Decimal(updateData.amount),
-              notes: `Liability: ${updatedLiability.name} - ${updatedLiability.category} (Updated)`,
-              updatedAt: this.getCurrentDateInPKT(),
-            },
+            data: transactionUpdateData,
           });
         }
 
-        return { liability: updatedLiability, transaction: updatedTransaction };
+        // Re-fetch liability with updated vendor relation to ensure we have the latest data
+        const finalLiability = await prisma.liability.findUnique({
+          where: { id: liability_id },
+          include: {
+            transaction: {
+              include: {
+                vendor: true,
+              },
+            },
+            vendor: true,
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+
+        return { liability: finalLiability, transaction: updatedTransaction };
       });
 
       this.logger.log(
@@ -486,6 +525,7 @@ export class LiabilitiesService {
               vendor: true,
             },
           },
+          vendor: true,
           employee: {
             select: {
               id: true,
@@ -530,6 +570,7 @@ export class LiabilitiesService {
                 vendor: true,
               },
             },
+            vendor: true,
             employee: {
               select: {
                 id: true,
@@ -631,7 +672,7 @@ export class LiabilitiesService {
       createdAt: liability.createdAt,
       updatedAt: liability.updatedAt,
       transaction: this.mapTransactionToResponse(liability.transaction),
-      vendor: liability.transaction?.vendor ? this.mapVendorToResponse(liability.transaction.vendor) : null,
+      vendor: liability.vendor ? this.mapVendorToResponse(liability.vendor) : null,
       employee: liability.employee ? {
         id: liability.employee.id,
         firstName: liability.employee.firstName,
