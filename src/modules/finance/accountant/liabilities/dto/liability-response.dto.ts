@@ -48,6 +48,71 @@ export class ExpenseResponseDto {
   notes?: string;
 }
 
+export class VendorResponseDto {
+  @ApiProperty({ example: 5, description: 'Unique ID of the vendor' })
+  id: number;
+
+  @ApiProperty({ example: 'ABC Supplies', description: 'Name of the vendor' })
+  name: string;
+
+  @ApiProperty({
+    example: 'John Doe',
+    description: 'Contact person at the vendor',
+  })
+  contactPerson: string;
+
+  @ApiProperty({
+    example: 'contact@abc.com',
+    description: 'Email of the vendor',
+  })
+  email: string;
+
+  @ApiProperty({
+    example: '+1234567890',
+    description: 'Phone number of the vendor',
+  })
+  phone: string;
+
+  @ApiProperty({ example: '123 Main St', description: 'Address of the vendor' })
+  address: string;
+
+  @ApiProperty({ example: 'New York', description: 'City of the vendor' })
+  city: string;
+
+  @ApiProperty({ example: 'USA', description: 'Country of the vendor' })
+  country: string;
+
+  @ApiProperty({
+    example: '1234567890123456',
+    description: 'Bank account number of the vendor',
+  })
+  bankAccount: string;
+
+  @ApiProperty({
+    example: 'active',
+    description: 'Current status of the vendor',
+  })
+  status: string;
+
+  @ApiProperty({
+    example: 'Preferred vendor for IT equipment',
+    description: 'Additional notes',
+  })
+  notes: string;
+
+  @ApiProperty({
+    example: '2025-10-01T10:00:00Z',
+    description: 'Creation timestamp',
+  })
+  createdAt: Date;
+
+  @ApiProperty({
+    example: '2025-10-10T14:30:00Z',
+    description: 'Last updated timestamp',
+  })
+  updatedAt: Date;
+}
+
 export class LiabilityResponseDto {
   @ApiProperty({ example: 301, description: 'Liability ID' })
   id: number;
@@ -87,6 +152,20 @@ export class LiabilityResponseDto {
 
   @ApiProperty({ type: () => TransactionResponseDto, description: 'Linked transaction details' })
   transaction: TransactionResponseDto;
+
+  @ApiPropertyOptional({ type: () => VendorResponseDto, description: 'Vendor details associated with the liability' })
+  vendor: VendorResponseDto | null;
+
+  @ApiPropertyOptional({
+    type: () => Object,
+    description: 'Employee details associated with the liability',
+    example: { id: 12, firstName: 'Alice', lastName: 'Smith' },
+  })
+  employee: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  } | null;
 
   @ApiPropertyOptional({ type: () => ExpenseResponseDto, description: 'Linked expense details, if any' })
   expense?: ExpenseResponseDto;

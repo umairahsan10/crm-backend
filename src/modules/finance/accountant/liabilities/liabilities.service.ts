@@ -102,8 +102,11 @@ export class LiabilitiesService {
             createdBy: currentUserId,
           },
           include: {
-            transaction: true,
-            vendor: true,
+            transaction: {
+              include: {
+                vendor: true,
+              },
+            },
             employee: {
               select: {
                 id: true,
@@ -193,7 +196,7 @@ export class LiabilitiesService {
         whereClause.OR = [
           { name: { contains: query.search, mode: 'insensitive' } },
           { category: { contains: query.search, mode: 'insensitive' } },
-          // { transaction: { vendor: { name: { contains: query.search, mode: 'insensitive' } } } }
+          { transaction: { vendor: { name: { contains: query.search, mode: 'insensitive' } } } }
         ];
       }
 
@@ -206,8 +209,11 @@ export class LiabilitiesService {
         this.prisma.liability.findMany({
           where: whereClause,
           include: {
-            transaction: true,
-            vendor: true,
+            transaction: {
+              include: {
+                vendor: true,
+              },
+            },
             employee: {
               select: {
                 id: true,
@@ -257,8 +263,11 @@ export class LiabilitiesService {
       const liability = await this.prisma.liability.findUnique({
         where: { id },
         include: {
-          transaction: true,
-          vendor: true,
+          transaction: {
+            include: {
+              vendor: true,
+            },
+          },
           employee: {
             select: {
               id: true,
@@ -392,8 +401,11 @@ export class LiabilitiesService {
           where: { id: liability_id },
           data: liabilityUpdateData,
           include: {
-            transaction: true,
-            vendor: true,
+            transaction: {
+              include: {
+                vendor: true,
+              },
+            },
             employee: {
               select: {
                 id: true,
@@ -469,8 +481,11 @@ export class LiabilitiesService {
       const existingLiability = await this.prisma.liability.findUnique({
         where: { id: liability_id },
         include: {
-          transaction: true,
-          vendor: true,
+          transaction: {
+            include: {
+              vendor: true,
+            },
+          },
           employee: {
             select: {
               id: true,
@@ -510,8 +525,11 @@ export class LiabilitiesService {
             updatedAt: currentDate,
           },
           include: {
-            transaction: true,
-            vendor: true,
+            transaction: {
+              include: {
+                vendor: true,
+              },
+            },
             employee: {
               select: {
                 id: true,
@@ -613,7 +631,35 @@ export class LiabilitiesService {
       createdAt: liability.createdAt,
       updatedAt: liability.updatedAt,
       transaction: this.mapTransactionToResponse(liability.transaction),
+      vendor: liability.transaction?.vendor ? this.mapVendorToResponse(liability.transaction.vendor) : null,
+      employee: liability.employee ? {
+        id: liability.employee.id,
+        firstName: liability.employee.firstName,
+        lastName: liability.employee.lastName,
+      } : null,
       expense: liability.expense ? this.mapExpenseToResponse(liability.expense) : undefined,
+    };
+  }
+
+  /**
+   * Maps vendor data to response DTO
+   */
+  private mapVendorToResponse(vendor: any): any {
+    if (!vendor) return null;
+    return {
+      id: vendor.id,
+      name: vendor.name,
+      contactPerson: vendor.contactPerson,
+      email: vendor.email,
+      phone: vendor.phone,
+      address: vendor.address,
+      city: vendor.city,
+      country: vendor.country,
+      bankAccount: vendor.bankAccount,
+      status: vendor.status,
+      notes: vendor.notes,
+      createdAt: vendor.createdAt,
+      updatedAt: vendor.updatedAt,
     };
   }
 
