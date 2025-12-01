@@ -144,7 +144,7 @@ export class EmployeeController {
   /**
    * Get department for employee by taking in the department id
    */
-  @Get('employees/:id/department')
+  @Get('employees/:id/depa  rtment')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @ApiOperation({ summary: 'Get department for employee by department ID' })

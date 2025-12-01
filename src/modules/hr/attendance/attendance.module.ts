@@ -11,9 +11,10 @@ import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigg
 import { FutureHolidayTrigger } from './triggers/future-holiday-trigger';
 import { AutoCheckoutTrigger } from './triggers/auto-checkout.trigger';
 import { AutoMarkAbsentTrigger } from './triggers/auto-mark-absent.trigger';
+import { LogsModule } from '../view_logs/logs.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  imports: [ScheduleModule.forRoot(), LogsModule],
   controllers: [AttendanceController, HolidayController],
           providers: [
           AttendanceService,
