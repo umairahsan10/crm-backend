@@ -142,6 +142,20 @@ export class EmployeeController {
   }
 
   /**
+   * Get department for employee by taking in the department id
+   */
+  @Get('employees/:id/department')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR')
+  @ApiOperation({ summary: 'Get department for employee by department ID' })
+  @ApiParam({ name: 'id', description: 'Employee ID', type: Number })
+  @ApiResponse({ status: 200, description: 'Department retrieved' })
+  async getDepartmentForEmployee(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest) {
+    return await this.hrService.getDepartmentForEmployee(id);
+  }
+
+
+  /**
    * Update an employee
    */
   @Put('employees/:id')

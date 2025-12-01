@@ -101,6 +101,35 @@ export class EmployeeService {
     }
   }
 
+  async getDepartmentForEmployee(departmentId: number) {
+    const department = await this.prisma.department.findUnique({
+      where: { id: departmentId },
+    });
+
+    if (!department) {
+      throw new NotFoundException(`Department with ID ${departmentId} not found`);
+    }
+
+    const departmentName = department.name;
+
+    let units: any[];
+    switch (departmentName) {
+      case 'Production':
+        units = await this.prisma.productionUnit.findMany();
+        break;
+      case 'Marketing':
+        units = await this.prisma.marketingUnit.findMany();
+        break;
+      case 'Sales':
+        units = await this.prisma.salesUnit.findMany();
+        break;
+      default:
+        throw new BadRequestException(`Department ${departmentName} does not have associated units`);
+    }
+    
+    return units;
+  }
+
   async terminateEmployee(employeeId: number, terminationDate: string, hrEmployeeId: number, description?: string, isAdmin: boolean = false) {
     // Validate date format
     const parsedDate = new Date(terminationDate);
