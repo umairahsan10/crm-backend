@@ -64,6 +64,15 @@ export class ProjectsController {
     return this.projectsService.getProjects(req.user, query);
   }
 
+  // 2.5. Get Available Teams for Project Assignment
+  @Get('available-teams')
+  @UseGuards(JwtAuthGuard, DepartmentsGuard, RolesGuard)
+  @Departments('Production')
+  @Roles('dep_manager', 'unit_head') // Manager and Unit Head can view available teams
+  async getAvailableTeams() {
+    return this.projectsService.getAvailableTeams();
+  }
+
   // 3. Get Project Details
   @Get(':id')
   @UseGuards(JwtAuthGuard, DepartmentsGuard, ProjectAccessGuard)
@@ -85,6 +94,19 @@ export class ProjectsController {
     return this.projectsService.assignUnitHead(id, dto, req.user);
   }
 
+  // 4.5. Assign Team (Manager and Unit Head)
+  @Put(':id/assign-team')
+  @UseGuards(JwtAuthGuard, DepartmentsGuard, RolesGuard, ProjectAssignmentGuard)
+  @Departments('Production')
+  @Roles('dep_manager', 'unit_head') // Manager and Unit Head can assign teams
+  async assignTeam(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AssignProjectTeamDto,
+    @Request() req
+  ) {
+    return this.projectsService.assignTeam(id, dto, req.user);
+  }
+
   // 5. Unified Update Project (Role-based permissions)
   @Put(':id')
   @UseGuards(JwtAuthGuard, DepartmentsGuard, ProjectAccessGuard)
@@ -95,15 +117,6 @@ export class ProjectsController {
     @Request() req
   ) {
     return this.projectsService.updateProject(id, dto, req.user);
-  }
-
-  // 6. Get Available Teams for Project Assignment
-  @Get('available-teams')
-  @UseGuards(JwtAuthGuard, DepartmentsGuard, RolesGuard)
-  @Departments('Production')
-  @Roles('dep_manager', 'unit_head') // Manager and Unit Head can view available teams
-  async getAvailableTeams() {
-    return this.projectsService.getAvailableTeams();
   }
 
 }
