@@ -47,6 +47,7 @@ import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { log } from 'console';
 
 interface AuthenticatedRequest extends ExpressRequest {
   user: {
@@ -318,39 +319,6 @@ export class AttendanceController {
     );
   }
 
-  @Get('list')
-  @ApiOperation({ summary: 'Get attendance list' })
-  @ApiResponse({ status: 200, description: 'Attendance list retrieved successfully', type: AttendanceListResponseDto, isArray: true })
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async getAttendanceList(): Promise<AttendanceListResponseDto[]> {
-    return this.attendanceService.getAttendanceList();
-  }
-
-  @Get('list/:id')
-  @ApiOperation({ summary: 'Get attendance by employee ID' })
-  @ApiParam({ name: 'id', type: String })
-  @ApiResponse({ status: 200, description: 'Attendance for employee retrieved successfully', type: AttendanceListResponseDto })
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async getAttendanceById(@Param('id') id: string): Promise<AttendanceListResponseDto | null> {
-    const employeeId = Number(id);
-    if (isNaN(employeeId)) {
-      throw new BadRequestException('Invalid employee ID');
-    }
-    return this.attendanceService.getAttendanceById(employeeId);
-  }
-
-  @Get('month')
-  @ApiOperation({ summary: 'Get monthly attendance list' })
-  @ApiQuery({ name: 'month', type: String, required: false })
-  @ApiResponse({ status: 200, description: 'Monthly attendance list retrieved successfully', type: MonthlyAttendanceResponseDto, isArray: true })
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async getMonthlyAttendanceList(@Query('month') month?: string): Promise<MonthlyAttendanceResponseDto[]> {
-    return this.attendanceService.getMonthlyAttendanceList(month);
-  }
-
   @Get('month/:emp_id')
   @ApiOperation({ summary: 'Get monthly attendance for a specific employee' })
   @ApiParam({ name: 'emp_id', type: String })
@@ -369,184 +337,22 @@ export class AttendanceController {
     return this.attendanceService.getMonthlyAttendanceByEmployee(employeeId, month);
   }
 
-  @Put('update')
+  @Put('update/:id/status')
   @ApiOperation({ summary: 'Update attendance' })
   @ApiBody({ type: UpdateAttendanceDto })
-  @ApiResponse({ status: 200, description: 'Attendance updated successfully', type: AttendanceListResponseDto })
+  @ApiResponse({ status: 200, description: 'Attendance updated successfully', type: AttendanceLogResponseDto })
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions(PermissionName.attendance_permission)
-  async updateAttendance(@Body() updateData: UpdateAttendanceDto): Promise<AttendanceListResponseDto> {
-    return this.attendanceService.updateAttendance(updateData);
-  }
-
-  @Put('logs/:id/status')
-  @ApiOperation({ summary: 'Update attendance log status' })
-  @ApiParam({ name: 'id', type: String })
-  @ApiBody({ type: UpdateAttendanceLogStatusDto })
-  @ApiResponse({ status: 200, description: 'Attendance log status updated successfully', type: AttendanceLogResponseDto })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async updateAttendanceLogStatus(
-    @Param('id') id: string,
-    @Body() statusData: UpdateAttendanceLogStatusDto
+  async updateAttendance(
+    @Param() id: string,
+    @Body() updateData: UpdateAttendanceLogStatusDto
   ): Promise<AttendanceLogResponseDto> {
     const logId = Number(id);
     if (isNaN(logId)) {
       throw new BadRequestException('Invalid attendance log ID');
     }
-    return this.attendanceService.updateAttendanceLogStatus(
-      logId,
-      statusData.status,
-      statusData.reason,
-      statusData.reviewer_id,
-      statusData.checkin,
-      statusData.checkout
-    );
-  }
-
-  @Put('monthly/update')
-  @ApiOperation({ summary: 'Update monthly attendance' })
-  @ApiBody({ type: UpdateMonthlyAttendanceDto })
-  @ApiResponse({ status: 200, description: 'Monthly attendance updated successfully', type: MonthlyAttendanceResponseDto })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async updateMonthlyAttendance(@Body() updateData: UpdateMonthlyAttendanceDto): Promise<MonthlyAttendanceResponseDto> {
-    return this.attendanceService.updateMonthlyAttendance(updateData);
-  }
-
-  @Post('triggers/monthly-lates-reset')
-  @ApiOperation({ summary: 'Trigger monthly lates reset' })
-  @ApiResponse({ status: 200, description: 'Monthly lates reset triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, updated_count: { type: 'number' } } } })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async triggerMonthlyLatesReset(): Promise<{ message: string; updated_count: number }> {
-    const updatedCount = await this.monthlyLatesResetTrigger.manualReset();
-    return {
-      message: 'Monthly lates reset triggered successfully',
-      updated_count: updatedCount
-    };
-  }
-
-  @Post('triggers/quarterly-leaves-add')
-  @ApiOperation({ summary: 'Trigger quarterly leaves add' })
-  @ApiResponse({ status: 200, description: 'Quarterly leaves add triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, updated_count: { type: 'number' } } } })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async triggerQuarterlyLeavesAdd(): Promise<{ message: string; updated_count: number }> {
-    const updatedCount = await this.quarterlyLeavesUpdateTrigger.manualAddQuarterlyLeaves();
-    return {
-      message: 'Quarterly leaves add triggered successfully',
-      updated_count: updatedCount
-    };
-  }
-
-  @Post('triggers/quarterly-leaves-reset')
-  @ApiOperation({ summary: 'Trigger quarterly leaves reset' })
-  @ApiResponse({ status: 200, description: 'Quarterly leaves reset triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, updated_count: { type: 'number' } } } })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async triggerQuarterlyLeavesReset(): Promise<{ message: string; updated_count: number }> {
-    const updatedCount = await this.quarterlyLeavesUpdateTrigger.manualResetQuarterlyLeaves();
-    return {
-      message: 'Quarterly leaves reset triggered successfully',
-      updated_count: updatedCount
-    };
-  }
-
-  @Post('triggers/auto-mark-absent')
-  @ApiOperation({ summary: 'Trigger auto mark absent' })
-  @ApiResponse({ status: 200, description: 'Auto mark absent triggered successfully', schema: { type: 'object', properties: { message: { type: 'string' }, absent_marked: { type: 'number' }, leave_applied: { type: 'number' } } } })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async triggerAutoMarkAbsent(): Promise<{ message: string; absent_marked: number; leave_applied: number }> {
-    return this.attendanceService.autoMarkAbsent();
-  }
-
-  @Post('triggers/weekend-auto-present/override')
-  @ApiOperation({ summary: 'Trigger weekend auto-present override' })
-  @ApiResponse({ status: 200, description: 'Weekend auto-present override activated successfully', schema: { type: 'object', properties: { message: { type: 'string' }, marked_present: { type: 'number' }, errors: { type: 'number' } } } })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async triggerWeekendAutoPresentOverride(): Promise<{ message: string; marked_present: number; errors: number }> {
-    const result = await this.weekendAutoPresentTrigger.manualOverride();
-    return {
-      message: 'Weekend auto-present override activated successfully (bypassing weekend check)',
-      marked_present: result.marked_present,
-      errors: result.errors
-    };
-  }
-
-  @Get('triggers/weekend-status')
-  @ApiOperation({ summary: 'Get weekend status' })
-  @ApiResponse({ status: 200, description: 'Weekend status retrieved successfully', schema: { type: 'object', properties: { isWeekend: { type: 'boolean' }, dayOfWeek: { type: 'number' }, dayName: { type: 'string' }, currentTime: { type: 'string' }, activeEmployees: { type: 'number' } } } })
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async getWeekendStatus(): Promise<{
-    isWeekend: boolean;
-    dayOfWeek: number;
-    dayName: string;
-    currentTime: string;
-    activeEmployees: number;
-  }> {
-    return this.weekendAutoPresentTrigger.getWeekendStatus();
-  }
-
-  // ==================== FUTURE HOLIDAY TRIGGER ENDPOINTS ====================
-
-  /**
-   * Get status of future holiday trigger
-   * Shows if trigger is active, next check time, and today's holiday status
-   */
-  @Get('triggers/future-holiday-status')
-  @ApiOperation({ summary: 'Get future holiday trigger status' })
-  @ApiResponse({ status: 200, description: 'Future holiday trigger status retrieved successfully', schema: { type: 'object', properties: { isActive: { type: 'boolean' }, nextCheck: { type: 'string' }, todayHoliday: { type: 'string' }, activeEmployees: { type: 'number' } } } })
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async getFutureHolidayTriggerStatus(): Promise<{
-    isActive: boolean;
-    nextCheck: string;
-    todayHoliday?: string;
-    activeEmployees: number;
-  }> {
-    return this.futureHolidayTrigger.getTriggerStatus();
-  }
-
-  /**
-   * Manually trigger future holiday attendance marking for a specific date
-   * Useful for testing or immediate processing
-   */
-  @Post('triggers/future-holiday-manual/:date')
-  @ApiOperation({ summary: 'Manually trigger future holiday attendance marking for a specific date' })
-  @ApiParam({ name: 'date', type: String })
-  @ApiResponse({ status: 200, description: 'Manual future holiday trigger processed', schema: { type: 'object', properties: { marked_present: { type: 'number' }, errors: { type: 'number' }, message: { type: 'string' } } } })
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @Permissions(PermissionName.attendance_permission)
-  async manualTriggerFutureHoliday(@Param('date') date: string): Promise<{
-    marked_present: number;
-    errors: number;
-    message: string;
-  }> {
-    try {
-      // Validate date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(date)) {
-        throw new BadRequestException('Date must be in YYYY-MM-DD format');
-      }
-
-      return await this.futureHolidayTrigger.manualTriggerForDate(date);
-    } catch (error) {
-      this.logger.error(`Error in manual future holiday trigger: ${error.message}`);
-      throw error;
-    }
+    return this.attendanceService.updateAttendanceLogStatus(logId, updateData.status, updateData.reason, updateData.reviewer_id, updateData.checkin, updateData.checkout);
   }
 
   @Post('bulk-mark-present')

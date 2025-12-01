@@ -127,6 +127,7 @@ export class AttendanceService {
 
   async checkin(checkinData: CheckinDto): Promise<CheckinResponseDto> {
     try {
+      var night_shift = false;
       const { employee_id, checkin, mode, timezone, offset_minutes } = checkinData;
 
       const employeeId = Number(employee_id);
@@ -148,11 +149,11 @@ export class AttendanceService {
 
       const checkinLocal = new Date(
         new Date(checkin).toLocaleString("en-US", { timeZone: timezone || "Asia/Karachi" })
-      );
+      );  
 
       // Normalize local date to midnight for business date calculations
       const checkinDatePKT = new Date(checkinLocal);
-      checkinDatePKT.setHours(0, 0, 0, 0);
+      checkinDatePKT.setHours(5, 0, 0, 0);
 
       // Parse shift start/end from varchar 24-hour format
       const [shiftStartHour, shiftStartMinute = 0] = (employee.shiftStart || '09:00').split(':').map(Number);
@@ -165,6 +166,7 @@ export class AttendanceService {
       if (shiftEndHour < shiftStartHour) {
         if (currentHour < shiftEndHour || (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)) {
           checkinDatePKT.setDate(checkinDatePKT.getDate() - 1);
+          var night_shift = true;
           console.log(`Night shift: using previous day for employee ${employeeId}`);
         }
       }
@@ -210,20 +212,31 @@ export class AttendanceService {
       }
 
       // Check if already checked in for this business date or night shift adjacent dates
-      const prevDate = new Date(checkinDatePKT); prevDate.setDate(prevDate.getDate() - 1);
-      const nextDate = new Date(checkinDatePKT); nextDate.setDate(nextDate.getDate() + 1);
-
-      const existingCheckin = await this.prisma.attendanceLog.findFirst({
-        where: { employeeId, OR: [{ date: checkinDatePKT }, { date: prevDate }, { date: nextDate }] }
-      });
+      if (!night_shift) {
+        const prevDate = new Date(checkinDatePKT); prevDate.setDate(prevDate.getDate() - 1);
+        const nextDate = new Date(checkinDatePKT); nextDate.setDate(nextDate.getDate() + 1);
+        var existingCheckin = await this.prisma.attendanceLog.findFirst({
+          where: { employeeId, OR: [{ date: checkinDatePKT }, { date: prevDate }, { date: nextDate }] }
+        });
+      }
+      else {
+        var existingCheckin = await this.prisma.attendanceLog.findFirst({
+          where: { employeeId, date: checkinDatePKT  }
+        });
+      }
 
       if (existingCheckin && existingCheckin.checkin) throw new BadRequestException('Employee already checked in for this date');
 
-      // Create or update attendance log
-      const attendanceLog = await this.prisma.attendanceLog.upsert({
-        where: { id: existingCheckin?.id || 0 },
-        update: { checkin: checkinLocal, mode: mode || null, status, updatedAt: new Date() },
-        create: { employeeId, date: checkinDatePKT, checkin: checkinLocal, mode: mode || null, status }
+      // Create fresh attendance log
+      const attendanceLog = await this.prisma.attendanceLog.create({
+        data: {
+          employeeId,
+          date: checkinDatePKT,
+          checkin: checkinLocal,
+          mode: mode || 'onsite',
+          status,
+          createdAt: new Date(),
+        }
       });
 
       // Update monthly summary & base attendance (methods remain unchanged)
