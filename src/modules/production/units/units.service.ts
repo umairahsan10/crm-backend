@@ -753,26 +753,13 @@ export class UnitsService {
   }
 
 
-  async getAvailableHeads(assigned?: boolean) {
-    let whereClause: any = {
-      role: { name: 'unit_head' },
-      department: { name: 'Production' },
-      status: 'active'
-    };
-
-    if (assigned === true) {
-      // Only heads assigned to Production units
-      whereClause.productionUnitHead = { some: {} };
-    } else if (assigned === false) {
-      // Only heads NOT assigned to any Production unit
-      whereClause.productionUnitHead = { none: {} };
-    } else {
-      // Default behavior: Only show heads WITHOUT units (available for assignment)
-      whereClause.productionUnitHead = { none: {} };
-    }
-
+  async getAvailableHeads() {
     const heads = await this.prisma.employee.findMany({
-      where: whereClause,
+      where: {
+        role: { name: 'unit_head' },
+        department: { name: 'Production' },
+        status: 'active'
+      },
       include: {
         productionUnitHead: {
           select: {
@@ -799,8 +786,8 @@ export class UnitsService {
       })),
       total: heads.length,
       message: heads.length > 0 
-        ? 'Available heads retrieved successfully' 
-        : 'No available heads found'
+        ? 'Heads retrieved successfully' 
+        : 'No heads found'
     };
   }
 

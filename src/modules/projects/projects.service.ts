@@ -942,6 +942,161 @@ export class ProjectsService {
     }
   }
 
+  async assignTeam(id: number, dto: AssignProjectTeamDto, user: any) {
+    try {
+      // Verify user permissions (manager or unit head)
+      if (user.role !== 'dep_manager' && user.role !== 'unit_head') {
+        throw new ForbiddenException('Only managers and unit heads can assign teams');
+      }
+
+      const project = await this.prisma.project.findUnique({
+        where: { id },
+        include: {
+          unitHead: true,
+          team: true
+        }
+      });
+
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
+
+      // Check if unit head can assign team (only to their projects)
+      if (user.role === 'unit_head' && project.unitHeadId !== user.id) {
+        throw new ForbiddenException('You can only assign teams to your own projects');
+      }
+
+      // Validate team exists and is a production team
+      const team = await this.prisma.team.findUnique({
+        where: { id: dto.teamId },
+        include: {
+          productionUnit: true
+        }
+      });
+
+      if (!team) {
+        throw new NotFoundException('Team not found');
+      }
+
+      // Check if team is assigned to a production unit
+      if (!team.productionUnitId) {
+        throw new BadRequestException('Team must be assigned to a production unit before being assigned to a project');
+      }
+
+      // Check if project already has deadline and difficulty set
+      const hasDeadline = project.deadline !== null;
+      const hasDifficulty = project.difficultyLevel !== null;
+
+      // If either deadline or difficulty is missing from project, require both in request
+      if (!hasDeadline || !hasDifficulty) {
+        if (!dto.deadline || !dto.difficulty) {
+          throw new BadRequestException('Deadline and difficulty must be provided in order to assign team');
+        }
+      }
+
+      // Use deadline from request if provided, otherwise use existing project deadline
+      const deadlineToUse = dto.deadline || project.deadline?.toISOString();
+
+      // Validate team assignment prerequisites
+      const teamValidation = await this.validateTeamAssignment(project, dto.teamId, deadlineToUse);
+      if (!teamValidation.valid) {
+        throw new BadRequestException(teamValidation.reason);
+      }
+
+      // Prepare update data
+      const updateData: any = {
+        teamId: dto.teamId
+      };
+
+      // Update deadline if provided
+      if (dto.deadline) {
+        updateData.deadline = new Date(dto.deadline);
+      }
+
+      // Update difficulty if provided
+      if (dto.difficulty) {
+        updateData.difficultyLevel = dto.difficulty;
+      }
+
+      // Update status if project doesn't have one
+      if (!project.status) {
+        updateData.status = 'in_progress';
+      }
+
+      // Update team's current_project_id
+      await this.prisma.team.update({
+        where: { id: dto.teamId },
+        data: { currentProjectId: id }
+      });
+
+      // Update project
+      const updatedProject = await this.prisma.project.update({
+        where: { id },
+        data: updateData,
+        select: {
+          // Core project fields only
+          id: true,
+          status: true,
+          difficultyLevel: true,
+          paymentStage: true,
+          deadline: true,
+          liveProgress: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          // Minimal related data
+          salesRep: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          unitHead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              teamLead: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Add all team members to project chat as participants
+      await this.addTeamMembersToProjectChat(id, dto.teamId);
+
+      // Add all team members to project logs
+      await this.addTeamMembersToProjectLogs(id, dto.teamId);
+
+      return {
+        success: true,
+        message: 'Team assigned successfully',
+        data: updatedProject
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Failed to assign team: ${error.message}`);
+    }
+  }
+
   // 5. Unified Update Project (Role-based permissions)
   async updateProject(id: number, dto: UnifiedUpdateProjectDto, user: any) {
     try {
@@ -2089,9 +2244,7 @@ export class ProjectsService {
           // Check 1: Team must be assigned to a production unit
           productionUnitId: { not: null },
           // Check 2: Team must not have any projects
-          projects: {
-            none: {}
-          }
+          currentProjectId: { equals: null }
         },
         include: {
           teamLead: {

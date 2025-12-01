@@ -107,16 +107,10 @@ export class UnitsController {
   @Get('available-heads')
   @Roles('dep_manager')
   @Departments('Production')
-  @ApiOperation({ summary: 'Get available employees to assign as unit heads' })
-  @ApiQuery({ name: 'assigned', required: false, description: 'Filter by already assigned heads (true/false)' })
-  @ApiResponse({ status: 200, description: 'List of available heads' })
-  async getAvailableHeads(@Query('assigned') assigned?: string) {
-    // Convert string query parameter to boolean
-    let assignedBoolean: boolean | undefined;
-    if (assigned === 'true') assignedBoolean = true;
-    else if (assigned === 'false') assignedBoolean = false;
-    
-    return this.unitsService.getAvailableHeads(assignedBoolean);
+  @ApiOperation({ summary: 'Get all employees with unit_head role' })
+  @ApiResponse({ status: 200, description: 'List of all heads' })
+  async getAvailableHeads() {
+    return this.unitsService.getAvailableHeads();
   }
 
   @Get('available-teams')
