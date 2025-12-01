@@ -7,7 +7,7 @@ import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { Departments } from '../../../common/decorators/departments.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
-import { MarkSalaryPaidDto } from './dto/mark-paid.dto';
+import { FinanceMarkSalaryPaidDto } from './dto/mark-paid.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -252,10 +252,10 @@ export class FinanceSalaryController {
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
   @ApiOperation({ summary: 'Mark salary as paid (single or bulk)' })
-  @ApiBody({ type: MarkSalaryPaidDto })
+  @ApiBody({ type: FinanceMarkSalaryPaidDto })
   @ApiResponse({ status: 200, description: 'Salary mark operation completed' })
   async markSalary(
-    @Body() dto: MarkSalaryPaidDto,
+    @Body() dto: FinanceMarkSalaryPaidDto,
     @Request() req: AuthenticatedRequest,
   ) {
     return await this.financeSalaryService.handleMarkSalaryPaidRequest(

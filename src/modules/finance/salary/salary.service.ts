@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
-import { MarkSalaryPaidDto } from './dto/mark-paid.dto';
+import { FinanceMarkSalaryPaidDto } from './dto/mark-paid.dto';
 
 type GetAllSalariesParams = {
   month?: string;
@@ -2050,7 +2050,7 @@ export class FinanceSalaryService {
    * Handle salary mark-as-paid requests supporting both single and bulk operations.
    */
   public async handleMarkSalaryPaidRequest(
-    dto: MarkSalaryPaidDto,
+    dto: FinanceMarkSalaryPaidDto,
     processedBy: number,
     userType: string,
   ) {

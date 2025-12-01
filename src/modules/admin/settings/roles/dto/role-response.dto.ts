@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 
-export class EmployeeBriefDto {
+export class AdminEmployeeBriefDto {
   @ApiProperty({ example: 1 })
   id: number;
 
@@ -15,7 +15,7 @@ export class EmployeeBriefDto {
   email: string;
 }
 
-export class RoleResponseDto {
+export class AdminRoleResponseDto {
   @ApiProperty({ example: 1 })
   id: number;
 
@@ -31,13 +31,13 @@ export class RoleResponseDto {
   @ApiProperty({ example: '2025-01-10T12:00:00Z' })
   updatedAt: Date;
 
-  @ApiPropertyOptional({ type: [EmployeeBriefDto] })
-  employees?: EmployeeBriefDto[];
+  @ApiPropertyOptional({ type: [AdminEmployeeBriefDto] })
+  employees?: AdminEmployeeBriefDto[];
 }
 
-export class RolesListResponseDto {
-  @ApiProperty({ type: [RoleResponseDto] })
-  roles: RoleResponseDto[];
+export class AdminRolesListResponseDto {
+  @ApiProperty({ type: [AdminRoleResponseDto] })
+  roles: AdminRoleResponseDto[];
 
   @ApiProperty({ example: 50 })
   total: number;

@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
-import { DepartmentResponseDto, DepartmentsListResponseDto } from './dto/department-response.dto';
+import { AdminDepartmentResponseDto, AdminDepartmentsListResponseDto } from './dto/department-response.dto';
 
 @Injectable()
 export class DepartmentsService {
@@ -13,7 +13,7 @@ export class DepartmentsService {
   /**
    * Get all departments with pagination
    */
-  async getAllDepartments(page: number = 1, limit: number = 10, search?: string): Promise<DepartmentsListResponseDto> {
+  async getAllDepartments(page: number = 1, limit: number = 10, search?: string): Promise<AdminDepartmentsListResponseDto> {
     const skip = (page - 1) * limit;
     const where: any = {};
 
@@ -77,7 +77,7 @@ export class DepartmentsService {
   /**
    * Get department by ID
    */
-  async getDepartmentById(id: number): Promise<DepartmentResponseDto> {
+  async getDepartmentById(id: number): Promise<AdminDepartmentResponseDto> {
     const department = await this.prisma.department.findUnique({
       where: { id },
       include: {
@@ -108,13 +108,13 @@ export class DepartmentsService {
       updatedAt: department.updatedAt,
       managerEmail: department.manager?.email || null,
       employeesCount: department._count.employees,
-    } as DepartmentResponseDto;
+    } as AdminDepartmentResponseDto;
   }
 
   /**
    * Create a new department
    */
-  async createDepartment(dto: CreateDepartmentDto): Promise<DepartmentResponseDto> {
+  async createDepartment(dto: CreateDepartmentDto): Promise<AdminDepartmentResponseDto> {
     // Check if department name already exists
     const existingDepartment = await this.prisma.department.findUnique({
       where: { name: dto.name },
@@ -177,7 +177,7 @@ export class DepartmentsService {
         updatedAt: department.updatedAt,
         managerEmail: department.manager?.email || null,
         employeesCount: department._count.employees,
-      } as DepartmentResponseDto;
+      } as AdminDepartmentResponseDto;
     } catch (error) {
       this.logger.error(`Failed to create department: ${error.message}`);
       throw new BadRequestException(`Failed to create department: ${error.message}`);
@@ -187,7 +187,7 @@ export class DepartmentsService {
   /**
    * Update a department
    */
-  async updateDepartment(id: number, dto: UpdateDepartmentDto): Promise<DepartmentResponseDto> {
+  async updateDepartment(id: number, dto: UpdateDepartmentDto): Promise<AdminDepartmentResponseDto> {
     // Check if department exists
     const existingDepartment = await this.prisma.department.findUnique({
       where: { id },
@@ -272,7 +272,7 @@ export class DepartmentsService {
         updatedAt: department.updatedAt,
         managerEmail: department.manager?.email || null,
         employeesCount: department._count.employees,
-      } as DepartmentResponseDto;
+      } as AdminDepartmentResponseDto;
     } catch (error) {
       this.logger.error(`Failed to update department ${id}: ${error.message}`);
       throw new BadRequestException(`Failed to update department: ${error.message}`);

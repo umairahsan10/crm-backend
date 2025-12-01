@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class DepartmentResponseDto {
+export class AdminDepartmentResponseDto {
   @ApiProperty({ description: 'Unique ID of the department', example: 1 })
   id: number;
 
@@ -26,9 +26,9 @@ export class DepartmentResponseDto {
   employeesCount: number;
 }
 
-export class DepartmentsListResponseDto {
-  @ApiProperty({ description: 'Array of departments', type: [DepartmentResponseDto] })
-  departments: DepartmentResponseDto[];
+export class AdminDepartmentsListResponseDto {
+  @ApiProperty({ description: 'Array of departments', type: [AdminDepartmentResponseDto] })
+  departments: AdminDepartmentResponseDto[];
 
   @ApiProperty({ description: 'Total number of departments', example: 10 })
   total: number;

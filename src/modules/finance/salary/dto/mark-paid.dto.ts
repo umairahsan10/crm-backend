@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class MarkSalaryPaidDto {
+export class FinanceMarkSalaryPaidDto {
   @ApiPropertyOptional({
     description: 'Single employee ID to mark as paid (use for single mark)',
     example: 42,

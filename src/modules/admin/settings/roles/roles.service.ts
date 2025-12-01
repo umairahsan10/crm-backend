@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
-import { RoleResponseDto, RolesListResponseDto } from './dto/role-response.dto';
+import { AdminRoleResponseDto, AdminRolesListResponseDto } from './dto/role-response.dto';
 
 @Injectable()
 export class RolesService {
@@ -13,7 +13,7 @@ export class RolesService {
   /**
    * Get all roles with pagination
    */
-  async getAllRoles(page: number = 1, limit: number = 10, search?: string): Promise<RolesListResponseDto> {
+  async getAllRoles(page: number = 1, limit: number = 10, search?: string): Promise<AdminRolesListResponseDto> {
     const skip = (page - 1) * limit;
     const where: any = {};
 
@@ -63,7 +63,7 @@ export class RolesService {
   /**
    * Get role by ID
    */
-  async getRoleById(id: number): Promise<RoleResponseDto> {
+  async getRoleById(id: number): Promise<AdminRoleResponseDto> {
     const role = await this.prisma.role.findUnique({
       where: { id },
       include: {
@@ -88,7 +88,7 @@ export class RolesService {
   /**
    * Create a new role
    */
-  async createRole(dto: CreateRoleDto): Promise<RoleResponseDto> {
+  async createRole(dto: CreateRoleDto): Promise<AdminRoleResponseDto> {
     // Check if role name already exists
     const existingRole = await this.prisma.role.findUnique({
       where: { name: dto.name },
@@ -127,7 +127,7 @@ export class RolesService {
   /**
    * Update a role
    */
-  async updateRole(id: number, dto: UpdateRoleDto): Promise<RoleResponseDto> {
+  async updateRole(id: number, dto: UpdateRoleDto): Promise<AdminRoleResponseDto> {
     // Check if role exists
     const existingRole = await this.prisma.role.findUnique({
       where: { id },
