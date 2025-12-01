@@ -28,8 +28,7 @@ export class BulkMarkPresentDto {
   checkin?: string; // Format: ISO 8601 timestamp, optional - defaults to current time
 
   @ApiPropertyOptional({
-    description:
-      'Array of employee IDs to mark present. If not provided, marks all active employees.',
+    description: 'Array of employee IDs to mark present. If not provided, marks all active employees.',
     example: [1, 2, 3],
     type: [Number],
   })
@@ -59,10 +58,7 @@ export class BulkMarkPresentDto {
   @IsNumber()
   offset_minutes?: number;
 
-  @ApiPropertyOptional({
-    description: 'Optional reason for marking employees present',
-    example: 'Company event',
-  })
+  @ApiPropertyOptional({ description: 'Optional reason for marking employees present', example: 'Company event' })
   @IsOptional()
   @IsString()
   reason?: string; // Optional reason for marking employees present (e.g., "Company event", "Holiday compensation")

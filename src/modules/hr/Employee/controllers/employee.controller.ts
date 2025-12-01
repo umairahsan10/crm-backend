@@ -65,7 +65,7 @@ interface AuthenticatedRequest extends Request {
 @ApiBearerAuth()
 @Controller('hr')
 export class EmployeeController {
-  constructor(private readonly hrService: EmployeeService) {}
+  constructor(private readonly hrService: EmployeeService) { }
 
   /**
    * Terminate an employee and process their final salary

@@ -48,10 +48,7 @@ export class BulkCheckoutDto {
   @IsDateString()
   checkout?: string;
 
-  @ApiPropertyOptional({
-    description: 'IANA timezone of the client (e.g., Asia/Karachi)',
-    example: 'Asia/Karachi',
-  })
+  @ApiPropertyOptional({ description: 'IANA timezone of the client (e.g., Asia/Karachi)', example: 'Asia/Karachi' })
   @IsOptional()
   @IsString()
   timezone?: string;

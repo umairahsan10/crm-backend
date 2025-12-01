@@ -71,7 +71,7 @@ export class AttendanceController {
     private readonly quarterlyLeavesUpdateTrigger: QuarterlyLeavesUpdateTrigger,
     private readonly weekendAutoPresentTrigger: WeekendAutoPresentTrigger,
     private readonly futureHolidayTrigger: FutureHolidayTrigger,
-  ) {}
+  ) { }
 
   @Get('logs')
   @ApiOperation({ summary: 'Get attendance logs with filtering' })

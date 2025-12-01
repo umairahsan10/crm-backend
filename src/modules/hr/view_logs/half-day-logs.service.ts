@@ -9,7 +9,7 @@ import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto, EmployeeHalfDayStatsD
 
 @Injectable()
 export class HalfDayLogsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getHalfDayLogs(query: GetHalfDayLogsDto): Promise<HalfDayLogsListResponseDto[]> {
     try {

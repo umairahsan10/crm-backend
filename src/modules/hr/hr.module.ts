@@ -26,4 +26,4 @@ import { FinanceModule } from '../finance/finance.module';
     LogsModule,
   ],
 })
-export class HrModule {}
+export class HrModule { }

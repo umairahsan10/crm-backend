@@ -27,4 +27,4 @@ import { LogsModule } from '../view_logs/logs.module';
   ],
   exports: [AttendanceService],
 })
-export class AttendanceModule {}
+export class AttendanceModule { }
