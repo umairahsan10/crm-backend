@@ -17,5 +17,5 @@ export enum PermissionName {
   revenues_permission = 'revenues_permission',
 
   //common permission
-  salary_permission = 'salary_permission',  
-} 
+  salary_permission = 'salary_permission',
+}

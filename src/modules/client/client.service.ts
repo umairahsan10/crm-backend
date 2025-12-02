@@ -1,21 +1,32 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { ClientQueryDto } from './dto/client-query.dto';
-import { ClientResponseDto, ClientListResponseDto } from './dto/client-response.dto';
+import {
+  ClientResponseDto,
+  ClientListResponseDto,
+} from './dto/client-response.dto';
 import { Client, Prisma } from '@prisma/client';
 
 @Injectable()
 export class ClientService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createClientDto: CreateClientDto, createdBy: number): Promise<ClientResponseDto> {
+  async create(
+    createClientDto: CreateClientDto,
+    createdBy: number,
+  ): Promise<ClientResponseDto> {
     try {
       // Check if email already exists
       if (createClientDto.email) {
         const existingClient = await this.prisma.client.findFirst({
-          where: { email: createClientDto.email }
+          where: { email: createClientDto.email },
         });
         if (existingClient) {
           throw new ConflictException('Client with this email already exists');
@@ -25,7 +36,7 @@ export class ClientService {
       // Check if industry exists if provided
       if (createClientDto.industryId) {
         const industry = await this.prisma.industry.findUnique({
-          where: { id: createClientDto.industryId }
+          where: { id: createClientDto.industryId },
         });
         if (!industry) {
           throw new BadRequestException('Industry not found');
@@ -34,7 +45,7 @@ export class ClientService {
 
       // Get the next available ID (largest ID + 1)
       const maxClientId = await this.prisma.client.aggregate({
-        _max: { id: true }
+        _max: { id: true },
       });
       const nextClientId = (maxClientId._max.id || 0) + 1;
 
@@ -43,7 +54,7 @@ export class ClientService {
           id: nextClientId, // Use explicit ID to avoid sequence conflicts
           ...createClientDto,
           createdBy,
-          accountStatus: createClientDto.accountStatus || 'prospect'
+          accountStatus: createClientDto.accountStatus || 'prospect',
         },
         include: {
           industry: true,
@@ -52,15 +63,18 @@ export class ClientService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
       return this.mapToResponseDto(client);
     } catch (error) {
-      if (error instanceof ConflictException || error instanceof BadRequestException) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException('Failed to create client');
@@ -86,7 +100,7 @@ export class ClientService {
       sortBy = 'createdAt',
       sortOrder = 'desc',
       page = 1,
-      limit = 10
+      limit = 10,
     } = query;
 
     // Build where clause
@@ -101,14 +115,16 @@ export class ClientService {
         { phone: { contains: search, mode: 'insensitive' } },
         { city: { contains: search, mode: 'insensitive' } },
         { state: { contains: search, mode: 'insensitive' } },
-        { country: { contains: search, mode: 'insensitive' } }
+        { country: { contains: search, mode: 'insensitive' } },
       ];
     }
 
     // Individual field filters
     if (clientType) where.clientType = clientType;
-    if (companyName) where.companyName = { contains: companyName, mode: 'insensitive' };
-    if (clientName) where.clientName = { contains: clientName, mode: 'insensitive' };
+    if (companyName)
+      where.companyName = { contains: companyName, mode: 'insensitive' };
+    if (clientName)
+      where.clientName = { contains: clientName, mode: 'insensitive' };
     if (email) where.email = { contains: email, mode: 'insensitive' };
     if (phone) where.phone = { contains: phone, mode: 'insensitive' };
     if (city) where.city = { contains: city, mode: 'insensitive' };
@@ -143,25 +159,25 @@ export class ClientService {
                 id: true,
                 firstName: true,
                 lastName: true,
-                email: true
-              }
-            }
+                email: true,
+              },
+            },
           },
           orderBy,
           skip,
-          take: limit
+          take: limit,
         }),
-        this.prisma.client.count({ where })
+        this.prisma.client.count({ where }),
       ]);
 
       const totalPages = Math.ceil(total / limit);
 
       return {
-        clients: clients.map(client => this.mapToResponseDto(client)),
+        clients: clients.map((client) => this.mapToResponseDto(client)),
         total,
         page,
         limit,
-        totalPages
+        totalPages,
       };
     } catch (error) {
       throw new BadRequestException('Failed to fetch clients');
@@ -179,10 +195,10 @@ export class ClientService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
       if (!client) {
@@ -209,10 +225,10 @@ export class ClientService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
       if (!client) {
@@ -228,11 +244,14 @@ export class ClientService {
     }
   }
 
-  async update(id: number, updateClientDto: UpdateClientDto): Promise<ClientResponseDto> {
+  async update(
+    id: number,
+    updateClientDto: UpdateClientDto,
+  ): Promise<ClientResponseDto> {
     try {
       // Check if client exists
       const existingClient = await this.prisma.client.findUnique({
-        where: { id }
+        where: { id },
       });
 
       if (!existingClient) {
@@ -244,8 +263,8 @@ export class ClientService {
         const emailExists = await this.prisma.client.findFirst({
           where: {
             email: updateClientDto.email,
-            id: { not: id }
-          }
+            id: { not: id },
+          },
         });
         if (emailExists) {
           throw new ConflictException('Client with this email already exists');
@@ -255,7 +274,7 @@ export class ClientService {
       // Check if industry exists if provided
       if (updateClientDto.industryId) {
         const industry = await this.prisma.industry.findUnique({
-          where: { id: updateClientDto.industryId }
+          where: { id: updateClientDto.industryId },
         });
         if (!industry) {
           throw new BadRequestException('Industry not found');
@@ -272,15 +291,19 @@ export class ClientService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
       return this.mapToResponseDto(client);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ConflictException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ConflictException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException('Failed to update client');
@@ -290,7 +313,7 @@ export class ClientService {
   async remove(id: number): Promise<void> {
     try {
       const client = await this.prisma.client.findUnique({
-        where: { id }
+        where: { id },
       });
 
       if (!client) {
@@ -298,7 +321,7 @@ export class ClientService {
       }
 
       await this.prisma.client.delete({
-        where: { id }
+        where: { id },
       });
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -321,7 +344,7 @@ export class ClientService {
         this.prisma.client.count({ where: { accountStatus: 'active' } }),
         this.prisma.client.count({ where: { accountStatus: 'inactive' } }),
         this.prisma.client.count({ where: { accountStatus: 'suspended' } }),
-        this.prisma.client.count({ where: { accountStatus: 'prospect' } })
+        this.prisma.client.count({ where: { accountStatus: 'prospect' } }),
       ]);
 
       return {
@@ -329,7 +352,7 @@ export class ClientService {
         active,
         inactive,
         suspended,
-        prospect
+        prospect,
       };
     } catch (error) {
       throw new BadRequestException('Failed to fetch client statistics');
@@ -358,7 +381,7 @@ export class ClientService {
       createdAt: client.createdAt,
       updatedAt: client.updatedAt,
       industry: client.industry,
-      employee: client.employee
+      employee: client.employee,
     };
   }
 }

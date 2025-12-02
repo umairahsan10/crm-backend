@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
 @Injectable()
@@ -26,8 +32,8 @@ export class ProjectAccessGuard implements CanActivate {
         include: {
           unitHead: true,
           team: true,
-          salesRep: true
-        }
+          salesRep: true,
+        },
       });
 
       if (!project) {
@@ -44,8 +50,8 @@ export class ProjectAccessGuard implements CanActivate {
       include: {
         unitHead: true,
         team: true,
-        salesRep: true
-      }
+        salesRep: true,
+      },
     });
 
     if (!project) {
@@ -54,7 +60,7 @@ export class ProjectAccessGuard implements CanActivate {
 
     // Check access based on role and assignment
     const hasAccess = await this.checkProjectAccess(user, project);
-    
+
     if (!hasAccess) {
       throw new ForbiddenException('Access denied to this project');
     }
@@ -76,7 +82,11 @@ export class ProjectAccessGuard implements CanActivate {
     }
 
     // Team Lead (team_lead) and Employee (senior/junior) - Access to team projects
-    if (user.role === 'team_lead' || user.role === 'senior' || user.role === 'junior') {
+    if (
+      user.role === 'team_lead' ||
+      user.role === 'senior' ||
+      user.role === 'junior'
+    ) {
       if (!project.teamId) {
         return false;
       }
@@ -84,7 +94,7 @@ export class ProjectAccessGuard implements CanActivate {
       // Check if user is part of the assigned team
       const userTeam = await this.prisma.employee.findUnique({
         where: { id: user.id },
-        select: { teamLeadId: true }
+        select: { teamLeadId: true },
       });
 
       if (!userTeam) {

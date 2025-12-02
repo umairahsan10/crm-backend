@@ -1,27 +1,36 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
   Delete,
-  Param, 
-  Body, 
-  Query, 
-  UseGuards, 
+  Param,
+  Body,
+  Query,
+  UseGuards,
   Request,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
-  Res
+  Res,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ProjectLogsService } from './project-logs.service';
 import { CreateProjectLogDto } from './dto/create-project-log.dto';
 import { UpdateProjectLogDto } from './dto/update-project-log.dto';
 import { ProjectLogQueryDto } from './dto/project-log-query.dto';
 import { ExportProjectLogsDto } from './dto/export-project-logs.dto';
-import { ProjectLogsStatsDto, ProjectLogsStatsResponseDto } from './dto/project-logs-stats.dto';
+import {
+  ProjectLogsStatsDto,
+  ProjectLogsStatsResponseDto,
+} from './dto/project-logs-stats.dto';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -44,7 +53,7 @@ export class ProjectLogsController {
   async createLog(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() dto: CreateProjectLogDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectLogsService.createLog(projectId, dto, req.user);
   }
@@ -56,7 +65,7 @@ export class ProjectLogsController {
   async getProjectLogs(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Request() req,
-    @Query() query: ProjectLogQueryDto
+    @Query() query: ProjectLogQueryDto,
   ) {
     return this.projectLogsService.getProjectLogs(projectId, req.user, query);
   }
@@ -67,7 +76,7 @@ export class ProjectLogsController {
   @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
   async getProjectEmployees(
     @Param('projectId', ParseIntPipe) projectId: number,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectLogsService.getProjectEmployees(projectId, req.user);
   }
@@ -78,7 +87,7 @@ export class ProjectLogsController {
   @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
   async getLogStatistics(
     @Param('projectId', ParseIntPipe) projectId: number,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectLogsService.getLogStatistics(projectId, req.user);
   }
@@ -90,28 +99,40 @@ export class ProjectLogsController {
   @Get('export')
   @ApiOperation({ summary: 'Export project logs' })
   @ApiQuery({ type: ExportProjectLogsDto })
-  @ApiResponse({ status: 200, description: 'Project logs exported successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Project logs exported successfully',
+  })
   @UseGuards(RolesGuard)
   @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
   async exportProjectLogs(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Res() res: Response,
     @Query() query: ExportProjectLogsDto,
-    @Request() req
+    @Request() req,
   ) {
     // Set project_id from route parameter
     const exportQuery = { ...query, project_id: projectId };
     const { format = 'csv', ...filterQuery } = exportQuery;
-    const data = await this.projectLogsService.getProjectLogsForExport(filterQuery);
+    const data =
+      await this.projectLogsService.getProjectLogsForExport(filterQuery);
     const filename = `project-logs-${projectId}-${new Date().toISOString().split('T')[0]}.${format}`;
-    
+
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(this.projectLogsService.convertProjectLogsToCSV(data, exportQuery));
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.send(
+        this.projectLogsService.convertProjectLogsToCSV(data, exportQuery),
+      );
     } else if (format === 'json') {
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
       res.json(data);
     } else {
       res.status(400).json({ message: 'Unsupported format. Use csv or json.' });
@@ -125,13 +146,17 @@ export class ProjectLogsController {
   @Get('stats')
   @ApiOperation({ summary: 'Get project logs statistics' })
   @ApiQuery({ type: ProjectLogsStatsDto })
-  @ApiResponse({ status: 200, description: 'Project logs statistics retrieved successfully', type: ProjectLogsStatsResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Project logs statistics retrieved successfully',
+    type: ProjectLogsStatsResponseDto,
+  })
   @UseGuards(RolesGuard)
   @Roles('dep_manager', 'unit_head', 'team_lead', 'senior', 'junior')
   async getProjectLogsStats(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Query() query: ProjectLogsStatsDto,
-    @Request() req
+    @Request() req,
   ): Promise<ProjectLogsStatsResponseDto> {
     // Set project_id from route parameter
     const statsQuery = { ...query, project_id: projectId };
@@ -145,7 +170,7 @@ export class ProjectLogsController {
   async getLogById(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('logId', ParseIntPipe) logId: number,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectLogsService.getLogById(projectId, logId, req.user);
   }
@@ -158,7 +183,7 @@ export class ProjectLogsController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('logId', ParseIntPipe) logId: number,
     @Body() dto: UpdateProjectLogDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectLogsService.updateLog(projectId, logId, dto, req.user);
   }
@@ -171,7 +196,7 @@ export class ProjectLogsController {
   async deleteLog(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('logId', ParseIntPipe) logId: number,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectLogsService.deleteLog(projectId, logId, req.user);
   }

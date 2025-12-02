@@ -22,27 +22,53 @@ export class HalfDayLogsListResponseDto {
   @ApiProperty({ description: 'Number of minutes the employee was late' })
   minutes_late: number;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Reason provided for being late, if any' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Reason provided for being late, if any',
+  })
   reason: string | null;
 
-  @ApiProperty({ type: Boolean, nullable: true, description: 'Indicates whether the lateness has been justified by the reviewer' })
+  @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description:
+      'Indicates whether the lateness has been justified by the reviewer',
+  })
   justified: boolean | null;
 
-  @ApiProperty({ enum: ['paid', 'unpaid'], nullable: true, description: 'Type of half-day applied to the employee' })
+  @ApiProperty({
+    enum: ['paid', 'unpaid'],
+    nullable: true,
+    description: 'Type of half-day applied to the employee',
+  })
   half_day_type: 'paid' | 'unpaid' | null;
 
-  @ApiProperty({ enum: ['Created', 'Pending', 'Completed'], description: 'Current status of the half-day log process' })
+  @ApiProperty({
+    enum: ['Created', 'Pending', 'Completed'],
+    description: 'Current status of the half-day log process',
+  })
   action_taken: 'Created' | 'Pending' | 'Completed';
 
-  @ApiProperty({ type: Number, nullable: true, description: 'Reviewer ID who reviewed the log, if applicable' })
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Reviewer ID who reviewed the log, if applicable',
+  })
   reviewed_by: number | null;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Name of the reviewer, if available' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Name of the reviewer, if available',
+  })
   reviewer_name: string | null;
 
   @ApiProperty({ description: 'Timestamp when the log was created (ISO 8601)' })
   created_at: string;
 
-  @ApiProperty({ description: 'Timestamp when the log was last updated (ISO 8601)' })
+  @ApiProperty({
+    description: 'Timestamp when the log was last updated (ISO 8601)',
+  })
   updated_at: string;
 }

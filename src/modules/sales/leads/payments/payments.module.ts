@@ -9,6 +9,6 @@ import { ProjectsModule } from '../../../projects/projects.module';
   imports: [ProjectsModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, RevenueService],
-  exports: [PaymentsService]
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

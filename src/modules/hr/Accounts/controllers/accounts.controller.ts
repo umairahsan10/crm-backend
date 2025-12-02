@@ -1,5 +1,24 @@
-import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+  ApiBody,
+} from '@nestjs/swagger';
 import { AccountsService } from '../services/accounts.service';
 import { CreateAccountDto, UpdateAccountDto } from '../dto/accounts.dto';
 import { UpdateBaseSalaryDto } from '../dto/update-base-salary.dto';
@@ -26,7 +45,10 @@ export class AccountsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all account records' })
-  @ApiResponse({ status: 200, description: 'Account records retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account records retrieved successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
@@ -39,7 +61,10 @@ export class AccountsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get account record by ID' })
   @ApiParam({ name: 'id', type: 'string', description: 'Account record ID' })
-  @ApiResponse({ status: 200, description: 'Account record retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account record retrieved successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Account record not found' })
@@ -53,14 +78,20 @@ export class AccountsController {
   @Post()
   @ApiOperation({ summary: 'Create a new account record' })
   @ApiBody({ type: CreateAccountDto })
-  @ApiResponse({ status: 201, description: 'Account record created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Account record created successfully',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async createAccountRecord(@Body() dto: CreateAccountDto, @Request() req: AuthenticatedRequest) {
+  async createAccountRecord(
+    @Body() dto: CreateAccountDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
     return await this.accountsService.createAccountRecord(dto, req.user.id);
   }
 
@@ -68,7 +99,10 @@ export class AccountsController {
   @ApiOperation({ summary: 'Update account record' })
   @ApiParam({ name: 'id', type: 'string', description: 'Account record ID' })
   @ApiBody({ type: UpdateAccountDto })
-  @ApiResponse({ status: 200, description: 'Account record updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account record updated successfully',
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -76,8 +110,16 @@ export class AccountsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async updateAccountRecord(@Param('id') id: string, @Body() dto: UpdateAccountDto, @Request() req: AuthenticatedRequest) {
-    return await this.accountsService.updateAccountRecord(+id, dto, req.user.id);
+  async updateAccountRecord(
+    @Param('id') id: string,
+    @Body() dto: UpdateAccountDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return await this.accountsService.updateAccountRecord(
+      +id,
+      dto,
+      req.user.id,
+    );
   }
 
   /**
@@ -98,22 +140,32 @@ export class AccountsController {
   async updateBaseSalary(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBaseSalaryDto,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ) {
-    return await this.accountsService.updateBaseSalary(id, dto.baseSalary, req.user.id);
+    return await this.accountsService.updateBaseSalary(
+      id,
+      dto.baseSalary,
+      req.user.id,
+    );
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete account record' })
   @ApiParam({ name: 'id', type: 'string', description: 'Account record ID' })
-  @ApiResponse({ status: 200, description: 'Account record deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account record deleted successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Account record not found' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async deleteAccountRecord(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+  async deleteAccountRecord(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
     return await this.accountsService.deleteAccountRecord(+id, req.user.id);
   }
-} 
+}

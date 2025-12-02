@@ -6,7 +6,7 @@ export enum StatsPeriod {
   DAILY = 'daily',
   WEEKLY = 'weekly',
   MONTHLY = 'monthly',
-  YEARLY = 'yearly'
+  YEARLY = 'yearly',
 }
 
 export class ProjectLogsStatsDto {
@@ -114,7 +114,8 @@ export class ProjectLogsStatsResponseDto {
 
 export class PeriodStatsDto {
   @ApiProperty({
-    description: 'The label of the time period (e.g., "September 2025", "Week 41")',
+    description:
+      'The label of the time period (e.g., "September 2025", "Week 41")',
     example: 'September 2025',
   })
   period: string;
@@ -201,4 +202,3 @@ export class ProjectStatsDto {
   })
   average_logs_per_developer: number;
 }
-

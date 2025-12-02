@@ -3,17 +3,26 @@ import { LeadStatus, LeadOutcome } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class GetCrackedLeadsDto {
-  @ApiPropertyOptional({ description: 'Search term to filter leads by name, email, or phone', type: String })
+  @ApiPropertyOptional({
+    description: 'Search term to filter leads by name, email, or phone',
+    type: String,
+  })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Page number for pagination', type: Number })
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
+    type: Number,
+  })
   @IsOptional()
   @IsNumber()
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Number of items per page', type: Number })
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    type: Number,
+  })
   @IsOptional()
   @IsNumber()
   limit?: number;
@@ -23,17 +32,26 @@ export class GetCrackedLeadsDto {
   @IsString()
   sortBy?: string;
 
-  @ApiPropertyOptional({ description: 'Sort order: asc or desc', enum: ['asc', 'desc'] })
+  @ApiPropertyOptional({
+    description: 'Sort order: asc or desc',
+    enum: ['asc', 'desc'],
+  })
   @IsOptional()
   @IsString()
   sortOrder?: 'asc' | 'desc';
 
-  @ApiPropertyOptional({ description: 'Filter by lead status', enum: LeadStatus })
+  @ApiPropertyOptional({
+    description: 'Filter by lead status',
+    enum: LeadStatus,
+  })
   @IsOptional()
   @IsEnum(LeadStatus)
   status?: LeadStatus;
 
-  @ApiPropertyOptional({ description: 'Filter by lead outcome', enum: LeadOutcome })
+  @ApiPropertyOptional({
+    description: 'Filter by lead outcome',
+    enum: LeadOutcome,
+  })
   @IsOptional()
   @IsEnum(LeadOutcome)
   outcome?: LeadOutcome;
@@ -43,7 +61,10 @@ export class GetCrackedLeadsDto {
   @IsNumber()
   salesUnitId?: number;
 
-  @ApiPropertyOptional({ description: 'Filter by assigned employee ID', type: Number })
+  @ApiPropertyOptional({
+    description: 'Filter by assigned employee ID',
+    type: Number,
+  })
   @IsOptional()
   @IsNumber()
   assignedTo?: number;
@@ -63,17 +84,26 @@ export class GetCrackedLeadsDto {
   @IsNumber()
   maxAmount?: number;
 
-  @ApiPropertyOptional({ description: 'Filter by employee who closed the lead', type: Number })
+  @ApiPropertyOptional({
+    description: 'Filter by employee who closed the lead',
+    type: Number,
+  })
   @IsOptional()
   @IsNumber()
   closedBy?: number;
 
-  @ApiPropertyOptional({ description: 'Current phase number of the lead', type: Number })
+  @ApiPropertyOptional({
+    description: 'Current phase number of the lead',
+    type: Number,
+  })
   @IsOptional()
   @IsNumber()
   currentPhase?: number;
 
-  @ApiPropertyOptional({ description: 'Total number of phases for the lead', type: Number })
+  @ApiPropertyOptional({
+    description: 'Total number of phases for the lead',
+    type: Number,
+  })
   @IsOptional()
   @IsNumber()
   totalPhases?: number;

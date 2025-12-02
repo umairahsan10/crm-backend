@@ -1,7 +1,15 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { UpdatePermissionsDto, PermissionsDto } from './dto/update-permission.dto';
+import {
+  UpdatePermissionsDto,
+  PermissionsDto,
+} from './dto/update-permission.dto';
 import { PermissionsResponseDto } from './dto/permission-response.dto';
 import { AddVendorDto } from './dto/add-vendor.dto';
 import { VendorResponseDto } from './dto/vendor-response.dto';
@@ -30,7 +38,9 @@ export class AccountantService {
    * Helper method to get current date in PKT timezone
    */
   private getCurrentDateInPKT(): Date {
-    return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Karachi"}));
+    return new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+    );
   }
 
   /**
@@ -40,20 +50,20 @@ export class AccountantService {
   async updatePermissions(
     dto: UpdatePermissionsDto,
     currentUserId: number,
-    isAdmin: boolean
+    isAdmin: boolean,
   ): Promise<PermissionsResponseDto> {
     try {
       // 1. Check if employee exists and is active
       const employee = await this.prisma.employee.findUnique({
         where: { id: dto.employee_id },
-        select: { 
-          id: true, 
-          status: true, 
-          firstName: true, 
+        select: {
+          id: true,
+          status: true,
+          firstName: true,
           lastName: true,
           department: {
-            select: { name: true }
-          }
+            select: { name: true },
+          },
         },
       });
 
@@ -61,7 +71,7 @@ export class AccountantService {
         return {
           status: 'error',
           message: 'Employee does not exist',
-          error_code: 'EMPLOYEE_NOT_FOUND'
+          error_code: 'EMPLOYEE_NOT_FOUND',
         };
       }
 
@@ -69,7 +79,7 @@ export class AccountantService {
         return {
           status: 'error',
           message: 'Employee is not active',
-          error_code: 'EMPLOYEE_INACTIVE'
+          error_code: 'EMPLOYEE_INACTIVE',
         };
       }
 
@@ -78,7 +88,7 @@ export class AccountantService {
         return {
           status: 'error',
           message: 'Employee is not in Accounts department',
-          error_code: 'NOT_ACCOUNTS_DEPARTMENT'
+          error_code: 'NOT_ACCOUNTS_DEPARTMENT',
         };
       }
 
@@ -101,12 +111,14 @@ export class AccountantService {
         return {
           status: 'error',
           message: 'Employee is not an accountant',
-          error_code: 'NOT_ACCOUNTANT'
+          error_code: 'NOT_ACCOUNTANT',
         };
       }
 
       // Debug: Log current accountant permissions
-      this.logger.log(`Current accountant permissions: ${JSON.stringify(accountant)}`);
+      this.logger.log(
+        `Current accountant permissions: ${JSON.stringify(accountant)}`,
+      );
 
       // 4. Apply permission restrictions for non-admin users
       if (!isAdmin) {
@@ -116,8 +128,8 @@ export class AccountantService {
           select: {
             id: true,
             department: {
-              select: { name: true, managerId: true }
-            }
+              select: { name: true, managerId: true },
+            },
           },
         });
 
@@ -125,7 +137,7 @@ export class AccountantService {
           return {
             status: 'error',
             message: 'Current user not found',
-            error_code: 'CURRENT_USER_NOT_FOUND'
+            error_code: 'CURRENT_USER_NOT_FOUND',
           };
         }
 
@@ -152,7 +164,7 @@ export class AccountantService {
           return {
             status: 'error',
             message: 'Account manager cannot update their own permissions',
-            error_code: 'SELF_PERMISSION_RESTRICTION'
+            error_code: 'SELF_PERMISSION_RESTRICTION',
           };
         }
       }
@@ -175,73 +187,123 @@ export class AccountantService {
 
       // Check each permission that was provided in the request
       if (dto.permissions.liabilities_permission !== undefined) {
-        if (dto.permissions.liabilities_permission === currentPermissions.liabilities_permission) {
-          alreadySetPermissions.liabilities_permission = dto.permissions.liabilities_permission;
+        if (
+          dto.permissions.liabilities_permission ===
+          currentPermissions.liabilities_permission
+        ) {
+          alreadySetPermissions.liabilities_permission =
+            dto.permissions.liabilities_permission;
         } else {
-          permissionsToUpdate.liabilitiesPermission = dto.permissions.liabilities_permission;
-          changedPermissions.liabilities_permission = currentPermissions.liabilities_permission;
+          permissionsToUpdate.liabilitiesPermission =
+            dto.permissions.liabilities_permission;
+          changedPermissions.liabilities_permission =
+            currentPermissions.liabilities_permission;
         }
       }
 
       if (dto.permissions.salary_permission !== undefined) {
-        if (dto.permissions.salary_permission === currentPermissions.salary_permission) {
-          alreadySetPermissions.salary_permission = dto.permissions.salary_permission;
+        if (
+          dto.permissions.salary_permission ===
+          currentPermissions.salary_permission
+        ) {
+          alreadySetPermissions.salary_permission =
+            dto.permissions.salary_permission;
         } else {
-          permissionsToUpdate.salaryPermission = dto.permissions.salary_permission;
-          changedPermissions.salary_permission = currentPermissions.salary_permission;
+          permissionsToUpdate.salaryPermission =
+            dto.permissions.salary_permission;
+          changedPermissions.salary_permission =
+            currentPermissions.salary_permission;
         }
       }
 
       if (dto.permissions.sales_permission !== undefined) {
-        if (dto.permissions.sales_permission === currentPermissions.sales_permission) {
-          alreadySetPermissions.sales_permission = dto.permissions.sales_permission;
+        if (
+          dto.permissions.sales_permission ===
+          currentPermissions.sales_permission
+        ) {
+          alreadySetPermissions.sales_permission =
+            dto.permissions.sales_permission;
         } else {
-          permissionsToUpdate.salesPermission = dto.permissions.sales_permission;
-          changedPermissions.sales_permission = currentPermissions.sales_permission;
+          permissionsToUpdate.salesPermission =
+            dto.permissions.sales_permission;
+          changedPermissions.sales_permission =
+            currentPermissions.sales_permission;
         }
       }
 
       if (dto.permissions.invoices_permission !== undefined) {
-        if (dto.permissions.invoices_permission === currentPermissions.invoices_permission) {
-          alreadySetPermissions.invoices_permission = dto.permissions.invoices_permission;
+        if (
+          dto.permissions.invoices_permission ===
+          currentPermissions.invoices_permission
+        ) {
+          alreadySetPermissions.invoices_permission =
+            dto.permissions.invoices_permission;
         } else {
-          permissionsToUpdate.invoicesPermission = dto.permissions.invoices_permission;
-          changedPermissions.invoices_permission = currentPermissions.invoices_permission;
+          permissionsToUpdate.invoicesPermission =
+            dto.permissions.invoices_permission;
+          changedPermissions.invoices_permission =
+            currentPermissions.invoices_permission;
         }
       }
 
       if (dto.permissions.expenses_permission !== undefined) {
-        if (dto.permissions.expenses_permission === currentPermissions.expenses_permission) {
-          alreadySetPermissions.expenses_permission = dto.permissions.expenses_permission;
+        if (
+          dto.permissions.expenses_permission ===
+          currentPermissions.expenses_permission
+        ) {
+          alreadySetPermissions.expenses_permission =
+            dto.permissions.expenses_permission;
         } else {
-          permissionsToUpdate.expensesPermission = dto.permissions.expenses_permission;
-          changedPermissions.expenses_permission = currentPermissions.expenses_permission;
+          permissionsToUpdate.expensesPermission =
+            dto.permissions.expenses_permission;
+          changedPermissions.expenses_permission =
+            currentPermissions.expenses_permission;
         }
       }
 
       if (dto.permissions.assets_permission !== undefined) {
-        if (dto.permissions.assets_permission === currentPermissions.assets_permission) {
-          alreadySetPermissions.assets_permission = dto.permissions.assets_permission;
+        if (
+          dto.permissions.assets_permission ===
+          currentPermissions.assets_permission
+        ) {
+          alreadySetPermissions.assets_permission =
+            dto.permissions.assets_permission;
         } else {
-          permissionsToUpdate.assetsPermission = dto.permissions.assets_permission;
-          changedPermissions.assets_permission = currentPermissions.assets_permission;
+          permissionsToUpdate.assetsPermission =
+            dto.permissions.assets_permission;
+          changedPermissions.assets_permission =
+            currentPermissions.assets_permission;
         }
       }
 
       if (dto.permissions.revenues_permission !== undefined) {
-        if (dto.permissions.revenues_permission === currentPermissions.revenues_permission) {
-          alreadySetPermissions.revenues_permission = dto.permissions.revenues_permission;
+        if (
+          dto.permissions.revenues_permission ===
+          currentPermissions.revenues_permission
+        ) {
+          alreadySetPermissions.revenues_permission =
+            dto.permissions.revenues_permission;
         } else {
-          permissionsToUpdate.revenuesPermission = dto.permissions.revenues_permission;
-          changedPermissions.revenues_permission = currentPermissions.revenues_permission;
+          permissionsToUpdate.revenuesPermission =
+            dto.permissions.revenues_permission;
+          changedPermissions.revenues_permission =
+            currentPermissions.revenues_permission;
         }
       }
 
       // Debug logging
-      this.logger.log(`Request permissions: ${JSON.stringify(dto.permissions)}`);
-      this.logger.log(`Current permissions: ${JSON.stringify(currentPermissions)}`);
-      this.logger.log(`Permissions to update: ${JSON.stringify(permissionsToUpdate)}`);
-      this.logger.log(`Already set permissions: ${JSON.stringify(alreadySetPermissions)}`);
+      this.logger.log(
+        `Request permissions: ${JSON.stringify(dto.permissions)}`,
+      );
+      this.logger.log(
+        `Current permissions: ${JSON.stringify(currentPermissions)}`,
+      );
+      this.logger.log(
+        `Permissions to update: ${JSON.stringify(permissionsToUpdate)}`,
+      );
+      this.logger.log(
+        `Already set permissions: ${JSON.stringify(alreadySetPermissions)}`,
+      );
 
       // 7. If no permissions need to be updated, return early
       if (Object.keys(permissionsToUpdate).length === 0) {
@@ -269,15 +331,21 @@ export class AccountantService {
         data: updateData,
       });
 
-      this.logger.log(`Updated accountant result: ${JSON.stringify(updatedAccountant)}`);
+      this.logger.log(
+        `Updated accountant result: ${JSON.stringify(updatedAccountant)}`,
+      );
 
       // 9. Create audit log entry
       const logDescription = `Accountant permissions updated for ${employee.firstName} ${employee.lastName} (ID: ${dto.employee_id}) by ${isAdmin ? 'Admin' : 'Account Manager ID: ' + currentUserId}`;
 
       try {
         this.logger.log(logDescription);
-        this.logger.log(`Previous permissions: ${JSON.stringify(changedPermissions)}`);
-        this.logger.log(`New permissions: ${JSON.stringify(permissionsToUpdate)}`);
+        this.logger.log(
+          `Previous permissions: ${JSON.stringify(changedPermissions)}`,
+        );
+        this.logger.log(
+          `New permissions: ${JSON.stringify(permissionsToUpdate)}`,
+        );
       } catch (logError) {
         this.logger.error(`Failed to create audit log: ${logError.message}`);
       }
@@ -288,7 +356,7 @@ export class AccountantService {
 
       // 10. Prepare response
       const updatedPermissions: any = {};
-      Object.keys(permissionsToUpdate).forEach(key => {
+      Object.keys(permissionsToUpdate).forEach((key) => {
         const permissionKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
         updatedPermissions[permissionKey] = permissionsToUpdate[key];
       });
@@ -299,11 +367,15 @@ export class AccountantService {
         employee_id: dto.employee_id,
         updated_permissions: updatedPermissions,
         previous_permissions: changedPermissions,
-        already_set_permissions: Object.keys(alreadySetPermissions).length > 0 ? alreadySetPermissions : undefined,
+        already_set_permissions:
+          Object.keys(alreadySetPermissions).length > 0
+            ? alreadySetPermissions
+            : undefined,
       };
-
     } catch (error) {
-      this.logger.error(`Failed to update permissions for accountant ${dto.employee_id}: ${error.message}`);
+      this.logger.error(
+        `Failed to update permissions for accountant ${dto.employee_id}: ${error.message}`,
+      );
 
       // Handle specific database constraint errors
       if (error.message.includes('Unique constraint failed')) {
@@ -331,7 +403,7 @@ export class AccountantService {
   async addVendor(
     dto: AddVendorDto,
     currentUserId: number,
-    user?: any
+    user?: any,
   ): Promise<VendorResponseDto> {
     try {
       // Admin bypass - check both type and role for defense in depth
@@ -340,22 +412,23 @@ export class AccountantService {
       // 1. Check if current user exists and is active
       const currentEmployee = await this.prisma.employee.findUnique({
         where: { id: currentUserId },
-        select: { 
-          id: true, 
-          status: true, 
-          firstName: true, 
+        select: {
+          id: true,
+          status: true,
+          firstName: true,
           lastName: true,
           department: {
-            select: { name: true }
-          }
+            select: { name: true },
+          },
         },
       });
 
       if (!currentEmployee) {
         return {
           status: 'error',
-          message: 'Authentication failed: User account not found in the system. Please contact your administrator.',
-          error_code: 'CURRENT_USER_NOT_FOUND'
+          message:
+            'Authentication failed: User account not found in the system. Please contact your administrator.',
+          error_code: 'CURRENT_USER_NOT_FOUND',
         };
       }
 
@@ -363,7 +436,7 @@ export class AccountantService {
         return {
           status: 'error',
           message: `Access denied: Your account (${currentEmployee.firstName} ${currentEmployee.lastName}) is currently inactive. Please contact HR to reactivate your account.`,
-          error_code: 'CURRENT_USER_INACTIVE'
+          error_code: 'CURRENT_USER_INACTIVE',
         };
       }
 
@@ -372,7 +445,7 @@ export class AccountantService {
         return {
           status: 'error',
           message: `Permission denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are in the ${currentEmployee.department?.name || 'Unknown'} department. Only members of the Accounts department can add vendor records.`,
-          error_code: 'NOT_ACCOUNTS_DEPARTMENT'
+          error_code: 'NOT_ACCOUNTS_DEPARTMENT',
         };
       }
 
@@ -387,7 +460,7 @@ export class AccountantService {
           return {
             status: 'error',
             message: `Access denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are not authorized as an accountant. Only accountants can add vendor records. Please contact your department manager to request accountant privileges.`,
-            error_code: 'NOT_ACCOUNTANT'
+            error_code: 'NOT_ACCOUNTANT',
           };
         }
       }
@@ -396,8 +469,9 @@ export class AccountantService {
       if (!dto.name && !dto.contact_person && !dto.email && !dto.phone) {
         return {
           status: 'error',
-          message: 'Validation error: Please provide at least one identifying field (name, contact person, email, or phone number) to create a vendor record.',
-          error_code: 'INSUFFICIENT_VENDOR_DATA'
+          message:
+            'Validation error: Please provide at least one identifying field (name, contact person, email, or phone number) to create a vendor record.',
+          error_code: 'INSUFFICIENT_VENDOR_DATA',
         };
       }
 
@@ -446,7 +520,6 @@ export class AccountantService {
           updated_at: newVendor.updatedAt,
         },
       };
-
     } catch (error) {
       this.logger.error(`Failed to create vendor: ${error.message}`);
 
@@ -454,7 +527,8 @@ export class AccountantService {
       if (error.message.includes('Unique constraint failed')) {
         return {
           status: 'error',
-          message: 'Database error: A vendor with similar information already exists. Please check for duplicate entries or contact support if this is unexpected.',
+          message:
+            'Database error: A vendor with similar information already exists. Please check for duplicate entries or contact support if this is unexpected.',
           error_code: 'DATABASE_CONSTRAINT_VIOLATION',
         };
       }
@@ -463,16 +537,21 @@ export class AccountantService {
       if (error.message.includes('Validation failed')) {
         return {
           status: 'error',
-          message: 'Validation error: Please check that all provided information is in the correct format (e.g., valid email address, proper phone number format).',
+          message:
+            'Validation error: Please check that all provided information is in the correct format (e.g., valid email address, proper phone number format).',
           error_code: 'VALIDATION_ERROR',
         };
       }
 
       // Handle database connection errors
-      if (error.message.includes('connect') || error.message.includes('timeout')) {
+      if (
+        error.message.includes('connect') ||
+        error.message.includes('timeout')
+      ) {
         return {
           status: 'error',
-          message: 'System error: Unable to connect to the database. Please try again in a few moments or contact technical support if the problem persists.',
+          message:
+            'System error: Unable to connect to the database. Please try again in a few moments or contact technical support if the problem persists.',
           error_code: 'DATABASE_CONNECTION_ERROR',
         };
       }
@@ -493,7 +572,7 @@ export class AccountantService {
    */
   async getAllVendors(
     currentUserId: number,
-    user?: any
+    user?: any,
   ): Promise<VendorListResponseDto> {
     try {
       // Admin bypass - check both type and role for defense in depth
@@ -502,22 +581,23 @@ export class AccountantService {
       // 1. Check if current user exists and is active
       const currentEmployee = await this.prisma.employee.findUnique({
         where: { id: currentUserId },
-        select: { 
-          id: true, 
-          status: true, 
-          firstName: true, 
+        select: {
+          id: true,
+          status: true,
+          firstName: true,
           lastName: true,
           department: {
-            select: { name: true }
-          }
+            select: { name: true },
+          },
         },
       });
 
       if (!currentEmployee) {
         return {
           status: 'error',
-          message: 'Authentication failed: User account not found in the system. Please contact your administrator.',
-          error_code: 'CURRENT_USER_NOT_FOUND'
+          message:
+            'Authentication failed: User account not found in the system. Please contact your administrator.',
+          error_code: 'CURRENT_USER_NOT_FOUND',
         };
       }
 
@@ -525,7 +605,7 @@ export class AccountantService {
         return {
           status: 'error',
           message: `Access denied: Your account (${currentEmployee.firstName} ${currentEmployee.lastName}) is currently inactive. Please contact HR to reactivate your account.`,
-          error_code: 'CURRENT_USER_INACTIVE'
+          error_code: 'CURRENT_USER_INACTIVE',
         };
       }
 
@@ -534,7 +614,7 @@ export class AccountantService {
         return {
           status: 'error',
           message: `Permission denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are in the ${currentEmployee.department?.name || 'Unknown'} department. Only members of the Accounts department can view vendor records.`,
-          error_code: 'NOT_ACCOUNTS_DEPARTMENT'
+          error_code: 'NOT_ACCOUNTS_DEPARTMENT',
         };
       }
 
@@ -549,16 +629,14 @@ export class AccountantService {
           return {
             status: 'error',
             message: `Access denied: You (${currentEmployee.firstName} ${currentEmployee.lastName}) are not authorized as an accountant. Only accountants can view vendor records. Please contact your department manager to request accountant privileges.`,
-            error_code: 'NOT_ACCOUNTANT'
+            error_code: 'NOT_ACCOUNTANT',
           };
         }
       }
 
       // 4. Retrieve all vendor records
       const vendors = await this.prisma.vendor.findMany({
-        orderBy: [
-          { name: 'asc' }
-        ],
+        orderBy: [{ name: 'asc' }],
         select: {
           id: true,
           name: true,
@@ -588,7 +666,7 @@ export class AccountantService {
       return {
         status: 'success',
         message: `Successfully retrieved ${vendors.length} vendor record${vendors.length !== 1 ? 's' : ''}.`,
-        vendors: vendors.map(vendor => ({
+        vendors: vendors.map((vendor) => ({
           id: vendor.id,
           name: vendor.name || undefined,
           contact_person: vendor.contactPerson || undefined,
@@ -608,15 +686,18 @@ export class AccountantService {
           total_count: totalCount,
         },
       };
-
     } catch (error) {
       this.logger.error(`Failed to retrieve vendors: ${error.message}`);
 
       // Handle database connection errors
-      if (error.message.includes('connect') || error.message.includes('timeout')) {
+      if (
+        error.message.includes('connect') ||
+        error.message.includes('timeout')
+      ) {
         return {
           status: 'error',
-          message: 'System error: Unable to connect to the database. Please try again in a few moments or contact technical support if the problem persists.',
+          message:
+            'System error: Unable to connect to the database. Please try again in a few moments or contact technical support if the problem persists.',
           error_code: 'DATABASE_CONNECTION_ERROR',
         };
       }
@@ -641,20 +722,31 @@ export class AccountantService {
       // Check database connection first
       const isHealthy = await this.prisma.isConnectionHealthy();
       if (!isHealthy) {
-        this.logger.warn('Database connection is unhealthy, attempting to reconnect...');
+        this.logger.warn(
+          'Database connection is unhealthy, attempting to reconnect...',
+        );
         const reconnected = await this.prisma.reconnectIfNeeded();
         if (!reconnected) {
-          this.logger.warn('Failed to reconnect to database, skipping monthly P&L calculation');
+          this.logger.warn(
+            'Failed to reconnect to database, skipping monthly P&L calculation',
+          );
           return;
         }
       }
-      
-      this.logger.log('🕔 12:00 AM PKT reached - Starting monthly auto P&L calculation');
+
+      this.logger.log(
+        '🕔 12:00 AM PKT reached - Starting monthly auto P&L calculation',
+      );
       await this.calculateAndSavePnL();
       this.logger.log('✅ Monthly auto P&L calculation completed successfully');
     } catch (error) {
-      if (error.message?.includes("Can't reach database server") || error.code === 'P1001') {
-        this.logger.warn(`❌ Database connection issue in monthly P&L cron: ${error.message}`);
+      if (
+        error.message?.includes("Can't reach database server") ||
+        error.code === 'P1001'
+      ) {
+        this.logger.warn(
+          `❌ Database connection issue in monthly P&L cron: ${error.message}`,
+        );
       } else {
         this.logger.error(`❌ Monthly P&L cron failed: ${error.message}`);
         throw error; // Re-throw to let NestJS handle the error
@@ -665,12 +757,17 @@ export class AccountantService {
   /**
    * Calculate P&L for a specific month and save to database (used by cron job)
    */
-  public async calculateAndSavePnL(month?: string, year?: string): Promise<PnLResponseDto> {
+  public async calculateAndSavePnL(
+    month?: string,
+    year?: string,
+  ): Promise<PnLResponseDto> {
     try {
       // Get the calculation period (previous month if not specified)
       const { calcMonth, calcYear } = this.getCalculationPeriod(month, year);
-      
-      this.logger.log(`🔄 Auto P&L calculation: Processing for ${calcMonth}/${calcYear}`);
+
+      this.logger.log(
+        `🔄 Auto P&L calculation: Processing for ${calcMonth}/${calcYear}`,
+      );
 
       // Check if record already exists
       const existingRecord = await this.prisma.profitLoss.findFirst({
@@ -681,7 +778,9 @@ export class AccountantService {
       });
 
       if (existingRecord) {
-        this.logger.log(`⏭️ P&L record already exists for ${calcMonth}/${calcYear} - skipping`);
+        this.logger.log(
+          `⏭️ P&L record already exists for ${calcMonth}/${calcYear} - skipping`,
+        );
         return {
           status: 'success',
           message: `P&L record already exists for ${calcMonth}/${calcYear}`,
@@ -714,16 +813,20 @@ export class AccountantService {
       } catch (createError) {
         // If create fails due to unique constraint, try to find existing record
         if (createError.message.includes('Unique constraint failed')) {
-          this.logger.log(`🔄 Unique constraint failed, checking for existing record`);
+          this.logger.log(
+            `🔄 Unique constraint failed, checking for existing record`,
+          );
           const existingRecord = await this.prisma.profitLoss.findFirst({
             where: {
               month: calcMonth,
               year: calcYear,
             },
           });
-          
+
           if (existingRecord) {
-            this.logger.log(`✅ Found existing record for ${calcMonth}/${calcYear}`);
+            this.logger.log(
+              `✅ Found existing record for ${calcMonth}/${calcYear}`,
+            );
             savedRecord = existingRecord;
           } else {
             throw createError; // Re-throw if no existing record found
@@ -733,7 +836,9 @@ export class AccountantService {
         }
       }
 
-      this.logger.log(`✅ P&L calculation and save completed for ${calcMonth}/${calcYear} - record id ${savedRecord.id}`);
+      this.logger.log(
+        `✅ P&L calculation and save completed for ${calcMonth}/${calcYear} - record id ${savedRecord.id}`,
+      );
 
       return {
         status: 'success',
@@ -747,10 +852,9 @@ export class AccountantService {
           calculationDate: savedRecord.createdAt.toISOString(),
         },
       };
-
     } catch (error) {
       this.logger.error(`Failed to calculate and save P&L: ${error.message}`);
-      
+
       // Handle specific database errors
       if (error.message.includes('Unique constraint failed')) {
         return {
@@ -759,7 +863,7 @@ export class AccountantService {
           error_code: 'RECORD_ALREADY_EXISTS',
         };
       }
-      
+
       return {
         status: 'error',
         message: 'Failed to calculate and save P&L',
@@ -772,7 +876,10 @@ export class AccountantService {
    * Read-only P&L calculation for a specific month (manual trigger)
    * This method calculates P&L but does NOT update the database.
    */
-  public async calculatePnLPreview(month: string, year: string): Promise<PnLResponseDto> {
+  public async calculatePnLPreview(
+    month: string,
+    year: string,
+  ): Promise<PnLResponseDto> {
     try {
       this.logger.log(`⏳ Starting read-only P&L preview for ${month}/${year}`);
 
@@ -780,7 +887,8 @@ export class AccountantService {
       if (!this.isValidNumericMonth(month) || !this.isValidYear(year)) {
         return {
           status: 'error',
-          message: 'Invalid month or year format. Month should be 01-12, year should be 2000-2100',
+          message:
+            'Invalid month or year format. Month should be 01-12, year should be 2000-2100',
           error_code: 'INVALID_DATE_FORMAT',
         };
       }
@@ -788,7 +896,9 @@ export class AccountantService {
       // Calculate P&L
       const result = await this.calculatePnLInternal(month, year);
 
-      this.logger.log(`✅ P&L preview calculation completed for ${month}/${year}`);
+      this.logger.log(
+        `✅ P&L preview calculation completed for ${month}/${year}`,
+      );
 
       return {
         status: 'success',
@@ -802,7 +912,6 @@ export class AccountantService {
           calculationDate: new Date().toISOString(),
         },
       };
-
     } catch (error) {
       this.logger.error(`Failed to calculate P&L preview: ${error.message}`);
       return {
@@ -817,15 +926,21 @@ export class AccountantService {
    * Read-only P&L calculation with category breakdown for a specific month
    * This method calculates P&L with detailed category breakdown but does NOT update the database.
    */
-  public async calculatePnLWithCategories(month: string, year: string): Promise<PnLCategoryResponseDto> {
+  public async calculatePnLWithCategories(
+    month: string,
+    year: string,
+  ): Promise<PnLCategoryResponseDto> {
     try {
-      this.logger.log(`⏳ Starting read-only P&L category breakdown for ${month}/${year}`);
+      this.logger.log(
+        `⏳ Starting read-only P&L category breakdown for ${month}/${year}`,
+      );
 
       // Validate month and year
       if (!this.isValidNumericMonth(month) || !this.isValidYear(year)) {
         return {
           status: 'error',
-          message: 'Invalid month or year format. Month should be 01-12, year should be 2000-2100',
+          message:
+            'Invalid month or year format. Month should be 01-12, year should be 2000-2100',
           error_code: 'INVALID_DATE_FORMAT',
         };
       }
@@ -833,7 +948,9 @@ export class AccountantService {
       // Calculate P&L with category breakdown
       const result = await this.calculatePnLWithCategoriesInternal(month, year);
 
-      this.logger.log(`✅ P&L category breakdown completed for ${month}/${year}`);
+      this.logger.log(
+        `✅ P&L category breakdown completed for ${month}/${year}`,
+      );
 
       return {
         status: 'success',
@@ -849,9 +966,10 @@ export class AccountantService {
           calculationDate: new Date().toISOString(),
         },
       };
-
     } catch (error) {
-      this.logger.error(`Failed to calculate P&L category breakdown: ${error.message}`);
+      this.logger.error(
+        `Failed to calculate P&L category breakdown: ${error.message}`,
+      );
       return {
         status: 'error',
         message: 'Failed to calculate P&L category breakdown',
@@ -863,7 +981,10 @@ export class AccountantService {
   /**
    * Internal method to calculate P&L for a specific month
    */
-  private async calculatePnLInternal(month: string, year: string): Promise<{
+  private async calculatePnLInternal(
+    month: string,
+    year: string,
+  ): Promise<{
     totalIncome: number;
     totalExpenses: number;
     netProfit: number;
@@ -873,7 +994,9 @@ export class AccountantService {
     const startDate = new Date(parseInt(year), monthNumber - 1, 1);
     const endDate = new Date(parseInt(year), monthNumber, 0); // Last day of the month
 
-    this.logger.log(`📊 Calculating P&L for period: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    this.logger.log(
+      `📊 Calculating P&L for period: ${startDate.toISOString()} to ${endDate.toISOString()}`,
+    );
 
     // Calculate total revenue
     const totalRevenue = await this.prisma.revenue.aggregate({
@@ -905,7 +1028,9 @@ export class AccountantService {
     const totalExpensesAmount = Number(totalExpenses._sum.amount) || 0;
     const netProfit = totalIncome - totalExpensesAmount;
 
-    this.logger.log(`💰 P&L calculation results: Income=${totalIncome}, Expenses=${totalExpensesAmount}, Net Profit=${netProfit}`);
+    this.logger.log(
+      `💰 P&L calculation results: Income=${totalIncome}, Expenses=${totalExpensesAmount}, Net Profit=${netProfit}`,
+    );
 
     return {
       totalIncome,
@@ -917,19 +1042,32 @@ export class AccountantService {
   /**
    * Internal method to calculate P&L with category breakdown for a specific month
    */
-  private async calculatePnLWithCategoriesInternal(month: string, year: string): Promise<{
+  private async calculatePnLWithCategoriesInternal(
+    month: string,
+    year: string,
+  ): Promise<{
     totalIncome: number;
     totalExpenses: number;
     netProfit: number;
-    revenueBreakdown: Array<{ category: string; totalAmount: number; count: number }>;
-    expenseBreakdown: Array<{ category: string; totalAmount: number; count: number }>;
+    revenueBreakdown: Array<{
+      category: string;
+      totalAmount: number;
+      count: number;
+    }>;
+    expenseBreakdown: Array<{
+      category: string;
+      totalAmount: number;
+      count: number;
+    }>;
   }> {
     // Get month number for date filtering
     const monthNumber = parseInt(month);
     const startDate = new Date(parseInt(year), monthNumber - 1, 1);
     const endDate = new Date(parseInt(year), monthNumber, 0); // Last day of the month
 
-    this.logger.log(`📊 Calculating P&L category breakdown for period: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    this.logger.log(
+      `📊 Calculating P&L category breakdown for period: ${startDate.toISOString()} to ${endDate.toISOString()}`,
+    );
 
     // Calculate revenue breakdown by category
     const revenueBreakdown = await this.prisma.revenue.groupBy({
@@ -966,26 +1104,36 @@ export class AccountantService {
     });
 
     // Calculate totals
-    const totalIncome = revenueBreakdown.reduce((sum, item) => sum + Number(item._sum.amount || 0), 0);
-    const totalExpenses = expenseBreakdown.reduce((sum, item) => sum + Number(item._sum.amount || 0), 0);
+    const totalIncome = revenueBreakdown.reduce(
+      (sum, item) => sum + Number(item._sum.amount || 0),
+      0,
+    );
+    const totalExpenses = expenseBreakdown.reduce(
+      (sum, item) => sum + Number(item._sum.amount || 0),
+      0,
+    );
     const netProfit = totalIncome - totalExpenses;
 
     // Format revenue breakdown
-    const formattedRevenueBreakdown = revenueBreakdown.map(item => ({
+    const formattedRevenueBreakdown = revenueBreakdown.map((item) => ({
       category: item.category || 'Uncategorized',
       totalAmount: Number(item._sum.amount || 0),
       count: item._count.id,
     }));
 
     // Format expense breakdown
-    const formattedExpenseBreakdown = expenseBreakdown.map(item => ({
+    const formattedExpenseBreakdown = expenseBreakdown.map((item) => ({
       category: item.category || 'Uncategorized',
       totalAmount: Number(item._sum.amount || 0),
       count: item._count.id,
     }));
 
-    this.logger.log(`💰 P&L category breakdown results: Income=${totalIncome}, Expenses=${totalExpenses}, Net Profit=${netProfit}`);
-    this.logger.log(`📈 Revenue categories: ${formattedRevenueBreakdown.length}, Expense categories: ${formattedExpenseBreakdown.length}`);
+    this.logger.log(
+      `💰 P&L category breakdown results: Income=${totalIncome}, Expenses=${totalExpenses}, Net Profit=${netProfit}`,
+    );
+    this.logger.log(
+      `📈 Revenue categories: ${formattedRevenueBreakdown.length}, Expense categories: ${formattedExpenseBreakdown.length}`,
+    );
 
     return {
       totalIncome,
@@ -999,15 +1147,22 @@ export class AccountantService {
   /**
    * Get calculation period (previous month if not specified)
    */
-  private getCalculationPeriod(month?: string, year?: string): { calcMonth: string; calcYear: string } {
+  private getCalculationPeriod(
+    month?: string,
+    year?: string,
+  ): { calcMonth: string; calcYear: string } {
     if (month && year) {
       return { calcMonth: month, calcYear: year };
     }
 
     // Calculate previous month
     const currentDate = this.getCurrentDateInPKT();
-    const previousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    
+    const previousMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 1,
+      1,
+    );
+
     const calcMonth = String(previousMonth.getMonth() + 1).padStart(2, '0'); // 01, 02, 03, etc.
     const calcYear = previousMonth.getFullYear().toString();
 

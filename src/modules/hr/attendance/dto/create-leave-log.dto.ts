@@ -13,16 +13,25 @@ export class CreateLeaveLogDto {
   @IsString()
   leave_type?: string;
 
-  @ApiProperty({ description: 'Leave start date (YYYY-MM-DD)', example: '2023-01-15' })
+  @ApiProperty({
+    description: 'Leave start date (YYYY-MM-DD)',
+    example: '2023-01-15',
+  })
   @IsDateString()
   start_date: string;
 
-  @ApiProperty({ description: 'Leave end date (YYYY-MM-DD)', example: '2023-01-17' })
+  @ApiProperty({
+    description: 'Leave end date (YYYY-MM-DD)',
+    example: '2023-01-17',
+  })
   @IsDateString()
   end_date: string;
 
-  @ApiPropertyOptional({ description: 'Reason for leave', example: 'Medical appointment' })
+  @ApiPropertyOptional({
+    description: 'Reason for leave',
+    example: 'Medical appointment',
+  })
   @IsOptional()
   @IsString()
   reason?: string;
-} 
+}

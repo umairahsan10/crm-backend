@@ -10,7 +10,10 @@ export class UnitHeadDto {
   @ApiProperty({ description: 'Last name', example: 'Doe' })
   lastName: string;
 
-  @ApiPropertyOptional({ description: 'Email address', example: 'john.doe@company.com' })
+  @ApiPropertyOptional({
+    description: 'Email address',
+    example: 'john.doe@company.com',
+  })
   email?: string;
 }
 
@@ -44,7 +47,10 @@ export class TeamDto {
   @ApiProperty({ description: 'Number of projects', example: 2 })
   projectsCount: number;
 
-  @ApiProperty({ description: 'Team creation date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Team creation date',
+    example: '2024-01-15T10:30:00Z',
+  })
   createdAt: string;
 }
 
@@ -71,16 +77,22 @@ export class ProjectDto {
   @ApiProperty({ description: 'Project ID', example: 101 })
   id: number;
 
-  @ApiProperty({ description: 'Project description', example: 'E-commerce website development' })
+  @ApiProperty({
+    description: 'Project description',
+    example: 'E-commerce website development',
+  })
   description: string;
 
   @ApiProperty({ description: 'Project status', example: 'in_progress' })
   status: string;
 
-  @ApiProperty({ description: 'Project deadline', example: '2024-03-15T00:00:00Z' })
+  @ApiProperty({
+    description: 'Project deadline',
+    example: '2024-03-15T00:00:00Z',
+  })
   deadline: string;
 
-  @ApiProperty({ description: 'Live progress percentage', example: 65.50 })
+  @ApiProperty({ description: 'Live progress percentage', example: 65.5 })
   liveProgress: number;
 
   @ApiProperty({ description: 'Difficulty level', example: 'medium' })
@@ -95,10 +107,16 @@ export class ProjectDto {
   @ApiProperty({ description: 'Team details', type: ProjectTeamDto })
   team: ProjectTeamDto;
 
-  @ApiProperty({ description: 'Project creation date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Project creation date',
+    example: '2024-01-15T10:30:00Z',
+  })
   createdAt: string;
 
-  @ApiProperty({ description: 'Project update date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Project update date',
+    example: '2024-01-15T10:30:00Z',
+  })
   updatedAt: string;
 }
 
@@ -106,7 +124,10 @@ export class UnitListDto {
   @ApiProperty({ description: 'Unit ID', example: 1 })
   id: number;
 
-  @ApiProperty({ description: 'Unit name', example: 'Frontend Development Unit' })
+  @ApiProperty({
+    description: 'Unit name',
+    example: 'Frontend Development Unit',
+  })
   name: string;
 
   @ApiProperty({ description: 'Unit head ID', example: 123 })
@@ -124,10 +145,16 @@ export class UnitListDto {
   @ApiProperty({ description: 'Number of projects', example: 5 })
   projectsCount: number;
 
-  @ApiProperty({ description: 'Unit creation date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Unit creation date',
+    example: '2024-01-15T10:30:00Z',
+  })
   createdAt: string;
 
-  @ApiProperty({ description: 'Unit update date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Unit update date',
+    example: '2024-01-15T10:30:00Z',
+  })
   updatedAt: string;
 }
 
@@ -163,7 +190,10 @@ export class UnitListResponseDto {
   @ApiProperty({ description: 'Pagination details', type: PaginationDto })
   pagination: PaginationDto;
 
-  @ApiProperty({ description: 'Response message', example: 'Units retrieved successfully' })
+  @ApiProperty({
+    description: 'Response message',
+    example: 'Units retrieved successfully',
+  })
   message: string;
 }
 
@@ -174,6 +204,9 @@ export class UnitDetailResponseDto {
   @ApiProperty({ description: 'Unit details', type: UnitDetailDto })
   data: UnitDetailDto;
 
-  @ApiProperty({ description: 'Response message', example: 'Unit details retrieved successfully' })
+  @ApiProperty({
+    description: 'Response message',
+    example: 'Unit details retrieved successfully',
+  })
   message: string;
 }

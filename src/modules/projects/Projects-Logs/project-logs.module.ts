@@ -7,12 +7,7 @@ import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 
 @Module({
   controllers: [ProjectLogsController],
-  providers: [
-    ProjectLogsService,
-    AutoLogService,
-    RolesGuard,
-    DepartmentsGuard
-  ],
-  exports: [ProjectLogsService, AutoLogService]
+  providers: [ProjectLogsService, AutoLogService, RolesGuard, DepartmentsGuard],
+  exports: [ProjectLogsService, AutoLogService],
 })
 export class ProjectLogsModule {}

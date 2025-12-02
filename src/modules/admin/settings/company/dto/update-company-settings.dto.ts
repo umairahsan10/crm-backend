@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsNumber, IsEmail, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsEmail,
+  IsUrl,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateCompanySettingsDto {
@@ -7,7 +13,10 @@ export class UpdateCompanySettingsDto {
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ description: 'Company address', example: '123 Main St' })
+  @ApiPropertyOptional({
+    description: 'Company address',
+    example: '123 Main St',
+  })
   @IsOptional()
   @IsString()
   address?: string;
@@ -37,44 +46,69 @@ export class UpdateCompanySettingsDto {
   @IsString()
   phone?: string;
 
-  @ApiPropertyOptional({ description: 'Email address', example: 'info@acme.com' })
+  @ApiPropertyOptional({
+    description: 'Email address',
+    example: 'info@acme.com',
+  })
   @IsOptional()
   @IsEmail()
   email?: string;
 
-  @ApiPropertyOptional({ description: 'Website URL', example: 'https://www.acme.com' })
+  @ApiPropertyOptional({
+    description: 'Website URL',
+    example: 'https://www.acme.com',
+  })
   @IsOptional()
   @IsUrl()
   website?: string;
 
-  @ApiPropertyOptional({ description: 'Tax ID or registration number', example: 'TAX123456' })
+  @ApiPropertyOptional({
+    description: 'Tax ID or registration number',
+    example: 'TAX123456',
+  })
   @IsOptional()
   @IsString()
   taxId?: string;
 
-  @ApiPropertyOptional({ description: 'Company status', example: 'active', enum: ['active', 'inactive'] })
+  @ApiPropertyOptional({
+    description: 'Company status',
+    example: 'active',
+    enum: ['active', 'inactive'],
+  })
   @IsOptional()
   @IsString()
   status?: string;
 
   // Attendance Settings
-  @ApiPropertyOptional({ description: 'Late time threshold in minutes', example: 30 })
+  @ApiPropertyOptional({
+    description: 'Late time threshold in minutes',
+    example: 30,
+  })
   @IsOptional()
   @IsNumber()
   lateTime?: number;
 
-  @ApiPropertyOptional({ description: 'Half-day time threshold in minutes', example: 90 })
+  @ApiPropertyOptional({
+    description: 'Half-day time threshold in minutes',
+    example: 90,
+  })
   @IsOptional()
   @IsNumber()
   halfTime?: number;
 
-  @ApiPropertyOptional({ description: 'Absent time threshold in minutes', example: 180 })
+  @ApiPropertyOptional({
+    description: 'Absent time threshold in minutes',
+    example: 180,
+  })
   @IsOptional()
   @IsNumber()
   absentTime?: number;
 
   // Leave Policies
-  @ApiPropertyOptional({ description: 'Quarterly leave days allowed', example: 20 })
+  @ApiPropertyOptional({
+    description: 'Quarterly leave days allowed',
+    example: 20,
+  })
   @IsOptional()
   @IsNumber()
   quarterlyLeavesDays?: number;
@@ -85,7 +119,10 @@ export class UpdateCompanySettingsDto {
   monthlyLatesDays?: number;
 
   // Deductions
-  @ApiPropertyOptional({ description: 'Absent deduction amount', example: 1000 })
+  @ApiPropertyOptional({
+    description: 'Absent deduction amount',
+    example: 1000,
+  })
   @IsOptional()
   @IsNumber()
   absentDeduction?: number;
@@ -95,9 +132,11 @@ export class UpdateCompanySettingsDto {
   @IsNumber()
   lateDeduction?: number;
 
-  @ApiPropertyOptional({ description: 'Half-day deduction amount', example: 750 })
+  @ApiPropertyOptional({
+    description: 'Half-day deduction amount',
+    example: 750,
+  })
   @IsOptional()
   @IsNumber()
   halfDeduction?: number;
 }
-

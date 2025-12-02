@@ -14,7 +14,7 @@ export class MonthlyLatesResetTrigger {
    */
   @Cron('0 18 1 * *', {
     name: 'monthly-lates-reset',
-    timeZone: 'Asia/Karachi' // PKT timezone
+    timeZone: 'Asia/Karachi', // PKT timezone
   })
   async resetMonthlyLates(): Promise<number> {
     try {
@@ -22,9 +22,13 @@ export class MonthlyLatesResetTrigger {
 
       // Get current date in PKT
       const now = new Date();
-      const pktDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
-      
-      this.logger.log(`Executing monthly lates reset for ${pktDate.toISOString()}`);
+      const pktDate = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+      );
+
+      this.logger.log(
+        `Executing monthly lates reset for ${pktDate.toISOString()}`,
+      );
 
       // Update all employees' monthly_lates to 3
       const result = await this.prisma.attendance.updateMany({
@@ -32,11 +36,13 @@ export class MonthlyLatesResetTrigger {
           // Update all records (no specific condition needed)
         },
         data: {
-          monthlyLates: 3
-        }
+          monthlyLates: 3,
+        },
       });
 
-      this.logger.log(`Successfully reset monthly_lates to 3 for ${result.count} employees`);
+      this.logger.log(
+        `Successfully reset monthly_lates to 3 for ${result.count} employees`,
+      );
 
       // Log the action for audit purposes
       await this.logMonthlyLatesReset(result.count);
@@ -54,11 +60,14 @@ export class MonthlyLatesResetTrigger {
   private async logMonthlyLatesReset(updatedCount: number) {
     try {
       // You can implement logging to a separate table or file here
-      this.logger.log(`Monthly lates reset completed: ${updatedCount} employees updated`);
-      
+      this.logger.log(
+        `Monthly lates reset completed: ${updatedCount} employees updated`,
+      );
+
       // Example: Log to console with timestamp
-      console.log(`[${new Date().toISOString()}] Monthly lates reset: ${updatedCount} employees updated`);
-      
+      console.log(
+        `[${new Date().toISOString()}] Monthly lates reset: ${updatedCount} employees updated`,
+      );
     } catch (error) {
       this.logger.error('Error logging monthly lates reset:', error);
     }
@@ -84,23 +93,23 @@ export class MonthlyLatesResetTrigger {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          employeeId: 'asc'
-        }
+          employeeId: 'asc',
+        },
       });
 
-      return employees.map(emp => ({
+      return employees.map((emp) => ({
         employee_id: emp.employeeId,
         employee_name: `${emp.employee.firstName} ${emp.employee.lastName}`,
-        monthly_lates: emp.monthlyLates
+        monthly_lates: emp.monthlyLates,
       }));
     } catch (error) {
       this.logger.error('Error getting monthly lates status:', error);
       throw error;
     }
   }
-} 
+}

@@ -11,13 +11,20 @@ export class CreateMarketingDto {
   @IsNumber()
   marketingUnitId?: number;
 
-  @ApiPropertyOptional({ description: 'Total campaigns run by the employee', example: 10, minimum: 0 })
+  @ApiPropertyOptional({
+    description: 'Total campaigns run by the employee',
+    example: 10,
+    minimum: 0,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   totalCampaignsRun?: number;
 
-  @ApiPropertyOptional({ description: 'Primary platform focus of the marketing employee', example: 'Facebook Ads' })
+  @ApiPropertyOptional({
+    description: 'Primary platform focus of the marketing employee',
+    example: 'Facebook Ads',
+  })
   @IsOptional()
   @IsString()
   platformFocus?: string;
@@ -29,13 +36,20 @@ export class UpdateMarketingDto {
   @IsNumber()
   marketingUnitId?: number;
 
-  @ApiPropertyOptional({ description: 'Total campaigns run by the employee', example: 10, minimum: 0 })
+  @ApiPropertyOptional({
+    description: 'Total campaigns run by the employee',
+    example: 10,
+    minimum: 0,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   totalCampaignsRun?: number;
 
-  @ApiPropertyOptional({ description: 'Primary platform focus of the marketing employee', example: 'Facebook Ads' })
+  @ApiPropertyOptional({
+    description: 'Primary platform focus of the marketing employee',
+    example: 'Facebook Ads',
+  })
   @IsOptional()
   @IsString()
   platformFocus?: string;

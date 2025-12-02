@@ -8,8 +8,14 @@ export class AppController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Root endpoint', description: 'Returns a basic hello message.' })
-  @ApiResponse({ status: 200, description: 'Successfully returned a greeting.' })
+  @ApiOperation({
+    summary: 'Root endpoint',
+    description: 'Returns a basic hello message.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully returned a greeting.',
+  })
   getHello(): string {
     return 'Hello from Render!';
   }
@@ -17,7 +23,8 @@ export class AppController {
   @Get('health/db')
   @ApiOperation({
     summary: 'Database health check',
-    description: 'Verifies if the database connection is active and responding properly.',
+    description:
+      'Verifies if the database connection is active and responding properly.',
   })
   @ApiResponse({
     status: 200,
@@ -44,17 +51,31 @@ export class AppController {
   })
   async checkDatabaseHealth() {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
-      return {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        message: 'Database connection is working properly',
-      };
+      // Use PrismaService's isConnectionHealthy() method instead of raw SQL
+      // This avoids prepared statement conflicts with PgBouncer and uses typed queries
+      const isHealthy = await this.prisma.isConnectionHealthy();
+
+      if (isHealthy) {
+        return {
+          status: 'healthy',
+          timestamp: new Date().toISOString(),
+          message: 'Database connection is working properly',
+        };
+      } else {
+        return {
+          status: 'unhealthy',
+          timestamp: new Date().toISOString(),
+          error: 'Connection health check returned false',
+          message: 'Database connection failed',
+        };
+      }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
-        error: error.message,
+        error: errorMessage,
         message: 'Database connection failed',
       };
     }

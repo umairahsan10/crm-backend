@@ -4,7 +4,10 @@ export class VendorListResponseDto {
   @ApiProperty({ example: 'success', description: 'Response status' })
   status: 'success' | 'error';
 
-  @ApiProperty({ example: 'Vendors retrieved successfully', description: 'Response message' })
+  @ApiProperty({
+    example: 'Vendors retrieved successfully',
+    description: 'Response message',
+  })
   message: string;
 
   @ApiPropertyOptional({
@@ -25,9 +28,9 @@ export class VendorListResponseDto {
         created_by: 101,
         notes: 'Top vendor for electronics',
         created_at: '2025-10-14T00:00:00.000Z',
-        updated_at: '2025-10-14T00:00:00.000Z'
-      }
-    ]
+        updated_at: '2025-10-14T00:00:00.000Z',
+      },
+    ],
   })
   vendors?: {
     id: number;
@@ -52,8 +55,8 @@ export class VendorListResponseDto {
       total_count: 50,
       page: 1,
       limit: 10,
-      total_pages: 5
-    }
+      total_pages: 5,
+    },
   })
   metadata?: {
     total_count: number;
@@ -62,6 +65,9 @@ export class VendorListResponseDto {
     total_pages?: number;
   };
 
-  @ApiPropertyOptional({ example: 'VENDOR_LIST_ERROR', description: 'Error code if request fails' })
+  @ApiPropertyOptional({
+    example: 'VENDOR_LIST_ERROR',
+    description: 'Error code if request fails',
+  })
   error_code?: string;
-} 
+}

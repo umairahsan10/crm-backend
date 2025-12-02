@@ -7,7 +7,10 @@ export class PromotedEmployeeDto {
   @ApiProperty({ description: 'Employee full name', example: 'John Doe' })
   name: string;
 
-  @ApiProperty({ description: 'Previous role (for direct promotion)', example: 'senior' })
+  @ApiProperty({
+    description: 'Previous role (for direct promotion)',
+    example: 'senior',
+  })
   previousRole?: string;
 
   @ApiProperty({ description: 'New role', example: 'unit_head' })
@@ -40,16 +43,30 @@ export class CreateUnitDataDto {
   @ApiProperty({ description: 'Created unit ID', example: 1 })
   unitId: number;
 
-  @ApiProperty({ description: 'Created unit name', example: 'Frontend Development Unit' })
+  @ApiProperty({
+    description: 'Created unit name',
+    example: 'Frontend Development Unit',
+  })
   unitName: string;
 
-  @ApiProperty({ description: 'Promoted employee details', type: PromotedEmployeeDto })
+  @ApiProperty({
+    description: 'Promoted employee details',
+    type: PromotedEmployeeDto,
+  })
   promotedEmployee: PromotedEmployeeDto;
 
-  @ApiProperty({ description: 'New team lead details (for team lead promotion)', type: NewTeamLeadDto, required: false })
+  @ApiProperty({
+    description: 'New team lead details (for team lead promotion)',
+    type: NewTeamLeadDto,
+    required: false,
+  })
   newTeamLead?: NewTeamLeadDto;
 
-  @ApiProperty({ description: 'Original team details (for team lead promotion)', type: OriginalTeamDto, required: false })
+  @ApiProperty({
+    description: 'Original team details (for team lead promotion)',
+    type: OriginalTeamDto,
+    required: false,
+  })
   originalTeam?: OriginalTeamDto;
 }
 
@@ -57,7 +74,11 @@ export class CreateUnitResponseDto {
   @ApiProperty({ description: 'Success status', example: true })
   success: boolean;
 
-  @ApiProperty({ description: 'Response message', example: 'Production unit \'Frontend Development Unit\' created successfully with team lead promotion' })
+  @ApiProperty({
+    description: 'Response message',
+    example:
+      "Production unit 'Frontend Development Unit' created successfully with team lead promotion",
+  })
   message: string;
 
   @ApiProperty({ description: 'Response data', type: CreateUnitDataDto })

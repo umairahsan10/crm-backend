@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { CompanyService } from './company.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -9,7 +20,15 @@ import { DepartmentsGuard } from '../../common/guards/departments.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Departments } from '../../common/decorators/departments.decorator';
 import { RoleName } from '@prisma/client';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Company')
 @ApiBearerAuth()
@@ -27,8 +46,14 @@ export class CompanyController {
   @Departments('HR')
   @ApiOperation({ summary: 'Create a new company' })
   @ApiBody({ type: CreateCompanyDto })
-  @ApiResponse({ status: 201, description: 'Company created successfully', type: CompanyResponseDto })
-  async createCompany(@Body() createCompanyDto: CreateCompanyDto): Promise<CompanyResponseDto> {
+  @ApiResponse({
+    status: 201,
+    description: 'Company created successfully',
+    type: CompanyResponseDto,
+  })
+  async createCompany(
+    @Body() createCompanyDto: CreateCompanyDto,
+  ): Promise<CompanyResponseDto> {
     return this.companyService.createCompany(createCompanyDto);
   }
 
@@ -40,15 +65,50 @@ export class CompanyController {
   @Roles(RoleName.dep_manager, RoleName.unit_head)
   @Departments('HR', 'Sales')
   @ApiOperation({ summary: 'Get all companies with search and filtering' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search term to filter companies by name, country, or status' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Number of items per page' })
-  @ApiQuery({ name: 'sortBy', required: false, description: 'Field to sort by' })
-  @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order: asc or desc' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by company status (active/inactive)' })
-  @ApiQuery({ name: 'country', required: false, description: 'Filter by country' })
-  @ApiQuery({ name: 'name', required: false, description: 'Filter by company name' })
-  @ApiResponse({ status: 200, description: 'List of companies with pagination metadata' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search term to filter companies by name, country, or status',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of items per page',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'Field to sort by',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    description: 'Sort order: asc or desc',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by company status (active/inactive)',
+  })
+  @ApiQuery({
+    name: 'country',
+    required: false,
+    description: 'Filter by country',
+  })
+  @ApiQuery({
+    name: 'name',
+    required: false,
+    description: 'Filter by company name',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of companies with pagination metadata',
+  })
   async getAllCompanies(@Query() query: any): Promise<any> {
     return this.companyService.getAllCompanies(query);
   }
@@ -61,27 +121,31 @@ export class CompanyController {
   @Roles(RoleName.dep_manager, RoleName.unit_head)
   @Departments('HR', 'Sales')
   @ApiOperation({ summary: 'Get company statistics' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Company statistics including total, active, inactive, byCountry, and byStatus',
+  @ApiResponse({
+    status: 200,
+    description:
+      'Company statistics including total, active, inactive, byCountry, and byStatus',
     schema: {
       type: 'object',
       properties: {
         total: { type: 'number', description: 'Total number of companies' },
         active: { type: 'number', description: 'Number of active companies' },
-        inactive: { type: 'number', description: 'Number of inactive companies' },
-        byCountry: { 
-          type: 'object', 
-          description: 'Companies grouped by country',
-          additionalProperties: { type: 'number' }
+        inactive: {
+          type: 'number',
+          description: 'Number of inactive companies',
         },
-        byStatus: { 
-          type: 'object', 
+        byCountry: {
+          type: 'object',
+          description: 'Companies grouped by country',
+          additionalProperties: { type: 'number' },
+        },
+        byStatus: {
+          type: 'object',
           description: 'Companies grouped by status',
-          additionalProperties: { type: 'number' }
-        }
-      }
-    }
+          additionalProperties: { type: 'number' },
+        },
+      },
+    },
   })
   async getCompanyStatistics(): Promise<any> {
     return this.companyService.getCompanyStatistics();
@@ -96,8 +160,14 @@ export class CompanyController {
   @Departments('HR')
   @ApiOperation({ summary: 'Get company by ID' })
   @ApiParam({ name: 'id', description: 'Company ID', example: 1 })
-  @ApiResponse({ status: 200, description: 'Company details', type: CompanyResponseDto })
-  async getCompanyById(@Param('id', ParseIntPipe) id: number): Promise<CompanyResponseDto> {
+  @ApiResponse({
+    status: 200,
+    description: 'Company details',
+    type: CompanyResponseDto,
+  })
+  async getCompanyById(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<CompanyResponseDto> {
     return this.companyService.getCompanyById(id);
   }
 
@@ -111,7 +181,11 @@ export class CompanyController {
   @ApiOperation({ summary: 'Update company by ID' })
   @ApiParam({ name: 'id', description: 'Company ID', example: 1 })
   @ApiBody({ type: UpdateCompanyDto })
-  @ApiResponse({ status: 200, description: 'Updated company details', type: CompanyResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Updated company details',
+    type: CompanyResponseDto,
+  })
   async updateCompany(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateCompanyDto: UpdateCompanyDto,
@@ -128,8 +202,14 @@ export class CompanyController {
   @Departments('HR')
   @ApiOperation({ summary: 'Delete company by ID' })
   @ApiParam({ name: 'id', description: 'Company ID', example: 1 })
-  @ApiResponse({ status: 200, description: 'Company deleted successfully', schema: { example: { message: 'Company deleted successfully' } } })
-  async deleteCompany(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Company deleted successfully',
+    schema: { example: { message: 'Company deleted successfully' } },
+  })
+  async deleteCompany(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ message: string }> {
     return this.companyService.deleteCompany(id);
   }
 
@@ -140,17 +220,25 @@ export class CompanyController {
   @Get('settings/attendance')
   @Roles(RoleName.dep_manager, RoleName.unit_head)
   @Departments('HR')
-  @ApiOperation({ summary: 'Get company attendance settings (time thresholds and deductions)' })
-  @ApiResponse({ status: 200, description: 'Company attendance settings', schema: { example: {
-    lateTime: 15,
-    halfTime: 4,
-    absentTime: 8,
-    quarterlyLeavesDays: 10,
-    monthlyLatesDays: 3,
-    absentDeduction: 500,
-    lateDeduction: 50,
-    halfDeduction: 250,
-  }}})
+  @ApiOperation({
+    summary: 'Get company attendance settings (time thresholds and deductions)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Company attendance settings',
+    schema: {
+      example: {
+        lateTime: 15,
+        halfTime: 4,
+        absentTime: 8,
+        quarterlyLeavesDays: 10,
+        monthlyLatesDays: 3,
+        absentDeduction: 500,
+        lateDeduction: 50,
+        halfDeduction: 250,
+      },
+    },
+  })
   async getCompanySettings(): Promise<{
     lateTime: number;
     halfTime: number;

@@ -21,7 +21,8 @@ export class UpdateAttendanceLogStatusDto {
   reason?: string;
 
   @ApiProperty({
-    description: 'ID of the reviewer or manager approving or updating the status',
+    description:
+      'ID of the reviewer or manager approving or updating the status',
     example: 42,
   })
   @IsNumber()

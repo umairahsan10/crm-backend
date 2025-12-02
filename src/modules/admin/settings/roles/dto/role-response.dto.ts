@@ -51,4 +51,3 @@ export class AdminRolesListResponseDto {
   @ApiProperty({ example: 5 })
   totalPages: number;
 }
-

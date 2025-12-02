@@ -62,7 +62,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     } catch (error) {
       // If the error is due to DB connectivity, fail gracefully in non-prod env
-      if (error.message?.includes("Can't reach database server") || error.errorCode === 'P1001') {
+      if (
+        error.message?.includes("Can't reach database server") ||
+        error.errorCode === 'P1001'
+      ) {
         if (process.env.NODE_ENV !== 'production') {
           // In dev, allow startup with a mock user for testing guards
           return {
@@ -153,7 +156,9 @@ export class AuthService {
       role: user.role,
       type: user.type,
       ...(user.department && { department: user.department }),
-      ...(Object.keys(permissionData).length > 0 && { permissions: permissionData }),
+      ...(Object.keys(permissionData).length > 0 && {
+        permissions: permissionData,
+      }),
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -195,29 +200,36 @@ export class AuthService {
     // Check various headers for the real IP address
     const forwarded = req.headers['x-forwarded-for'];
     const realIp = req.headers['x-real-ip'];
-    const remoteAddress = req.connection?.remoteAddress || req.socket?.remoteAddress;
-    
+    const remoteAddress =
+      req.connection?.remoteAddress || req.socket?.remoteAddress;
+
     if (forwarded) {
       // x-forwarded-for can contain multiple IPs, take the first one
-      return Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim();
+      return Array.isArray(forwarded)
+        ? forwarded[0]
+        : forwarded.split(',')[0].trim();
     }
-    
+
     if (realIp) {
       return Array.isArray(realIp) ? realIp[0] : realIp;
     }
-    
+
     if (remoteAddress) {
       // Remove IPv6 prefix if present
       return remoteAddress.replace(/^::ffff:/, '');
     }
-    
+
     return null;
   }
 
-  private async createAccessLog(employeeId: number, ipAddress: string | null, success: boolean) {
+  private async createAccessLog(
+    employeeId: number,
+    ipAddress: string | null,
+    success: boolean,
+  ) {
     // Create time for storage using the utility
     const storageTime = TimeStorageUtil.getCurrentTimeForStorage();
-    
+
     return this.prisma.accessLog.create({
       data: {
         employeeId,
@@ -243,7 +255,7 @@ export class AuthService {
 
     if (latestAccessLog) {
       const storageTime = TimeStorageUtil.getCurrentTimeForStorage();
-      
+
       await this.prisma.accessLog.update({
         where: { id: latestAccessLog.id },
         data: { logoutTime: storageTime },
@@ -251,13 +263,17 @@ export class AuthService {
     }
   }
 
-  async getAccessLogs(employeeId?: number, success?: boolean, limit: number = 50) {
+  async getAccessLogs(
+    employeeId?: number,
+    success?: boolean,
+    limit: number = 50,
+  ) {
     const whereClause: any = {};
-    
+
     if (employeeId) {
       whereClause.employeeId = employeeId;
     }
-    
+
     if (success !== undefined) {
       whereClause.success = success;
     }
@@ -290,54 +306,56 @@ export class AuthService {
       todayLogs,
       thisWeekLogs,
       thisMonthLogs,
-      recentActivity
+      recentActivity,
     ] = await Promise.all([
       // Total access logs
       this.prisma.accessLog.count(),
-      
+
       // Successful logins
       this.prisma.accessLog.count({
-        where: { success: true }
+        where: { success: true },
       }),
-      
+
       // Failed logins
       this.prisma.accessLog.count({
-        where: { success: false }
+        where: { success: false },
       }),
-      
+
       // Unique users who have logged in
-      this.prisma.accessLog.groupBy({
-        by: ['employeeId'],
-        where: { success: true }
-      }).then(groups => groups.length),
-      
+      this.prisma.accessLog
+        .groupBy({
+          by: ['employeeId'],
+          where: { success: true },
+        })
+        .then((groups) => groups.length),
+
       // Today's logs
       this.prisma.accessLog.count({
         where: {
           loginTime: {
-            gte: new Date(new Date().setHours(0, 0, 0, 0))
-          }
-        }
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          },
+        },
       }),
-      
+
       // This week's logs
       this.prisma.accessLog.count({
         where: {
           loginTime: {
-            gte: new Date(new Date().setDate(new Date().getDate() - 7))
-          }
-        }
+            gte: new Date(new Date().setDate(new Date().getDate() - 7)),
+          },
+        },
       }),
-      
+
       // This month's logs
       this.prisma.accessLog.count({
         where: {
           loginTime: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-          }
-        }
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          },
+        },
       }),
-      
+
       // Recent activity (last 10 successful logins)
       this.prisma.accessLog.findMany({
         where: { success: true },
@@ -352,11 +370,14 @@ export class AuthService {
           },
         },
         orderBy: { loginTime: 'desc' },
-        take: 10
-      })
+        take: 10,
+      }),
     ]);
 
-    const successRate = totalLogs > 0 ? ((successfulLogins / totalLogs) * 100).toFixed(2) : '0.00';
+    const successRate =
+      totalLogs > 0
+        ? ((successfulLogins / totalLogs) * 100).toFixed(2)
+        : '0.00';
 
     return {
       summary: {
@@ -364,14 +385,14 @@ export class AuthService {
         successfulLogins,
         failedLogins,
         uniqueUsers,
-        successRate: parseFloat(successRate)
+        successRate: parseFloat(successRate),
       },
       timeBasedStats: {
         today: todayLogs,
         thisWeek: thisWeekLogs,
-        thisMonth: thisMonthLogs
+        thisMonth: thisMonthLogs,
       },
-      recentActivity
+      recentActivity,
     };
   }
 
@@ -382,11 +403,11 @@ export class AuthService {
     endDate?: Date,
   ) {
     const whereClause: any = {};
-    
+
     if (employeeId) {
       whereClause.employeeId = employeeId;
     }
-    
+
     if (success !== undefined) {
       whereClause.success = success;
     }
@@ -444,7 +465,7 @@ export class AuthService {
     ];
 
     // Convert data to CSV rows
-    const rows = data.map(log => [
+    const rows = data.map((log) => [
       log.id,
       log.employeeId,
       `${log.employee.firstName} ${log.employee.lastName}`,
@@ -461,7 +482,11 @@ export class AuthService {
     const escapeCsvValue = (value: any) => {
       if (value === null || value === undefined) return '';
       const stringValue = String(value);
-      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+      if (
+        stringValue.includes(',') ||
+        stringValue.includes('"') ||
+        stringValue.includes('\n')
+      ) {
         return `"${stringValue.replace(/"/g, '""')}"`;
       }
       return stringValue;
@@ -470,7 +495,7 @@ export class AuthService {
     // Combine headers and rows
     const csvContent = [
       headers.map(escapeCsvValue).join(','),
-      ...rows.map(row => row.map(escapeCsvValue).join(','))
+      ...rows.map((row) => row.map(escapeCsvValue).join(',')),
     ].join('\n');
 
     return csvContent;

@@ -46,4 +46,4 @@ export class DepartmentsGuard implements CanActivate {
 
     return true;
   }
-} 
+}

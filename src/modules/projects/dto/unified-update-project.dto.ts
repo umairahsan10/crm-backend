@@ -1,5 +1,18 @@
-import { IsOptional, IsString, IsEnum, IsNumber, IsDateString, Min, Max, IsInt } from 'class-validator';
-import { DifficultyLevel, PaymentStage, ProjectStatus } from './update-project-details.dto';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsNumber,
+  IsDateString,
+  Min,
+  Max,
+  IsInt,
+} from 'class-validator';
+import {
+  DifficultyLevel,
+  PaymentStage,
+  ProjectStatus,
+} from './update-project-details.dto';
 
 export class UnifiedUpdateProjectDto {
   @IsOptional()

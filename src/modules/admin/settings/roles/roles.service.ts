@@ -1,8 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
-import { AdminRoleResponseDto, AdminRolesListResponseDto } from './dto/role-response.dto';
+import {
+  AdminRoleResponseDto,
+  AdminRolesListResponseDto,
+} from './dto/role-response.dto';
 
 @Injectable()
 export class RolesService {
@@ -13,7 +21,11 @@ export class RolesService {
   /**
    * Get all roles with pagination
    */
-  async getAllRoles(page: number = 1, limit: number = 10, search?: string): Promise<AdminRolesListResponseDto> {
+  async getAllRoles(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+  ): Promise<AdminRolesListResponseDto> {
     const skip = (page - 1) * limit;
     const where: any = {};
 
@@ -95,7 +107,9 @@ export class RolesService {
     });
 
     if (existingRole) {
-      throw new BadRequestException(`Role with name "${dto.name}" already exists`);
+      throw new BadRequestException(
+        `Role with name "${dto.name}" already exists`,
+      );
     }
 
     try {
@@ -127,7 +141,10 @@ export class RolesService {
   /**
    * Update a role
    */
-  async updateRole(id: number, dto: UpdateRoleDto): Promise<AdminRoleResponseDto> {
+  async updateRole(
+    id: number,
+    dto: UpdateRoleDto,
+  ): Promise<AdminRoleResponseDto> {
     // Check if role exists
     const existingRole = await this.prisma.role.findUnique({
       where: { id },
@@ -144,7 +161,9 @@ export class RolesService {
       });
 
       if (nameExists) {
-        throw new BadRequestException(`Role with name "${dto.name}" already exists`);
+        throw new BadRequestException(
+          `Role with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -153,7 +172,8 @@ export class RolesService {
 
       // Only include fields that are provided
       if (dto.name !== undefined) updateData.name = dto.name;
-      if (dto.description !== undefined) updateData.description = dto.description;
+      if (dto.description !== undefined)
+        updateData.description = dto.description;
 
       const role = await this.prisma.role.update({
         where: { id },
@@ -196,7 +216,9 @@ export class RolesService {
 
     // Check if role has employees
     if (role.employees.length > 0) {
-      throw new BadRequestException(`Cannot delete role "${role.name}" because it has ${role.employees.length} employee(s). Please reassign employees first.`);
+      throw new BadRequestException(
+        `Cannot delete role "${role.name}" because it has ${role.employees.length} employee(s). Please reassign employees first.`,
+      );
     }
 
     try {
@@ -212,4 +234,3 @@ export class RolesService {
     }
   }
 }
-

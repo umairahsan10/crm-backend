@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { FinanceService } from '../../../finance/finance.service';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
@@ -16,24 +22,30 @@ export class EmployeeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly financeService: FinanceService,
-  ) { }
+  ) {}
 
   /**
    * Helper method to get current date in PKT timezone
    */
   private getCurrentDateInPKT(): Date {
-    return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Karachi"}));
+    return new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+    );
   }
 
   /**
    * Validate role-based hierarchy constraints
-   * 
+   *
    * Rules:
    * - team_lead: Can't have team_lead, only unit_head and dep_manager
-   * - unit_head: Can't have team_lead or unit_head, only dep_manager  
+   * - unit_head: Can't have team_lead or unit_head, only dep_manager
    * - dep_manager: Can't have anyone above (no team_lead, unit_head, dep_manager)
    */
-  private async validateRoleHierarchy(roleId: number, managerId?: number, teamLeadId?: number): Promise<void> {
+  private async validateRoleHierarchy(
+    roleId: number,
+    managerId?: number,
+    teamLeadId?: number,
+  ): Promise<void> {
     // Get the role information
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
@@ -50,7 +62,9 @@ export class EmployeeService {
       case 'team_lead':
         // Team lead can't have a team lead
         if (teamLeadId) {
-          throw new BadRequestException('Team Lead cannot have a Team Lead. Only Unit Head and Department Manager are allowed.');
+          throw new BadRequestException(
+            'Team Lead cannot have a Team Lead. Only Unit Head and Department Manager are allowed.',
+          );
         }
         // Validate manager is unit_head or dep_manager
         if (managerId) {
@@ -58,8 +72,13 @@ export class EmployeeService {
             where: { id: managerId },
             include: { role: true },
           });
-          if (manager && !['unit_head', 'dep_manager'].includes(manager.role.name)) {
-            throw new BadRequestException('Team Lead can only report to Unit Head or Department Manager.');
+          if (
+            manager &&
+            !['unit_head', 'dep_manager'].includes(manager.role.name)
+          ) {
+            throw new BadRequestException(
+              'Team Lead can only report to Unit Head or Department Manager.',
+            );
           }
         }
         break;
@@ -75,7 +94,9 @@ export class EmployeeService {
             include: { role: true },
           });
           if (manager && !['dep_manager'].includes(manager.role.name)) {
-            throw new BadRequestException('Unit Head can only report to Department Manager.');
+            throw new BadRequestException(
+              'Unit Head can only report to Department Manager.',
+            );
           }
         }
         break;
@@ -83,10 +104,14 @@ export class EmployeeService {
       case 'dep_manager':
         // Department manager can't have anyone above
         if (teamLeadId) {
-          throw new BadRequestException('Department Manager cannot have a Team Lead.');
+          throw new BadRequestException(
+            'Department Manager cannot have a Team Lead.',
+          );
         }
         if (managerId) {
-          throw new BadRequestException('Department Manager cannot have a manager.');
+          throw new BadRequestException(
+            'Department Manager cannot have a manager.',
+          );
         }
         break;
 
@@ -96,7 +121,9 @@ export class EmployeeService {
         break;
 
       default:
-        this.logger.warn(`Unknown role: ${roleName}. Skipping hierarchy validation.`);
+        this.logger.warn(
+          `Unknown role: ${roleName}. Skipping hierarchy validation.`,
+        );
         break;
     }
   }
@@ -107,7 +134,9 @@ export class EmployeeService {
     });
 
     if (!department) {
-      throw new NotFoundException(`Department with ID ${departmentId} not found`);
+      throw new NotFoundException(
+        `Department with ID ${departmentId} not found`,
+      );
     }
 
     const departmentName = department.name;
@@ -124,17 +153,27 @@ export class EmployeeService {
         units = await this.prisma.salesUnit.findMany();
         break;
       default:
-        throw new BadRequestException(`Department ${departmentName} does not have associated units`);
+        throw new BadRequestException(
+          `Department ${departmentName} does not have associated units`,
+        );
     }
-    
+
     return units;
   }
 
-  async terminateEmployee(employeeId: number, terminationDate: string, hrEmployeeId: number, description?: string, isAdmin: boolean = false) {
+  async terminateEmployee(
+    employeeId: number,
+    terminationDate: string,
+    hrEmployeeId: number,
+    description?: string,
+    isAdmin: boolean = false,
+  ) {
     // Validate date format
     const parsedDate = new Date(terminationDate);
     if (isNaN(parsedDate.getTime())) {
-      throw new BadRequestException(`Invalid date format: ${terminationDate}. Please use YYYY-MM-DD format (e.g., 2025-07-31)`);
+      throw new BadRequestException(
+        `Invalid date format: ${terminationDate}. Please use YYYY-MM-DD format (e.g., 2025-07-31)`,
+      );
     }
 
     // Check if employee exists
@@ -148,7 +187,9 @@ export class EmployeeService {
 
     // Check if employee is already terminated
     if (employee.status === 'terminated') {
-      throw new BadRequestException(`Employee ${employeeId} is already terminated`);
+      throw new BadRequestException(
+        `Employee ${employeeId} is already terminated`,
+      );
     }
 
     // For non-admin users, validate HR employee and HR record
@@ -159,7 +200,9 @@ export class EmployeeService {
       });
 
       if (!hrEmployee) {
-        throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+        throw new NotFoundException(
+          `HR Employee with ID ${hrEmployeeId} not found`,
+        );
       }
 
       // Get HR record - required for non-admin users
@@ -168,12 +211,16 @@ export class EmployeeService {
       });
 
       if (!hrRecord) {
-        throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}. Only HR employees with proper permissions can terminate employees.`);
+        throw new NotFoundException(
+          `HR record not found for employee ${hrEmployeeId}. Only HR employees with proper permissions can terminate employees.`,
+        );
       }
 
       // Verify HR employee has both required permissions
       if (!hrRecord.terminationsHandle || !hrRecord.salaryPermission) {
-        throw new ForbiddenException(`HR employee ${hrEmployeeId} does not have both terminations_handle and salary_permission required to terminate employees.`);
+        throw new ForbiddenException(
+          `HR employee ${hrEmployeeId} does not have both terminations_handle and salary_permission required to terminate employees.`,
+        );
       }
     }
 
@@ -192,36 +239,50 @@ export class EmployeeService {
         // Try to calculate salary - this might fail if no base salary is set
         try {
           await this.financeService.calculateSalaryManual(employeeId);
-          this.logger.log(`Salary calculated for terminated employee ${employeeId}`);
+          this.logger.log(
+            `Salary calculated for terminated employee ${employeeId}`,
+          );
         } catch (salaryError) {
-          this.logger.warn(`Could not calculate salary for employee ${employeeId}: ${salaryError.message}. Employee terminated but no salary processed.`);
+          this.logger.warn(
+            `Could not calculate salary for employee ${employeeId}: ${salaryError.message}. Employee terminated but no salary processed.`,
+          );
           // Continue with termination even if salary calculation fails
         }
 
         // Create HR log entry
-        const logDescription = description ||
+        const logDescription =
+          description ||
           `Employee ${employee.firstName} ${employee.lastName} terminated on ${terminationDate}`;
-        
-        await this.createHrLog(hrEmployeeId, 'employee_terminated', employeeId, logDescription);
+
+        await this.createHrLog(
+          hrEmployeeId,
+          'employee_terminated',
+          employeeId,
+          logDescription,
+        );
       });
 
       this.logger.log(
         `Employee ${employeeId} terminated on ${terminationDate}.`,
       );
     } catch (error) {
-      this.logger.error(`Failed to terminate employee ${employeeId}: ${error.message}`);
-      throw new BadRequestException(`Failed to terminate employee: ${error.message}`);
+      this.logger.error(
+        `Failed to terminate employee ${employeeId}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to terminate employee: ${error.message}`,
+      );
     }
   }
 
   private getOrderByClause(orderBy: string, orderDirection: string) {
     // Map frontend field names to Prisma field names
     const fieldMapping: { [key: string]: string } = {
-      'id': 'id',
-      'createdAt': 'createdAt',
-      'updatedAt': 'updatedAt',
-      'actionType': 'actionType',
-      'affectedEmployeeId': 'affectedEmployeeId'
+      id: 'id',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
+      actionType: 'actionType',
+      affectedEmployeeId: 'affectedEmployeeId',
     };
 
     const prismaField = fieldMapping[orderBy] || 'createdAt';
@@ -229,20 +290,20 @@ export class EmployeeService {
   }
 
   async getHrLogs(query: any) {
-    const { 
-      hr_id, 
-      action_type, 
-      affected_employee_id, 
-      start_date, 
+    const {
+      hr_id,
+      action_type,
+      affected_employee_id,
+      start_date,
       end_date,
       created_start,
       created_end,
       updated_start,
       updated_end,
-      page = 1, 
+      page = 1,
       limit = 10,
       orderBy = 'createdAt',
-      orderDirection = 'desc'
+      orderDirection = 'desc',
     } = query;
 
     // Ensure page and limit are numbers
@@ -303,7 +364,7 @@ export class EmployeeService {
         where,
         orderBy,
         orderDirection,
-        orderByClause: this.getOrderByClause(orderBy, orderDirection)
+        orderByClause: this.getOrderByClause(orderBy, orderDirection),
       });
 
       const [logs, total] = await Promise.all([
@@ -346,11 +407,11 @@ export class EmployeeService {
         pageNum,
         limitNum,
         totalPages,
-        skip
+        skip,
       });
 
       return {
-        logs: logs.map(log => ({
+        logs: logs.map((log) => ({
           id: log.id,
           hrId: log.hrId,
           actionType: log.actionType,
@@ -376,14 +437,19 @@ export class EmployeeService {
    * Create a complete employee with all related records in a single transaction
    * This method handles employee creation, department-specific records, and bank account
    */
-  async createCompleteEmployee(dto: CreateCompleteEmployeeDto, hrEmployeeId: number) {
+  async createCompleteEmployee(
+    dto: CreateCompleteEmployeeDto,
+    hrEmployeeId: number,
+  ) {
     // Validate email uniqueness
     const existingEmployee = await this.prisma.employee.findUnique({
       where: { email: dto.employee.email },
     });
 
     if (existingEmployee) {
-      throw new BadRequestException(`Employee with email ${dto.employee.email} already exists`);
+      throw new BadRequestException(
+        `Employee with email ${dto.employee.email} already exists`,
+      );
     }
 
     // Validate department exists
@@ -392,7 +458,9 @@ export class EmployeeService {
     });
 
     if (!department) {
-      throw new NotFoundException(`Department with ID ${dto.employee.departmentId} not found`);
+      throw new NotFoundException(
+        `Department with ID ${dto.employee.departmentId} not found`,
+      );
     }
 
     // Validate role exists
@@ -401,7 +469,9 @@ export class EmployeeService {
     });
 
     if (!role) {
-      throw new NotFoundException(`Role with ID ${dto.employee.roleId} not found`);
+      throw new NotFoundException(
+        `Role with ID ${dto.employee.roleId} not found`,
+      );
     }
 
     // Validate manager if provided
@@ -411,7 +481,9 @@ export class EmployeeService {
       });
 
       if (!manager) {
-        throw new NotFoundException(`Manager with ID ${dto.employee.managerId} not found`);
+        throw new NotFoundException(
+          `Manager with ID ${dto.employee.managerId} not found`,
+        );
       }
     }
 
@@ -422,7 +494,9 @@ export class EmployeeService {
       });
 
       if (!teamLead) {
-        throw new NotFoundException(`Team Lead with ID ${dto.employee.teamLeadId} not found`);
+        throw new NotFoundException(
+          `Team Lead with ID ${dto.employee.teamLeadId} not found`,
+        );
       }
     }
 
@@ -430,36 +504,44 @@ export class EmployeeService {
     await this.validateRoleHierarchy(
       dto.employee.roleId,
       dto.employee.managerId,
-      dto.employee.teamLeadId
+      dto.employee.teamLeadId,
     );
 
     // Department-specific validation
     const departmentName = department.name;
 
     // CRITICAL VALIDATION 1: Ensure only ONE department data is provided
-    const departmentDataKeys = dto.departmentData ? Object.keys(dto.departmentData).filter(key => dto.departmentData![key] !== null && dto.departmentData![key] !== undefined) : [];
-    
+    const departmentDataKeys = dto.departmentData
+      ? Object.keys(dto.departmentData).filter(
+          (key) =>
+            dto.departmentData![key] !== null &&
+            dto.departmentData![key] !== undefined,
+        )
+      : [];
+
     if (departmentDataKeys.length > 1) {
-      throw new BadRequestException(`Only one department data should be provided. Found: ${departmentDataKeys.join(', ')}`);
+      throw new BadRequestException(
+        `Only one department data should be provided. Found: ${departmentDataKeys.join(', ')}`,
+      );
     }
 
     // CRITICAL VALIDATION 2: Ensure department data matches the selected department
     const departmentDataMapping = {
-      'HR': 'hr',
-      'Sales': 'sales',
-      'Marketing': 'marketing',
-      'Production': 'production',
-      'Accounts': 'accountant'
+      HR: 'hr',
+      Sales: 'sales',
+      Marketing: 'marketing',
+      Production: 'production',
+      Accounts: 'accountant',
     };
 
     const expectedKey = departmentDataMapping[departmentName];
-    
+
     if (departmentDataKeys.length > 0) {
       const providedKey = departmentDataKeys[0];
       if (expectedKey && providedKey !== expectedKey) {
         throw new BadRequestException(
           `Department data mismatch. Selected department is '${departmentName}' but provided data for '${providedKey}'. ` +
-          `Please provide '${expectedKey}' data for ${departmentName} department.`
+            `Please provide '${expectedKey}' data for ${departmentName} department.`,
         );
       }
     }
@@ -467,14 +549,26 @@ export class EmployeeService {
     // CRITICAL VALIDATION 3: For Sales department, ensure data is provided and withholdCommission/withholdFlag are present
     if (departmentName === 'Sales') {
       if (!dto.departmentData?.sales) {
-        throw new BadRequestException('Sales department data is required when creating a Sales employee');
+        throw new BadRequestException(
+          'Sales department data is required when creating a Sales employee',
+        );
       }
-      
-      if (dto.departmentData.sales.withholdCommission === undefined || dto.departmentData.sales.withholdCommission === null) {
-        throw new BadRequestException('withholdCommission is required for Sales department');
+
+      if (
+        dto.departmentData.sales.withholdCommission === undefined ||
+        dto.departmentData.sales.withholdCommission === null
+      ) {
+        throw new BadRequestException(
+          'withholdCommission is required for Sales department',
+        );
       }
-      if (dto.departmentData.sales.withholdFlag === undefined || dto.departmentData.sales.withholdFlag === null) {
-        throw new BadRequestException('withholdFlag is required for Sales department');
+      if (
+        dto.departmentData.sales.withholdFlag === undefined ||
+        dto.departmentData.sales.withholdFlag === null
+      ) {
+        throw new BadRequestException(
+          'withholdFlag is required for Sales department',
+        );
       }
 
       // Validate sales unit if provided
@@ -483,213 +577,310 @@ export class EmployeeService {
           where: { id: dto.departmentData.sales.salesUnitId },
         });
         if (!salesUnit) {
-          throw new NotFoundException(`Sales Unit with ID ${dto.departmentData.sales.salesUnitId} not found`);
+          throw new NotFoundException(
+            `Sales Unit with ID ${dto.departmentData.sales.salesUnitId} not found`,
+          );
         }
       }
     }
 
     // For other departments, validate if data is provided
-    if (departmentName === 'HR' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.hr) {
-      throw new BadRequestException(`Department data mismatch. Selected department is 'HR' but no HR data provided.`);
+    if (
+      departmentName === 'HR' &&
+      dto.departmentData &&
+      departmentDataKeys.length > 0 &&
+      !dto.departmentData.hr
+    ) {
+      throw new BadRequestException(
+        `Department data mismatch. Selected department is 'HR' but no HR data provided.`,
+      );
     }
 
-    if (departmentName === 'Marketing' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.marketing) {
-      throw new BadRequestException(`Department data mismatch. Selected department is 'Marketing' but no Marketing data provided.`);
+    if (
+      departmentName === 'Marketing' &&
+      dto.departmentData &&
+      departmentDataKeys.length > 0 &&
+      !dto.departmentData.marketing
+    ) {
+      throw new BadRequestException(
+        `Department data mismatch. Selected department is 'Marketing' but no Marketing data provided.`,
+      );
     }
 
-    if (departmentName === 'Production' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.production) {
-      throw new BadRequestException(`Department data mismatch. Selected department is 'Production' but no Production data provided.`);
+    if (
+      departmentName === 'Production' &&
+      dto.departmentData &&
+      departmentDataKeys.length > 0 &&
+      !dto.departmentData.production
+    ) {
+      throw new BadRequestException(
+        `Department data mismatch. Selected department is 'Production' but no Production data provided.`,
+      );
     }
 
-    if (departmentName === 'Accounts' && dto.departmentData && departmentDataKeys.length > 0 && !dto.departmentData.accountant) {
-      throw new BadRequestException(`Department data mismatch. Selected department is 'Accounts' but no Accountant data provided.`);
+    if (
+      departmentName === 'Accounts' &&
+      dto.departmentData &&
+      departmentDataKeys.length > 0 &&
+      !dto.departmentData.accountant
+    ) {
+      throw new BadRequestException(
+        `Department data mismatch. Selected department is 'Accounts' but no Accountant data provided.`,
+      );
     }
 
     // Additional validation for Sales department (already done above)
     // This section is now handled in CRITICAL VALIDATION 3
 
     // Validate marketing unit if provided
-    if (departmentName === 'Marketing' && dto.departmentData?.marketing?.marketingUnitId) {
+    if (
+      departmentName === 'Marketing' &&
+      dto.departmentData?.marketing?.marketingUnitId
+    ) {
       const marketingUnit = await this.prisma.marketingUnit.findUnique({
         where: { id: dto.departmentData.marketing.marketingUnitId },
       });
       if (!marketingUnit) {
-        throw new NotFoundException(`Marketing Unit with ID ${dto.departmentData.marketing.marketingUnitId} not found`);
+        throw new NotFoundException(
+          `Marketing Unit with ID ${dto.departmentData.marketing.marketingUnitId} not found`,
+        );
       }
     }
 
     // Validate production unit if provided
-    if (departmentName === 'Production' && dto.departmentData?.production?.productionUnitId) {
+    if (
+      departmentName === 'Production' &&
+      dto.departmentData?.production?.productionUnitId
+    ) {
       const productionUnit = await this.prisma.productionUnit.findUnique({
         where: { id: dto.departmentData.production.productionUnitId },
       });
       if (!productionUnit) {
-        throw new NotFoundException(`Production Unit with ID ${dto.departmentData.production.productionUnitId} not found`);
+        throw new NotFoundException(
+          `Production Unit with ID ${dto.departmentData.production.productionUnitId} not found`,
+        );
       }
     }
 
     // OPTIMIZATION: Fix all sequences BEFORE transaction (reduces transaction time)
     try {
-      await this.prisma.$executeRaw`SELECT setval('employees_emp_id_seq', (SELECT COALESCE(MAX(emp_id), 0) + 1 FROM employees))`;
-      await this.prisma.$executeRaw`SELECT setval('hr_hr_id_seq', (SELECT COALESCE(MAX(hr_id), 0) + 1 FROM hr))`;
-      await this.prisma.$executeRaw`SELECT setval('sales_departments_sales_department_id_seq', (SELECT COALESCE(MAX(sales_department_id), 0) + 1 FROM sales_departments))`;
-      await this.prisma.$executeRaw`SELECT setval('marketing_marketing_id_seq', (SELECT COALESCE(MAX(marketing_id), 0) + 1 FROM marketing))`;
-      await this.prisma.$executeRaw`SELECT setval('production_production_id_seq', (SELECT COALESCE(MAX(production_id), 0) + 1 FROM production))`;
-      await this.prisma.$executeRaw`SELECT setval('accountants_accountant_id_seq', (SELECT COALESCE(MAX(accountant_id), 0) + 1 FROM accountants))`;
-      await this.prisma.$executeRaw`SELECT setval('accounts_account_id_seq', (SELECT COALESCE(MAX(account_id), 0) + 1 FROM accounts))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('employees_emp_id_seq', (SELECT COALESCE(MAX(emp_id), 0) + 1 FROM employees))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('hr_hr_id_seq', (SELECT COALESCE(MAX(hr_id), 0) + 1 FROM hr))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('sales_departments_sales_department_id_seq', (SELECT COALESCE(MAX(sales_department_id), 0) + 1 FROM sales_departments))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('marketing_marketing_id_seq', (SELECT COALESCE(MAX(marketing_id), 0) + 1 FROM marketing))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('production_production_id_seq', (SELECT COALESCE(MAX(production_id), 0) + 1 FROM production))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('accountants_accountant_id_seq', (SELECT COALESCE(MAX(accountant_id), 0) + 1 FROM accountants))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('accounts_account_id_seq', (SELECT COALESCE(MAX(account_id), 0) + 1 FROM accounts))`;
     } catch (error) {
-      this.logger.warn('Could not reset all sequences, continuing with creation');
+      this.logger.warn(
+        'Could not reset all sequences, continuing with creation',
+      );
     }
 
     try {
       // Use optimized transaction - only critical operations inside
-      const result = await this.prisma.$transaction(async (tx) => {
-
-        // Step 1: Create Employee
-        const employee = await tx.employee.create({
-          data: {
-            firstName: dto.employee.firstName,
-            lastName: dto.employee.lastName,
-            email: dto.employee.email,
-            phone: dto.employee.phone,
-            gender: dto.employee.gender,
-            cnic: dto.employee.cnic,
-            departmentId: dto.employee.departmentId,
-            roleId: dto.employee.roleId,
-            managerId: dto.employee.managerId,
-            teamLeadId: dto.employee.teamLeadId,
-            address: dto.employee.address,
-            maritalStatus: dto.employee.maritalStatus,
-            status: dto.employee.status || 'active',
-            startDate: dto.employee.startDate ? new Date(dto.employee.startDate) : null,
-            endDate: dto.employee.endDate ? new Date(dto.employee.endDate) : null,
-            modeOfWork: dto.employee.modeOfWork,
-            remoteDaysAllowed: dto.employee.remoteDaysAllowed,
-            dob: dto.employee.dob ? new Date(dto.employee.dob) : null,
-            emergencyContact: dto.employee.emergencyContact,
-            shiftStart: dto.employee.shiftStart,
-            shiftEnd: dto.employee.shiftEnd,
-            employmentType: dto.employee.employmentType,
-            dateOfConfirmation: dto.employee.dateOfConfirmation ? new Date(dto.employee.dateOfConfirmation) : null,
-            periodType: dto.employee.periodType,
-            passwordHash: await bcrypt.hash(dto.employee.passwordHash, 10),
-            bonus: dto.employee.bonus,
-          },
-        });
-
-        this.logger.log(`Employee ${employee.id} created successfully in transaction`);
-
-        // Step 2: Create Department-Specific Record
-        let departmentRecord: any = null;
-
-        if (departmentName === 'HR' && dto.departmentData?.hr) {
-          // Apply defaults for HR permissions (false if not provided)
-          departmentRecord = await tx.hR.create({
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          // Step 1: Create Employee
+          const employee = await tx.employee.create({
             data: {
-              employeeId: employee.id,
-              attendancePermission: dto.departmentData.hr.attendancePermission ?? false,
-              salaryPermission: dto.departmentData.hr.salaryPermission ?? false,
-              commissionPermission: dto.departmentData.hr.commissionPermission ?? false,
-              employeeAddPermission: dto.departmentData.hr.employeeAddPermission ?? false,
-              terminationsHandle: dto.departmentData.hr.terminationsHandle ?? false,
-              monthlyRequestApprovals: dto.departmentData.hr.monthlyRequestApprovals ?? false,
-              targetsSet: dto.departmentData.hr.targetsSet ?? false,
-              bonusesSet: dto.departmentData.hr.bonusesSet ?? false,
-              shiftTimingSet: dto.departmentData.hr.shiftTimingSet ?? false,
+              firstName: dto.employee.firstName,
+              lastName: dto.employee.lastName,
+              email: dto.employee.email,
+              phone: dto.employee.phone,
+              gender: dto.employee.gender,
+              cnic: dto.employee.cnic,
+              departmentId: dto.employee.departmentId,
+              roleId: dto.employee.roleId,
+              managerId: dto.employee.managerId,
+              teamLeadId: dto.employee.teamLeadId,
+              address: dto.employee.address,
+              maritalStatus: dto.employee.maritalStatus,
+              status: dto.employee.status || 'active',
+              startDate: dto.employee.startDate
+                ? new Date(dto.employee.startDate)
+                : null,
+              endDate: dto.employee.endDate
+                ? new Date(dto.employee.endDate)
+                : null,
+              modeOfWork: dto.employee.modeOfWork,
+              remoteDaysAllowed: dto.employee.remoteDaysAllowed,
+              dob: dto.employee.dob ? new Date(dto.employee.dob) : null,
+              emergencyContact: dto.employee.emergencyContact,
+              shiftStart: dto.employee.shiftStart,
+              shiftEnd: dto.employee.shiftEnd,
+              employmentType: dto.employee.employmentType,
+              dateOfConfirmation: dto.employee.dateOfConfirmation
+                ? new Date(dto.employee.dateOfConfirmation)
+                : null,
+              periodType: dto.employee.periodType,
+              passwordHash: await bcrypt.hash(dto.employee.passwordHash, 10),
+              bonus: dto.employee.bonus,
             },
           });
-          this.logger.log(`HR record created for employee ${employee.id}`);
-        } else if (departmentName === 'Sales' && dto.departmentData?.sales) {
-          // Apply defaults for Sales department (0 for optional numeric fields)
-          departmentRecord = await tx.salesDepartment.create({
-            data: {
-              employeeId: employee.id,
-              salesUnitId: dto.departmentData.sales.salesUnitId,
-              commissionRate: dto.departmentData.sales.commissionRate,
-              withholdCommission: dto.departmentData.sales.withholdCommission,
-              withholdFlag: dto.departmentData.sales.withholdFlag,
-              targetAmount: dto.departmentData.sales.targetAmount ?? 0,
-              salesBonus: dto.departmentData.sales.salesBonus ?? 0,
-              leadsClosed: dto.departmentData.sales.leadsClosed ?? 0,
-              salesAmount: dto.departmentData.sales.salesAmount ?? 0,
-              commissionAmount: dto.departmentData.sales.commissionAmount ?? 0,
-              chargebackDeductions: dto.departmentData.sales.chargebackDeductions ?? 0,
-              refundDeductions: dto.departmentData.sales.refundDeductions ?? 0,
-            },
-          });
-          this.logger.log(`Sales department record created for employee ${employee.id}`);
-        } else if (departmentName === 'Marketing' && dto.departmentData?.marketing) {
-          // Apply defaults for Marketing department
-          departmentRecord = await tx.marketing.create({
-            data: {
-              employeeId: employee.id,
-              marketingUnitId: dto.departmentData.marketing.marketingUnitId,
-              platformFocus: dto.departmentData.marketing.platformFocus,
-              totalCampaignsRun: dto.departmentData.marketing.totalCampaignsRun ?? 0,
-            },
-          });
-          this.logger.log(`Marketing record created for employee ${employee.id}`);
-        } else if (departmentName === 'Production' && dto.departmentData?.production) {
-          // Apply defaults for Production department
-          departmentRecord = await tx.production.create({
-            data: {
-              employeeId: employee.id,
-              specialization: dto.departmentData.production.specialization,
-              productionUnitId: dto.departmentData.production.productionUnitId,
-              projectsCompleted: dto.departmentData.production.projectsCompleted ?? 0,
-            },
-          });
-          this.logger.log(`Production record created for employee ${employee.id}`);
-        } else if (departmentName === 'Accounts' && dto.departmentData?.accountant) {
-          // Apply defaults for Accountant permissions (false if not provided)
-          departmentRecord = await tx.accountant.create({
-            data: {
-              employeeId: employee.id,
-              liabilitiesPermission: dto.departmentData.accountant.liabilitiesPermission ?? false,
-              salaryPermission: dto.departmentData.accountant.salaryPermission ?? false,
-              salesPermission: dto.departmentData.accountant.salesPermission ?? false,
-              invoicesPermission: dto.departmentData.accountant.invoicesPermission ?? false,
-              expensesPermission: dto.departmentData.accountant.expensesPermission ?? false,
-              assetsPermission: dto.departmentData.accountant.assetsPermission ?? false,
-              revenuesPermission: dto.departmentData.accountant.revenuesPermission ?? false,
-            },
-          });
-          this.logger.log(`Accountant record created for employee ${employee.id}`);
-        }
 
-        // Step 3: Create Bank Account Record (optional)
-        let bankAccountRecord: any = null;
-        if (dto.bankAccount) {
-          bankAccountRecord = await tx.account.create({
-            data: {
-              employeeId: employee.id,
-              accountTitle: dto.bankAccount.accountTitle,
-              bankName: dto.bankAccount.bankName,
-              ibanNumber: dto.bankAccount.ibanNumber,
-              baseSalary: dto.bankAccount.baseSalary,
-            },
-          });
-          this.logger.log(`Bank account record created for employee ${employee.id}`);
-        }
+          this.logger.log(
+            `Employee ${employee.id} created successfully in transaction`,
+          );
 
-        // Return only essential data from transaction
-        return {
-          employeeId: employee.id,
-          employeeFirstName: employee.firstName,
-          employeeLastName: employee.lastName,
-          employeeEmail: employee.email,
-        };
-      }, {
-        timeout: 10000, // 10 seconds timeout - optimized transaction
-      });
+          // Step 2: Create Department-Specific Record
+          let departmentRecord: any = null;
+
+          if (departmentName === 'HR' && dto.departmentData?.hr) {
+            // Apply defaults for HR permissions (false if not provided)
+            departmentRecord = await tx.hR.create({
+              data: {
+                employeeId: employee.id,
+                attendancePermission:
+                  dto.departmentData.hr.attendancePermission ?? false,
+                salaryPermission:
+                  dto.departmentData.hr.salaryPermission ?? false,
+                commissionPermission:
+                  dto.departmentData.hr.commissionPermission ?? false,
+                employeeAddPermission:
+                  dto.departmentData.hr.employeeAddPermission ?? false,
+                terminationsHandle:
+                  dto.departmentData.hr.terminationsHandle ?? false,
+                monthlyRequestApprovals:
+                  dto.departmentData.hr.monthlyRequestApprovals ?? false,
+                targetsSet: dto.departmentData.hr.targetsSet ?? false,
+                bonusesSet: dto.departmentData.hr.bonusesSet ?? false,
+                shiftTimingSet: dto.departmentData.hr.shiftTimingSet ?? false,
+              },
+            });
+            this.logger.log(`HR record created for employee ${employee.id}`);
+          } else if (departmentName === 'Sales' && dto.departmentData?.sales) {
+            // Apply defaults for Sales department (0 for optional numeric fields)
+            departmentRecord = await tx.salesDepartment.create({
+              data: {
+                employeeId: employee.id,
+                salesUnitId: dto.departmentData.sales.salesUnitId,
+                commissionRate: dto.departmentData.sales.commissionRate,
+                withholdCommission: dto.departmentData.sales.withholdCommission,
+                withholdFlag: dto.departmentData.sales.withholdFlag,
+                targetAmount: dto.departmentData.sales.targetAmount ?? 0,
+                salesBonus: dto.departmentData.sales.salesBonus ?? 0,
+                leadsClosed: dto.departmentData.sales.leadsClosed ?? 0,
+                salesAmount: dto.departmentData.sales.salesAmount ?? 0,
+                commissionAmount:
+                  dto.departmentData.sales.commissionAmount ?? 0,
+                chargebackDeductions:
+                  dto.departmentData.sales.chargebackDeductions ?? 0,
+                refundDeductions:
+                  dto.departmentData.sales.refundDeductions ?? 0,
+              },
+            });
+            this.logger.log(
+              `Sales department record created for employee ${employee.id}`,
+            );
+          } else if (
+            departmentName === 'Marketing' &&
+            dto.departmentData?.marketing
+          ) {
+            // Apply defaults for Marketing department
+            departmentRecord = await tx.marketing.create({
+              data: {
+                employeeId: employee.id,
+                marketingUnitId: dto.departmentData.marketing.marketingUnitId,
+                platformFocus: dto.departmentData.marketing.platformFocus,
+                totalCampaignsRun:
+                  dto.departmentData.marketing.totalCampaignsRun ?? 0,
+              },
+            });
+            this.logger.log(
+              `Marketing record created for employee ${employee.id}`,
+            );
+          } else if (
+            departmentName === 'Production' &&
+            dto.departmentData?.production
+          ) {
+            // Apply defaults for Production department
+            departmentRecord = await tx.production.create({
+              data: {
+                employeeId: employee.id,
+                specialization: dto.departmentData.production.specialization,
+                productionUnitId:
+                  dto.departmentData.production.productionUnitId,
+                projectsCompleted:
+                  dto.departmentData.production.projectsCompleted ?? 0,
+              },
+            });
+            this.logger.log(
+              `Production record created for employee ${employee.id}`,
+            );
+          } else if (
+            departmentName === 'Accounts' &&
+            dto.departmentData?.accountant
+          ) {
+            // Apply defaults for Accountant permissions (false if not provided)
+            departmentRecord = await tx.accountant.create({
+              data: {
+                employeeId: employee.id,
+                liabilitiesPermission:
+                  dto.departmentData.accountant.liabilitiesPermission ?? false,
+                salaryPermission:
+                  dto.departmentData.accountant.salaryPermission ?? false,
+                salesPermission:
+                  dto.departmentData.accountant.salesPermission ?? false,
+                invoicesPermission:
+                  dto.departmentData.accountant.invoicesPermission ?? false,
+                expensesPermission:
+                  dto.departmentData.accountant.expensesPermission ?? false,
+                assetsPermission:
+                  dto.departmentData.accountant.assetsPermission ?? false,
+                revenuesPermission:
+                  dto.departmentData.accountant.revenuesPermission ?? false,
+              },
+            });
+            this.logger.log(
+              `Accountant record created for employee ${employee.id}`,
+            );
+          }
+
+          // Step 3: Create Bank Account Record (optional)
+          let bankAccountRecord: any = null;
+          if (dto.bankAccount) {
+            bankAccountRecord = await tx.account.create({
+              data: {
+                employeeId: employee.id,
+                accountTitle: dto.bankAccount.accountTitle,
+                bankName: dto.bankAccount.bankName,
+                ibanNumber: dto.bankAccount.ibanNumber,
+                baseSalary: dto.bankAccount.baseSalary,
+              },
+            });
+            this.logger.log(
+              `Bank account record created for employee ${employee.id}`,
+            );
+          }
+
+          // Return only essential data from transaction
+          return {
+            employeeId: employee.id,
+            employeeFirstName: employee.firstName,
+            employeeLastName: employee.lastName,
+            employeeEmail: employee.email,
+          };
+        },
+        {
+          timeout: 10000, // 10 seconds timeout - optimized transaction
+        },
+      );
 
       // OPTIMIZATION: Move HR log creation OUTSIDE transaction (non-critical for atomicity)
       try {
         await this.createHrLog(
-          hrEmployeeId, 
-          'employee_created', 
-          result.employeeId, 
-          `Complete employee record created for ${result.employeeFirstName} ${result.employeeLastName} (${result.employeeEmail}) in ${departmentName} department`
+          hrEmployeeId,
+          'employee_created',
+          result.employeeId,
+          `Complete employee record created for ${result.employeeFirstName} ${result.employeeLastName} (${result.employeeEmail}) in ${departmentName} department`,
         );
       } catch (error) {
         this.logger.warn(`Failed to create HR log: ${error.message}`);
@@ -726,7 +917,9 @@ export class EmployeeService {
         },
       });
 
-      this.logger.log(`Complete employee creation successful for ID ${result.employeeId}`);
+      this.logger.log(
+        `Complete employee creation successful for ID ${result.employeeId}`,
+      );
 
       return {
         status: 'success',
@@ -737,7 +930,9 @@ export class EmployeeService {
       };
     } catch (error) {
       this.logger.error(`Failed to create complete employee: ${error.message}`);
-      throw new BadRequestException(`Failed to create employee: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create employee: ${error.message}`,
+      );
     }
   }
 
@@ -751,14 +946,19 @@ export class EmployeeService {
     });
 
     if (existingEmployee) {
-      throw new BadRequestException(`Employee with email ${dto.email} already exists`);
+      throw new BadRequestException(
+        `Employee with email ${dto.email} already exists`,
+      );
     }
 
     // Fix sequence issue if it exists
     try {
-      await this.prisma.$executeRaw`SELECT setval('employees_emp_id_seq', (SELECT COALESCE(MAX(emp_id), 0) + 1 FROM employees))`;
+      await this.prisma
+        .$executeRaw`SELECT setval('employees_emp_id_seq', (SELECT COALESCE(MAX(emp_id), 0) + 1 FROM employees))`;
     } catch (error) {
-      this.logger.warn('Could not reset employee sequence, continuing with creation');
+      this.logger.warn(
+        'Could not reset employee sequence, continuing with creation',
+      );
     }
 
     // Validate department exists
@@ -767,7 +967,9 @@ export class EmployeeService {
     });
 
     if (!department) {
-      throw new NotFoundException(`Department with ID ${dto.departmentId} not found`);
+      throw new NotFoundException(
+        `Department with ID ${dto.departmentId} not found`,
+      );
     }
 
     // Validate role exists
@@ -786,7 +988,9 @@ export class EmployeeService {
       });
 
       if (!manager) {
-        throw new NotFoundException(`Manager with ID ${dto.managerId} not found`);
+        throw new NotFoundException(
+          `Manager with ID ${dto.managerId} not found`,
+        );
       }
     }
 
@@ -797,16 +1001,14 @@ export class EmployeeService {
       });
 
       if (!teamLead) {
-        throw new NotFoundException(`Team Lead with ID ${dto.teamLeadId} not found`);
+        throw new NotFoundException(
+          `Team Lead with ID ${dto.teamLeadId} not found`,
+        );
       }
     }
 
     // Validate role hierarchy constraints
-    await this.validateRoleHierarchy(
-      dto.roleId,
-      dto.managerId,
-      dto.teamLeadId
-    );
+    await this.validateRoleHierarchy(dto.roleId, dto.managerId, dto.teamLeadId);
 
     try {
       const employee = await this.prisma.employee.create({
@@ -832,7 +1034,9 @@ export class EmployeeService {
           shiftStart: dto.shiftStart,
           shiftEnd: dto.shiftEnd,
           employmentType: dto.employmentType,
-          dateOfConfirmation: dto.dateOfConfirmation ? new Date(dto.dateOfConfirmation) : null,
+          dateOfConfirmation: dto.dateOfConfirmation
+            ? new Date(dto.dateOfConfirmation)
+            : null,
           periodType: dto.periodType,
           passwordHash: await bcrypt.hash(dto.passwordHash, 10),
           bonus: dto.bonus,
@@ -860,13 +1064,20 @@ export class EmployeeService {
       });
 
       // Create HR log entry
-      await this.createHrLog(hrEmployeeId, 'employee_created', employee.id, `New employee ${employee.firstName} ${employee.lastName} created with email ${employee.email} in department ${employee.department.name}`);
+      await this.createHrLog(
+        hrEmployeeId,
+        'employee_created',
+        employee.id,
+        `New employee ${employee.firstName} ${employee.lastName} created with email ${employee.email} in department ${employee.department.name}`,
+      );
 
       this.logger.log(`Employee ${employee.id} created successfully`);
       return employee;
     } catch (error) {
       this.logger.error(`Failed to create employee: ${error.message}`);
-      throw new BadRequestException(`Failed to create employee: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create employee: ${error.message}`,
+      );
     }
   }
 
@@ -874,7 +1085,17 @@ export class EmployeeService {
    * Get all employees with filters and pagination
    */
   async getEmployees(filters: GetEmployeesDto) {
-    const { departmentId, roleId, status, gender, employmentType, modeOfWork, search, page = 1, limit = 10 } = filters;
+    const {
+      departmentId,
+      roleId,
+      status,
+      gender,
+      employmentType,
+      modeOfWork,
+      search,
+      page = 1,
+      limit = 10,
+    } = filters;
     const skip = (page - 1) * limit;
 
     // Build where clause
@@ -916,11 +1137,11 @@ export class EmployeeService {
       const [employees, total] = await Promise.all([
         this.prisma.employee.findMany({
           where,
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
             departmentId: true,
             roleId: true,
             status: true,
@@ -960,7 +1181,9 @@ export class EmployeeService {
       };
     } catch (error) {
       this.logger.error(`Failed to get employees: ${error.message}`);
-      throw new BadRequestException(`Failed to get employees: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get employees: ${error.message}`,
+      );
     }
   }
 
@@ -1002,7 +1225,11 @@ export class EmployeeService {
   /**
    * Update an employee
    */
-  async updateEmployee(id: number, dto: UpdateEmployeeDto, hrEmployeeId: number) {
+  async updateEmployee(
+    id: number,
+    dto: UpdateEmployeeDto,
+    hrEmployeeId: number,
+  ) {
     // Check if employee exists
     const existingEmployee = await this.prisma.employee.findUnique({
       where: { id },
@@ -1019,7 +1246,9 @@ export class EmployeeService {
       });
 
       if (emailExists) {
-        throw new BadRequestException(`Employee with email ${dto.email} already exists`);
+        throw new BadRequestException(
+          `Employee with email ${dto.email} already exists`,
+        );
       }
     }
 
@@ -1030,7 +1259,9 @@ export class EmployeeService {
       });
 
       if (!department) {
-        throw new NotFoundException(`Department with ID ${dto.departmentId} not found`);
+        throw new NotFoundException(
+          `Department with ID ${dto.departmentId} not found`,
+        );
       }
     }
 
@@ -1052,7 +1283,9 @@ export class EmployeeService {
       });
 
       if (!manager) {
-        throw new NotFoundException(`Manager with ID ${dto.managerId} not found`);
+        throw new NotFoundException(
+          `Manager with ID ${dto.managerId} not found`,
+        );
       }
     }
 
@@ -1063,7 +1296,9 @@ export class EmployeeService {
       });
 
       if (!teamLead) {
-        throw new NotFoundException(`Team Lead with ID ${dto.teamLeadId} not found`);
+        throw new NotFoundException(
+          `Team Lead with ID ${dto.teamLeadId} not found`,
+        );
       }
     }
 
@@ -1072,7 +1307,7 @@ export class EmployeeService {
       await this.validateRoleHierarchy(
         dto.roleId,
         dto.managerId,
-        dto.teamLeadId
+        dto.teamLeadId,
       );
     }
 
@@ -1086,25 +1321,37 @@ export class EmployeeService {
       if (dto.phone !== undefined) updateData.phone = dto.phone;
       if (dto.gender !== undefined) updateData.gender = dto.gender;
       if (dto.cnic !== undefined) updateData.cnic = dto.cnic;
-      if (dto.departmentId !== undefined) updateData.departmentId = dto.departmentId;
+      if (dto.departmentId !== undefined)
+        updateData.departmentId = dto.departmentId;
       if (dto.roleId !== undefined) updateData.roleId = dto.roleId;
       if (dto.managerId !== undefined) updateData.managerId = dto.managerId;
       if (dto.teamLeadId !== undefined) updateData.teamLeadId = dto.teamLeadId;
       if (dto.address !== undefined) updateData.address = dto.address;
-      if (dto.maritalStatus !== undefined) updateData.maritalStatus = dto.maritalStatus;
+      if (dto.maritalStatus !== undefined)
+        updateData.maritalStatus = dto.maritalStatus;
       if (dto.status !== undefined) updateData.status = dto.status;
-      if (dto.startDate !== undefined) updateData.startDate = dto.startDate ? new Date(dto.startDate) : null;
-      if (dto.endDate !== undefined) updateData.endDate = dto.endDate ? new Date(dto.endDate) : null;
+      if (dto.startDate !== undefined)
+        updateData.startDate = dto.startDate ? new Date(dto.startDate) : null;
+      if (dto.endDate !== undefined)
+        updateData.endDate = dto.endDate ? new Date(dto.endDate) : null;
       if (dto.modeOfWork !== undefined) updateData.modeOfWork = dto.modeOfWork;
-      if (dto.remoteDaysAllowed !== undefined) updateData.remoteDaysAllowed = dto.remoteDaysAllowed;
-      if (dto.dob !== undefined) updateData.dob = dto.dob ? new Date(dto.dob) : null;
-      if (dto.emergencyContact !== undefined) updateData.emergencyContact = dto.emergencyContact;
+      if (dto.remoteDaysAllowed !== undefined)
+        updateData.remoteDaysAllowed = dto.remoteDaysAllowed;
+      if (dto.dob !== undefined)
+        updateData.dob = dto.dob ? new Date(dto.dob) : null;
+      if (dto.emergencyContact !== undefined)
+        updateData.emergencyContact = dto.emergencyContact;
       if (dto.shiftStart !== undefined) updateData.shiftStart = dto.shiftStart;
       if (dto.shiftEnd !== undefined) updateData.shiftEnd = dto.shiftEnd;
-      if (dto.employmentType !== undefined) updateData.employmentType = dto.employmentType;
-      if (dto.dateOfConfirmation !== undefined) updateData.dateOfConfirmation = dto.dateOfConfirmation ? new Date(dto.dateOfConfirmation) : null;
+      if (dto.employmentType !== undefined)
+        updateData.employmentType = dto.employmentType;
+      if (dto.dateOfConfirmation !== undefined)
+        updateData.dateOfConfirmation = dto.dateOfConfirmation
+          ? new Date(dto.dateOfConfirmation)
+          : null;
       if (dto.periodType !== undefined) updateData.periodType = dto.periodType;
-      if (dto.passwordHash !== undefined) updateData.passwordHash = await bcrypt.hash(dto.passwordHash, 10);
+      if (dto.passwordHash !== undefined)
+        updateData.passwordHash = await bcrypt.hash(dto.passwordHash, 10);
       if (dto.bonus !== undefined) updateData.bonus = dto.bonus;
 
       const employee = await this.prisma.employee.update({
@@ -1134,13 +1381,20 @@ export class EmployeeService {
 
       // Create HR log entry
       const updatedFields = Object.keys(updateData).join(', ');
-      await this.createHrLog(hrEmployeeId, 'employee_updated', employee.id, `Employee ${employee.firstName} ${employee.lastName} updated - Fields changed: ${updatedFields}`);
+      await this.createHrLog(
+        hrEmployeeId,
+        'employee_updated',
+        employee.id,
+        `Employee ${employee.firstName} ${employee.lastName} updated - Fields changed: ${updatedFields}`,
+      );
 
       this.logger.log(`Employee ${id} updated successfully`);
       return employee;
     } catch (error) {
       this.logger.error(`Failed to update employee ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to update employee: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update employee: ${error.message}`,
+      );
     }
   }
 
@@ -1161,8 +1415,8 @@ export class EmployeeService {
     const existingDeletionLog = await this.prisma.hRLog.findFirst({
       where: {
         affectedEmployeeId: id,
-        actionType: 'employee_deleted'
-      }
+        actionType: 'employee_deleted',
+      },
     });
 
     if (existingDeletionLog) {
@@ -1171,326 +1425,325 @@ export class EmployeeService {
 
     try {
       // Use a transaction to ensure all related records are deleted atomically
-      await this.prisma.$transaction(async (tx) => {
-        // Delete all related records first (in reverse order of dependencies)
-        
-        // Delete attendance records
-        await tx.attendance.deleteMany({
-          where: { employeeId: id },
-        });
+      await this.prisma.$transaction(
+        async (tx) => {
+          // Delete all related records first (in reverse order of dependencies)
 
-        // Delete attendance logs
-        await tx.attendanceLog.deleteMany({
-          where: { employeeId: id },
-        });
+          // Delete attendance records
+          await tx.attendance.deleteMany({
+            where: { employeeId: id },
+          });
 
-        // Delete monthly attendance summaries
-        await tx.monthlyAttendanceSummary.deleteMany({
-          where: { empId: id },
-        });
+          // Delete attendance logs
+          await tx.attendanceLog.deleteMany({
+            where: { employeeId: id },
+          });
 
-        // Delete late logs
-        await tx.lateLog.deleteMany({
-          where: { empId: id },
-        });
+          // Delete monthly attendance summaries
+          await tx.monthlyAttendanceSummary.deleteMany({
+            where: { empId: id },
+          });
 
-        // Delete half day logs
-        await tx.halfDayLog.deleteMany({
-          where: { empId: id },
-        });
+          // Delete late logs
+          await tx.lateLog.deleteMany({
+            where: { empId: id },
+          });
 
-        // Delete leave logs
-        await tx.leaveLog.deleteMany({
-          where: { empId: id },
-        });
+          // Delete half day logs
+          await tx.halfDayLog.deleteMany({
+            where: { empId: id },
+          });
 
-        // Delete HR logs where this employee is affected (but keep creation and update logs for audit trail)
-        // We'll create the deletion log before deleting other HR logs
-        await tx.hRLog.deleteMany({
-          where: { 
-            affectedEmployeeId: id,
-            actionType: { 
-              notIn: ['employee_created', 'employee_updated'] // Keep creation and update logs, deletion log will be created separately
-            }
-          },
-        });
+          // Delete leave logs
+          await tx.leaveLog.deleteMany({
+            where: { empId: id },
+          });
 
-        // Delete HR record if exists
-        await tx.hR.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete accountant record if exists
-        await tx.accountant.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete accounts
-        await tx.account.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete net salary logs
-        await tx.netSalaryLog.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete sales department records
-        await tx.salesDepartment.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete marketing records
-        await tx.marketing.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete production records
-        await tx.production.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete project logs
-        await tx.projectLog.deleteMany({
-          where: { developerId: id },
-        });
-
-        // Delete project tasks
-        await tx.projectTask.deleteMany({
-          where: { 
-            OR: [
-              { assignedBy: id },
-              { assignedTo: id }
-            ]
-          },
-        });
-
-        // Delete lead comments
-        await tx.leadComment.deleteMany({
-          where: { commentBy: id },
-        });
-
-        // Delete lead outcome history
-        await tx.leadOutcomeHistory.deleteMany({
-          where: { changedBy: id },
-        });
-
-        // Delete cracked leads
-        await tx.crackedLead.deleteMany({
-          where: { closedBy: id },
-        });
-
-        // Delete refunds
-        await tx.refund.deleteMany({
-          where: { refundedBy: id },
-        });
-
-        // Delete chargebacks
-        await tx.chargeback.deleteMany({
-          where: { handledBy: id },
-        });
-
-        // Delete transactions
-        await tx.transaction.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete expenses
-        await tx.expense.deleteMany({
-          where: { createdBy: id },
-        });
-
-        // Delete revenues
-        await tx.revenue.deleteMany({
-          where: { createdBy: id },
-        });
-
-        // Delete assets
-        await tx.asset.deleteMany({
-          where: { createdBy: id },
-        });
-
-        // Delete liabilities
-        await tx.liability.deleteMany({
-          where: { createdBy: id },
-        });
-
-        // Delete vendors
-        await tx.vendor.deleteMany({
-          where: { createdBy: id },
-        });
-
-        // Delete clients
-        await tx.client.deleteMany({
-          where: { createdBy: id },
-        });
-
-        // Delete access logs
-        await tx.accessLog.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete project chats
-        await tx.projectChat.deleteMany({
-          where: { 
-            OR: [
-              { transferredFrom: id },
-              { transferredTo: id }
-            ]
-          },
-        });
-
-        // Delete chat participants
-        await tx.chatParticipant.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete chat messages
-        await tx.chatMessage.deleteMany({
-          where: { senderId: id },
-        });
-
-        // Delete meetings
-        await tx.meeting.deleteMany({
-          where: { employeeId: id },
-        });
-
-        // Delete notifications
-        await tx.notification.deleteMany({
-          where: { 
-            OR: [
-              { sentTo: id },
-              { sentBy: id }
-            ]
-          },
-        });
-
-        // Delete HR requests
-        await tx.hrRequest.deleteMany({
-          where: { 
-            OR: [
-              { empId: id },
-              { assignedTo: id }
-            ]
-          },
-        });
-
-        // Delete complaints
-        await tx.complaint.deleteMany({
-          where: { 
-            OR: [
-              { raisedBy: id },
-              { againstEmployeeId: id },
-              { assignedTo: id }
-            ]
-          },
-        });
-
-        // Delete reminders
-        await tx.reminders.deleteMany({
-          where: { empId: id },
-        });
-
-        // Delete client payments
-        await tx.clientPayment.deleteMany({
-          where: { paymentPhase: id },
-        });
-
-        // Delete archive leads
-        await tx.archiveLead.deleteMany({
-          where: { assignedTo: id },
-        });
-
-        // Update projects to remove employee references
-        await tx.project.updateMany({
-          where: { salesRepId: id },
-          data: { salesRepId: null },
-        });
-
-        // Update teams to remove employee references
-        await tx.team.updateMany({
-          where: { teamLeadId: id },
-          data: { teamLeadId: null },
-        });
-
-        // Update departments to remove manager reference
-        await tx.department.updateMany({
-          where: { managerId: id },
-          data: { managerId: null },
-        });
-
-        // Update sales units to remove head reference
-        await tx.salesUnit.updateMany({
-          where: { headId: id },
-          data: { headId: null },
-        });
-
-        // Update production units to remove head reference
-        await tx.productionUnit.updateMany({
-          where: { headId: id },
-          data: { headId: null },
-        });
-
-        // Update marketing units to remove head reference
-        await tx.marketingUnit.updateMany({
-          where: { headId: id },
-          data: { headId: null },
-        });
-
-        // Update other employees to remove manager/team lead references
-        await tx.employee.updateMany({
-          where: { managerId: id },
-          data: { managerId: null },
-        });
-
-        await tx.employee.updateMany({
-          where: { teamLeadId: id },
-          data: { teamLeadId: null },
-        });
-
-        // Create HR log entry BEFORE deleting the employee record
-        // This ensures the log is created within the transaction and won't be lost
-        const hrRecord = await tx.hR.findUnique({
-          where: { employeeId: hrEmployeeId },
-        });
-
-        if (hrRecord) {
-          await tx.hRLog.create({
-            data: {
-              hrId: hrRecord.id,
-              actionType: 'employee_deleted',
+          // Delete HR logs where this employee is affected (but keep creation and update logs for audit trail)
+          // We'll create the deletion log before deleting other HR logs
+          await tx.hRLog.deleteMany({
+            where: {
               affectedEmployeeId: id,
-              description: `Employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) permanently deleted from all systems`,
+              actionType: {
+                notIn: ['employee_created', 'employee_updated'], // Keep creation and update logs, deletion log will be created separately
+              },
             },
           });
-          this.logger.log(`HR deletion log created for employee ${id}`);
-        } else {
-          this.logger.warn(`No HR record found for HR employee ${hrEmployeeId}, skipping deletion log creation`);
-          // Still proceed with deletion even if log creation fails
-        }
 
-        // Finally, delete the employee record
-        await tx.employee.delete({
-          where: { id },
-        });
-      }, {
-        timeout: 30000 // 30 second timeout
-      });
+          // Delete HR record if exists
+          await tx.hR.deleteMany({
+            where: { employeeId: id },
+          });
 
-      this.logger.log(`Employee ${id} and all related records deleted successfully`);
-      return { message: 'Employee and all related records deleted successfully' };
+          // Delete accountant record if exists
+          await tx.accountant.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete accounts
+          await tx.account.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete net salary logs
+          await tx.netSalaryLog.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete sales department records
+          await tx.salesDepartment.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete marketing records
+          await tx.marketing.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete production records
+          await tx.production.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete project logs
+          await tx.projectLog.deleteMany({
+            where: { developerId: id },
+          });
+
+          // Delete project tasks
+          await tx.projectTask.deleteMany({
+            where: {
+              OR: [{ assignedBy: id }, { assignedTo: id }],
+            },
+          });
+
+          // Delete lead comments
+          await tx.leadComment.deleteMany({
+            where: { commentBy: id },
+          });
+
+          // Delete lead outcome history
+          await tx.leadOutcomeHistory.deleteMany({
+            where: { changedBy: id },
+          });
+
+          // Delete cracked leads
+          await tx.crackedLead.deleteMany({
+            where: { closedBy: id },
+          });
+
+          // Delete refunds
+          await tx.refund.deleteMany({
+            where: { refundedBy: id },
+          });
+
+          // Delete chargebacks
+          await tx.chargeback.deleteMany({
+            where: { handledBy: id },
+          });
+
+          // Delete transactions
+          await tx.transaction.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete expenses
+          await tx.expense.deleteMany({
+            where: { createdBy: id },
+          });
+
+          // Delete revenues
+          await tx.revenue.deleteMany({
+            where: { createdBy: id },
+          });
+
+          // Delete assets
+          await tx.asset.deleteMany({
+            where: { createdBy: id },
+          });
+
+          // Delete liabilities
+          await tx.liability.deleteMany({
+            where: { createdBy: id },
+          });
+
+          // Delete vendors
+          await tx.vendor.deleteMany({
+            where: { createdBy: id },
+          });
+
+          // Delete clients
+          await tx.client.deleteMany({
+            where: { createdBy: id },
+          });
+
+          // Delete access logs
+          await tx.accessLog.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete project chats
+          await tx.projectChat.deleteMany({
+            where: {
+              OR: [{ transferredFrom: id }, { transferredTo: id }],
+            },
+          });
+
+          // Delete chat participants
+          await tx.chatParticipant.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete chat messages
+          await tx.chatMessage.deleteMany({
+            where: { senderId: id },
+          });
+
+          // Delete meetings
+          await tx.meeting.deleteMany({
+            where: { employeeId: id },
+          });
+
+          // Delete notifications
+          await tx.notification.deleteMany({
+            where: {
+              OR: [{ sentTo: id }, { sentBy: id }],
+            },
+          });
+
+          // Delete HR requests
+          await tx.hrRequest.deleteMany({
+            where: {
+              OR: [{ empId: id }, { assignedTo: id }],
+            },
+          });
+
+          // Delete complaints
+          await tx.complaint.deleteMany({
+            where: {
+              OR: [
+                { raisedBy: id },
+                { againstEmployeeId: id },
+                { assignedTo: id },
+              ],
+            },
+          });
+
+          // Delete reminders
+          await tx.reminders.deleteMany({
+            where: { empId: id },
+          });
+
+          // Delete client payments
+          await tx.clientPayment.deleteMany({
+            where: { paymentPhase: id },
+          });
+
+          // Delete archive leads
+          await tx.archiveLead.deleteMany({
+            where: { assignedTo: id },
+          });
+
+          // Update projects to remove employee references
+          await tx.project.updateMany({
+            where: { salesRepId: id },
+            data: { salesRepId: null },
+          });
+
+          // Update teams to remove employee references
+          await tx.team.updateMany({
+            where: { teamLeadId: id },
+            data: { teamLeadId: null },
+          });
+
+          // Update departments to remove manager reference
+          await tx.department.updateMany({
+            where: { managerId: id },
+            data: { managerId: null },
+          });
+
+          // Update sales units to remove head reference
+          await tx.salesUnit.updateMany({
+            where: { headId: id },
+            data: { headId: null },
+          });
+
+          // Update production units to remove head reference
+          await tx.productionUnit.updateMany({
+            where: { headId: id },
+            data: { headId: null },
+          });
+
+          // Update marketing units to remove head reference
+          await tx.marketingUnit.updateMany({
+            where: { headId: id },
+            data: { headId: null },
+          });
+
+          // Update other employees to remove manager/team lead references
+          await tx.employee.updateMany({
+            where: { managerId: id },
+            data: { managerId: null },
+          });
+
+          await tx.employee.updateMany({
+            where: { teamLeadId: id },
+            data: { teamLeadId: null },
+          });
+
+          // Create HR log entry BEFORE deleting the employee record
+          // This ensures the log is created within the transaction and won't be lost
+          const hrRecord = await tx.hR.findUnique({
+            where: { employeeId: hrEmployeeId },
+          });
+
+          if (hrRecord) {
+            await tx.hRLog.create({
+              data: {
+                hrId: hrRecord.id,
+                actionType: 'employee_deleted',
+                affectedEmployeeId: id,
+                description: `Employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) permanently deleted from all systems`,
+              },
+            });
+            this.logger.log(`HR deletion log created for employee ${id}`);
+          } else {
+            this.logger.warn(
+              `No HR record found for HR employee ${hrEmployeeId}, skipping deletion log creation`,
+            );
+            // Still proceed with deletion even if log creation fails
+          }
+
+          // Finally, delete the employee record
+          await tx.employee.delete({
+            where: { id },
+          });
+        },
+        {
+          timeout: 30000, // 30 second timeout
+        },
+      );
+
+      this.logger.log(
+        `Employee ${id} and all related records deleted successfully`,
+      );
+      return {
+        message: 'Employee and all related records deleted successfully',
+      };
     } catch (error) {
       this.logger.error(`Failed to delete employee ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to delete employee: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to delete employee: ${error.message}`,
+      );
     }
   }
 
   /**
    * Update employee bonus
-   * 
+   *
    * This method updates the bonus amount for a specific employee.
    * It validates that the employee exists and creates an HR log entry.
-   * 
+   *
    * @param id - Employee ID
    * @param bonus - New bonus amount
    * @param hrEmployeeId - ID of the HR employee making the change
@@ -1512,7 +1765,9 @@ export class EmployeeService {
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -1521,7 +1776,9 @@ export class EmployeeService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     try {
@@ -1555,11 +1812,15 @@ export class EmployeeService {
       const logDescription = `Bonus updated for employee ${employee.firstName} ${employee.lastName} from ${employee.bonus || 0} to ${bonus}`;
       await this.createHrLog(hrEmployeeId, 'bonus_updated', id, logDescription);
 
-      this.logger.log(`Bonus updated for employee ${id} from ${employee.bonus || 0} to ${bonus}`);
+      this.logger.log(
+        `Bonus updated for employee ${id} from ${employee.bonus || 0} to ${bonus}`,
+      );
 
       return updatedEmployee;
     } catch (error) {
-      this.logger.error(`Failed to update bonus for employee ${id}: ${error.message}`);
+      this.logger.error(
+        `Failed to update bonus for employee ${id}: ${error.message}`,
+      );
       throw new BadRequestException(`Failed to update bonus: ${error.message}`);
     }
   }
@@ -1567,7 +1828,11 @@ export class EmployeeService {
   /**
    * Update employee shift times
    */
-  async updateShift(id: number, shiftData: { shift_start?: string; shift_end?: string }, hrEmployeeId: number) {
+  async updateShift(
+    id: number,
+    shiftData: { shift_start?: string; shift_end?: string },
+    hrEmployeeId: number,
+  ) {
     // Check if employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id },
@@ -1583,7 +1848,9 @@ export class EmployeeService {
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -1592,12 +1859,16 @@ export class EmployeeService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     // Validate that at least one shift time is provided
     if (!shiftData.shift_start && !shiftData.shift_end) {
-      throw new BadRequestException('At least one shift time (shift_start or shift_end) must be provided');
+      throw new BadRequestException(
+        'At least one shift time (shift_start or shift_end) must be provided',
+      );
     }
 
     try {
@@ -1639,21 +1910,31 @@ export class EmployeeService {
       // Create HR log entry
       const changes: string[] = [];
       if (shiftData.shift_start !== undefined) {
-        changes.push(`shift_start: ${employee.shiftStart || 'N/A'} → ${shiftData.shift_start}`);
+        changes.push(
+          `shift_start: ${employee.shiftStart || 'N/A'} → ${shiftData.shift_start}`,
+        );
       }
       if (shiftData.shift_end !== undefined) {
-        changes.push(`shift_end: ${employee.shiftEnd || 'N/A'} → ${shiftData.shift_end}`);
+        changes.push(
+          `shift_end: ${employee.shiftEnd || 'N/A'} → ${shiftData.shift_end}`,
+        );
       }
 
       const logDescription = `Shift times updated for employee ${employee.firstName} ${employee.lastName} - Changes: ${changes.join(', ')}`;
       await this.createHrLog(hrEmployeeId, 'shift_updated', id, logDescription);
 
-      this.logger.log(`Shift times updated for employee ${id}: ${changes.join(', ')}`);
+      this.logger.log(
+        `Shift times updated for employee ${id}: ${changes.join(', ')}`,
+      );
 
       return updatedEmployee;
     } catch (error) {
-      this.logger.error(`Failed to update shift times for employee ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to update shift times: ${error.message}`);
+      this.logger.error(
+        `Failed to update shift times for employee ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to update shift times: ${error.message}`,
+      );
     }
   }
 
@@ -1698,81 +1979,115 @@ export class EmployeeService {
       const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
 
       // Basic counts
-      const activeEmployees = employees.filter(emp => emp.status === 'active');
-      const terminatedEmployees = employees.filter(emp => emp.status === 'terminated');
-      const inactiveEmployees = employees.filter(emp => emp.status === 'inactive');
+      const activeEmployees = employees.filter(
+        (emp) => emp.status === 'active',
+      );
+      const terminatedEmployees = employees.filter(
+        (emp) => emp.status === 'terminated',
+      );
+      const inactiveEmployees = employees.filter(
+        (emp) => emp.status === 'inactive',
+      );
 
       // New employees this month (employees that have start date of this month)
-      const newThisMonth = employees.filter(emp => {
+      const newThisMonth = employees.filter((emp) => {
         if (!emp.startDate) return false;
         const startDate = new Date(emp.startDate);
         return startDate >= firstDayOfMonth;
       });
 
       // Department breakdown
-      const byDepartment = employees.reduce((acc, emp) => {
-        const deptName = emp.department?.name || 'Unknown';
-        acc[deptName] = (acc[deptName] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byDepartment = employees.reduce(
+        (acc, emp) => {
+          const deptName = emp.department?.name || 'Unknown';
+          acc[deptName] = (acc[deptName] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       // Role breakdown
-      const byRole = employees.reduce((acc, emp) => {
-        const roleName = emp.role?.name || 'Unknown';
-        acc[roleName] = (acc[roleName] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byRole = employees.reduce(
+        (acc, emp) => {
+          const roleName = emp.role?.name || 'Unknown';
+          acc[roleName] = (acc[roleName] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       // Gender breakdown
-      const byGender = employees.reduce((acc, emp) => {
-        const gender = emp.gender || 'Unknown';
-        acc[gender] = (acc[gender] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byGender = employees.reduce(
+        (acc, emp) => {
+          const gender = emp.gender || 'Unknown';
+          acc[gender] = (acc[gender] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       // Employment type breakdown
-      const byEmploymentType = employees.reduce((acc, emp) => {
-        const type = emp.employmentType || 'Unknown';
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byEmploymentType = employees.reduce(
+        (acc, emp) => {
+          const type = emp.employmentType || 'Unknown';
+          acc[type] = (acc[type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       // Mode of work breakdown
-      const byModeOfWork = employees.reduce((acc, emp) => {
-        const mode = emp.modeOfWork || 'Unknown';
-        acc[mode] = (acc[mode] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byModeOfWork = employees.reduce(
+        (acc, emp) => {
+          const mode = emp.modeOfWork || 'Unknown';
+          acc[mode] = (acc[mode] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       // Average age calculation
       const validAges = employees
-        .filter(emp => emp.dob)
-        .map(emp => {
+        .filter((emp) => emp.dob)
+        .map((emp) => {
           const dob = new Date(emp.dob!);
           const age = now.getFullYear() - dob.getFullYear();
           const monthDiff = now.getMonth() - dob.getMonth();
-          return monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate()) ? age - 1 : age;
+          return monthDiff < 0 ||
+            (monthDiff === 0 && now.getDate() < dob.getDate())
+            ? age - 1
+            : age;
         });
 
-      const averageAge = validAges.length > 0 
-        ? Math.round(validAges.reduce((sum, age) => sum + age, 0) / validAges.length)
-        : 0;
+      const averageAge =
+        validAges.length > 0
+          ? Math.round(
+              validAges.reduce((sum, age) => sum + age, 0) / validAges.length,
+            )
+          : 0;
 
       // Average bonus calculation
       const validBonuses = employees
-        .filter(emp => emp.bonus && emp.bonus > 0)
-        .map(emp => emp.bonus!);
+        .filter((emp) => emp.bonus && emp.bonus > 0)
+        .map((emp) => emp.bonus!);
 
-      const averageBonus = validBonuses.length > 0
-        ? Math.round(validBonuses.reduce((sum, bonus) => sum + bonus, 0) / validBonuses.length)
-        : 0;
+      const averageBonus =
+        validBonuses.length > 0
+          ? Math.round(
+              validBonuses.reduce((sum, bonus) => sum + bonus, 0) /
+                validBonuses.length,
+            )
+          : 0;
 
       // Marital status breakdown
-      const byMaritalStatus = employees.reduce((acc, emp) => {
-        const status = emp.maritalStatus ? 'Married' : 'Single';
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const byMaritalStatus = employees.reduce(
+        (acc, emp) => {
+          const status = emp.maritalStatus ? 'Married' : 'Single';
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       const statistics: EmployeeStatisticsDto = {
         total: employees.length,
@@ -1789,8 +2104,9 @@ export class EmployeeService {
         averageBonus,
         thisMonth: {
           new: newThisMonth.length,
-          active: newThisMonth.filter(emp => emp.status === 'active').length,
-          inactive: newThisMonth.filter(emp => emp.status === 'terminated').length, // Changed to specifically count terminated employees
+          active: newThisMonth.filter((emp) => emp.status === 'active').length,
+          inactive: newThisMonth.filter((emp) => emp.status === 'terminated')
+            .length, // Changed to specifically count terminated employees
         },
       };
 
@@ -1798,7 +2114,9 @@ export class EmployeeService {
       return statistics;
     } catch (error) {
       this.logger.error(`Failed to get employee statistics: ${error.message}`);
-      throw new BadRequestException(`Failed to get employee statistics: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get employee statistics: ${error.message}`,
+      );
     }
   }
 
@@ -1808,50 +2126,55 @@ export class EmployeeService {
   async getHrLogsStats(): Promise<HrLogsStatsResponseDto> {
     try {
       const now = new Date();
-      
+
       // Get start of today (00:00:00)
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
+      const startOfToday = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      );
+
       // Get start of this week (Monday)
       const startOfWeek = new Date(startOfToday);
       const dayOfWeek = startOfToday.getDay();
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, Monday = 1
       startOfWeek.setDate(startOfToday.getDate() - daysToMonday);
-      
+
       // Get start of this month
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const [totalLogs, todayLogs, thisWeekLogs, thisMonthLogs] = await Promise.all([
-        // Total logs
-        this.prisma.hRLog.count(),
-        
-        // Today's logs
-        this.prisma.hRLog.count({
-          where: {
-            createdAt: {
-              gte: startOfToday,
+      const [totalLogs, todayLogs, thisWeekLogs, thisMonthLogs] =
+        await Promise.all([
+          // Total logs
+          this.prisma.hRLog.count(),
+
+          // Today's logs
+          this.prisma.hRLog.count({
+            where: {
+              createdAt: {
+                gte: startOfToday,
+              },
             },
-          },
-        }),
-        
-        // This week's logs
-        this.prisma.hRLog.count({
-          where: {
-            createdAt: {
-              gte: startOfWeek,
+          }),
+
+          // This week's logs
+          this.prisma.hRLog.count({
+            where: {
+              createdAt: {
+                gte: startOfWeek,
+              },
             },
-          },
-        }),
-        
-        // This month's logs
-        this.prisma.hRLog.count({
-          where: {
-            createdAt: {
-              gte: startOfMonth,
+          }),
+
+          // This month's logs
+          this.prisma.hRLog.count({
+            where: {
+              createdAt: {
+                gte: startOfMonth,
+              },
             },
-          },
-        }),
-      ]);
+          }),
+        ]);
 
       console.log('HR Logs Stats Debug:', {
         totalLogs,
@@ -1871,14 +2194,21 @@ export class EmployeeService {
       };
     } catch (error) {
       this.logger.error(`Failed to get HR logs stats: ${error.message}`);
-      throw new BadRequestException(`Failed to get HR logs stats: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get HR logs stats: ${error.message}`,
+      );
     }
   }
 
   /**
    * Helper method to create HR log entries
    */
-  private async createHrLog(hrEmployeeId: number, actionType: string, affectedEmployeeId: number, description: string) {
+  private async createHrLog(
+    hrEmployeeId: number,
+    actionType: string,
+    affectedEmployeeId: number,
+    description: string,
+  ) {
     try {
       const hrRecord = await this.prisma.hR.findUnique({
         where: { employeeId: hrEmployeeId },
@@ -1901,11 +2231,11 @@ export class EmployeeService {
   }
 
   async getHrLogsForExport(query: any) {
-    const { 
-      hr_id, 
-      action_type, 
-      affected_employee_id, 
-      start_date, 
+    const {
+      hr_id,
+      action_type,
+      affected_employee_id,
+      start_date,
       end_date,
       created_start,
       created_end,
@@ -2021,15 +2351,19 @@ export class EmployeeService {
     ];
 
     // Convert data to CSV rows
-    const rows = data.map(log => [
+    const rows = data.map((log) => [
       log.id,
       log.hr?.employee?.id || 'N/A',
-      log.hr?.employee ? `${log.hr.employee.firstName} ${log.hr.employee.lastName}` : 'N/A',
+      log.hr?.employee
+        ? `${log.hr.employee.firstName} ${log.hr.employee.lastName}`
+        : 'N/A',
       log.hr?.employee?.email || 'N/A',
       log.hr?.employee?.department?.name || 'N/A',
       log.actionType,
       log.affectedEmployeeId,
-      log.affectedEmployee ? `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}` : 'N/A',
+      log.affectedEmployee
+        ? `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}`
+        : 'N/A',
       log.affectedEmployee?.email || 'N/A',
       log.affectedEmployee?.department?.name || 'N/A',
       log.description,
@@ -2041,7 +2375,11 @@ export class EmployeeService {
     const escapeCsvValue = (value: any) => {
       if (value === null || value === undefined) return '';
       const stringValue = String(value);
-      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+      if (
+        stringValue.includes(',') ||
+        stringValue.includes('"') ||
+        stringValue.includes('\n')
+      ) {
         return `"${stringValue.replace(/"/g, '""')}"`;
       }
       return stringValue;
@@ -2050,7 +2388,7 @@ export class EmployeeService {
     // Combine headers and rows
     const csvContent = [
       headers.map(escapeCsvValue).join(','),
-      ...rows.map(row => row.map(escapeCsvValue).join(','))
+      ...rows.map((row) => row.map(escapeCsvValue).join(',')),
     ].join('\n');
 
     return csvContent;

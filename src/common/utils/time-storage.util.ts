@@ -1,6 +1,6 @@
 /**
  * Time Storage Utility
- * 
+ *
  * This utility provides consistent time storage across the application,
  * ensuring that times are stored exactly as entered without timezone conversion.
  * This matches the behavior of the attendance system.
@@ -16,12 +16,12 @@ export class TimeStorageUtil {
     const hours = date.getHours();
     const minutes = date.getMinutes();
     const seconds = date.getSeconds();
-    
+
     // Create a new date with the same date but set UTC time directly
     // This ensures the time is stored as entered without timezone conversion
     const storageDate = new Date(date);
     storageDate.setUTCHours(hours, minutes, seconds, 0);
-    
+
     return storageDate;
   }
 
@@ -29,13 +29,18 @@ export class TimeStorageUtil {
    * Creates a date for storage from a date string and time string
    * Used for parsing input times (like checkin/checkout)
    */
-  static createTimeForStorageFromStrings(dateString: string, timeString: string): Date {
+  static createTimeForStorageFromStrings(
+    dateString: string,
+    timeString: string,
+  ): Date {
     try {
       // Extract time components directly from the ISO string
       const timeMatch = timeString.match(/T(\d{2}):(\d{2}):(\d{2})/);
 
       if (!timeMatch) {
-        throw new Error('Invalid time format - could not extract time from: ' + timeString);
+        throw new Error(
+          'Invalid time format - could not extract time from: ' + timeString,
+        );
       }
 
       const hours = parseInt(timeMatch[1], 10);
@@ -44,7 +49,7 @@ export class TimeStorageUtil {
 
       // Create the date
       const date = new Date(dateString);
-      
+
       if (isNaN(date.getTime())) {
         throw new Error('Invalid date format: ' + dateString);
       }
@@ -54,7 +59,14 @@ export class TimeStorageUtil {
       storageDate.setUTCHours(hours, minutes, seconds, 0);
 
       if (isNaN(storageDate.getTime())) {
-        throw new Error('Invalid time values for storage: ' + hours + ':' + minutes + ':' + seconds);
+        throw new Error(
+          'Invalid time values for storage: ' +
+            hours +
+            ':' +
+            minutes +
+            ':' +
+            seconds,
+        );
       }
 
       return storageDate;
@@ -75,12 +87,12 @@ export class TimeStorageUtil {
    * Creates a date for storage from time components
    */
   static createTimeForStorageFromComponents(
-    year: number, 
-    month: number, 
-    day: number, 
-    hours: number, 
-    minutes: number, 
-    seconds: number = 0
+    year: number,
+    month: number,
+    day: number,
+    hours: number,
+    minutes: number,
+    seconds: number = 0,
   ): Date {
     const date = new Date(year, month, day);
     const storageDate = new Date(date);
@@ -93,11 +105,11 @@ export class TimeStorageUtil {
    */
   static getCurrentPKTTimeForStorage(): Date {
     const now = new Date();
-    
+
     // Convert to PKT (UTC+5)
     // Get UTC time in milliseconds and add 5 hours (5 * 60 * 60 * 1000)
-    const pktTime = new Date(now.getTime() + (5 * 60 * 60 * 1000));
-    
+    const pktTime = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+
     // Extract PKT time components
     const hours = pktTime.getUTCHours();
     const minutes = pktTime.getUTCMinutes();
@@ -105,10 +117,12 @@ export class TimeStorageUtil {
     const date = pktTime.getUTCDate();
     const month = pktTime.getUTCMonth();
     const year = pktTime.getUTCFullYear();
-    
+
     // Create a new date with PKT time stored in UTC format
-    const storageDate = new Date(Date.UTC(year, month, date, hours, minutes, seconds, 0));
-    
+    const storageDate = new Date(
+      Date.UTC(year, month, date, hours, minutes, seconds, 0),
+    );
+
     return storageDate;
   }
 }

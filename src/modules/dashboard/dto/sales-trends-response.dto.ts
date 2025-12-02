@@ -1,7 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class PeriodSummaryDto {
-  @ApiProperty({ description: 'Total revenue for the period', example: 5400000 })
+  @ApiProperty({
+    description: 'Total revenue for the period',
+    example: 5400000,
+  })
   totalRevenue: number;
 
   @ApiProperty({ description: 'Total number of deals closed', example: 47 })
@@ -41,15 +44,25 @@ export class ChangeDto {
   @ApiProperty({ description: 'Deals change percentage', example: 11.9 })
   dealsPercentage: number;
 
-  @ApiProperty({ description: 'Trend direction', example: 'up', enum: ['up', 'down', 'neutral'] })
+  @ApiProperty({
+    description: 'Trend direction',
+    example: 'up',
+    enum: ['up', 'down', 'neutral'],
+  })
   trend: 'up' | 'down' | 'neutral';
 }
 
 export class SalesSummaryDto {
-  @ApiProperty({ description: 'Current period summary', type: PeriodSummaryDto })
+  @ApiProperty({
+    description: 'Current period summary',
+    type: PeriodSummaryDto,
+  })
   currentPeriod: PeriodSummaryDto;
 
-  @ApiProperty({ description: 'Previous period summary', type: PeriodSummaryDto })
+  @ApiProperty({
+    description: 'Previous period summary',
+    type: PeriodSummaryDto,
+  })
   previousPeriod: PeriodSummaryDto;
 
   @ApiProperty({ description: 'Change comparison', type: ChangeDto })
@@ -57,13 +70,20 @@ export class SalesSummaryDto {
 }
 
 export class SalesDataPointDto {
-  @ApiProperty({ description: 'Date in ISO format (YYYY-MM-DD, YYYY-MM, YYYY-WW, YYYY-Q, or YYYY)', example: '2024-01' })
+  @ApiProperty({
+    description:
+      'Date in ISO format (YYYY-MM-DD, YYYY-MM, YYYY-WW, YYYY-Q, or YYYY)',
+    example: '2024-01',
+  })
   date: string;
 
   @ApiProperty({ description: 'Short label for chart', example: 'Jan' })
   label: string;
 
-  @ApiProperty({ description: 'Full label for tooltips', example: 'January 2024' })
+  @ApiProperty({
+    description: 'Full label for tooltips',
+    example: 'January 2024',
+  })
   fullLabel: string;
 
   @ApiProperty({ description: 'Total revenue for the period', example: 420000 })
@@ -81,16 +101,32 @@ export class SalesDataPointDto {
   @ApiProperty({ description: 'Value for chart mapping', example: 420000 })
   chartValue: number;
 
-  @ApiProperty({ description: 'Month number (1-12) for sorting', required: false, example: 1 })
+  @ApiProperty({
+    description: 'Month number (1-12) for sorting',
+    required: false,
+    example: 1,
+  })
   monthNumber?: number;
 
-  @ApiProperty({ description: 'Year for sorting', required: false, example: 2024 })
+  @ApiProperty({
+    description: 'Year for sorting',
+    required: false,
+    example: 2024,
+  })
   year?: number;
 
-  @ApiProperty({ description: 'Week number (for weekly period)', required: false, example: 5 })
+  @ApiProperty({
+    description: 'Week number (for weekly period)',
+    required: false,
+    example: 5,
+  })
   weekNumber?: number;
 
-  @ApiProperty({ description: 'Quarter number (1-4) for sorting', required: false, example: 1 })
+  @ApiProperty({
+    description: 'Quarter number (1-4) for sorting',
+    required: false,
+    example: 1,
+  })
   quarterNumber?: number;
 }
 
@@ -106,22 +142,45 @@ export class SalesMetadataDto {
   @ApiProperty({ description: 'Date range', type: DateRangeDto })
   dateRange: DateRangeDto;
 
-  @ApiProperty({ description: 'Total months in dataset', required: false, example: 12 })
+  @ApiProperty({
+    description: 'Total months in dataset',
+    required: false,
+    example: 12,
+  })
   totalMonths?: number;
 
-  @ApiProperty({ description: 'Total days in dataset', required: false, example: 30 })
+  @ApiProperty({
+    description: 'Total days in dataset',
+    required: false,
+    example: 30,
+  })
   totalDays?: number;
 
-  @ApiProperty({ description: 'Total weeks in dataset', required: false, example: 12 })
+  @ApiProperty({
+    description: 'Total weeks in dataset',
+    required: false,
+    example: 12,
+  })
   totalWeeks?: number;
 
-  @ApiProperty({ description: 'Total quarters in dataset', required: false, example: 4 })
+  @ApiProperty({
+    description: 'Total quarters in dataset',
+    required: false,
+    example: 4,
+  })
   totalQuarters?: number;
 
-  @ApiProperty({ description: 'Total years in dataset', required: false, example: 5 })
+  @ApiProperty({
+    description: 'Total years in dataset',
+    required: false,
+    example: 5,
+  })
   totalYears?: number;
 
-  @ApiProperty({ description: 'Generation timestamp', example: '2024-12-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Generation timestamp',
+    example: '2024-12-15T10:30:00Z',
+  })
   generatedAt: string;
 }
 
@@ -135,7 +194,11 @@ export class SalesTrendsResponseDto {
   @ApiProperty({ description: 'User role', example: 'dep_manager' })
   role: string;
 
-  @ApiProperty({ description: 'Period type', example: 'monthly', enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] })
+  @ApiProperty({
+    description: 'Period type',
+    example: 'monthly',
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+  })
   period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
   @ApiProperty({ description: 'Summary statistics', type: SalesSummaryDto })
@@ -147,4 +210,3 @@ export class SalesTrendsResponseDto {
   @ApiProperty({ description: 'Response metadata', type: SalesMetadataDto })
   metadata: SalesMetadataDto;
 }
-

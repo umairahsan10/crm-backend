@@ -4,7 +4,10 @@ export class PnLCategoryResponseDto {
   @ApiProperty({ example: 'success', description: 'Response status' })
   status: 'success' | 'error';
 
-  @ApiProperty({ example: 'PnL calculated successfully', description: 'Response message' })
+  @ApiProperty({
+    example: 'PnL calculated successfully',
+    description: 'Response message',
+  })
   message: string;
 
   @ApiPropertyOptional({
@@ -18,14 +21,14 @@ export class PnLCategoryResponseDto {
       netProfit: 20000,
       revenueBreakdown: [
         { category: 'Sales', totalAmount: 30000, count: 10 },
-        { category: 'Services', totalAmount: 20000, count: 5 }
+        { category: 'Services', totalAmount: 20000, count: 5 },
       ],
       expenseBreakdown: [
         { category: 'Salaries', totalAmount: 20000, count: 2 },
-        { category: 'Rent', totalAmount: 10000, count: 1 }
+        { category: 'Rent', totalAmount: 10000, count: 1 },
       ],
-      calculationDate: '2025-10-14T12:00:00.000Z'
-    }
+      calculationDate: '2025-10-14T12:00:00.000Z',
+    },
   })
   data?: {
     month: string;
@@ -46,6 +49,9 @@ export class PnLCategoryResponseDto {
     calculationDate: string;
   };
 
-  @ApiPropertyOptional({ example: 'CALCULATION_ERROR', description: 'Error code if any' })
+  @ApiPropertyOptional({
+    example: 'CALCULATION_ERROR',
+    description: 'Error code if any',
+  })
   error_code?: string;
-} 
+}

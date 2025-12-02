@@ -18,4 +18,4 @@ export class MarkSalaryPaidDto {
   @IsOptional()
   @IsEnum(PaymentWays)
   type?: PaymentWays;
-} 
+}

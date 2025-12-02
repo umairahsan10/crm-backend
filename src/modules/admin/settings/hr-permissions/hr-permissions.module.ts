@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
 import { HrPermissionsController } from './hr-permissions.controller';
 import { HrPermissionsService } from './hr-permissions.service';
-import { PrismaService } from '../../../../../prisma/prisma.service';
 
 @Module({
   controllers: [HrPermissionsController],
-  providers: [HrPermissionsService, PrismaService],
+  providers: [HrPermissionsService],
   exports: [HrPermissionsService],
 })
 export class HrPermissionsModule {}
-

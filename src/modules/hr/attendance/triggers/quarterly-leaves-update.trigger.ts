@@ -14,7 +14,7 @@ export class QuarterlyLeavesUpdateTrigger {
    */
   @Cron('0 18 1 4,7,10 *', {
     name: 'quarterly-leaves-add',
-    timeZone: 'Asia/Karachi' // PKT timezone
+    timeZone: 'Asia/Karachi', // PKT timezone
   })
   async addQuarterlyLeaves(): Promise<number> {
     try {
@@ -22,9 +22,13 @@ export class QuarterlyLeavesUpdateTrigger {
 
       // Get current date in PKT
       const now = new Date();
-      const pktDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
-      
-      this.logger.log(`Executing quarterly leaves add for ${pktDate.toISOString()}`);
+      const pktDate = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+      );
+
+      this.logger.log(
+        `Executing quarterly leaves add for ${pktDate.toISOString()}`,
+      );
 
       // Update all employees' quarterly_leaves by adding 5
       const result = await this.prisma.attendance.updateMany({
@@ -33,12 +37,14 @@ export class QuarterlyLeavesUpdateTrigger {
         },
         data: {
           quarterlyLeaves: {
-            increment: 5
-          }
-        }
+            increment: 5,
+          },
+        },
       });
 
-      this.logger.log(`Successfully added 5 quarterly leaves for ${result.count} employees`);
+      this.logger.log(
+        `Successfully added 5 quarterly leaves for ${result.count} employees`,
+      );
 
       // Log the action for audit purposes
       await this.logQuarterlyLeavesUpdate('ADD', 5, result.count);
@@ -56,7 +62,7 @@ export class QuarterlyLeavesUpdateTrigger {
    */
   @Cron('0 18 1 1 *', {
     name: 'quarterly-leaves-reset',
-    timeZone: 'Asia/Karachi' // PKT timezone
+    timeZone: 'Asia/Karachi', // PKT timezone
   })
   async resetQuarterlyLeaves(): Promise<number> {
     try {
@@ -64,9 +70,13 @@ export class QuarterlyLeavesUpdateTrigger {
 
       // Get current date in PKT
       const now = new Date();
-      const pktDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
-      
-      this.logger.log(`Executing quarterly leaves reset for ${pktDate.toISOString()}`);
+      const pktDate = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+      );
+
+      this.logger.log(
+        `Executing quarterly leaves reset for ${pktDate.toISOString()}`,
+      );
 
       // Update all employees' quarterly_leaves to 5
       const result = await this.prisma.attendance.updateMany({
@@ -74,11 +84,13 @@ export class QuarterlyLeavesUpdateTrigger {
           // Update all records (no specific condition needed)
         },
         data: {
-          quarterlyLeaves: 5
-        }
+          quarterlyLeaves: 5,
+        },
       });
 
-      this.logger.log(`Successfully reset quarterly_leaves to 5 for ${result.count} employees`);
+      this.logger.log(
+        `Successfully reset quarterly_leaves to 5 for ${result.count} employees`,
+      );
 
       // Log the action for audit purposes
       await this.logQuarterlyLeavesUpdate('RESET', 5, result.count);
@@ -93,14 +105,21 @@ export class QuarterlyLeavesUpdateTrigger {
   /**
    * Log the quarterly leaves update action for audit purposes
    */
-  private async logQuarterlyLeavesUpdate(action: 'ADD' | 'RESET', amount: number, updatedCount: number) {
+  private async logQuarterlyLeavesUpdate(
+    action: 'ADD' | 'RESET',
+    amount: number,
+    updatedCount: number,
+  ) {
     try {
       const actionText = action === 'ADD' ? 'added' : 'reset to';
-      this.logger.log(`Quarterly leaves ${actionText} ${amount} for ${updatedCount} employees`);
-      
+      this.logger.log(
+        `Quarterly leaves ${actionText} ${amount} for ${updatedCount} employees`,
+      );
+
       // Example: Log to console with timestamp
-      console.log(`[${new Date().toISOString()}] Quarterly leaves ${actionText} ${amount}: ${updatedCount} employees updated`);
-      
+      console.log(
+        `[${new Date().toISOString()}] Quarterly leaves ${actionText} ${amount}: ${updatedCount} employees updated`,
+      );
     } catch (error) {
       this.logger.error('Error logging quarterly leaves update:', error);
     }
@@ -131,23 +150,23 @@ export class QuarterlyLeavesUpdateTrigger {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          employeeId: 'asc'
-        }
+          employeeId: 'asc',
+        },
       });
 
-      return employees.map(emp => ({
+      return employees.map((emp) => ({
         employee_id: emp.employeeId,
         employee_name: `${emp.employee.firstName} ${emp.employee.lastName}`,
-        quarterly_leaves: emp.quarterlyLeaves
+        quarterly_leaves: emp.quarterlyLeaves,
       }));
     } catch (error) {
       this.logger.error('Error getting quarterly leaves status:', error);
       throw error;
     }
   }
-} 
+}

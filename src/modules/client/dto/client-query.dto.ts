@@ -1,12 +1,12 @@
-import { 
-  IsOptional, 
-  IsString, 
-  IsEnum, 
-  IsInt, 
-  IsDateString, 
-  Min, 
-  Max, 
-  IsEmail 
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsInt,
+  IsDateString,
+  Min,
+  Max,
+  IsEmail,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -14,7 +14,8 @@ import { accStat } from '@prisma/client';
 
 export class ClientQueryDto {
   @ApiPropertyOptional({
-    description: 'Search term to filter clients by name, email, or company name',
+    description:
+      'Search term to filter clients by name, email, or company name',
     example: 'John Doe',
   })
   @IsOptional()

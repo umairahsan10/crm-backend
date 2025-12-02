@@ -1,9 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { CampaignQueryDto } from './dto/campaign-query.dto';
-import { CampaignResponseDto, CampaignListResponseDto } from './dto/campaign-response.dto';
+import {
+  CampaignResponseDto,
+  CampaignListResponseDto,
+} from './dto/campaign-response.dto';
 import { CampaignLog, CampaignStatus } from '@prisma/client';
 
 @Injectable()
@@ -14,7 +22,7 @@ export class CampaignService {
   private async validateMarketingAccess(userId: number): Promise<void> {
     const user = await this.prisma.employee.findUnique({
       where: { id: userId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!user) {
@@ -22,7 +30,9 @@ export class CampaignService {
     }
 
     if (user.department.name !== 'Marketing') {
-      throw new ForbiddenException('Access denied. Only Marketing department can manage campaigns.');
+      throw new ForbiddenException(
+        'Access denied. Only Marketing department can manage campaigns.',
+      );
     }
   }
 
@@ -34,7 +44,7 @@ export class CampaignService {
       where.OR = [
         { campaignName: { contains: query.search, mode: 'insensitive' } },
         { campaignType: { contains: query.search, mode: 'insensitive' } },
-        { description: { contains: query.search, mode: 'insensitive' } }
+        { description: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
@@ -43,7 +53,10 @@ export class CampaignService {
     }
 
     if (query.campaignType) {
-      where.campaignType = { contains: query.campaignType, mode: 'insensitive' };
+      where.campaignType = {
+        contains: query.campaignType,
+        mode: 'insensitive',
+      };
     }
 
     if (query.unitId) {
@@ -90,13 +103,20 @@ export class CampaignService {
   // Helper method to build orderBy clause
   private buildOrderByClause(sortBy?: string, sortOrder?: 'asc' | 'desc') {
     const orderBy: any = {};
-    
+
     if (sortBy) {
       const validSortFields = [
-        'campaignName', 'campaignType', 'startDate', 'endDate', 
-        'status', 'budget', 'actualCost', 'createdAt', 'updatedAt'
+        'campaignName',
+        'campaignType',
+        'startDate',
+        'endDate',
+        'status',
+        'budget',
+        'actualCost',
+        'createdAt',
+        'updatedAt',
       ];
-      
+
       if (validSortFields.includes(sortBy)) {
         orderBy[sortBy] = sortOrder || 'asc';
       } else {
@@ -110,26 +130,33 @@ export class CampaignService {
   }
 
   // Create a new campaign
-  async createCampaign(createCampaignDto: CreateCampaignDto, userId: number): Promise<CampaignResponseDto> {
+  async createCampaign(
+    createCampaignDto: CreateCampaignDto,
+    userId: number,
+  ): Promise<CampaignResponseDto> {
     await this.validateMarketingAccess(userId);
 
     // Validate that the marketing unit exists
     const marketingUnit = await this.prisma.marketingUnit.findUnique({
-      where: { id: createCampaignDto.unitId }
+      where: { id: createCampaignDto.unitId },
     });
 
     if (!marketingUnit) {
-      throw new NotFoundException(`Marketing unit with ID ${createCampaignDto.unitId} not found`);
+      throw new NotFoundException(
+        `Marketing unit with ID ${createCampaignDto.unitId} not found`,
+      );
     }
 
     // Validate production unit if provided
     if (createCampaignDto.productionUnitId) {
       const productionUnit = await this.prisma.productionUnit.findUnique({
-        where: { id: createCampaignDto.productionUnitId }
+        where: { id: createCampaignDto.productionUnitId },
       });
 
       if (!productionUnit) {
-        throw new NotFoundException(`Production unit with ID ${createCampaignDto.productionUnitId} not found`);
+        throw new NotFoundException(
+          `Production unit with ID ${createCampaignDto.productionUnitId} not found`,
+        );
       }
     }
 
@@ -152,34 +179,37 @@ export class CampaignService {
         actualCost: createCampaignDto.actualCost,
         unitId: createCampaignDto.unitId,
         description: createCampaignDto.description,
-        productionUnitId: createCampaignDto.productionUnitId
+        productionUnitId: createCampaignDto.productionUnitId,
       },
       include: {
         marketingUnit: {
           select: {
             id: true,
-            name: true
-          }
+            name: true,
+          },
         },
         ProductionUnit: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
     return this.mapToResponseDto(campaign);
   }
 
   // Get all campaigns with filtering and pagination
-  async getAllCampaigns(query: CampaignQueryDto, userId: number): Promise<CampaignListResponseDto> {
+  async getAllCampaigns(
+    query: CampaignQueryDto,
+    userId: number,
+  ): Promise<CampaignListResponseDto> {
     await this.validateMarketingAccess(userId);
 
     const where = this.buildWhereClause(query);
     const orderBy = this.buildOrderByClause(query.sortBy, query.sortOrder);
-    
+
     const page = query.page || 1;
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
@@ -194,33 +224,36 @@ export class CampaignService {
           marketingUnit: {
             select: {
               id: true,
-              name: true
-            }
+              name: true,
+            },
           },
           ProductionUnit: {
             select: {
               id: true,
-              name: true
-            }
-          }
-        }
+              name: true,
+            },
+          },
+        },
       }),
-      this.prisma.campaignLog.count({ where })
+      this.prisma.campaignLog.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit);
 
     return {
-      campaigns: campaigns.map(campaign => this.mapToResponseDto(campaign)),
+      campaigns: campaigns.map((campaign) => this.mapToResponseDto(campaign)),
       total,
       page,
       limit,
-      totalPages
+      totalPages,
     };
   }
 
   // Get campaign by ID
-  async getCampaignById(id: number, userId: number): Promise<CampaignResponseDto> {
+  async getCampaignById(
+    id: number,
+    userId: number,
+  ): Promise<CampaignResponseDto> {
     await this.validateMarketingAccess(userId);
 
     const campaign = await this.prisma.campaignLog.findUnique({
@@ -229,16 +262,16 @@ export class CampaignService {
         marketingUnit: {
           select: {
             id: true,
-            name: true
-          }
+            name: true,
+          },
         },
         ProductionUnit: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
     if (!campaign) {
@@ -249,12 +282,16 @@ export class CampaignService {
   }
 
   // Update campaign
-  async updateCampaign(id: number, updateCampaignDto: UpdateCampaignDto, userId: number): Promise<CampaignResponseDto> {
+  async updateCampaign(
+    id: number,
+    updateCampaignDto: UpdateCampaignDto,
+    userId: number,
+  ): Promise<CampaignResponseDto> {
     await this.validateMarketingAccess(userId);
 
     // Check if campaign exists
     const existingCampaign = await this.prisma.campaignLog.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingCampaign) {
@@ -264,29 +301,37 @@ export class CampaignService {
     // Validate marketing unit if provided
     if (updateCampaignDto.unitId) {
       const marketingUnit = await this.prisma.marketingUnit.findUnique({
-        where: { id: updateCampaignDto.unitId }
+        where: { id: updateCampaignDto.unitId },
       });
 
       if (!marketingUnit) {
-        throw new NotFoundException(`Marketing unit with ID ${updateCampaignDto.unitId} not found`);
+        throw new NotFoundException(
+          `Marketing unit with ID ${updateCampaignDto.unitId} not found`,
+        );
       }
     }
 
     // Validate production unit if provided
     if (updateCampaignDto.productionUnitId) {
       const productionUnit = await this.prisma.productionUnit.findUnique({
-        where: { id: updateCampaignDto.productionUnitId }
+        where: { id: updateCampaignDto.productionUnitId },
       });
 
       if (!productionUnit) {
-        throw new NotFoundException(`Production unit with ID ${updateCampaignDto.productionUnitId} not found`);
+        throw new NotFoundException(
+          `Production unit with ID ${updateCampaignDto.productionUnitId} not found`,
+        );
       }
     }
 
     // Validate date range if dates are provided
     if (updateCampaignDto.startDate || updateCampaignDto.endDate) {
-      const startDate = updateCampaignDto.startDate ? new Date(updateCampaignDto.startDate) : existingCampaign.startDate;
-      const endDate = updateCampaignDto.endDate ? new Date(updateCampaignDto.endDate) : existingCampaign.endDate;
+      const startDate = updateCampaignDto.startDate
+        ? new Date(updateCampaignDto.startDate)
+        : existingCampaign.startDate;
+      const endDate = updateCampaignDto.endDate
+        ? new Date(updateCampaignDto.endDate)
+        : existingCampaign.endDate;
 
       if (startDate >= endDate) {
         throw new BadRequestException('End date must be after start date');
@@ -297,34 +342,41 @@ export class CampaignService {
       where: { id },
       data: {
         ...updateCampaignDto,
-        startDate: updateCampaignDto.startDate ? new Date(updateCampaignDto.startDate) : undefined,
-        endDate: updateCampaignDto.endDate ? new Date(updateCampaignDto.endDate) : undefined
+        startDate: updateCampaignDto.startDate
+          ? new Date(updateCampaignDto.startDate)
+          : undefined,
+        endDate: updateCampaignDto.endDate
+          ? new Date(updateCampaignDto.endDate)
+          : undefined,
       },
       include: {
         marketingUnit: {
           select: {
             id: true,
-            name: true
-          }
+            name: true,
+          },
         },
         ProductionUnit: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
     return this.mapToResponseDto(campaign);
   }
 
   // Delete campaign
-  async deleteCampaign(id: number, userId: number): Promise<{ message: string }> {
+  async deleteCampaign(
+    id: number,
+    userId: number,
+  ): Promise<{ message: string }> {
     await this.validateMarketingAccess(userId);
 
     const campaign = await this.prisma.campaignLog.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!campaign) {
@@ -332,11 +384,11 @@ export class CampaignService {
     }
 
     await this.prisma.campaignLog.delete({
-      where: { id }
+      where: { id },
     });
 
     return {
-      message: `Campaign "${campaign.campaignName}" deleted successfully`
+      message: `Campaign "${campaign.campaignName}" deleted successfully`,
     };
   }
 
@@ -351,25 +403,25 @@ export class CampaignService {
       totalBudget,
       totalActualCost,
       campaignsByStatus,
-      campaignsByType
+      campaignsByType,
     ] = await Promise.all([
       this.prisma.campaignLog.count(),
       this.prisma.campaignLog.count({ where: { status: 'Running' } }),
       this.prisma.campaignLog.count({ where: { status: 'Completed' } }),
       this.prisma.campaignLog.aggregate({
-        _sum: { budget: true }
+        _sum: { budget: true },
       }),
       this.prisma.campaignLog.aggregate({
-        _sum: { actualCost: true }
+        _sum: { actualCost: true },
       }),
       this.prisma.campaignLog.groupBy({
         by: ['status'],
-        _count: { status: true }
+        _count: { status: true },
       }),
       this.prisma.campaignLog.groupBy({
         by: ['campaignType'],
-        _count: { campaignType: true }
-      })
+        _count: { campaignType: true },
+      }),
     ]);
 
     return {
@@ -378,14 +430,14 @@ export class CampaignService {
       completedCampaigns,
       totalBudget: totalBudget._sum.budget || 0,
       totalActualCost: totalActualCost._sum.actualCost || 0,
-      campaignsByStatus: campaignsByStatus.map(item => ({
+      campaignsByStatus: campaignsByStatus.map((item) => ({
         status: item.status,
-        count: item._count.status
+        count: item._count.status,
       })),
-      campaignsByType: campaignsByType.map(item => ({
+      campaignsByType: campaignsByType.map((item) => ({
         type: item.campaignType,
-        count: item._count.campaignType
-      }))
+        count: item._count.campaignType,
+      })),
     };
   }
 
@@ -406,7 +458,7 @@ export class CampaignService {
       updatedAt: campaign.updatedAt,
       productionUnitId: campaign.productionUnitId,
       marketingUnit: campaign.marketingUnit,
-      productionUnit: campaign.ProductionUnit
+      productionUnit: campaign.ProductionUnit,
     };
   }
 }

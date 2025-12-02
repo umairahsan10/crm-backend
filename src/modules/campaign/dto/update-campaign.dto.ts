@@ -1,12 +1,12 @@
-import { 
-  IsString, 
-  IsDateString, 
-  IsEnum, 
-  IsNumber, 
-  IsOptional, 
-  IsPositive, 
-  MinLength, 
-  MaxLength 
+import {
+  IsString,
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  MinLength,
+  MaxLength,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CampaignStatus } from '@prisma/client';
@@ -81,7 +81,8 @@ export class UpdateCampaignDto {
 
   @ApiPropertyOptional({
     example: 2,
-    description: 'Updated ID of the marketing unit associated with the campaign',
+    description:
+      'Updated ID of the marketing unit associated with the campaign',
   })
   @IsOptional()
   @IsNumber({}, { message: 'Unit ID must be a number' })
@@ -100,7 +101,8 @@ export class UpdateCampaignDto {
 
   @ApiPropertyOptional({
     example: 8,
-    description: 'Updated ID of the production unit associated with the campaign',
+    description:
+      'Updated ID of the production unit associated with the campaign',
   })
   @IsOptional()
   @IsNumber({}, { message: 'Production unit ID must be a number' })

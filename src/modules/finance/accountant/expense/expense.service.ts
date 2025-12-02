@@ -11,7 +11,12 @@ import {
   TransactionResponseDto,
   VendorResponseDto,
 } from './dto/expense-response.dto';
-import { Prisma, TransactionType, TransactionStatus, PaymentWays } from '@prisma/client';
+import {
+  Prisma,
+  TransactionType,
+  TransactionStatus,
+  PaymentWays,
+} from '@prisma/client';
 
 export interface ErrorResponseDto {
   status: string;
@@ -38,7 +43,7 @@ export class ExpenseService {
 
   private getCurrentDateInPKT(): Date {
     const now = new Date();
-    return new Date(now.getTime() + (5 * 60 * 60 * 1000)); // PKT is UTC+5
+    return new Date(now.getTime() + 5 * 60 * 60 * 1000); // PKT is UTC+5
   }
 
   private getErrorMessage(errorMessage: string): string {
@@ -103,8 +108,12 @@ export class ExpenseService {
       createdBy: expense.createdBy,
       createdAt: expense.createdAt.toISOString(),
       updatedAt: expense.updatedAt.toISOString(),
-      transaction: expense.transaction ? this.mapTransactionToResponse(expense.transaction) : null,
-      vendor: expense.transaction?.vendor ? this.mapVendorToResponse(expense.transaction.vendor) : null,
+      transaction: expense.transaction
+        ? this.mapTransactionToResponse(expense.transaction)
+        : null,
+      vendor: expense.transaction?.vendor
+        ? this.mapVendorToResponse(expense.transaction.vendor)
+        : null,
       employee: expense.employee ? { id: expense.employee.id } : null,
     };
   }
@@ -124,7 +133,7 @@ export class ExpenseService {
 
   async createExpense(
     dto: CreateExpenseDto,
-    currentUserId: number
+    currentUserId: number,
   ): Promise<ExpenseCreateResponseDto | ErrorResponseDto> {
     try {
       // Validate vendor exists if provided
@@ -136,7 +145,7 @@ export class ExpenseService {
           return {
             status: 'error',
             message: 'Vendor not found',
-            error_code: 'VENDOR_NOT_FOUND'
+            error_code: 'VENDOR_NOT_FOUND',
           };
         }
       }
@@ -146,26 +155,28 @@ export class ExpenseService {
         const currentDate = this.getCurrentDateInPKT();
         const paidOn = dto.paidOn ? new Date(dto.paidOn) : currentDate;
 
-                 // 1. Create transaction record first
-         // Get the next available ID (largest ID + 1)
-         const maxTransactionId = await prisma.transaction.aggregate({
-           _max: { id: true }
-         });
-         const nextTransactionId = (maxTransactionId._max.id || 0) + 1;
+        // 1. Create transaction record first
+        // Get the next available ID (largest ID + 1)
+        const maxTransactionId = await prisma.transaction.aggregate({
+          _max: { id: true },
+        });
+        const nextTransactionId = (maxTransactionId._max.id || 0) + 1;
 
-         const transaction = await prisma.transaction.create({
-           data: {
-             id: nextTransactionId, // Use explicit ID to avoid sequence conflicts
-             employeeId: currentUserId,
-             vendorId: dto.vendorId || null,
-             amount: new Prisma.Decimal(dto.amount),
-             transactionType: TransactionType.expense,
-             paymentMethod: dto.paymentMethod ? this.mapPaymentMethodToPaymentWays(dto.paymentMethod) : PaymentWays.cash,
-             transactionDate: currentDate,
-             status: TransactionStatus.completed,
-             notes: `Expense: ${dto.title} - ${dto.category}`,
-           },
-         });
+        const transaction = await prisma.transaction.create({
+          data: {
+            id: nextTransactionId, // Use explicit ID to avoid sequence conflicts
+            employeeId: currentUserId,
+            vendorId: dto.vendorId || null,
+            amount: new Prisma.Decimal(dto.amount),
+            transactionType: TransactionType.expense,
+            paymentMethod: dto.paymentMethod
+              ? this.mapPaymentMethodToPaymentWays(dto.paymentMethod)
+              : PaymentWays.cash,
+            transactionDate: currentDate,
+            status: TransactionStatus.completed,
+            notes: `Expense: ${dto.title} - ${dto.category}`,
+          },
+        });
 
         // 2. Create expense record
         const expense = await prisma.expense.create({
@@ -195,7 +206,9 @@ export class ExpenseService {
         });
         return { expense, transaction };
       });
-      this.logger.log(`Expense created: ${result.expense.id} by user ${currentUserId}`);
+      this.logger.log(
+        `Expense created: ${result.expense.id} by user ${currentUserId}`,
+      );
       return {
         status: 'success',
         message: 'Expense created successfully',
@@ -214,13 +227,19 @@ export class ExpenseService {
     }
   }
 
-  async getAllExpenses(filters: ExpenseFilters, query?: any): Promise<ExpenseListResponseDto | ErrorResponseDto> {
+  async getAllExpenses(
+    filters: ExpenseFilters,
+    query?: any,
+  ): Promise<ExpenseListResponseDto | ErrorResponseDto> {
     try {
       const whereClause: any = {};
 
       // Apply filters
       if (filters.category) {
-        whereClause.category = { contains: filters.category, mode: 'insensitive' };
+        whereClause.category = {
+          contains: filters.category,
+          mode: 'insensitive',
+        };
       }
 
       if (filters.fromDate || filters.toDate) {
@@ -260,7 +279,11 @@ export class ExpenseService {
         whereClause.OR = [
           { title: { contains: query.search, mode: 'insensitive' } },
           { category: { contains: query.search, mode: 'insensitive' } },
-          { transaction: { vendor: { name: { contains: query.search, mode: 'insensitive' } } } }
+          {
+            transaction: {
+              vendor: { name: { contains: query.search, mode: 'insensitive' } },
+            },
+          },
         ];
       }
 
@@ -292,20 +315,20 @@ export class ExpenseService {
         }),
         this.prisma.expense.count({
           where: whereClause,
-        })
+        }),
       ]);
 
       return {
         status: 'success',
         message: 'Expenses retrieved successfully',
-        data: expenses.map(expense => this.mapExpenseToResponse(expense)),
+        data: expenses.map((expense) => this.mapExpenseToResponse(expense)),
         pagination: {
           page,
           limit,
           total,
           totalPages: Math.ceil(total / limit),
-          retrieved: expenses.length
-        }
+          retrieved: expenses.length,
+        },
       };
     } catch (error) {
       this.logger.error(`Failed to retrieve expenses: ${error.message}`);
@@ -317,7 +340,9 @@ export class ExpenseService {
     }
   }
 
-  async getExpenseById(id: number): Promise<ExpenseSingleResponseDto | ErrorResponseDto> {
+  async getExpenseById(
+    id: number,
+  ): Promise<ExpenseSingleResponseDto | ErrorResponseDto> {
     try {
       const expense = await this.prisma.expense.findUnique({
         where: { id },
@@ -339,7 +364,7 @@ export class ExpenseService {
         return {
           status: 'error',
           message: 'Expense not found',
-          error_code: 'EXPENSE_NOT_FOUND'
+          error_code: 'EXPENSE_NOT_FOUND',
         };
       }
 
@@ -360,7 +385,7 @@ export class ExpenseService {
 
   async updateExpense(
     dto: UpdateExpenseDto,
-    currentUserId: number
+    currentUserId: number,
   ): Promise<ExpenseUpdateResponseDto | ErrorResponseDto> {
     try {
       // Validate expense_id is provided
@@ -368,7 +393,7 @@ export class ExpenseService {
         return {
           status: 'error',
           message: 'Expense ID is required',
-          error_code: 'MISSING_EXPENSE_ID'
+          error_code: 'MISSING_EXPENSE_ID',
         };
       }
 
@@ -384,7 +409,7 @@ export class ExpenseService {
         return {
           status: 'error',
           message: 'Expense not found',
-          error_code: 'EXPENSE_NOT_FOUND'
+          error_code: 'EXPENSE_NOT_FOUND',
         };
       }
 
@@ -397,7 +422,7 @@ export class ExpenseService {
           return {
             status: 'error',
             message: 'Vendor not found',
-            error_code: 'VENDOR_NOT_FOUND'
+            error_code: 'VENDOR_NOT_FOUND',
           };
         }
       }
@@ -444,12 +469,13 @@ export class ExpenseService {
             transactionUpdateData.amount = new Prisma.Decimal(dto.amount);
           }
 
-                     if (dto.vendorId !== undefined) {
-             transactionUpdateData.vendorId = dto.vendorId;
-           }
+          if (dto.vendorId !== undefined) {
+            transactionUpdateData.vendorId = dto.vendorId;
+          }
 
           if (dto.paymentMethod) {
-            transactionUpdateData.paymentMethod = this.mapPaymentMethodToPaymentWays(dto.paymentMethod);
+            transactionUpdateData.paymentMethod =
+              this.mapPaymentMethodToPaymentWays(dto.paymentMethod);
           }
 
           if (dto.title || dto.category) {
@@ -469,13 +495,17 @@ export class ExpenseService {
         return { expense: updatedExpense, transaction: updatedTransaction };
       });
 
-      this.logger.log(`Expense updated: ${result.expense.id} by user ${currentUserId}`);
+      this.logger.log(
+        `Expense updated: ${result.expense.id} by user ${currentUserId}`,
+      );
       return {
         status: 'success',
         message: 'Expense updated successfully',
         data: {
           expense: this.mapExpenseToResponse(result.expense),
-          transaction: result.transaction ? this.mapTransactionToResponse(result.transaction) : undefined,
+          transaction: result.transaction
+            ? this.mapTransactionToResponse(result.transaction)
+            : undefined,
         },
       };
     } catch (error) {
@@ -491,18 +521,29 @@ export class ExpenseService {
   async getExpenseStats(): Promise<any> {
     try {
       const currentDate = this.getCurrentDateInPKT();
-      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const firstDayOfMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      );
 
       // Get all expenses
       const allExpenses = await this.prisma.expense.findMany({});
 
       // Total count and sum
       const totalExpenses = allExpenses.length;
-      const totalAmount = allExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
-      const averageExpense = totalExpenses > 0 ? totalAmount / totalExpenses : 0;
+      const totalAmount = allExpenses.reduce(
+        (sum, exp) => sum + Number(exp.amount),
+        0,
+      );
+      const averageExpense =
+        totalExpenses > 0 ? totalAmount / totalExpenses : 0;
 
       // Breakdown by category
-      const categoryBreakdown: Record<string, { count: number; amount: number }> = {};
+      const categoryBreakdown: Record<
+        string,
+        { count: number; amount: number }
+      > = {};
       allExpenses.forEach((exp) => {
         const category = exp.category || 'Uncategorized';
         if (!categoryBreakdown[category]) {
@@ -524,10 +565,13 @@ export class ExpenseService {
 
       // This month's stats
       const thisMonthExpenses = allExpenses.filter(
-        (exp) => exp.createdAt >= firstDayOfMonth
+        (exp) => exp.createdAt >= firstDayOfMonth,
       );
       const thisMonthCount = thisMonthExpenses.length;
-      const thisMonthAmount = thisMonthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+      const thisMonthAmount = thisMonthExpenses.reduce(
+        (sum, exp) => sum + Number(exp.amount),
+        0,
+      );
 
       return {
         status: 'success',
@@ -545,7 +589,9 @@ export class ExpenseService {
         },
       };
     } catch (error) {
-      this.logger.error(`Error retrieving expense statistics: ${error.message}`);
+      this.logger.error(
+        `Error retrieving expense statistics: ${error.message}`,
+      );
       return {
         status: 'error',
         message: 'An error occurred while retrieving expense statistics',
@@ -553,4 +599,4 @@ export class ExpenseService {
       };
     }
   }
-} 
+}

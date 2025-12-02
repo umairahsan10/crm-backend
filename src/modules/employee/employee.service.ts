@@ -18,7 +18,7 @@ export class EmployeeService {
         status: true,
         address: true,
         dob: true, // dateOfBirth
-        
+
         // Department
         department: {
           select: {
@@ -26,7 +26,7 @@ export class EmployeeService {
             name: true,
           },
         },
-        
+
         // Role
         role: {
           select: {
@@ -34,7 +34,7 @@ export class EmployeeService {
             name: true,
           },
         },
-        
+
         // Manager (name and email)
         manager: {
           select: {
@@ -44,7 +44,7 @@ export class EmployeeService {
             email: true,
           },
         },
-        
+
         // Team Lead (name and email)
         teamLead: {
           select: {
@@ -125,9 +125,9 @@ export class EmployeeService {
       where: {
         role: {
           name: {
-            in: ['senior', 'dep_manager', 'team_lead', 'unit_head']
-          }
-        }
+            in: ['senior', 'dep_manager', 'team_lead', 'unit_head'],
+          },
+        },
       },
       include: {
         department: true,

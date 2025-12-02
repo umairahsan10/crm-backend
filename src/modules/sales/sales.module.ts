@@ -6,6 +6,12 @@ import { CommissionsModule } from './commissions/commissions.module';
 import { PaymentsModule } from './leads/payments/payments.module';
 
 @Module({
-  imports: [LeadsModule, UnitsModule, TeamsModule, CommissionsModule, PaymentsModule],
+  imports: [
+    LeadsModule,
+    UnitsModule,
+    TeamsModule,
+    CommissionsModule,
+    PaymentsModule,
+  ],
 })
 export class SalesModule {}

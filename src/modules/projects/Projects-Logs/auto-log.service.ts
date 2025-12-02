@@ -12,8 +12,8 @@ export class AutoLogService {
       const existingLog = await this.prisma.projectLog.findFirst({
         where: {
           projectId: projectId,
-          developerId: employeeId
-        }
+          developerId: employeeId,
+        },
       });
 
       // Only create log if employee is not already logged for this project
@@ -21,13 +21,17 @@ export class AutoLogService {
         await this.prisma.projectLog.create({
           data: {
             projectId,
-            developerId: employeeId
-          }
+            developerId: employeeId,
+          },
         });
-        
-        console.log(`Employee ${employeeId} added to project ${projectId} logs`);
+
+        console.log(
+          `Employee ${employeeId} added to project ${projectId} logs`,
+        );
       } else {
-        console.log(`Employee ${employeeId} already exists in project ${projectId} logs`);
+        console.log(
+          `Employee ${employeeId} already exists in project ${projectId} logs`,
+        );
       }
     } catch (error) {
       console.error('Failed to add employee to project log:', error);
@@ -56,15 +60,15 @@ export class AutoLogService {
           developer: {
             include: {
               role: true,
-              department: true
-            }
-          }
-        }
+              department: true,
+            },
+          },
+        },
       });
 
-      return logs.map(log => ({
+      return logs.map((log) => ({
         employeeId: log.developerId,
-        employee: log.developer
+        employee: log.developer,
       }));
     } catch (error) {
       console.error('Failed to get project employees:', error);
@@ -76,7 +80,7 @@ export class AutoLogService {
   async getEmployeeProjectCount(employeeId: number) {
     try {
       const count = await this.prisma.projectLog.count({
-        where: { developerId: employeeId }
+        where: { developerId: employeeId },
       });
       return count;
     } catch (error) {
@@ -92,9 +96,9 @@ export class AutoLogService {
       const teamProjects = await this.prisma.project.findMany({
         where: {
           team: {
-            teamLeadId: teamLeadId
-          }
-        }
+            teamLeadId: teamLeadId,
+          },
+        },
       });
 
       // Add employee to all team projects
@@ -102,7 +106,9 @@ export class AutoLogService {
         await this.addEmployeeToProjectLog(project.id, employeeId);
       }
 
-      console.log(`Added employee ${employeeId} to ${teamProjects.length} team projects`);
+      console.log(
+        `Added employee ${employeeId} to ${teamProjects.length} team projects`,
+      );
     } catch (error) {
       console.error('Failed to add employee to team projects:', error);
     }

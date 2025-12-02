@@ -10,16 +10,15 @@ import { AccountantsModule } from './Accountants/accountants.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { FinanceModule } from '../finance/finance.module';
 
-
 @Module({
   imports: [
-    FinanceModule, 
-    SalaryModule, 
-    EmployeeModule, 
-    SalesModule, 
-    ProductionModule, 
-    MarketingModule, 
-    HrManagementModule, 
+    FinanceModule,
+    SalaryModule,
+    EmployeeModule,
+    SalesModule,
+    ProductionModule,
+    MarketingModule,
+    HrManagementModule,
     AccountsModule,
     AccountantsModule,
     AttendanceModule,

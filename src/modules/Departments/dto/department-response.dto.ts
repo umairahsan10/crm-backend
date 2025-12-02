@@ -4,19 +4,34 @@ export class DepartmentResponseDto {
   @ApiProperty({ description: 'Unique ID of the department', example: 1 })
   id: number;
 
-  @ApiProperty({ description: 'Name of the department', example: 'Human Resources' })
+  @ApiProperty({
+    description: 'Name of the department',
+    example: 'Human Resources',
+  })
   name: string;
 
-  @ApiPropertyOptional({ description: 'Description of the department', example: 'Handles HR operations' })
+  @ApiPropertyOptional({
+    description: 'Description of the department',
+    example: 'Handles HR operations',
+  })
   description?: string | null;
 
-  @ApiPropertyOptional({ description: 'Employee ID of the manager', example: 5 })
+  @ApiPropertyOptional({
+    description: 'Employee ID of the manager',
+    example: 5,
+  })
   managerId?: number | null;
 
-  @ApiProperty({ description: 'Date when the department was created', example: '2025-10-14T12:00:00.000Z' })
+  @ApiProperty({
+    description: 'Date when the department was created',
+    example: '2025-10-14T12:00:00.000Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Date when the department was last updated', example: '2025-10-14T12:30:00.000Z' })
+  @ApiProperty({
+    description: 'Date when the department was last updated',
+    example: '2025-10-14T12:30:00.000Z',
+  })
   updatedAt: Date;
 
   @ApiPropertyOptional({
@@ -40,8 +55,18 @@ export class DepartmentResponseDto {
     description: 'List of employees in the department',
     type: [Object],
     example: [
-      { id: 6, firstName: 'Jane', lastName: 'Smith', email: 'jane.smith@example.com' },
-      { id: 7, firstName: 'Bob', lastName: 'Brown', email: 'bob.brown@example.com' },
+      {
+        id: 6,
+        firstName: 'Jane',
+        lastName: 'Smith',
+        email: 'jane.smith@example.com',
+      },
+      {
+        id: 7,
+        firstName: 'Bob',
+        lastName: 'Brown',
+        email: 'bob.brown@example.com',
+      },
     ],
   })
   employees?: {
@@ -53,7 +78,10 @@ export class DepartmentResponseDto {
 }
 
 export class DepartmentsListResponseDto {
-  @ApiProperty({ description: 'Array of departments', type: [DepartmentResponseDto] })
+  @ApiProperty({
+    description: 'Array of departments',
+    type: [DepartmentResponseDto],
+  })
   departments: DepartmentResponseDto[];
 
   @ApiProperty({ description: 'Total number of departments', example: 10 })

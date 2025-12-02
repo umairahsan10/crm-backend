@@ -18,4 +18,3 @@ import { FinanceModule } from '../finance/finance.module';
   exports: [],
 })
 export class AllLogsModule {}
-

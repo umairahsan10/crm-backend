@@ -22,7 +22,9 @@ export class HrPermissionResponseDto {
   @ApiPropertyOptional({ description: 'Permission to handle terminations' })
   terminationsHandle?: boolean | null;
 
-  @ApiPropertyOptional({ description: 'Permission to approve monthly requests' })
+  @ApiPropertyOptional({
+    description: 'Permission to approve monthly requests',
+  })
   monthlyRequestApprovals?: boolean | null;
 
   @ApiPropertyOptional({ description: 'Permission to set targets' })
@@ -47,8 +49,8 @@ export class HrPermissionResponseDto {
       id: 1,
       firstName: 'John',
       lastName: 'Doe',
-      email: 'john.doe@example.com'
-    }
+      email: 'john.doe@example.com',
+    },
   })
   employee?: {
     id: number;
@@ -59,7 +61,10 @@ export class HrPermissionResponseDto {
 }
 
 export class HrPermissionsListResponseDto {
-  @ApiProperty({ type: [HrPermissionResponseDto], description: 'List of HR records' })
+  @ApiProperty({
+    type: [HrPermissionResponseDto],
+    description: 'List of HR records',
+  })
   hrRecords: HrPermissionResponseDto[];
 
   @ApiProperty({ description: 'Total number of HR records' })
@@ -74,4 +79,3 @@ export class HrPermissionsListResponseDto {
   @ApiProperty({ description: 'Total number of pages', example: 1 })
   totalPages: number;
 }
-

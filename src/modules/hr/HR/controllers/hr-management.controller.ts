@@ -1,7 +1,32 @@
-import { Body, Controller, Post, Get, Put, Delete, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Post,
+  Get,
+  Put,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { HrManagementService } from '../services/hr-management.service';
-import { CreateHrDto, UpdateHrDto, HrResponseDto, HrListResponseDto } from '../dto/hr-management.dto';
+import {
+  CreateHrDto,
+  UpdateHrDto,
+  HrResponseDto,
+  HrListResponseDto,
+} from '../dto/hr-management.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -32,8 +57,15 @@ export class HrManagementController {
   @Permissions(PermissionName.employee_add_permission)
   @ApiOperation({ summary: 'Create a new HR record' })
   @ApiBody({ type: CreateHrDto })
-  @ApiResponse({ status: 201, description: 'HR record created successfully', type: HrResponseDto })
-  async createHr(@Body() dto: CreateHrDto, @Request() req: AuthenticatedRequest): Promise<HrResponseDto> {
+  @ApiResponse({
+    status: 201,
+    description: 'HR record created successfully',
+    type: HrResponseDto,
+  })
+  async createHr(
+    @Body() dto: CreateHrDto,
+    @Request() req: AuthenticatedRequest,
+  ): Promise<HrResponseDto> {
     return await this.hrManagementService.createHr(dto, req.user.id);
   }
 
@@ -44,12 +76,23 @@ export class HrManagementController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  @ApiOperation({ summary: 'Get all HR records, optionally filtered by employee ID' })
-  @ApiQuery({ name: 'employeeId', required: false, description: 'Filter HR records by employee ID', type: Number })
-  @ApiResponse({ status: 200, description: 'List of HR records', type: HrListResponseDto })
+  @ApiOperation({
+    summary: 'Get all HR records, optionally filtered by employee ID',
+  })
+  @ApiQuery({
+    name: 'employeeId',
+    required: false,
+    description: 'Filter HR records by employee ID',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of HR records',
+    type: HrListResponseDto,
+  })
   async getAllHr(
     @Query('employeeId') employeeId?: string,
-    @Request() req?: AuthenticatedRequest
+    @Request() req?: AuthenticatedRequest,
   ): Promise<HrListResponseDto> {
     const parsedEmployeeId = employeeId ? parseInt(employeeId, 10) : undefined;
     return await this.hrManagementService.getAllHr(parsedEmployeeId);
@@ -64,10 +107,14 @@ export class HrManagementController {
   @Permissions(PermissionName.employee_add_permission)
   @ApiOperation({ summary: 'Get a specific HR record by ID' })
   @ApiParam({ name: 'id', description: 'HR record ID' })
-  @ApiResponse({ status: 200, description: 'HR record details', type: HrResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'HR record details',
+    type: HrResponseDto,
+  })
   async getHrById(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<HrResponseDto> {
     return await this.hrManagementService.getHrById(id);
   }
@@ -82,11 +129,15 @@ export class HrManagementController {
   @ApiOperation({ summary: 'Update an existing HR record' })
   @ApiParam({ name: 'id', description: 'HR record ID' })
   @ApiBody({ type: UpdateHrDto })
-  @ApiResponse({ status: 200, description: 'Updated HR record', type: HrResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Updated HR record',
+    type: HrResponseDto,
+  })
   async updateHr(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateHrDto,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<HrResponseDto> {
     return await this.hrManagementService.updateHr(id, dto, req.user.id);
   }
@@ -103,7 +154,7 @@ export class HrManagementController {
   @ApiResponse({ status: 200, description: 'Deletion confirmation message' })
   async deleteHr(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     return await this.hrManagementService.deleteHr(id, req.user.id);
   }

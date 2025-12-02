@@ -21,7 +21,11 @@ export class ChangeDto {
   @ApiProperty({ description: 'Percentage change', example: 20.0 })
   percentage: number;
 
-  @ApiProperty({ description: 'Trend direction', example: 'up', enum: ['up', 'down', 'neutral'] })
+  @ApiProperty({
+    description: 'Trend direction',
+    example: 'up',
+    enum: ['up', 'down', 'neutral'],
+  })
   trend: 'up' | 'down' | 'neutral';
 }
 
@@ -35,35 +39,60 @@ export class TopPerformerDto {
   @ApiProperty({ description: 'Primary performance metric value', example: 18 })
   value: number;
 
-  @ApiProperty({ description: 'The metric being used for ranking', example: 'deals', enum: ['deals', 'revenue', 'conversion_rate', 'leads'] })
+  @ApiProperty({
+    description: 'The metric being used for ranking',
+    example: 'deals',
+    enum: ['deals', 'revenue', 'conversion_rate', 'leads'],
+  })
   metric: string;
 
-  @ApiProperty({ description: 'Additional performance metrics', type: AdditionalMetricsDto })
+  @ApiProperty({
+    description: 'Additional performance metrics',
+    type: AdditionalMetricsDto,
+  })
   additionalMetrics: AdditionalMetricsDto;
 
   @ApiProperty({ description: 'Ranking position (1 = best)', example: 1 })
   rank: number;
 
-  @ApiProperty({ description: 'Comparison with previous period', type: ChangeDto })
+  @ApiProperty({
+    description: 'Comparison with previous period',
+    type: ChangeDto,
+  })
   change: ChangeDto;
 }
 
 export class TopPerformersSummaryDto {
-  @ApiProperty({ description: 'Total number of team members in scope', example: 25 })
+  @ApiProperty({
+    description: 'Total number of team members in scope',
+    example: 25,
+  })
   totalTeamMembers: number;
 
-  @ApiProperty({ description: 'Start date of the performance period', example: '2024-01-01' })
+  @ApiProperty({
+    description: 'Start date of the performance period',
+    example: '2024-01-01',
+  })
   periodStart: string;
 
-  @ApiProperty({ description: 'End date of the performance period', example: '2024-01-31' })
+  @ApiProperty({
+    description: 'End date of the performance period',
+    example: '2024-01-31',
+  })
   periodEnd: string;
 
-  @ApiProperty({ description: 'Average performance value across all team members', example: 8.5 })
+  @ApiProperty({
+    description: 'Average performance value across all team members',
+    example: 8.5,
+  })
   averagePerformance: number;
 }
 
 export class TopPerformersMetadataDto {
-  @ApiProperty({ description: 'Generation timestamp', example: '2024-12-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Generation timestamp',
+    example: '2024-12-15T10:30:00Z',
+  })
   generatedAt: string;
 }
 
@@ -77,19 +106,32 @@ export class TopPerformersResponseDto {
   @ApiProperty({ description: 'User role', example: 'dep_manager' })
   role: string;
 
-  @ApiProperty({ description: 'Period type', example: 'monthly', enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'] })
+  @ApiProperty({
+    description: 'Period type',
+    example: 'monthly',
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+  })
   period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
-  @ApiProperty({ description: 'Performance metric used for ranking', example: 'deals', enum: ['deals', 'revenue', 'conversion_rate', 'leads'] })
+  @ApiProperty({
+    description: 'Performance metric used for ranking',
+    example: 'deals',
+    enum: ['deals', 'revenue', 'conversion_rate', 'leads'],
+  })
   metric: string;
 
-  @ApiProperty({ description: 'Summary statistics', type: TopPerformersSummaryDto })
+  @ApiProperty({
+    description: 'Summary statistics',
+    type: TopPerformersSummaryDto,
+  })
   summary: TopPerformersSummaryDto;
 
   @ApiProperty({ description: 'Top performers data', type: [TopPerformerDto] })
   data: TopPerformerDto[];
 
-  @ApiProperty({ description: 'Response metadata', type: TopPerformersMetadataDto })
+  @ApiProperty({
+    description: 'Response metadata',
+    type: TopPerformersMetadataDto,
+  })
   metadata: TopPerformersMetadataDto;
 }
-

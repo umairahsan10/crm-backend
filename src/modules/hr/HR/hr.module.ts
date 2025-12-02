@@ -11,4 +11,4 @@ import { PrismaService } from '../../../../prisma/prisma.service';
   providers: [HrManagementService, AdminRequestsService],
   exports: [HrManagementService, AdminRequestsService],
 })
-export class HrManagementModule {} 
+export class HrManagementModule {}

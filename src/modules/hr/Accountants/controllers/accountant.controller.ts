@@ -1,7 +1,32 @@
-import { Body, Controller, Post, Get, Put, Delete, Param, Query, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Post,
+  Get,
+  Put,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+  ParseIntPipe,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBearerAuth,
+  ApiBody,
+} from '@nestjs/swagger';
 import { AccountantService } from '../services/accountant.service';
-import { CreateAccountantDto, UpdateAccountantDto, AccountantResponseDto, AccountantListResponseDto } from '../dto/accountant.dto';
+import {
+  CreateAccountantDto,
+  UpdateAccountantDto,
+  AccountantResponseDto,
+  AccountantListResponseDto,
+} from '../dto/accountant.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../../common/guards/departments.guard';
@@ -29,14 +54,21 @@ export class AccountantController {
   @Post()
   @ApiOperation({ summary: 'Create a new accountant record' })
   @ApiBody({ type: CreateAccountantDto })
-  @ApiResponse({ status: 201, description: 'Accountant created successfully', type: AccountantResponseDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Accountant created successfully',
+    type: AccountantResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
-  async createAccountant(@Body() dto: CreateAccountantDto, @Request() req: AuthenticatedRequest): Promise<AccountantResponseDto> {
+  async createAccountant(
+    @Body() dto: CreateAccountantDto,
+    @Request() req: AuthenticatedRequest,
+  ): Promise<AccountantResponseDto> {
     return await this.accountantService.createAccountant(dto, req.user.id);
   }
 
@@ -44,9 +76,20 @@ export class AccountantController {
    * Get all accountant records or filter by employee ID
    */
   @Get()
-  @ApiOperation({ summary: 'Get all accountant records or filter by employee ID' })
-  @ApiQuery({ name: 'employeeId', required: false, type: String, description: 'Filter by employee ID' })
-  @ApiResponse({ status: 200, description: 'Accountants retrieved successfully', type: AccountantListResponseDto })
+  @ApiOperation({
+    summary: 'Get all accountant records or filter by employee ID',
+  })
+  @ApiQuery({
+    name: 'employeeId',
+    required: false,
+    type: String,
+    description: 'Filter by employee ID',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Accountants retrieved successfully',
+    type: AccountantListResponseDto,
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
@@ -54,7 +97,7 @@ export class AccountantController {
   @Permissions(PermissionName.employee_add_permission)
   async getAllAccountants(
     @Query('employeeId') employeeId?: string,
-    @Request() req?: AuthenticatedRequest
+    @Request() req?: AuthenticatedRequest,
   ): Promise<AccountantListResponseDto> {
     const parsedEmployeeId = employeeId ? parseInt(employeeId, 10) : undefined;
     return await this.accountantService.getAllAccountants(parsedEmployeeId);
@@ -66,7 +109,11 @@ export class AccountantController {
   @Get(':id')
   @ApiOperation({ summary: 'Get accountant record by ID' })
   @ApiParam({ name: 'id', type: 'number', description: 'Accountant ID' })
-  @ApiResponse({ status: 200, description: 'Accountant retrieved successfully', type: AccountantResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Accountant retrieved successfully',
+    type: AccountantResponseDto,
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Accountant not found' })
@@ -75,7 +122,7 @@ export class AccountantController {
   @Permissions(PermissionName.employee_add_permission)
   async getAccountantById(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<AccountantResponseDto> {
     return await this.accountantService.getAccountantById(id);
   }
@@ -87,7 +134,11 @@ export class AccountantController {
   @ApiOperation({ summary: 'Update accountant record' })
   @ApiParam({ name: 'id', type: 'number', description: 'Accountant ID' })
   @ApiBody({ type: UpdateAccountantDto })
-  @ApiResponse({ status: 200, description: 'Accountant updated successfully', type: AccountantResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Accountant updated successfully',
+    type: AccountantResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -98,7 +149,7 @@ export class AccountantController {
   async updateAccountant(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAccountantDto,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<AccountantResponseDto> {
     return await this.accountantService.updateAccountant(id, dto, req.user.id);
   }
@@ -109,7 +160,11 @@ export class AccountantController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete accountant record' })
   @ApiParam({ name: 'id', type: 'number', description: 'Accountant ID' })
-  @ApiResponse({ status: 200, description: 'Accountant deleted successfully', schema: { type: 'object', properties: { message: { type: 'string' } } } })
+  @ApiResponse({
+    status: 200,
+    description: 'Accountant deleted successfully',
+    schema: { type: 'object', properties: { message: { type: 'string' } } },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Accountant not found' })
@@ -118,8 +173,8 @@ export class AccountantController {
   @Permissions(PermissionName.employee_add_permission)
   async deleteAccountant(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     return await this.accountantService.deleteAccountant(id, req.user.id);
   }
-} 
+}

@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+  Request,
+  Body,
+} from '@nestjs/common';
 import { MarketingService } from '../services/marketing.service';
 import { CreateMarketingDto, UpdateMarketingDto } from '../dto/marketing.dto';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
@@ -8,8 +19,17 @@ import { PermissionsGuard } from '../../../../common/guards/permissions.guard';
 import { Departments } from '../../../../common/decorators/departments.decorator';
 import { Permissions } from '../../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../../common/constants/permission.enum';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
-import { MarketingRecordResponseDto, MarketingRecordsListResponseDto } from '../dto/marketing-response.dto';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
+import {
+  MarketingRecordResponseDto,
+  MarketingRecordsListResponseDto,
+} from '../dto/marketing-response.dto';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -29,7 +49,11 @@ export class MarketingController {
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
   @ApiOperation({ summary: 'Get all marketing records' })
-  @ApiResponse({ status: 200, description: 'List of marketing records', type: MarketingRecordsListResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'List of marketing records',
+    type: MarketingRecordsListResponseDto,
+  })
   async getAllMarketingRecords(@Request() req: AuthenticatedRequest) {
     return await this.marketingService.getAllMarketingRecords();
   }
@@ -40,10 +64,14 @@ export class MarketingController {
   @Permissions(PermissionName.employee_add_permission)
   @ApiOperation({ summary: 'Get a marketing record by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'Marketing record ID' })
-  @ApiResponse({ status: 200, description: 'Marketing record details', type: MarketingRecordResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Marketing record details',
+    type: MarketingRecordResponseDto,
+  })
   async getMarketingRecordById(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ) {
     return await this.marketingService.getMarketingRecordById(id);
   }
@@ -53,10 +81,14 @@ export class MarketingController {
   @Departments('HR')
   @Permissions(PermissionName.employee_add_permission)
   @ApiOperation({ summary: 'Create a new marketing record' })
-  @ApiResponse({ status: 201, description: 'Marketing record created', type: MarketingRecordResponseDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Marketing record created',
+    type: MarketingRecordResponseDto,
+  })
   async createMarketingRecord(
     @Body() dto: CreateMarketingDto,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ) {
     return await this.marketingService.createMarketingRecord(dto, req.user.id);
   }
@@ -67,13 +99,21 @@ export class MarketingController {
   @Permissions(PermissionName.employee_add_permission)
   @ApiOperation({ summary: 'Update a marketing record' })
   @ApiParam({ name: 'id', type: Number, description: 'Marketing record ID' })
-  @ApiResponse({ status: 200, description: 'Marketing record updated', type: MarketingRecordResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Marketing record updated',
+    type: MarketingRecordResponseDto,
+  })
   async updateMarketingRecord(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMarketingDto,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ) {
-    return await this.marketingService.updateMarketingRecord(id, dto, req.user.id);
+    return await this.marketingService.updateMarketingRecord(
+      id,
+      dto,
+      req.user.id,
+    );
   }
 
   @Delete(':id')
@@ -85,7 +125,7 @@ export class MarketingController {
   @ApiResponse({ status: 200, description: 'Marketing record deleted' })
   async deleteMarketingRecord(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ) {
     return await this.marketingService.deleteMarketingRecord(id, req.user.id);
   }

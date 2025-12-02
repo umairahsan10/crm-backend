@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsEnum, IsEmail, MinLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsEmail,
+  MinLength,
+} from 'class-validator';
 import { AdminRole } from '@prisma/client';
 
 export class UpdateAdminDto {

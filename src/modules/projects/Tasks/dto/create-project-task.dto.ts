@@ -1,5 +1,17 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsDateString, IsEnum, IsIn } from 'class-validator';
-import { ProjectTaskPriority, ProjectTaskStatus, ProjectTaskDifficulty } from '@prisma/client';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsOptional,
+  IsDateString,
+  IsEnum,
+  IsIn,
+} from 'class-validator';
+import {
+  ProjectTaskPriority,
+  ProjectTaskStatus,
+  ProjectTaskDifficulty,
+} from '@prisma/client';
 
 export class CreateProjectTaskDto {
   @IsNotEmpty({ message: 'Task title is required' })

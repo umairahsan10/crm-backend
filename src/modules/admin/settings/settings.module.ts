@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PrismaService } from '../../../../prisma/prisma.service';
 import { CompanySettingsModule } from './company/company-settings.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { RolesModule } from './roles/roles.module';
@@ -8,7 +7,7 @@ import { AccountantPermissionsModule } from './accountant-permissions/accountant
 
 /**
  * Settings Module
- * 
+ *
  * This module contains sub-modules for:
  * - Company Settings ✅
  * - Departments Management ✅
@@ -24,8 +23,5 @@ import { AccountantPermissionsModule } from './accountant-permissions/accountant
     HrPermissionsModule,
     AccountantPermissionsModule,
   ],
-  providers: [PrismaService],
-  exports: [PrismaService],
 })
 export class SettingsModule {}
-

@@ -1,4 +1,14 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Param, Patch, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Get,
+  Param,
+  Patch,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { GeneratePaymentLinkDto } from './dto/generate-payment-link.dto';
@@ -17,7 +27,7 @@ export class PaymentsController {
   @Post('payment-link-generate')
   async generatePaymentLink(
     @Body() dto: GeneratePaymentLinkDto,
-    @Request() req
+    @Request() req,
   ): Promise<PaymentLinkResponseDto> {
     const userId = req.user.id;
     return await this.paymentsService.generatePaymentLink(dto, userId);
@@ -26,34 +36,41 @@ export class PaymentsController {
   @Get('transaction/:id')
   async getPaymentDetails(
     @Param('id', ParseIntPipe) transactionId: number,
-    @Request() req
+    @Request() req,
   ) {
     const userId = req.user.id;
     return await this.paymentsService.getPaymentDetails(transactionId, userId);
   }
 
-
-
-  @Patch('payment-link-generate/:id')    //pass transactionId in getparams
+  @Patch('payment-link-generate/:id') //pass transactionId in getparams
   async updatePaymentLinkDetails(
     @Param('id', ParseIntPipe) transactionId: number,
     @Body() updateDto: UpdatePaymentLinkDto,
-    @Request() req
+    @Request() req,
   ) {
     const userId = req.user.id;
-    return await this.paymentsService.updatePaymentLinkDetails(transactionId, updateDto, userId);
+    return await this.paymentsService.updatePaymentLinkDetails(
+      transactionId,
+      updateDto,
+      userId,
+    );
   }
 
   @Post('payment-link-complete/:id') //pass transactionId in getparams
   async completePayment(
     @Param('id', ParseIntPipe) transactionId: number,
-    @Body() paymentDetails: {
+    @Body()
+    paymentDetails: {
       paymentMethod?: string;
       category?: string;
     } = {},
-    @Request() req
+    @Request() req,
   ) {
     const userId = req.user.id;
-    return await this.paymentsService.handlePaymentCompletion(transactionId, userId, paymentDetails);
+    return await this.paymentsService.handlePaymentCompletion(
+      transactionId,
+      userId,
+      paymentDetails,
+    );
   }
 }

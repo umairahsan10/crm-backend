@@ -1,9 +1,19 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProjectFromPaymentDto } from './dto/create-project-from-payment.dto';
 import { CreateCompanyProjectDto } from './dto/create-company-project.dto';
 import { AssignUnitHeadDto } from './dto/assign-unit-head.dto';
-import { UpdateProjectDetailsDto, ProjectStatus } from './dto/update-project-details.dto';
+import {
+  UpdateProjectDetailsDto,
+  ProjectStatus,
+} from './dto/update-project-details.dto';
 import { AssignProjectTeamDto } from './dto/assign-team.dto';
 import { ProjectQueryDto } from './dto/project-query.dto';
 import { UnifiedUpdateProjectDto } from './dto/unified-update-project.dto';
@@ -14,36 +24,36 @@ export class ProjectsService {
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => AutoLogService))
-    private autoLogService: AutoLogService
+    private autoLogService: AutoLogService,
   ) {}
 
   // Helper method to normalize user object
   private normalizeUser(user: any) {
     if (!user) return null;
-    
+
     // Admin users - return as is with type flag
     if (user.type === 'admin') {
       return {
         ...user,
         type: 'admin',
-        id: user.id
+        id: user.id,
       };
     }
-    
+
     // Map role names to numeric IDs for backward compatibility
     const roleMap: { [key: string]: number } = {
-      'dep_manager': 1,
-      'unit_head': 2,
-      'team_lead': 3,
-      'senior': 4,
-      'junior': 4
+      dep_manager: 1,
+      unit_head: 2,
+      team_lead: 3,
+      senior: 4,
+      junior: 4,
     };
-    
+
     return {
       ...user,
       roleId: roleMap[user.role] || user.roleId || user.role,
       role: user.role,
-      id: user.id
+      id: user.id,
     };
   }
 
@@ -54,14 +64,16 @@ export class ProjectsService {
       if (user) {
         const normalizedUser = this.normalizeUser(user);
         if (normalizedUser.roleId !== 1 && normalizedUser.roleId !== 2) {
-          throw new ForbiddenException('Only managers and unit heads can create projects');
+          throw new ForbiddenException(
+            'Only managers and unit heads can create projects',
+          );
         }
       }
 
       // Validate cracked lead exists
       const crackedLead = await this.prisma.crackedLead.findUnique({
         where: { id: dto.crackedLeadId },
-        include: { lead: true }
+        include: { lead: true },
       });
 
       if (!crackedLead) {
@@ -70,7 +82,7 @@ export class ProjectsService {
 
       // Validate client exists
       const client = await this.prisma.client.findUnique({
-        where: { id: dto.clientId }
+        where: { id: dto.clientId },
       });
 
       if (!client) {
@@ -79,7 +91,7 @@ export class ProjectsService {
 
       // Validate sales rep exists
       const salesRep = await this.prisma.employee.findUnique({
-        where: { id: dto.salesRepId }
+        where: { id: dto.salesRepId },
       });
 
       if (!salesRep) {
@@ -88,11 +100,13 @@ export class ProjectsService {
 
       // Check if project already exists for this cracked lead
       const existingProject = await this.prisma.project.findFirst({
-        where: { crackedLeadId: dto.crackedLeadId }
+        where: { crackedLeadId: dto.crackedLeadId },
       });
 
       if (existingProject) {
-        throw new BadRequestException('Project already exists for this cracked lead');
+        throw new BadRequestException(
+          'Project already exists for this cracked lead',
+        );
       }
 
       // Create project with null status (pending_assignment) and initial payment stage
@@ -104,7 +118,7 @@ export class ProjectsService {
           status: null, // null represents pending_assignment
           description: `Project created from cracked lead ${dto.crackedLeadId}`,
           liveProgress: 0,
-          paymentStage: 'initial' // Set payment stage to initial
+          paymentStage: 'initial', // Set payment stage to initial
         },
         select: {
           // Core project fields only
@@ -123,16 +137,16 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           team: {
             select: {
@@ -143,12 +157,12 @@ export class ProjectsService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       // Automatically create project chat with HR and Production managers as owners
@@ -160,13 +174,15 @@ export class ProjectsService {
       return {
         success: true,
         message: 'Project created successfully',
-        data: project
+        data: project,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new BadRequestException(`Failed to create project: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create project: ${error.message}`,
+      );
     }
   }
 
@@ -177,7 +193,9 @@ export class ProjectsService {
       if (user) {
         const normalizedUser = this.normalizeUser(user);
         if (normalizedUser.roleId !== 1 && normalizedUser.roleId !== 2) {
-          throw new ForbiddenException('Only managers and unit heads can create projects');
+          throw new ForbiddenException(
+            'Only managers and unit heads can create projects',
+          );
         }
       }
 
@@ -186,16 +204,16 @@ export class ProjectsService {
         // First, check if employee exists and get their role name via join
         const unitHead = await this.prisma.employee.findUnique({
           where: { id: dto.unitHeadId },
-          include: { 
+          include: {
             role: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         });
-        
+
         if (!unitHead) {
           throw new NotFoundException('Unit head not found');
         }
@@ -204,21 +222,25 @@ export class ProjectsService {
         const hasUnitHeadRole = unitHead.role?.name === 'unit_head';
 
         // Check if employee is assigned as head of any ProductionUnit (query ProductionUnit table)
-        const productionUnitAsHead = await this.prisma.productionUnit.findFirst({
-          where: { headId: dto.unitHeadId }
-        });
+        const productionUnitAsHead = await this.prisma.productionUnit.findFirst(
+          {
+            where: { headId: dto.unitHeadId },
+          },
+        );
         const isProductionUnitHead = !!productionUnitAsHead;
-        
+
         // Employee must be either: 1) have unit_head role, OR 2) be assigned as head of a ProductionUnit
         if (!hasUnitHeadRole && !isProductionUnitHead) {
-          throw new BadRequestException('The specified employee is not a unit head. Employee must either have unit_head role or be assigned as head of a ProductionUnit.');
+          throw new BadRequestException(
+            'The specified employee is not a unit head. Employee must either have unit_head role or be assigned as head of a ProductionUnit.',
+          );
         }
       }
 
       // Validate team if provided
       if (dto.teamId) {
         const team = await this.prisma.team.findUnique({
-          where: { id: dto.teamId }
+          where: { id: dto.teamId },
         });
         if (!team) {
           throw new NotFoundException('Team not found');
@@ -255,8 +277,8 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           team: {
             select: {
@@ -267,12 +289,12 @@ export class ProjectsService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       // Automatically create project chat WITHOUT sales manager/rep (only HR and Production managers)
@@ -281,7 +303,10 @@ export class ProjectsService {
       // If unit head is assigned, add to chat and logs
       if (dto.unitHeadId) {
         await this.addUnitHeadToProjectChat(project.id, dto.unitHeadId);
-        await this.autoLogService.addEmployeeToProject(project.id, dto.unitHeadId);
+        await this.autoLogService.addEmployeeToProject(
+          project.id,
+          dto.unitHeadId,
+        );
       }
 
       // If team is assigned, add team members to chat and logs
@@ -289,7 +314,7 @@ export class ProjectsService {
         // Update team's current_project_id (important for team tracking)
         await this.prisma.team.update({
           where: { id: dto.teamId },
-          data: { currentProjectId: project.id }
+          data: { currentProjectId: project.id },
         });
 
         // Add all team members to project chat as participants
@@ -303,7 +328,7 @@ export class ProjectsService {
       if (dto.unitHeadId && dto.teamId) {
         await this.prisma.project.update({
           where: { id: project.id },
-          data: { status: 'in_progress' }
+          data: { status: 'in_progress' },
         });
         // Update the project object for response
         project.status = 'in_progress';
@@ -327,8 +352,8 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           team: {
             select: {
@@ -339,24 +364,30 @@ export class ProjectsService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       return {
         success: true,
         message: 'Company project created successfully',
-        data: finalProject
+        data: finalProject,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to create company project: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create company project: ${error.message}`,
+      );
     }
   }
 
@@ -375,13 +406,16 @@ export class ProjectsService {
         throw new ForbiddenException('User authentication required');
       }
 
-      let whereClause: any = {};
+      const whereClause: any = {};
 
       // Handle different filter types
       if (query.filterBy === 'team' && query.teamId) {
         return await this.getProjectsByTeam(query.teamId, normalizedUser);
       } else if (query.filterBy === 'employee' && query.employeeId) {
-        return await this.getProjectsByEmployee(query.employeeId, normalizedUser);
+        return await this.getProjectsByEmployee(
+          query.employeeId,
+          normalizedUser,
+        );
       } else if (query.filterBy === 'status' && query.status) {
         return await this.getProjectsByStatus(query.status, normalizedUser);
       }
@@ -397,7 +431,7 @@ export class ProjectsService {
         // Team Lead and Employee - gets projects assigned to their team
         const userEmployee = await this.prisma.employee.findUnique({
           where: { id: normalizedUser.id },
-          select: { teamLeadId: true }
+          select: { teamLeadId: true },
         });
 
         if (!userEmployee) {
@@ -409,9 +443,9 @@ export class ProjectsService {
           where: {
             OR: [
               { teamLeadId: user.id }, // User is team lead
-              { teamLeadId: userEmployee.teamLeadId } // User is team member
-            ]
-          }
+              { teamLeadId: userEmployee.teamLeadId }, // User is team member
+            ],
+          },
         });
 
         if (team) {
@@ -467,15 +501,15 @@ export class ProjectsService {
               select: {
                 id: true,
                 firstName: true,
-                lastName: true
-              }
+                lastName: true,
+              },
             },
             unitHead: {
               select: {
                 id: true,
                 firstName: true,
-                lastName: true
-              }
+                lastName: true,
+              },
             },
             team: {
               select: {
@@ -485,17 +519,17 @@ export class ProjectsService {
                   select: {
                     id: true,
                     firstName: true,
-                    lastName: true
-                  }
-                }
-              }
-            }
+                    lastName: true,
+                  },
+                },
+              },
+            },
           },
           orderBy,
           skip,
-          take
+          take,
         }),
-        this.prisma.project.count({ where: whereClause })
+        this.prisma.project.count({ where: whereClause }),
       ]);
 
       // Calculate counts for each project
@@ -505,36 +539,37 @@ export class ProjectsService {
             tasksCount,
             logsCount,
             chatParticipantsCount,
-            teamMembersCount
+            teamMembersCount,
           ] = await Promise.all([
             // Tasks count
             this.prisma.projectTask.count({
-              where: { projectId: project.id }
+              where: { projectId: project.id },
             }),
             // Logs count
             this.prisma.projectLog.count({
-              where: { projectId: project.id }
+              where: { projectId: project.id },
             }),
             // Chat participants count
-            this.prisma.chatParticipant.count({
-              where: {
-                chat: {
-                  projectId: project.id
-                }
-              }
-            }).catch(() => 0),
-            // Team members count (if team assigned)
-            project.team?.teamLead?.id ? (() => {
-              const teamLeadId = project.team.teamLead.id;
-              return this.prisma.employee.count({
+            this.prisma.chatParticipant
+              .count({
                 where: {
-                  OR: [
-                    { id: teamLeadId },
-                    { teamLeadId: teamLeadId }
-                  ]
-                }
-              });
-            })() : Promise.resolve(0)
+                  chat: {
+                    projectId: project.id,
+                  },
+                },
+              })
+              .catch(() => 0),
+            // Team members count (if team assigned)
+            project.team?.teamLead?.id
+              ? (() => {
+                  const teamLeadId = project.team.teamLead.id;
+                  return this.prisma.employee.count({
+                    where: {
+                      OR: [{ id: teamLeadId }, { teamLeadId: teamLeadId }],
+                    },
+                  });
+                })()
+              : Promise.resolve(0),
           ]);
 
           return {
@@ -542,9 +577,9 @@ export class ProjectsService {
             tasksCount,
             logsCount,
             chatParticipantsCount,
-            teamMembersCount
+            teamMembersCount,
           };
-        })
+        }),
       );
 
       return {
@@ -554,15 +589,20 @@ export class ProjectsService {
         pagination: {
           page: query.page || 1,
           limit: query.limit || 10,
-          totalPages: Math.ceil(total / (query.limit || 10))
+          totalPages: Math.ceil(total / (query.limit || 10)),
         },
-        message: projectsWithCounts.length > 0 ? 'Projects retrieved successfully' : 'No projects found'
+        message:
+          projectsWithCounts.length > 0
+            ? 'Projects retrieved successfully'
+            : 'No projects found',
       };
     } catch (error) {
       if (error instanceof ForbiddenException) {
         throw error;
       }
-      throw new BadRequestException(`Failed to fetch projects: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch projects: ${error.message}`,
+      );
     }
   }
 
@@ -589,16 +629,16 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           team: {
             include: {
@@ -607,24 +647,24 @@ export class ProjectsService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true
-                }
+                  email: true,
+                },
               },
               productionUnit: {
                 select: {
                   id: true,
-                  name: true
-                }
-              }
-            }
+                  name: true,
+                },
+              },
+            },
           },
           crackedLead: {
             select: {
               currentPhase: true,
-              totalPhases: true
-            }
-          }
-        }
+              totalPhases: true,
+            },
+          },
+        },
       });
 
       if (!project) {
@@ -633,17 +673,17 @@ export class ProjectsService {
 
       // Check access permissions (admins bypass this check)
       if (!isAdmin) {
-        const hasAccess = await this.checkProjectAccess(normalizedUser, project);
+        const hasAccess = await this.checkProjectAccess(
+          normalizedUser,
+          project,
+        );
         if (!hasAccess) {
           throw new ForbiddenException('Access denied to this project');
         }
       }
 
       // Get all employees related to this project
-      const [
-        projectLogsEmployees,
-        teamMembers
-      ] = await Promise.all([
+      const [projectLogsEmployees, teamMembers] = await Promise.all([
         // Employees from project logs (get unique developers)
         this.prisma.projectLog.findMany({
           where: { projectId: id },
@@ -660,77 +700,79 @@ export class ProjectsService {
                   select: {
                     id: true,
                     name: true,
-                    description: true
-                  }
+                    description: true,
+                  },
                 },
                 department: {
                   select: {
                     id: true,
-                    name: true
-                  }
-                }
-              }
-            }
+                    name: true,
+                  },
+                },
+              },
+            },
           },
-          distinct: ['developerId']
+          distinct: ['developerId'],
         }),
         // Team members (if team assigned)
-        project.teamId && project.team?.teamLeadId ? (() => {
-          const teamLeadId = project.team.teamLeadId;
-          return this.prisma.employee.findMany({
-            where: {
-              OR: [
-                { id: teamLeadId },
-                { teamLeadId: teamLeadId }
-              ]
-            },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-            role: {
-              select: {
-                id: true,
-                name: true,
-                description: true
-              }
-            },
-            department: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          }
-          });
-        })() : Promise.resolve([])
+        project.teamId && project.team?.teamLeadId
+          ? (() => {
+              const teamLeadId = project.team.teamLeadId;
+              return this.prisma.employee.findMany({
+                where: {
+                  OR: [{ id: teamLeadId }, { teamLeadId: teamLeadId }],
+                },
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                  role: {
+                    select: {
+                      id: true,
+                      name: true,
+                      description: true,
+                    },
+                  },
+                  department: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              });
+            })()
+          : Promise.resolve([]),
       ]);
 
       // Extract unique employees from logs
       const logsEmployees = projectLogsEmployees
-        .map(log => log.developer)
-        .filter((emp, index, self) => emp && index === self.findIndex(e => e?.id === emp.id));
+        .map((log) => log.developer)
+        .filter(
+          (emp, index, self) =>
+            emp && index === self.findIndex((e) => e?.id === emp.id),
+        );
 
       // Combine all employees and get unique list
       const allEmployeesMap = new Map();
-      
+
       // Add sales rep
       if (project.salesRep) {
         allEmployeesMap.set(project.salesRep.id, project.salesRep);
       }
-      
+
       // Add unit head
       if (project.unitHead) {
         allEmployeesMap.set(project.unitHead.id, project.unitHead);
       }
-      
+
       // Add team lead
       if (project.team?.teamLead) {
         allEmployeesMap.set(project.team.teamLead.id, project.team.teamLead);
       }
-      
+
       // Add team members
       if (Array.isArray(teamMembers)) {
         teamMembers.forEach((emp: any) => {
@@ -739,9 +781,9 @@ export class ProjectsService {
           }
         });
       }
-      
+
       // Add employees from logs
-      logsEmployees.forEach(emp => {
+      logsEmployees.forEach((emp) => {
         if (emp) {
           allEmployeesMap.set(emp.id, emp);
         }
@@ -750,34 +792,31 @@ export class ProjectsService {
       const allRelatedEmployeesList = Array.from(allEmployeesMap.values());
 
       // Calculate counts
-      const [
-        tasksCount,
-        logsCount,
-        chatParticipantsCount,
-        teamMembersCount
-      ] = await Promise.all([
-        this.prisma.projectTask.count({ where: { projectId: id } }),
-        this.prisma.projectLog.count({ where: { projectId: id } }),
-        this.prisma.chatParticipant.count({
-          where: {
-            chat: { projectId: id }
-          }
-        }),
-        project.teamId && project.team?.teamLeadId ? (() => {
-          const teamLeadId = project.team.teamLeadId;
-          return this.prisma.employee.count({
+      const [tasksCount, logsCount, chatParticipantsCount, teamMembersCount] =
+        await Promise.all([
+          this.prisma.projectTask.count({ where: { projectId: id } }),
+          this.prisma.projectLog.count({ where: { projectId: id } }),
+          this.prisma.chatParticipant.count({
             where: {
-              OR: [
-                { id: teamLeadId },
-                { teamLeadId: teamLeadId }
-              ]
-            }
-          });
-        })() : Promise.resolve(0)
-      ]);
+              chat: { projectId: id },
+            },
+          }),
+          project.teamId && project.team?.teamLeadId
+            ? (() => {
+                const teamLeadId = project.team.teamLeadId;
+                return this.prisma.employee.count({
+                  where: {
+                    OR: [{ id: teamLeadId }, { teamLeadId: teamLeadId }],
+                  },
+                });
+              })()
+            : Promise.resolve(0),
+        ]);
 
       // Calculate phase-related fields
-      const overallProgress = project.liveProgress ? Number(project.liveProgress) : 0;
+      const overallProgress = project.liveProgress
+        ? Number(project.liveProgress)
+        : 0;
       let currentPhase = 1;
       let currentPhaseProgress = overallProgress; // Default for company projects
 
@@ -792,16 +831,23 @@ export class ProjectsService {
           // So: currentPhaseProgress = ((totalProgress - completedPhases%) / phaseWeight) * 100
 
           const completedPhases = Math.max(0, currentPhase - 1);
-          const completedPhasesContribution = (completedPhases / totalPhases) * 100;
+          const completedPhasesContribution =
+            (completedPhases / totalPhases) * 100;
           const phaseWeight = (1 / totalPhases) * 100;
 
           // Calculate what portion of progress belongs to current phase
           // Use Math.max(0, ...) to handle edge case where overall < base (shouldn't happen but safety)
-          const currentPhaseContribution = Math.max(0, overallProgress - completedPhasesContribution);
+          const currentPhaseContribution = Math.max(
+            0,
+            overallProgress - completedPhasesContribution,
+          );
 
           // Convert to current phase progress percentage
           if (phaseWeight > 0) {
-            currentPhaseProgress = Math.max(0, Math.min(100, (currentPhaseContribution / phaseWeight) * 100));
+            currentPhaseProgress = Math.max(
+              0,
+              Math.min(100, (currentPhaseContribution / phaseWeight) * 100),
+            );
           } else {
             currentPhaseProgress = 0;
           }
@@ -829,14 +875,19 @@ export class ProjectsService {
           tasksCount,
           logsCount,
           chatParticipantsCount,
-          teamMembersCount
-        }
+          teamMembersCount,
+        },
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to fetch project: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch project: ${error.message}`,
+      );
     }
   }
 
@@ -849,7 +900,7 @@ export class ProjectsService {
       }
 
       const project = await this.prisma.project.findUnique({
-        where: { id }
+        where: { id },
       });
 
       if (!project) {
@@ -859,7 +910,7 @@ export class ProjectsService {
       // Validate unit head exists and has correct role
       const unitHead = await this.prisma.employee.findUnique({
         where: { id: dto.unitHeadId },
-        include: { role: true }
+        include: { role: true },
       });
 
       if (!unitHead) {
@@ -875,7 +926,7 @@ export class ProjectsService {
         where: { id },
         data: {
           unitHeadId: dto.unitHeadId,
-          status: 'in_progress'
+          status: 'in_progress',
         },
         select: {
           // Core project fields only
@@ -894,16 +945,16 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           team: {
             select: {
@@ -914,12 +965,12 @@ export class ProjectsService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       // Add unit head as owner to project chat
@@ -932,13 +983,19 @@ export class ProjectsService {
       return {
         success: true,
         message: 'Unit head assigned successfully',
-        data: updatedProject
+        data: updatedProject,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to assign unit head: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to assign unit head: ${error.message}`,
+      );
     }
   }
 
@@ -946,15 +1003,17 @@ export class ProjectsService {
     try {
       // Verify user permissions (manager or unit head)
       if (user.role !== 'dep_manager' && user.role !== 'unit_head') {
-        throw new ForbiddenException('Only managers and unit heads can assign teams');
+        throw new ForbiddenException(
+          'Only managers and unit heads can assign teams',
+        );
       }
 
       const project = await this.prisma.project.findUnique({
         where: { id },
         include: {
           unitHead: true,
-          team: true
-        }
+          team: true,
+        },
       });
 
       if (!project) {
@@ -963,15 +1022,17 @@ export class ProjectsService {
 
       // Check if unit head can assign team (only to their projects)
       if (user.role === 'unit_head' && project.unitHeadId !== user.id) {
-        throw new ForbiddenException('You can only assign teams to your own projects');
+        throw new ForbiddenException(
+          'You can only assign teams to your own projects',
+        );
       }
 
       // Validate team exists and is a production team
       const team = await this.prisma.team.findUnique({
         where: { id: dto.teamId },
         include: {
-          productionUnit: true
-        }
+          productionUnit: true,
+        },
       });
 
       if (!team) {
@@ -980,7 +1041,9 @@ export class ProjectsService {
 
       // Check if team is assigned to a production unit
       if (!team.productionUnitId) {
-        throw new BadRequestException('Team must be assigned to a production unit before being assigned to a project');
+        throw new BadRequestException(
+          'Team must be assigned to a production unit before being assigned to a project',
+        );
       }
 
       // Check if project already has deadline and difficulty set
@@ -990,7 +1053,9 @@ export class ProjectsService {
       // If either deadline or difficulty is missing from project, require both in request
       if (!hasDeadline || !hasDifficulty) {
         if (!dto.deadline || !dto.difficulty) {
-          throw new BadRequestException('Deadline and difficulty must be provided in order to assign team');
+          throw new BadRequestException(
+            'Deadline and difficulty must be provided in order to assign team',
+          );
         }
       }
 
@@ -998,14 +1063,18 @@ export class ProjectsService {
       const deadlineToUse = dto.deadline || project.deadline?.toISOString();
 
       // Validate team assignment prerequisites
-      const teamValidation = await this.validateTeamAssignment(project, dto.teamId, deadlineToUse);
+      const teamValidation = await this.validateTeamAssignment(
+        project,
+        dto.teamId,
+        deadlineToUse,
+      );
       if (!teamValidation.valid) {
         throw new BadRequestException(teamValidation.reason);
       }
 
       // Prepare update data
       const updateData: any = {
-        teamId: dto.teamId
+        teamId: dto.teamId,
       };
 
       // Update deadline if provided
@@ -1026,7 +1095,7 @@ export class ProjectsService {
       // Update team's current_project_id
       await this.prisma.team.update({
         where: { id: dto.teamId },
-        data: { currentProjectId: id }
+        data: { currentProjectId: id },
       });
 
       // Update project
@@ -1050,16 +1119,16 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           team: {
             select: {
@@ -1070,12 +1139,12 @@ export class ProjectsService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       // Add all team members to project chat as participants
@@ -1087,10 +1156,14 @@ export class ProjectsService {
       return {
         success: true,
         message: 'Team assigned successfully',
-        data: updatedProject
+        data: updatedProject,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException(`Failed to assign team: ${error.message}`);
@@ -1102,16 +1175,16 @@ export class ProjectsService {
     try {
       const project = await this.prisma.project.findUnique({
         where: { id },
-        include: { 
-          unitHead: true, 
+        include: {
+          unitHead: true,
           team: true,
           crackedLead: {
             select: {
               currentPhase: true,
-              totalPhases: true
-            }
-          }
-        }
+              totalPhases: true,
+            },
+          },
+        },
       });
 
       if (!project) {
@@ -1119,46 +1192,67 @@ export class ProjectsService {
       }
 
       // Check permissions based on role
-      const canUpdate = await this.checkUnifiedUpdatePermission(user, project, dto);
+      const canUpdate = await this.checkUnifiedUpdatePermission(
+        user,
+        project,
+        dto,
+      );
       if (!canUpdate.allowed) {
         throw new ForbiddenException(canUpdate.reason);
       }
 
       // Prevent updates to completed projects (except status changes)
       if (project.status === 'completed' && dto.liveProgress !== undefined) {
-        throw new BadRequestException('Cannot update live progress for completed projects');
+        throw new BadRequestException(
+          'Cannot update live progress for completed projects',
+        );
       }
 
       // If status is being updated, validate status transition
       if (dto.status !== undefined) {
-        const isValidTransition = this.validateStatusTransition(project.status, dto.status);
+        const isValidTransition = this.validateStatusTransition(
+          project.status,
+          dto.status,
+        );
         if (!isValidTransition) {
           const currentStatusDisplay = project.status || 'pending_assignment';
-          throw new BadRequestException(`Invalid status transition from ${currentStatusDisplay} to ${dto.status}`);
+          throw new BadRequestException(
+            `Invalid status transition from ${currentStatusDisplay} to ${dto.status}`,
+          );
         }
 
         // Special validation for completed status
         // Only check payment stage for CLIENT projects (paymentStage is not null)
         // Company projects (paymentStage is null) can be completed directly
         if (dto.status === 'completed') {
-          if (project.paymentStage !== null && project.paymentStage !== 'final') {
-            throw new BadRequestException('Project can only be marked as completed when payment stage is final');
+          if (
+            project.paymentStage !== null &&
+            project.paymentStage !== 'final'
+          ) {
+            throw new BadRequestException(
+              'Project can only be marked as completed when payment stage is final',
+            );
           }
         }
       }
 
       // Prepare update data (excluding teamId for now)
       const updateData: any = {};
-      
-      if (dto.description !== undefined) updateData.description = dto.description;
-      if (dto.difficulty !== undefined) updateData.difficultyLevel = dto.difficulty;
-      if (dto.paymentStage !== undefined) updateData.paymentStage = dto.paymentStage;
-      
+
+      if (dto.description !== undefined)
+        updateData.description = dto.description;
+      if (dto.difficulty !== undefined)
+        updateData.difficultyLevel = dto.difficulty;
+      if (dto.paymentStage !== undefined)
+        updateData.paymentStage = dto.paymentStage;
+
       // Handle liveProgress: treat incoming value as current phase progress and calculate total project progress
       if (dto.liveProgress !== undefined) {
         // Validate range
         if (dto.liveProgress < 0 || dto.liveProgress > 100) {
-          throw new BadRequestException('Live progress must be between 0 and 100');
+          throw new BadRequestException(
+            'Live progress must be between 0 and 100',
+          );
         }
 
         const currentPhaseProgress = dto.liveProgress; // This is the progress of current phase (0-100%)
@@ -1167,7 +1261,9 @@ export class ProjectsService {
         if (!project.crackedLeadId || !project.crackedLead) {
           // Company project: treat as 1 phase, direct value
           updateData.liveProgress = currentPhaseProgress;
-          console.log(`Company project ${id} - Live progress updated to ${currentPhaseProgress}%`);
+          console.log(
+            `Company project ${id} - Live progress updated to ${currentPhaseProgress}%`,
+          );
         } else {
           // Client project: phase-based calculation
           const currentPhase = project.crackedLead.currentPhase || 1;
@@ -1175,33 +1271,46 @@ export class ProjectsService {
 
           // Validate phase data
           if (!totalPhases || totalPhases <= 0) {
-            throw new BadRequestException('Invalid total phases. Cannot calculate phase-based progress.');
+            throw new BadRequestException(
+              'Invalid total phases. Cannot calculate phase-based progress.',
+            );
           }
 
           if (currentPhase < 1 || currentPhase > totalPhases) {
-            throw new BadRequestException(`Invalid current phase (${currentPhase}). Must be between 1 and ${totalPhases}.`);
+            throw new BadRequestException(
+              `Invalid current phase (${currentPhase}). Must be between 1 and ${totalPhases}.`,
+            );
           }
 
           // Calculate total project progress
           // Base: completed phases contribution = ((currentPhase - 1) / totalPhases) * 100
           const completedPhases = Math.max(0, currentPhase - 1);
-          const completedPhasesContribution = (completedPhases / totalPhases) * 100;
+          const completedPhasesContribution =
+            (completedPhases / totalPhases) * 100;
 
           // Current phase contribution: (currentPhaseProgress / 100) * (1 / totalPhases) * 100
           const phaseWeight = (1 / totalPhases) * 100;
-          const currentPhaseContribution = (currentPhaseProgress / 100) * phaseWeight;
+          const currentPhaseContribution =
+            (currentPhaseProgress / 100) * phaseWeight;
 
           // Total project progress
-          const totalProjectProgress = completedPhasesContribution + currentPhaseContribution;
+          const totalProjectProgress =
+            completedPhasesContribution + currentPhaseContribution;
 
           // Cap at 100% (though it should naturally be capped)
-          updateData.liveProgress = Math.min(100, Math.max(0, totalProjectProgress));
+          updateData.liveProgress = Math.min(
+            100,
+            Math.max(0, totalProjectProgress),
+          );
 
-          console.log(`Project ${id} - Phase ${currentPhase}/${totalPhases}, Current phase progress: ${currentPhaseProgress}%, Total project progress: ${updateData.liveProgress}%`);
+          console.log(
+            `Project ${id} - Phase ${currentPhase}/${totalPhases}, Current phase progress: ${currentPhaseProgress}%, Total project progress: ${updateData.liveProgress}%`,
+          );
         }
       }
-      
-      if (dto.deadline !== undefined) updateData.deadline = new Date(dto.deadline);
+
+      if (dto.deadline !== undefined)
+        updateData.deadline = new Date(dto.deadline);
       if (dto.status !== undefined) updateData.status = dto.status;
 
       // Auto-update logic when status is set to completed
@@ -1211,9 +1320,13 @@ export class ProjectsService {
         // Company projects (paymentStage is null) should remain null
         if (project.paymentStage !== null) {
           updateData.paymentStage = 'approved';
-          console.log(`Project ${id} marked as completed - auto-updating payment stage to 'approved' and live progress to 100%`);
+          console.log(
+            `Project ${id} marked as completed - auto-updating payment stage to 'approved' and live progress to 100%`,
+          );
         } else {
-          console.log(`Company project ${id} marked as completed - auto-updating live progress to 100%`);
+          console.log(
+            `Company project ${id} marked as completed - auto-updating live progress to 100%`,
+          );
         }
       }
 
@@ -1238,16 +1351,16 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           team: {
             select: {
@@ -1258,12 +1371,12 @@ export class ProjectsService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       });
 
       // Handle team assignment separately
@@ -1275,15 +1388,22 @@ export class ProjectsService {
         // If either deadline or difficulty is missing from project, require both in request
         if (!hasDeadline || !hasDifficulty) {
           if (!dto.deadline || !dto.difficulty) {
-            throw new BadRequestException('Deadline and difficulty must be provided in order to assign team');
+            throw new BadRequestException(
+              'Deadline and difficulty must be provided in order to assign team',
+            );
           }
         }
 
         // Use deadline from request if provided, otherwise use existing project deadline
-        const deadlineToUse = dto.deadline || updatedProject.deadline?.toISOString();
+        const deadlineToUse =
+          dto.deadline || updatedProject.deadline?.toISOString();
 
         // Validate team assignment prerequisites
-        const teamValidation = await this.validateTeamAssignment(updatedProject, dto.teamId, deadlineToUse);
+        const teamValidation = await this.validateTeamAssignment(
+          updatedProject,
+          dto.teamId,
+          deadlineToUse,
+        );
         if (!teamValidation.valid) {
           throw new BadRequestException(teamValidation.reason);
         }
@@ -1291,7 +1411,7 @@ export class ProjectsService {
         // Update team's current_project_id
         await this.prisma.team.update({
           where: { id: dto.teamId },
-          data: { currentProjectId: id }
+          data: { currentProjectId: id },
         });
 
         // Add all team members to project chat as participants
@@ -1326,16 +1446,16 @@ export class ProjectsService {
                 id: true,
                 firstName: true,
                 lastName: true,
-                email: true
-              }
+                email: true,
+              },
             },
             unitHead: {
               select: {
                 id: true,
                 firstName: true,
                 lastName: true,
-                email: true
-              }
+                email: true,
+              },
             },
             team: {
               select: {
@@ -1346,37 +1466,44 @@ export class ProjectsService {
                     id: true,
                     firstName: true,
                     lastName: true,
-                    email: true
-                  }
-                }
-              }
-            }
-          }
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
         });
 
         return {
           success: true,
           message: 'Project updated and team assigned successfully',
-          data: finalUpdatedProject
+          data: finalUpdatedProject,
         };
       }
 
       // Prepare success message
       let message = 'Project updated successfully';
       if (dto.status === 'completed') {
-        message = 'Project marked as completed - payment stage set to approved and live progress set to 100%';
+        message =
+          'Project marked as completed - payment stage set to approved and live progress set to 100%';
       }
 
       return {
         success: true,
         message: message,
-        data: updatedProject
+        data: updatedProject,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to update project: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update project: ${error.message}`,
+      );
     }
   }
 
@@ -1385,7 +1512,7 @@ export class ProjectsService {
     try {
       // Validate team exists
       const team = await this.prisma.team.findUnique({
-        where: { id: teamId }
+        where: { id: teamId },
       });
 
       if (!team) {
@@ -1415,15 +1542,15 @@ export class ProjectsService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           team: {
             select: {
@@ -1433,25 +1560,30 @@ export class ProjectsService {
                 select: {
                   id: true,
                   firstName: true,
-                  lastName: true
-                }
-              }
-            }
-          }
+                  lastName: true,
+                },
+              },
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
 
       return {
         success: true,
         data: projects,
-        count: projects.length
+        count: projects.length,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to fetch team projects: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch team projects: ${error.message}`,
+      );
     }
   }
 
@@ -1461,7 +1593,7 @@ export class ProjectsService {
       // Validate employee exists
       const employee = await this.prisma.employee.findUnique({
         where: { id: employeeId },
-        include: { role: true }
+        include: { role: true },
       });
 
       if (!employee) {
@@ -1469,12 +1601,15 @@ export class ProjectsService {
       }
 
       // Check if user has permission to view this employee's projects
-      const hasPermission = await this.checkEmployeeProjectAccess(user, employeeId);
+      const hasPermission = await this.checkEmployeeProjectAccess(
+        user,
+        employeeId,
+      );
       if (!hasPermission) {
         throw new ForbiddenException('Access denied to employee projects');
       }
 
-      let whereClause: any = {};
+      const whereClause: any = {};
 
       // If requesting user is a manager, they can see all projects
       if (user.roleId === 1) {
@@ -1488,7 +1623,7 @@ export class ProjectsService {
         } else if (employee.roleId === 3) {
           // Team Lead - get projects assigned to their team
           const team = await this.prisma.team.findFirst({
-            where: { teamLeadId: employeeId }
+            where: { teamLeadId: employeeId },
           });
           if (team) {
             whereClause.teamId = team.id;
@@ -1501,15 +1636,15 @@ export class ProjectsService {
             where: {
               OR: [
                 { teamLeadId: employeeId },
-                { 
+                {
                   teamLead: {
                     teamMembers: {
-                      some: { id: employeeId }
-                    }
-                  }
-                }
-              ]
-            }
+                      some: { id: employeeId },
+                    },
+                  },
+                },
+              ],
+            },
           });
           if (userTeam) {
             whereClause.teamId = userTeam.id;
@@ -1536,15 +1671,15 @@ export class ProjectsService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           team: {
             select: {
@@ -1554,25 +1689,30 @@ export class ProjectsService {
                 select: {
                   id: true,
                   firstName: true,
-                  lastName: true
-                }
-              }
-            }
-          }
+                  lastName: true,
+                },
+              },
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
 
       return {
         success: true,
         data: projects,
-        count: projects.length
+        count: projects.length,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to fetch employee projects: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch employee projects: ${error.message}`,
+      );
     }
   }
 
@@ -1580,12 +1720,17 @@ export class ProjectsService {
   async getProjectsByStatus(status: string, user: any) {
     try {
       // Validate status
-      const validStatuses = ['pending_assignment', 'in_progress', 'onhold', 'completed'];
+      const validStatuses = [
+        'pending_assignment',
+        'in_progress',
+        'onhold',
+        'completed',
+      ];
       if (!validStatuses.includes(status)) {
         throw new BadRequestException('Invalid status provided');
       }
 
-      let whereClause: any = { status };
+      const whereClause: any = { status };
 
       // Apply role-based filtering
       if (user.roleId === 1) {
@@ -1597,7 +1742,7 @@ export class ProjectsService {
       } else if (user.roleId === 3) {
         // Team Lead - gets projects assigned to their team with this status
         const team = await this.prisma.team.findFirst({
-          where: { teamLeadId: user.id }
+          where: { teamLeadId: user.id },
         });
         if (team) {
           whereClause.teamId = team.id;
@@ -1623,15 +1768,15 @@ export class ProjectsService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           unitHead: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           team: {
             select: {
@@ -1641,39 +1786,40 @@ export class ProjectsService {
                 select: {
                   id: true,
                   firstName: true,
-                  lastName: true
-                }
-              }
-            }
-          }
+                  lastName: true,
+                },
+              },
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
 
       return {
         success: true,
         data: projects,
-        count: projects.length
+        count: projects.length,
       };
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new BadRequestException(`Failed to fetch projects by status: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch projects by status: ${error.message}`,
+      );
     }
   }
-
 
   // Helper Methods
   private async checkProjectAccess(user: any, project: any): Promise<boolean> {
     // Normalize user if not already normalized (defensive check)
     const normalizedUser = this.normalizeUser(user) || user;
-    
+
     // Admin users - Full access to all projects
     if (normalizedUser.type === 'admin' || user.type === 'admin') {
       return true;
     }
-    
+
     // Manager (Role 1 or 'dep_manager') - Access to all projects
     if (normalizedUser.roleId === 1 || normalizedUser.role === 'dep_manager') {
       return true;
@@ -1685,15 +1831,20 @@ export class ProjectsService {
     }
 
     // Team Lead (Role 3 or 'team_lead') and Employee - Access to team projects
-    if ((normalizedUser.roleId === 3 || normalizedUser.roleId === 4) || 
-        (normalizedUser.role === 'team_lead' || normalizedUser.role === 'senior' || normalizedUser.role === 'junior')) {
+    if (
+      normalizedUser.roleId === 3 ||
+      normalizedUser.roleId === 4 ||
+      normalizedUser.role === 'team_lead' ||
+      normalizedUser.role === 'senior' ||
+      normalizedUser.role === 'junior'
+    ) {
       if (!project.teamId) {
         return false;
       }
 
       const userEmployee = await this.prisma.employee.findUnique({
         where: { id: normalizedUser.id },
-        select: { teamLeadId: true }
+        select: { teamLeadId: true },
       });
 
       if (!userEmployee) {
@@ -1712,7 +1863,10 @@ export class ProjectsService {
     return false;
   }
 
-  private async checkUpdatePermission(user: any, project: any): Promise<boolean> {
+  private async checkUpdatePermission(
+    user: any,
+    project: any,
+  ): Promise<boolean> {
     // Manager (Role 1) - Can update all projects
     if (user.roleId === 1) {
       return true;
@@ -1726,22 +1880,28 @@ export class ProjectsService {
     return false;
   }
 
-
-  private validateStatusTransition(currentStatus: string | null, newStatus: ProjectStatus): boolean {
+  private validateStatusTransition(
+    currentStatus: string | null,
+    newStatus: ProjectStatus,
+  ): boolean {
     // Convert null to 'pending_assignment' for validation
     const status = currentStatus || 'pending_assignment';
-    
+
     const validTransitions: { [key: string]: ProjectStatus[] } = {
-      'pending_assignment': [ProjectStatus.IN_PROGRESS],
-      'in_progress': [ProjectStatus.ONHOLD, ProjectStatus.COMPLETED],
-      'onhold': [ProjectStatus.IN_PROGRESS, ProjectStatus.COMPLETED],
-      'completed': [] // Terminal state
+      pending_assignment: [ProjectStatus.IN_PROGRESS],
+      in_progress: [ProjectStatus.ONHOLD, ProjectStatus.COMPLETED],
+      onhold: [ProjectStatus.IN_PROGRESS, ProjectStatus.COMPLETED],
+      completed: [], // Terminal state
     };
 
     return validTransitions[status]?.includes(newStatus) || false;
   }
 
-  private async checkUnifiedUpdatePermission(user: any, project: any, dto: UnifiedUpdateProjectDto): Promise<{ allowed: boolean; reason?: string }> {
+  private async checkUnifiedUpdatePermission(
+    user: any,
+    project: any,
+    dto: UnifiedUpdateProjectDto,
+  ): Promise<{ allowed: boolean; reason?: string }> {
     // Manager (dep_manager) - Can update all fields
     if (user.role === 'dep_manager') {
       return { allowed: true };
@@ -1751,17 +1911,23 @@ export class ProjectsService {
     // liveProgress is now automatic (cannot be manually updated)
     if (user.role === 'unit_head') {
       if (project.unitHeadId !== user.id) {
-        return { allowed: false, reason: 'Only assigned unit head can update this project' };
+        return {
+          allowed: false,
+          reason: 'Only assigned unit head can update this project',
+        };
       }
-      
+
       // Check if trying to update restricted fields
       const restrictedFields = ['description', 'paymentStage', 'liveProgress'];
       for (const field of restrictedFields) {
         if (dto[field] !== undefined) {
-          return { allowed: false, reason: `Unit heads cannot update ${field}. Live progress is automatically updated based on payment phases.` };
+          return {
+            allowed: false,
+            reason: `Unit heads cannot update ${field}. Live progress is automatically updated based on payment phases.`,
+          };
         }
       }
-      
+
       return { allowed: true };
     }
 
@@ -1770,57 +1936,78 @@ export class ProjectsService {
       if (!project.teamId) {
         return { allowed: false, reason: 'Project not assigned to a team' };
       }
-      
+
       // Check if user is the team lead of the assigned team
       const team = await this.prisma.team.findUnique({
-        where: { id: project.teamId }
+        where: { id: project.teamId },
       });
-      
+
       if (!team || team.teamLeadId !== user.id) {
-        return { allowed: false, reason: 'Only the team lead of the assigned team can update live progress' };
+        return {
+          allowed: false,
+          reason:
+            'Only the team lead of the assigned team can update live progress',
+        };
       }
-      
+
       // Team leads can ONLY update liveProgress, no other fields
       const allowedFields = ['liveProgress'];
-      const requestedFields = Object.keys(dto).filter(key => dto[key] !== undefined);
-      const disallowedFields = requestedFields.filter(field => !allowedFields.includes(field));
-      
+      const requestedFields = Object.keys(dto).filter(
+        (key) => dto[key] !== undefined,
+      );
+      const disallowedFields = requestedFields.filter(
+        (field) => !allowedFields.includes(field),
+      );
+
       if (disallowedFields.length > 0) {
-        return { allowed: false, reason: `Team leads can only update liveProgress. Cannot update: ${disallowedFields.join(', ')}` };
+        return {
+          allowed: false,
+          reason: `Team leads can only update liveProgress. Cannot update: ${disallowedFields.join(', ')}`,
+        };
       }
-      
+
       // If only liveProgress is being updated, allow it
       if (dto.liveProgress !== undefined) {
         return { allowed: true };
       }
-      
-      return { allowed: false, reason: 'Team leads can only update liveProgress field' };
+
+      return {
+        allowed: false,
+        reason: 'Team leads can only update liveProgress field',
+      };
     }
 
     return { allowed: false, reason: 'Insufficient permissions' };
   }
 
-  private async validateTeamAssignment(project: any, teamId: number, deadline?: string): Promise<{ valid: boolean; reason?: string }> {
+  private async validateTeamAssignment(
+    project: any,
+    teamId: number,
+    deadline?: string,
+  ): Promise<{ valid: boolean; reason?: string }> {
     // Check if deadline is provided when assigning team
     if (!deadline) {
-      return { valid: false, reason: 'Deadline must be provided when assigning team' };
+      return {
+        valid: false,
+        reason: 'Deadline must be provided when assigning team',
+      };
     }
-    
+
     const deadlineDate = new Date(deadline);
     const now = new Date();
     if (deadlineDate <= now) {
       return { valid: false, reason: 'Deadline must be in the future' };
     }
-    
+
     // Validate team exists
     const team = await this.prisma.team.findUnique({
-      where: { id: teamId }
+      where: { id: teamId },
     });
-    
+
     if (!team) {
       return { valid: false, reason: 'Team not found' };
     }
-    
+
     return { valid: true };
   }
 
@@ -1839,7 +2026,7 @@ export class ProjectsService {
     // Team Lead (Role 3) - Access to their own team
     if (user.roleId === 3) {
       const team = await this.prisma.team.findUnique({
-        where: { id: teamId }
+        where: { id: teamId },
       });
       return team?.teamLeadId === user.id;
     }
@@ -1848,7 +2035,7 @@ export class ProjectsService {
     if (user.roleId === 4) {
       const userEmployee = await this.prisma.employee.findUnique({
         where: { id: user.id },
-        select: { teamLeadId: true }
+        select: { teamLeadId: true },
       });
 
       if (!userEmployee?.teamLeadId) {
@@ -1856,16 +2043,19 @@ export class ProjectsService {
       }
 
       const team = await this.prisma.team.findUnique({
-        where: { id: teamId }
+        where: { id: teamId },
       });
-      
+
       return team?.teamLeadId === userEmployee.teamLeadId;
     }
 
     return false;
   }
 
-  private async checkEmployeeProjectAccess(user: any, employeeId: number): Promise<boolean> {
+  private async checkEmployeeProjectAccess(
+    user: any,
+    employeeId: number,
+  ): Promise<boolean> {
     // Manager (Role 1) - Can view any employee's projects
     if (user.roleId === 1) {
       return true;
@@ -1880,7 +2070,7 @@ export class ProjectsService {
     // Team Lead (Role 3) - Can view projects of their team members
     if (user.roleId === 3) {
       const team = await this.prisma.team.findFirst({
-        where: { teamLeadId: user.id }
+        where: { teamLeadId: user.id },
       });
 
       if (!team) {
@@ -1890,7 +2080,7 @@ export class ProjectsService {
       // Check if the employee is in this team
       const employee = await this.prisma.employee.findUnique({
         where: { id: employeeId },
-        select: { teamLeadId: true }
+        select: { teamLeadId: true },
       });
 
       return employee?.teamLeadId === user.id;
@@ -1910,52 +2100,56 @@ export class ProjectsService {
       // Get the project to access salesRepId
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
-        select: { salesRepId: true }
+        select: { salesRepId: true },
       });
 
       if (!project || !project.salesRepId) {
-        throw new BadRequestException('Project or Sales Representative not found. Cannot create project chat.');
+        throw new BadRequestException(
+          'Project or Sales Representative not found. Cannot create project chat.',
+        );
       }
 
       // Find HR manager (dep_manager role in HR department)
       const hrManager = await this.prisma.employee.findFirst({
         where: {
           role: { name: 'dep_manager' },
-          department: { name: 'HR' }
-        }
+          department: { name: 'HR' },
+        },
       });
 
       // Find Production manager (dep_manager role in Production department)
       const productionManager = await this.prisma.employee.findFirst({
         where: {
           role: { name: 'dep_manager' },
-          department: { name: 'Production' }
-        }
+          department: { name: 'Production' },
+        },
       });
 
       // Find Sales manager (dep_manager role in Sales department)
       const salesManager = await this.prisma.employee.findFirst({
         where: {
           role: { name: 'dep_manager' },
-          department: { name: 'Sales' }
-        }
+          department: { name: 'Sales' },
+        },
       });
 
       // Get Sales Representative
       const salesRep = await this.prisma.employee.findUnique({
-        where: { id: project.salesRepId }
+        where: { id: project.salesRepId },
       });
 
       if (!hrManager || !productionManager || !salesManager || !salesRep) {
-        throw new BadRequestException('HR Manager, Production Manager, Sales Manager, or Sales Representative not found. Cannot create project chat.');
+        throw new BadRequestException(
+          'HR Manager, Production Manager, Sales Manager, or Sales Representative not found. Cannot create project chat.',
+        );
       }
 
       // Create project chat
       const projectChat = await this.prisma.projectChat.create({
         data: {
           projectId: projectId,
-          participants: 4 // Initially 4 participants (HR, Production, Sales managers + Sales Rep)
-        }
+          participants: 4, // Initially 4 participants (HR, Production, Sales managers + Sales Rep)
+        },
       });
 
       // Add HR manager as owner
@@ -1963,8 +2157,8 @@ export class ProjectsService {
         data: {
           chatId: projectChat.id,
           employeeId: hrManager.id,
-          memberType: 'owner'
-        }
+          memberType: 'owner',
+        },
       });
 
       // Add Production manager as owner
@@ -1972,8 +2166,8 @@ export class ProjectsService {
         data: {
           chatId: projectChat.id,
           employeeId: productionManager.id,
-          memberType: 'owner'
-        }
+          memberType: 'owner',
+        },
       });
 
       // Add Sales manager as owner
@@ -1981,8 +2175,8 @@ export class ProjectsService {
         data: {
           chatId: projectChat.id,
           employeeId: salesManager.id,
-          memberType: 'owner'
-        }
+          memberType: 'owner',
+        },
       });
 
       // Add Sales Representative as participant
@@ -1990,14 +2184,21 @@ export class ProjectsService {
         data: {
           chatId: projectChat.id,
           employeeId: salesRep.id,
-          memberType: 'participant'
-        }
+          memberType: 'participant',
+        },
       });
 
-      console.log(`Project chat created for project ${projectId} with HR manager (${hrManager.id}), Production manager (${productionManager.id}), Sales manager (${salesManager.id}) as owners and Sales Rep (${salesRep.id}) as participant`);
+      console.log(
+        `Project chat created for project ${projectId} with HR manager (${hrManager.id}), Production manager (${productionManager.id}), Sales manager (${salesManager.id}) as owners and Sales Rep (${salesRep.id}) as participant`,
+      );
     } catch (error) {
-      console.error(`Failed to create project chat for project ${projectId}:`, error);
-      throw new BadRequestException(`Failed to create project chat: ${error.message}`);
+      console.error(
+        `Failed to create project chat for project ${projectId}:`,
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to create project chat: ${error.message}`,
+      );
     }
   }
 
@@ -2008,28 +2209,30 @@ export class ProjectsService {
       const hrManager = await this.prisma.employee.findFirst({
         where: {
           role: { name: 'dep_manager' },
-          department: { name: 'HR' }
-        }
+          department: { name: 'HR' },
+        },
       });
 
       // Find Production manager (dep_manager role in Production department)
       const productionManager = await this.prisma.employee.findFirst({
         where: {
           role: { name: 'dep_manager' },
-          department: { name: 'Production' }
-        }
+          department: { name: 'Production' },
+        },
       });
 
       if (!hrManager || !productionManager) {
-        throw new BadRequestException('HR Manager or Production Manager not found. Cannot create project chat.');
+        throw new BadRequestException(
+          'HR Manager or Production Manager not found. Cannot create project chat.',
+        );
       }
 
       // Create project chat
       const projectChat = await this.prisma.projectChat.create({
         data: {
           projectId: projectId,
-          participants: 2 // Initially 2 participants (HR and Production managers)
-        }
+          participants: 2, // Initially 2 participants (HR and Production managers)
+        },
       });
 
       // Add HR manager as owner
@@ -2037,8 +2240,8 @@ export class ProjectsService {
         data: {
           chatId: projectChat.id,
           employeeId: hrManager.id,
-          memberType: 'owner'
-        }
+          memberType: 'owner',
+        },
       });
 
       // Add Production manager as owner
@@ -2046,42 +2249,54 @@ export class ProjectsService {
         data: {
           chatId: projectChat.id,
           employeeId: productionManager.id,
-          memberType: 'owner'
-        }
+          memberType: 'owner',
+        },
       });
 
-      console.log(`Company project chat created for project ${projectId} with HR manager (${hrManager.id}) and Production manager (${productionManager.id}) as owners`);
+      console.log(
+        `Company project chat created for project ${projectId} with HR manager (${hrManager.id}) and Production manager (${productionManager.id}) as owners`,
+      );
     } catch (error) {
-      console.error(`Failed to create company project chat for project ${projectId}:`, error);
-      throw new BadRequestException(`Failed to create company project chat: ${error.message}`);
+      console.error(
+        `Failed to create company project chat for project ${projectId}:`,
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to create company project chat: ${error.message}`,
+      );
     }
   }
 
   // Helper method to add unit head as owner to project chat
-  private async addUnitHeadToProjectChat(projectId: number, unitHeadId: number) {
+  private async addUnitHeadToProjectChat(
+    projectId: number,
+    unitHeadId: number,
+  ) {
     try {
       // Find the project chat
       const projectChat = await this.prisma.projectChat.findFirst({
-        where: { projectId: projectId }
+        where: { projectId: projectId },
       });
 
       if (!projectChat) {
-        throw new BadRequestException(`Project chat not found for project ${projectId}`);
+        throw new BadRequestException(
+          `Project chat not found for project ${projectId}`,
+        );
       }
 
       // Check if unit head is already a participant
       const existingParticipant = await this.prisma.chatParticipant.findFirst({
         where: {
           chatId: projectChat.id,
-          employeeId: unitHeadId
-        }
+          employeeId: unitHeadId,
+        },
       });
 
       if (existingParticipant) {
         // Update existing participant to owner
         await this.prisma.chatParticipant.update({
           where: { id: existingParticipant.id },
-          data: { memberType: 'owner' }
+          data: { memberType: 'owner' },
         });
       } else {
         // Add unit head as owner
@@ -2089,25 +2304,32 @@ export class ProjectsService {
           data: {
             chatId: projectChat.id,
             employeeId: unitHeadId,
-            memberType: 'owner'
-          }
+            memberType: 'owner',
+          },
         });
       }
 
       // Update participant count
       const participantCount = await this.prisma.chatParticipant.count({
-        where: { chatId: projectChat.id }
+        where: { chatId: projectChat.id },
       });
 
       await this.prisma.projectChat.update({
         where: { id: projectChat.id },
-        data: { participants: participantCount }
+        data: { participants: participantCount },
       });
 
-      console.log(`Unit head (${unitHeadId}) added as owner to project chat for project ${projectId}`);
+      console.log(
+        `Unit head (${unitHeadId}) added as owner to project chat for project ${projectId}`,
+      );
     } catch (error) {
-      console.error(`Failed to add unit head to project chat for project ${projectId}:`, error);
-      throw new BadRequestException(`Failed to add unit head to project chat: ${error.message}`);
+      console.error(
+        `Failed to add unit head to project chat for project ${projectId}:`,
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to add unit head to project chat: ${error.message}`,
+      );
     }
   }
 
@@ -2118,8 +2340,8 @@ export class ProjectsService {
       const team = await this.prisma.team.findUnique({
         where: { id: teamId },
         include: {
-          teamLead: true
-        }
+          teamLead: true,
+        },
       });
 
       if (!team) {
@@ -2128,20 +2350,24 @@ export class ProjectsService {
 
       // Get all team members (team lead + employees where teamLeadId = team.teamLeadId)
       if (!team.teamLeadId) {
-        throw new BadRequestException(`Team with ID ${teamId} has no team lead assigned`);
+        throw new BadRequestException(
+          `Team with ID ${teamId} has no team lead assigned`,
+        );
       }
 
       const teamMembers = await this.prisma.employee.findMany({
         where: {
           OR: [
             { id: team.teamLeadId }, // Team lead
-            { teamLeadId: team.teamLeadId } // Team members
-          ]
-        }
+            { teamLeadId: team.teamLeadId }, // Team members
+          ],
+        },
       });
 
       if (teamMembers.length === 0) {
-        throw new BadRequestException(`No team members found for team ${teamId}`);
+        throw new BadRequestException(
+          `No team members found for team ${teamId}`,
+        );
       }
 
       // Add each team member to project logs
@@ -2149,10 +2375,17 @@ export class ProjectsService {
         await this.autoLogService.addEmployeeToProject(projectId, member.id);
       }
 
-      console.log(`Added ${teamMembers.length} team members to project logs for project ${projectId}`);
+      console.log(
+        `Added ${teamMembers.length} team members to project logs for project ${projectId}`,
+      );
     } catch (error) {
-      console.error(`Failed to add team members to project logs for project ${projectId}:`, error);
-      throw new BadRequestException(`Failed to add team members to project logs: ${error.message}`);
+      console.error(
+        `Failed to add team members to project logs for project ${projectId}:`,
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to add team members to project logs: ${error.message}`,
+      );
     }
   }
 
@@ -2161,19 +2394,21 @@ export class ProjectsService {
     try {
       // Find the project chat
       const projectChat = await this.prisma.projectChat.findFirst({
-        where: { projectId: projectId }
+        where: { projectId: projectId },
       });
 
       if (!projectChat) {
-        throw new BadRequestException(`Project chat not found for project ${projectId}`);
+        throw new BadRequestException(
+          `Project chat not found for project ${projectId}`,
+        );
       }
 
       // Get team details
       const team = await this.prisma.team.findUnique({
         where: { id: teamId },
         include: {
-          teamLead: true
-        }
+          teamLead: true,
+        },
       });
 
       if (!team) {
@@ -2182,56 +2417,69 @@ export class ProjectsService {
 
       // Get all team members (team lead + employees where teamLeadId = team.teamLeadId)
       if (!team.teamLeadId) {
-        throw new BadRequestException(`Team with ID ${teamId} has no team lead assigned`);
+        throw new BadRequestException(
+          `Team with ID ${teamId} has no team lead assigned`,
+        );
       }
 
       const teamMembers = await this.prisma.employee.findMany({
         where: {
           OR: [
             { id: team.teamLeadId }, // Team lead
-            { teamLeadId: team.teamLeadId } // Team members
-          ]
-        }
+            { teamLeadId: team.teamLeadId }, // Team members
+          ],
+        },
       });
 
       if (teamMembers.length === 0) {
-        throw new BadRequestException(`No team members found for team ${teamId}`);
+        throw new BadRequestException(
+          `No team members found for team ${teamId}`,
+        );
       }
 
       // Add each team member as participant (if not already a participant)
       for (const member of teamMembers) {
-        const existingParticipant = await this.prisma.chatParticipant.findFirst({
-          where: {
-            chatId: projectChat.id,
-            employeeId: member.id
-          }
-        });
+        const existingParticipant = await this.prisma.chatParticipant.findFirst(
+          {
+            where: {
+              chatId: projectChat.id,
+              employeeId: member.id,
+            },
+          },
+        );
 
         if (!existingParticipant) {
           await this.prisma.chatParticipant.create({
             data: {
               chatId: projectChat.id,
               employeeId: member.id,
-              memberType: 'participant'
-            }
+              memberType: 'participant',
+            },
           });
         }
       }
 
       // Update participant count
       const participantCount = await this.prisma.chatParticipant.count({
-        where: { chatId: projectChat.id }
+        where: { chatId: projectChat.id },
       });
 
       await this.prisma.projectChat.update({
         where: { id: projectChat.id },
-        data: { participants: participantCount }
+        data: { participants: participantCount },
       });
 
-      console.log(`Added ${teamMembers.length} team members to project chat for project ${projectId}`);
+      console.log(
+        `Added ${teamMembers.length} team members to project chat for project ${projectId}`,
+      );
     } catch (error) {
-      console.error(`Failed to add team members to project chat for project ${projectId}:`, error);
-      throw new BadRequestException(`Failed to add team members to project chat: ${error.message}`);
+      console.error(
+        `Failed to add team members to project chat for project ${projectId}:`,
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to add team members to project chat: ${error.message}`,
+      );
     }
   }
 
@@ -2244,7 +2492,7 @@ export class ProjectsService {
           // Check 1: Team must be assigned to a production unit
           productionUnitId: { not: null },
           // Check 2: Team must not have any projects
-          currentProjectId: { equals: null }
+          currentProjectId: { equals: null },
         },
         include: {
           teamLead: {
@@ -2252,37 +2500,38 @@ export class ProjectsService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           productionUnit: {
             select: {
               id: true,
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
-        orderBy: [
-          { name: 'asc' }
-        ]
+        orderBy: [{ name: 'asc' }],
       });
 
       return {
         success: true,
-        data: teams.map(team => ({
+        data: teams.map((team) => ({
           id: team.id,
           name: team.name,
           employeeCount: team.employeeCount,
           teamLead: team.teamLead,
-          productionUnit: team.productionUnit
+          productionUnit: team.productionUnit,
         })),
         total: teams.length,
-        message: teams.length > 0 
-          ? 'Available teams retrieved successfully' 
-          : 'No available teams found'
+        message:
+          teams.length > 0
+            ? 'Available teams retrieved successfully'
+            : 'No available teams found',
       };
     } catch (error) {
-      throw new BadRequestException(`Failed to retrieve available teams: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to retrieve available teams: ${error.message}`,
+      );
     }
   }
 }

@@ -1,4 +1,10 @@
-import { IsOptional, IsNumber, IsString, IsDateString, IsIn } from 'class-validator';
+import {
+  IsOptional,
+  IsNumber,
+  IsString,
+  IsDateString,
+  IsIn,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -20,55 +26,93 @@ export class GetHrLogsDto {
   @IsNumber()
   affected_employee_id?: number;
 
-  @ApiPropertyOptional({ description: 'Filter logs from this start date', type: String, format: 'date-time' })
+  @ApiPropertyOptional({
+    description: 'Filter logs from this start date',
+    type: String,
+    format: 'date-time',
+  })
   @IsOptional()
   @IsDateString()
   start_date?: string;
 
-  @ApiPropertyOptional({ description: 'Filter logs until this end date', type: String, format: 'date-time' })
+  @ApiPropertyOptional({
+    description: 'Filter logs until this end date',
+    type: String,
+    format: 'date-time',
+  })
   @IsOptional()
   @IsDateString()
   end_date?: string;
 
-  @ApiPropertyOptional({ description: 'Created at start date filter', type: String, format: 'date-time' })
+  @ApiPropertyOptional({
+    description: 'Created at start date filter',
+    type: String,
+    format: 'date-time',
+  })
   @IsOptional()
   @IsDateString()
   created_start?: string;
 
-  @ApiPropertyOptional({ description: 'Created at end date filter', type: String, format: 'date-time' })
+  @ApiPropertyOptional({
+    description: 'Created at end date filter',
+    type: String,
+    format: 'date-time',
+  })
   @IsOptional()
   @IsDateString()
   created_end?: string;
 
-  @ApiPropertyOptional({ description: 'Updated at start date filter', type: String, format: 'date-time' })
+  @ApiPropertyOptional({
+    description: 'Updated at start date filter',
+    type: String,
+    format: 'date-time',
+  })
   @IsOptional()
   @IsDateString()
   updated_start?: string;
 
-  @ApiPropertyOptional({ description: 'Updated at end date filter', type: String, format: 'date-time' })
+  @ApiPropertyOptional({
+    description: 'Updated at end date filter',
+    type: String,
+    format: 'date-time',
+  })
   @IsOptional()
   @IsDateString()
   updated_end?: string;
 
-  @ApiPropertyOptional({ description: 'Page number for pagination', type: Number, default: 1 })
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
+    type: Number,
+    default: 1,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Number of logs per page', type: Number, default: 20 })
+  @ApiPropertyOptional({
+    description: 'Number of logs per page',
+    type: Number,
+    default: 20,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   limit?: number;
 
-  @ApiPropertyOptional({ description: 'Field to order by', enum: ['id', 'createdAt', 'updatedAt', 'actionType', 'affectedEmployeeId'] })
+  @ApiPropertyOptional({
+    description: 'Field to order by',
+    enum: ['id', 'createdAt', 'updatedAt', 'actionType', 'affectedEmployeeId'],
+  })
   @IsOptional()
   @IsString()
   @IsIn(['id', 'createdAt', 'updatedAt', 'actionType', 'affectedEmployeeId'])
   orderBy?: string;
 
-  @ApiPropertyOptional({ description: 'Order direction', enum: ['asc', 'desc'] })
+  @ApiPropertyOptional({
+    description: 'Order direction',
+    enum: ['asc', 'desc'],
+  })
   @IsOptional()
   @IsString()
   @IsIn(['asc', 'desc'])
@@ -88,7 +132,10 @@ export class HrLogResponseDto {
   @ApiPropertyOptional({ description: 'Affected employee ID', nullable: true })
   affectedEmployeeId: number | null;
 
-  @ApiPropertyOptional({ description: 'Description of the action', nullable: true })
+  @ApiPropertyOptional({
+    description: 'Description of the action',
+    nullable: true,
+  })
   description: string | null;
 
   @ApiPropertyOptional({ description: 'Created timestamp' })
@@ -97,7 +144,11 @@ export class HrLogResponseDto {
   @ApiPropertyOptional({ description: 'Updated timestamp' })
   updatedAt: string;
 
-  @ApiPropertyOptional({ type: () => Object, description: 'Affected employee details', nullable: true })
+  @ApiPropertyOptional({
+    type: () => Object,
+    description: 'Affected employee details',
+    nullable: true,
+  })
   affectedEmployee: {
     id: number;
     firstName: string;
@@ -118,7 +169,10 @@ export class HrLogResponseDto {
 }
 
 export class HrLogsListResponseDto {
-  @ApiPropertyOptional({ type: [HrLogResponseDto], description: 'List of HR logs' })
+  @ApiPropertyOptional({
+    type: [HrLogResponseDto],
+    description: 'List of HR logs',
+  })
   logs: HrLogResponseDto[];
 
   @ApiPropertyOptional({ description: 'Total number of logs' })

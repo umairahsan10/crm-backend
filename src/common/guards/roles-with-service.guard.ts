@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { RoleName } from '@prisma/client';
@@ -12,10 +17,10 @@ export class RolesWithServiceGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<RoleName[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<RoleName[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     const { user } = context.switchToHttp().getRequest();
 
@@ -28,7 +33,7 @@ export class RolesWithServiceGuard implements CanActivate {
     if (!requiredRoles || requiredRoles.length === 0) {
       return true;
     }
-    
+
     // If no user is present, deny access
     if (!user) {
       throw new ForbiddenException('User not authenticated');
@@ -36,19 +41,25 @@ export class RolesWithServiceGuard implements CanActivate {
 
     // Check if user has any of the required roles
     const hasRole = await this.checkUserRole(user, requiredRoles);
-    
+
     if (!hasRole) {
       throw new ForbiddenException(
-        `User does not have the required roles. Required: ${requiredRoles.join(', ')}. User role: ${user.role}`
+        `User does not have the required roles. Required: ${requiredRoles.join(', ')}. User role: ${user.role}`,
       );
     }
 
     return true;
   }
 
-  private async checkUserRole(user: any, requiredRoles: RoleName[]): Promise<boolean> {
+  private async checkUserRole(
+    user: any,
+    requiredRoles: RoleName[],
+  ): Promise<boolean> {
     // If user.role is already a role name, check directly
-    if (typeof user.role === 'string' && Object.values(RoleName).includes(user.role as RoleName)) {
+    if (
+      typeof user.role === 'string' &&
+      Object.values(RoleName).includes(user.role as RoleName)
+    ) {
       return requiredRoles.includes(user.role as RoleName);
     }
 
@@ -73,4 +84,4 @@ export class RolesWithServiceGuard implements CanActivate {
     // If user.role is neither string nor number, deny access
     return false;
   }
-} 
+}

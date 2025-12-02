@@ -31,7 +31,9 @@ export class CreateHrPermissionDto {
   @IsBoolean()
   terminationsHandle?: boolean;
 
-  @ApiPropertyOptional({ description: 'Permission to approve monthly requests' })
+  @ApiPropertyOptional({
+    description: 'Permission to approve monthly requests',
+  })
   @IsOptional()
   @IsBoolean()
   monthlyRequestApprovals?: boolean;
@@ -51,4 +53,3 @@ export class CreateHrPermissionDto {
   @IsBoolean()
   shiftTimingSet?: boolean;
 }
-

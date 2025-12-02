@@ -1,16 +1,16 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Param, 
-  Body, 
-  Query, 
-  UseGuards, 
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Body,
+  Query,
+  UseGuards,
   Request,
   ParseIntPipe,
   HttpCode,
-  HttpStatus
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
@@ -41,7 +41,10 @@ export class ProjectsController {
   @Departments('Production')
   @Roles('dep_manager', 'unit_head') // Manager and Unit Head can create projects
   @HttpCode(HttpStatus.CREATED)
-  async createFromPayment(@Body() dto: CreateProjectFromPaymentDto, @Request() req) {
+  async createFromPayment(
+    @Body() dto: CreateProjectFromPaymentDto,
+    @Request() req,
+  ) {
     return this.projectsService.createFromPayment(dto, req.user);
   }
 
@@ -51,7 +54,10 @@ export class ProjectsController {
   @Departments('Production')
   @Roles('dep_manager', 'unit_head') // Manager and Unit Head can create projects
   @HttpCode(HttpStatus.CREATED)
-  async createCompanyProject(@Body() dto: CreateCompanyProjectDto, @Request() req) {
+  async createCompanyProject(
+    @Body() dto: CreateCompanyProjectDto,
+    @Request() req,
+  ) {
     return this.projectsService.createCompanyProject(dto, req.user);
   }
 
@@ -89,7 +95,7 @@ export class ProjectsController {
   async assignUnitHead(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignUnitHeadDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectsService.assignUnitHead(id, dto, req.user);
   }
@@ -102,7 +108,7 @@ export class ProjectsController {
   async assignTeam(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignProjectTeamDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectsService.assignTeam(id, dto, req.user);
   }
@@ -114,9 +120,8 @@ export class ProjectsController {
   async updateProject(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UnifiedUpdateProjectDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectsService.updateProject(id, dto, req.user);
   }
-
 }

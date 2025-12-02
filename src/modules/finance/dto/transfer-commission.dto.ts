@@ -11,12 +11,16 @@ export class TransferCommissionDto {
   @IsInt()
   employee_id: number;
 
-  @ApiProperty({ example: 100.50, description: 'Amount to transfer' })
+  @ApiProperty({ example: 100.5, description: 'Amount to transfer' })
   @IsNumber()
   @Min(0)
   amount: number;
 
-  @ApiProperty({ example: TransferDirection.RELEASE, enum: TransferDirection, description: 'Direction of the transfer' })
+  @ApiProperty({
+    example: TransferDirection.RELEASE,
+    enum: TransferDirection,
+    description: 'Direction of the transfer',
+  })
   @IsEnum(TransferDirection)
   direction: TransferDirection;
 }

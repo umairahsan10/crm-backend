@@ -29,15 +29,21 @@ export class FinanceMarkSalaryPaidDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMinSize(1, { message: 'At least one employee ID is required when using employeeIds' })
+  @ArrayMinSize(1, {
+    message: 'At least one employee ID is required when using employeeIds',
+  })
   @IsNumber({}, { each: true, message: 'Each employee ID must be a number' })
-  @IsPositive({ each: true, message: 'Each employee ID must be a positive number' })
+  @IsPositive({
+    each: true,
+    message: 'Each employee ID must be a positive number',
+  })
   @Type(() => Number)
-  @ValidateIf(dto => !dto.employeeId)
+  @ValidateIf((dto) => !dto.employeeId)
   employeeIds?: number[];
 
   @ApiPropertyOptional({
-    description: 'Optional month in YYYY-MM format. Defaults to current month when omitted.',
+    description:
+      'Optional month in YYYY-MM format. Defaults to current month when omitted.',
     example: '2025-11',
     pattern: '^\\d{4}-\\d{2}$',
   })

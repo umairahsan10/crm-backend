@@ -1,4 +1,10 @@
-import { IsOptional, IsEnum, IsNumber, IsPositive, IsString } from 'class-validator';
+import {
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsPositive,
+  IsString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProjectStatus, DifficultyLevel } from './update-project-details.dto';
 

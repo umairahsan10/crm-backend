@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
@@ -17,8 +21,8 @@ export class DashboardService {
       include: {
         department: { select: { name: true } },
         role: { select: { name: true } },
-        teamsAsLead: { select: { id: true } }
-      }
+        teamsAsLead: { select: { id: true } },
+      },
     });
 
     if (!user) throw new Error('User not found');
@@ -39,67 +43,129 @@ export class DashboardService {
   private async getSalesCards(user: any, role: string) {
     let where: any = {};
     if (role === 'unit_head') where = { salesUnit: { headId: user.id } };
-    else if (role === 'team_lead') where = { assignedTo: { teamLeadId: user.id } };
+    else if (role === 'team_lead')
+      where = { assignedTo: { teamLeadId: user.id } };
     else if (role !== 'dep_manager') where = { assignedToId: user.id };
 
     const dateRanges = this.getDateRanges();
 
     // Current month data
-    const currentMonthWhere = { ...where, createdAt: { gte: dateRanges.currentMonthStart, lte: dateRanges.currentMonthEnd } };
-    const prevMonthWhere = { ...where, createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } };
+    const currentMonthWhere = {
+      ...where,
+      createdAt: {
+        gte: dateRanges.currentMonthStart,
+        lte: dateRanges.currentMonthEnd,
+      },
+    };
+    const prevMonthWhere = {
+      ...where,
+      createdAt: {
+        gte: dateRanges.prevMonthStart,
+        lt: dateRanges.currentMonthStart,
+      },
+    };
 
-    const [total, active, cracked, revenue, commission, prevTotal, prevCracked, prevRevenue] = await Promise.all([
+    const [
+      total,
+      active,
+      cracked,
+      revenue,
+      commission,
+      prevTotal,
+      prevCracked,
+      prevRevenue,
+    ] = await Promise.all([
       this.prisma.lead.count({ where }),
       this.prisma.lead.count({ where: { ...where, status: 'in_progress' } }),
       this.prisma.crackedLead.count({ where: { lead: where } }),
-      this.prisma.crackedLead.aggregate({ where: { lead: where }, _sum: { amount: true } }),
-      this.prisma.salesDepartment.findFirst({ where: { employeeId: user.id }, select: { commissionAmount: true } }),
+      this.prisma.crackedLead.aggregate({
+        where: { lead: where },
+        _sum: { amount: true },
+      }),
+      this.prisma.salesDepartment.findFirst({
+        where: { employeeId: user.id },
+        select: { commissionAmount: true },
+      }),
       // Previous month data - compare same period
       this.prisma.lead.count({ where: prevMonthWhere }),
-      this.prisma.crackedLead.count({ where: { lead: prevMonthWhere, crackedAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } } }),
-      this.prisma.crackedLead.aggregate({ where: { lead: prevMonthWhere, crackedAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, _sum: { amount: true } })
+      this.prisma.crackedLead.count({
+        where: {
+          lead: prevMonthWhere,
+          crackedAt: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+      }),
+      this.prisma.crackedLead.aggregate({
+        where: {
+          lead: prevMonthWhere,
+          crackedAt: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+        _sum: { amount: true },
+      }),
     ]);
 
-    const conversionRate = total > 0 ? ((cracked / total) * 100) : 0;
-    const prevConversionRate = prevTotal > 0 ? ((prevCracked / prevTotal) * 100) : 0;
+    const conversionRate = total > 0 ? (cracked / total) * 100 : 0;
+    const prevConversionRate =
+      prevTotal > 0 ? (prevCracked / prevTotal) * 100 : 0;
 
     return {
       department: 'Sales',
       role,
       cards: [
-        { 
-          id: 1, 
-          title: 'Leads', 
-          value: total.toString(), 
+        {
+          id: 1,
+          title: 'Leads',
+          value: total.toString(),
           subtitle: `Active: ${active}`,
           change: this.calculateChange(total, prevTotal, 'number'),
-          changeType: this.getChangeType(total, prevTotal, true)
+          changeType: this.getChangeType(total, prevTotal, true),
         },
-        { 
-          id: 2, 
-          title: 'Conversion Rate', 
-          value: `${conversionRate.toFixed(2)}%`, 
+        {
+          id: 2,
+          title: 'Conversion Rate',
+          value: `${conversionRate.toFixed(2)}%`,
           subtitle: 'Cracked / Total',
-          change: this.calculateChange(conversionRate, prevConversionRate, 'percentage'),
-          changeType: this.getChangeType(conversionRate, prevConversionRate, true)
+          change: this.calculateChange(
+            conversionRate,
+            prevConversionRate,
+            'percentage',
+          ),
+          changeType: this.getChangeType(
+            conversionRate,
+            prevConversionRate,
+            true,
+          ),
         },
-        { 
-          id: 3, 
-          title: 'Revenue / Commission', 
-          value: `$${this.fmt(Number(revenue._sum.amount || 0))} / $${this.fmt(Number(commission?.commissionAmount || 0))}`, 
+        {
+          id: 3,
+          title: 'Revenue / Commission',
+          value: `$${this.fmt(Number(revenue._sum.amount || 0))} / $${this.fmt(Number(commission?.commissionAmount || 0))}`,
           subtitle: 'Total / Your share',
-          change: this.calculateChange(Number(revenue._sum.amount || 0), Number(prevRevenue._sum.amount || 0), 'currency'),
-          changeType: this.getChangeType(Number(revenue._sum.amount || 0), Number(prevRevenue._sum.amount || 0), true)
+          change: this.calculateChange(
+            Number(revenue._sum.amount || 0),
+            Number(prevRevenue._sum.amount || 0),
+            'currency',
+          ),
+          changeType: this.getChangeType(
+            Number(revenue._sum.amount || 0),
+            Number(prevRevenue._sum.amount || 0),
+            true,
+          ),
         },
-        { 
-          id: 4, 
-          title: 'Won Deals', 
-          value: cracked.toString(), 
+        {
+          id: 4,
+          title: 'Won Deals',
+          value: cracked.toString(),
           subtitle: 'Cracked leads',
           change: this.calculateChange(cracked, prevCracked, 'number'),
-          changeType: this.getChangeType(cracked, prevCracked, true)
-        }
-      ]
+          changeType: this.getChangeType(cracked, prevCracked, true),
+        },
+      ],
     };
   }
 
@@ -112,58 +178,102 @@ export class DashboardService {
 
     const dateRanges = this.getDateRanges();
 
-    const assignedPending = await this.prisma.hrRequest.count({ where: { assignedTo: user.id, status: 'Pending' } });
-    const allPending = await this.prisma.hrRequest.count({ where: { status: 'Pending' } });
+    const assignedPending = await this.prisma.hrRequest.count({
+      where: { assignedTo: user.id, status: 'Pending' },
+    });
+    const allPending = await this.prisma.hrRequest.count({
+      where: { status: 'Pending' },
+    });
     const pending = assignedPending > 0 ? assignedPending : allPending;
 
-    const [employees, attendance, onLeave, prevEmployees, prevAttendance, prevPending, prevOnLeave] = await Promise.all([
+    const [
+      employees,
+      attendance,
+      onLeave,
+      prevEmployees,
+      prevAttendance,
+      prevPending,
+      prevOnLeave,
+    ] = await Promise.all([
       this.prisma.employee.count({ where: { status: 'active' } }),
       this.getAttendanceRate(),
-      this.prisma.leaveLog.count({ where: { status: 'Approved', startDate: { lte: today }, endDate: { gte: today } } }),
+      this.prisma.leaveLog.count({
+        where: {
+          status: 'Approved',
+          startDate: { lte: today },
+          endDate: { gte: today },
+        },
+      }),
       // Previous month data
-      this.prisma.employee.count({ where: { status: 'active', startDate: { lt: dateRanges.currentMonthStart } } }),
-      this.getAttendanceRate(dateRanges.prevMonthStart, dateRanges.currentMonthStart),
-      this.prisma.hrRequest.count({ where: { status: 'Pending', requestedOn: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } } }),
-      this.prisma.leaveLog.count({ where: { status: 'Approved', startDate: { lte: yesterday }, endDate: { gte: yesterday } } })
+      this.prisma.employee.count({
+        where: {
+          status: 'active',
+          startDate: { lt: dateRanges.currentMonthStart },
+        },
+      }),
+      this.getAttendanceRate(
+        dateRanges.prevMonthStart,
+        dateRanges.currentMonthStart,
+      ),
+      this.prisma.hrRequest.count({
+        where: {
+          status: 'Pending',
+          requestedOn: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+      }),
+      this.prisma.leaveLog.count({
+        where: {
+          status: 'Approved',
+          startDate: { lte: yesterday },
+          endDate: { gte: yesterday },
+        },
+      }),
     ]);
 
     return {
       department: 'HR',
       role: user.role.name,
       cards: [
-        { 
-          id: 1, 
-          title: 'Employees', 
-          value: employees.toString(), 
+        {
+          id: 1,
+          title: 'Employees',
+          value: employees.toString(),
           subtitle: 'Active employees',
           change: this.calculateChange(employees, prevEmployees, 'number'),
-          changeType: this.getChangeType(employees, prevEmployees, true)
+          changeType: this.getChangeType(employees, prevEmployees, true),
         },
-        { 
-          id: 2, 
-          title: 'Attendance Rate', 
-          value: `${attendance}%`, 
+        {
+          id: 2,
+          title: 'Attendance Rate',
+          value: `${attendance}%`,
           subtitle: 'This month',
-          change: this.calculateChange(attendance, prevAttendance, 'percentage'),
-          changeType: this.getChangeType(attendance, prevAttendance, true)
+          change: this.calculateChange(
+            attendance,
+            prevAttendance,
+            'percentage',
+          ),
+          changeType: this.getChangeType(attendance, prevAttendance, true),
         },
-        { 
-          id: 3, 
-          title: 'Request Pending', 
-          value: pending.toString(), 
+        {
+          id: 3,
+          title: 'Request Pending',
+          value: pending.toString(),
           subtitle: assignedPending > 0 ? 'Assigned to you' : 'All pending',
           change: this.calculateChange(pending, prevPending, 'number'),
-          changeType: this.getChangeType(pending, prevPending, false) // More pending is negative
+          changeType: this.getChangeType(pending, prevPending, false), // More pending is negative
         },
-        { 
-          id: 4, 
-          title: 'On Leave Today', 
-          value: onLeave.toString(), 
+        {
+          id: 4,
+          title: 'On Leave Today',
+          value: onLeave.toString(),
           subtitle: 'Currently on leave',
           change: this.calculateChange(onLeave, prevOnLeave, 'number'),
-          changeType: this.getChangeType(onLeave, prevOnLeave, false) // More on leave is negative
-        }
-      ]
+          changeType: this.getChangeType(onLeave, prevOnLeave, false), // More on leave is negative
+        },
+      ],
     };
   }
 
@@ -171,166 +281,203 @@ export class DashboardService {
   private async getProductionCards(user: any, role: string) {
     let where: any = {};
     if (role === 'unit_head') where = { unitHeadId: user.id };
-    else if (role === 'team_lead') where = { teamId: user.teamsAsLead[0]?.id || -1 };
-    else if (role !== 'dep_manager') where = { projectLogs: { some: { developerId: user.id } } };
+    else if (role === 'team_lead')
+      where = { teamId: user.teamsAsLead[0]?.id || -1 };
+    else if (role !== 'dep_manager')
+      where = { projectLogs: { some: { developerId: user.id } } };
     else where = { team: { productionUnitId: { not: null } } };
 
     const dateRanges = this.getDateRanges();
-    const prevWhere = { ...where, createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } };
+    const prevWhere = {
+      ...where,
+      createdAt: {
+        gte: dateRanges.prevMonthStart,
+        lt: dateRanges.currentMonthStart,
+      },
+    };
 
-    const [totalProjects, prevTotalProjects, card2, card3, card4] = await Promise.all([
-      this.prisma.project.count({ where }),
-      this.prisma.project.count({ where: prevWhere }),
-      this.getProductionCard2(user, role),
-      this.getProductionCard3(user, role, where),
-      this.getProductionCard4(user, role, where)
-    ]);
+    const [totalProjects, prevTotalProjects, card2, card3, card4] =
+      await Promise.all([
+        this.prisma.project.count({ where }),
+        this.prisma.project.count({ where: prevWhere }),
+        this.getProductionCard2(user, role),
+        this.getProductionCard3(user, role, where),
+        this.getProductionCard4(user, role, where),
+      ]);
 
     return {
       department: 'Production',
       role,
       cards: [
-        { 
-          id: 1, 
-          title: 'Total Projects', 
-          value: totalProjects.toString(), 
+        {
+          id: 1,
+          title: 'Total Projects',
+          value: totalProjects.toString(),
           subtitle: this.getSubtitle(role),
-          change: this.calculateChange(totalProjects, prevTotalProjects, 'number'),
-          changeType: this.getChangeType(totalProjects, prevTotalProjects, true)
+          change: this.calculateChange(
+            totalProjects,
+            prevTotalProjects,
+            'number',
+          ),
+          changeType: this.getChangeType(
+            totalProjects,
+            prevTotalProjects,
+            true,
+          ),
         },
         card2,
         card3,
-        card4
-      ]
+        card4,
+      ],
     };
   }
 
   private async getProductionCard2(user: any, role: string) {
     const dateRanges = this.getDateRanges();
-    
+
     if (role === 'dep_manager') {
       const [count, prevCount] = await Promise.all([
         this.prisma.productionUnit.count(),
         this.prisma.productionUnit.count({
           where: {
-            createdAt: { lt: dateRanges.currentMonthStart }
-          }
-        })
+            createdAt: { lt: dateRanges.currentMonthStart },
+          },
+        }),
       ]);
-      return { 
-        id: 2, 
-        title: 'Production Units', 
-        value: count.toString(), 
+      return {
+        id: 2,
+        title: 'Production Units',
+        value: count.toString(),
         subtitle: 'Total units',
         change: this.calculateChange(count, prevCount, 'number'),
-        changeType: this.getChangeType(count, prevCount, true)
+        changeType: this.getChangeType(count, prevCount, true),
       };
     }
     if (role === 'unit_head') {
-      const unit = await this.prisma.productionUnit.findFirst({ where: { headId: user.id } });
+      const unit = await this.prisma.productionUnit.findFirst({
+        where: { headId: user.id },
+      });
       const [count, prevCount] = await Promise.all([
         this.prisma.team.count({ where: { productionUnitId: unit?.id } }),
-        this.prisma.team.count({ 
-          where: { 
+        this.prisma.team.count({
+          where: {
             productionUnitId: unit?.id,
-            createdAt: { lt: dateRanges.currentMonthStart }
-          } 
-        })
+            createdAt: { lt: dateRanges.currentMonthStart },
+          },
+        }),
       ]);
-      return { 
-        id: 2, 
-        title: 'Teams', 
-        value: count.toString(), 
+      return {
+        id: 2,
+        title: 'Teams',
+        value: count.toString(),
         subtitle: 'In your unit',
         change: this.calculateChange(count, prevCount, 'number'),
-        changeType: this.getChangeType(count, prevCount, true)
+        changeType: this.getChangeType(count, prevCount, true),
       };
     }
     if (role === 'team_lead') {
-      const team = await this.prisma.team.findFirst({ where: { teamLeadId: user.id } });
+      const team = await this.prisma.team.findFirst({
+        where: { teamLeadId: user.id },
+      });
       if (!team?.teamLeadId) {
-        return { 
-          id: 2, 
-          title: 'Team Members', 
-          value: '0', 
+        return {
+          id: 2,
+          title: 'Team Members',
+          value: '0',
           subtitle: 'In your team',
           change: 'No Team',
-          changeType: 'neutral' as const
+          changeType: 'neutral' as const,
         };
       }
       const dateRangesForTeam = this.getDateRanges();
       const [count, prevCount] = await Promise.all([
-        this.prisma.employee.count({ where: { OR: [{ id: team.teamLeadId }, { teamLeadId: team.teamLeadId }] } }),
-        this.prisma.employee.count({ 
-          where: { 
+        this.prisma.employee.count({
+          where: {
             OR: [{ id: team.teamLeadId }, { teamLeadId: team.teamLeadId }],
-            createdAt: { lt: dateRangesForTeam.currentMonthStart }
-          } 
-        })
+          },
+        }),
+        this.prisma.employee.count({
+          where: {
+            OR: [{ id: team.teamLeadId }, { teamLeadId: team.teamLeadId }],
+            createdAt: { lt: dateRangesForTeam.currentMonthStart },
+          },
+        }),
       ]);
-      return { 
-        id: 2, 
-        title: 'Team Members', 
-        value: count.toString(), 
+      return {
+        id: 2,
+        title: 'Team Members',
+        value: count.toString(),
         subtitle: 'In your team',
         change: this.calculateChange(count, prevCount, 'number'),
-        changeType: this.getChangeType(count, prevCount, true)
+        changeType: this.getChangeType(count, prevCount, true),
       };
     }
-    const emp = await this.prisma.employee.findUnique({ 
-      where: { id: user.id }, 
-      include: { 
-        teamLead: { 
-          include: { 
-            teamsAsLead: { 
-              select: { name: true } 
-            } 
-          } 
-        } 
-      } 
+    const emp = await this.prisma.employee.findUnique({
+      where: { id: user.id },
+      include: {
+        teamLead: {
+          include: {
+            teamsAsLead: {
+              select: { name: true },
+            },
+          },
+        },
+      },
     });
     const teamName = emp?.teamLead?.teamsAsLead[0]?.name || 'No Team';
-    return { 
-      id: 2, 
-      title: 'Team', 
-      value: teamName, 
+    return {
+      id: 2,
+      title: 'Team',
+      value: teamName,
       subtitle: 'Your team',
       change: teamName !== 'No Team' ? 'Team assigned' : 'No Team',
-      changeType: 'neutral' as const
+      changeType: 'neutral' as const,
     };
   }
 
   private async getProductionCard3(user: any, role: string, where: any) {
     const activeWhere = { ...where, status: 'in_progress' };
     const dateRanges = this.getDateRanges();
-    const prevActiveWhere = { ...activeWhere, createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } };
+    const prevActiveWhere = {
+      ...activeWhere,
+      createdAt: {
+        gte: dateRanges.prevMonthStart,
+        lt: dateRanges.currentMonthStart,
+      },
+    };
 
     if (role === 'dep_manager' || role === 'unit_head') {
       const [count, prevCount] = await Promise.all([
         this.prisma.project.count({ where: activeWhere }),
-        this.prisma.project.count({ where: prevActiveWhere })
+        this.prisma.project.count({ where: prevActiveWhere }),
       ]);
-      return { 
-        id: 3, 
-        title: 'Active Projects', 
-        value: count.toString(), 
+      return {
+        id: 3,
+        title: 'Active Projects',
+        value: count.toString(),
         subtitle: 'In progress',
         change: this.calculateChange(count, prevCount, 'number'),
-        changeType: this.getChangeType(count, prevCount, true)
+        changeType: this.getChangeType(count, prevCount, true),
       };
     }
-    const project = await this.prisma.project.findFirst({ 
-      where: activeWhere, 
-      select: { deadline: true }, 
-      orderBy: { deadline: 'asc' } 
+    const project = await this.prisma.project.findFirst({
+      where: activeWhere,
+      select: { deadline: true },
+      orderBy: { deadline: 'asc' },
     });
-    return { 
-      id: 3, 
-      title: 'Next Deadline', 
-      value: project?.deadline ? new Date(project.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'None', 
+    return {
+      id: 3,
+      title: 'Next Deadline',
+      value: project?.deadline
+        ? new Date(project.deadline).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })
+        : 'None',
       subtitle: 'Active project',
       change: project?.deadline ? 'Upcoming' : 'No deadline',
-      changeType: 'neutral' as const
+      changeType: 'neutral' as const,
     };
   }
 
@@ -338,42 +485,58 @@ export class DashboardService {
     const activeWhere = { ...where, status: 'in_progress' };
     if (role === 'dep_manager' || role === 'unit_head') {
       const prod = await this.prisma.production.findFirst({
-        where: role === 'unit_head' ? { productionUnit: { headId: user.id } } : {},
+        where:
+          role === 'unit_head' ? { productionUnit: { headId: user.id } } : {},
         orderBy: { projectsCompleted: 'desc' },
-        select: { projectsCompleted: true, employee: { select: { firstName: true, lastName: true } } }
+        select: {
+          projectsCompleted: true,
+          employee: { select: { firstName: true, lastName: true } },
+        },
       });
       // For most completed, we can't easily compare, so show neutral
-      return { 
-        id: 4, 
-        title: 'Most Completed', 
-        value: (prod?.projectsCompleted || 0).toString(), 
-        subtitle: prod ? `${prod.employee.firstName} ${prod.employee.lastName}` : 'No data',
+      return {
+        id: 4,
+        title: 'Most Completed',
+        value: (prod?.projectsCompleted || 0).toString(),
+        subtitle: prod
+          ? `${prod.employee.firstName} ${prod.employee.lastName}`
+          : 'No data',
         change: prod ? 'Top performer' : 'No Performer',
-        changeType: 'neutral' as const
+        changeType: 'neutral' as const,
       };
     }
     const dateRangesForProgress = this.getDateRanges();
     const [project, prevProject] = await Promise.all([
-      this.prisma.project.findFirst({ 
-        where: activeWhere, 
-        select: { liveProgress: true, updatedAt: true }, 
-        orderBy: { updatedAt: 'desc' } 
+      this.prisma.project.findFirst({
+        where: activeWhere,
+        select: { liveProgress: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
       }),
-      this.prisma.project.findFirst({ 
-        where: { ...activeWhere, updatedAt: { gte: dateRangesForProgress.prevMonthStart, lt: dateRangesForProgress.currentMonthStart } }, 
-        select: { liveProgress: true }, 
-        orderBy: { updatedAt: 'desc' } 
-      })
+      this.prisma.project.findFirst({
+        where: {
+          ...activeWhere,
+          updatedAt: {
+            gte: dateRangesForProgress.prevMonthStart,
+            lt: dateRangesForProgress.currentMonthStart,
+          },
+        },
+        select: { liveProgress: true },
+        orderBy: { updatedAt: 'desc' },
+      }),
     ]);
-    const currentProgress = project?.liveProgress ? Number(project.liveProgress) : 0;
-    const prevProgress = prevProject?.liveProgress ? Number(prevProject.liveProgress) : 0;
-    return { 
-      id: 4, 
-      title: 'Progress', 
-      value: `${currentProgress}%`, 
+    const currentProgress = project?.liveProgress
+      ? Number(project.liveProgress)
+      : 0;
+    const prevProgress = prevProject?.liveProgress
+      ? Number(prevProject.liveProgress)
+      : 0;
+    return {
+      id: 4,
+      title: 'Progress',
+      value: `${currentProgress}%`,
       subtitle: 'Current project',
       change: this.calculateChange(currentProgress, prevProgress, 'percentage'),
-      changeType: this.getChangeType(currentProgress, prevProgress, true)
+      changeType: this.getChangeType(currentProgress, prevProgress, true),
     };
   }
 
@@ -381,19 +544,60 @@ export class DashboardService {
   private async getAccountantCards() {
     const dateRanges = this.getDateRanges();
 
-    const [revenue, expenses, allRevenue, allExpenses, prevRevenue, prevExpenses] = await Promise.all([
-      this.prisma.revenue.aggregate({ where: { receivedOn: { gte: dateRanges.currentMonthStart, lte: dateRanges.currentMonthEnd } }, _sum: { amount: true } }),
-      this.prisma.expense.aggregate({ where: { paidOn: { gte: dateRanges.currentMonthStart, lte: dateRanges.currentMonthEnd } }, _sum: { amount: true } }),
+    const [
+      revenue,
+      expenses,
+      allRevenue,
+      allExpenses,
+      prevRevenue,
+      prevExpenses,
+    ] = await Promise.all([
+      this.prisma.revenue.aggregate({
+        where: {
+          receivedOn: {
+            gte: dateRanges.currentMonthStart,
+            lte: dateRanges.currentMonthEnd,
+          },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: {
+          paidOn: {
+            gte: dateRanges.currentMonthStart,
+            lte: dateRanges.currentMonthEnd,
+          },
+        },
+        _sum: { amount: true },
+      }),
       this.prisma.revenue.aggregate({ _sum: { amount: true } }),
       this.prisma.expense.aggregate({ _sum: { amount: true } }),
       // Previous month data
-      this.prisma.revenue.aggregate({ where: { receivedOn: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, _sum: { amount: true } }),
-      this.prisma.expense.aggregate({ where: { paidOn: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, _sum: { amount: true } })
+      this.prisma.revenue.aggregate({
+        where: {
+          receivedOn: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: {
+          paidOn: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+        _sum: { amount: true },
+      }),
     ]);
 
     const rev = Number(revenue._sum.amount || 0);
     const exp = Number(expenses._sum.amount || 0);
-    const profit = Number(allRevenue._sum.amount || 0) - Number(allExpenses._sum.amount || 0);
+    const profit =
+      Number(allRevenue._sum.amount || 0) -
+      Number(allExpenses._sum.amount || 0);
     const prevRev = Number(prevRevenue._sum.amount || 0);
     const prevExp = Number(prevExpenses._sum.amount || 0);
     // Calculate previous month profit (all time profit minus current month profit)
@@ -404,39 +608,51 @@ export class DashboardService {
       department: 'Accounts',
       role: 'accountant',
       cards: [
-        { 
-          id: 1, 
-          title: 'Profit', 
-          value: this.fmtCurrency(profit), 
+        {
+          id: 1,
+          title: 'Profit',
+          value: this.fmtCurrency(profit),
           subtitle: 'All time',
-          change: this.calculateChange(currentMonthProfit, prevMonthProfit, 'currency'),
-          changeType: this.getChangeType(currentMonthProfit, prevMonthProfit, true)
+          change: this.calculateChange(
+            currentMonthProfit,
+            prevMonthProfit,
+            'currency',
+          ),
+          changeType: this.getChangeType(
+            currentMonthProfit,
+            prevMonthProfit,
+            true,
+          ),
         },
-        { 
-          id: 2, 
-          title: 'Expense', 
-          value: this.fmtCurrency(exp), 
+        {
+          id: 2,
+          title: 'Expense',
+          value: this.fmtCurrency(exp),
           subtitle: 'This month',
           change: this.calculateChange(exp, prevExp, 'currency'),
-          changeType: this.getChangeType(exp, prevExp, false) // More expense is negative
+          changeType: this.getChangeType(exp, prevExp, false), // More expense is negative
         },
-        { 
-          id: 3, 
-          title: 'Cash Flow', 
-          value: this.fmtCurrency(rev - exp), 
+        {
+          id: 3,
+          title: 'Cash Flow',
+          value: this.fmtCurrency(rev - exp),
           subtitle: 'This month',
-          change: this.calculateChange(rev - exp, prevRev - prevExp, 'currency'),
-          changeType: this.getChangeType(rev - exp, prevRev - prevExp, true)
+          change: this.calculateChange(
+            rev - exp,
+            prevRev - prevExp,
+            'currency',
+          ),
+          changeType: this.getChangeType(rev - exp, prevRev - prevExp, true),
         },
-        { 
-          id: 4, 
-          title: 'Revenue', 
-          value: this.fmtCurrency(rev), 
+        {
+          id: 4,
+          title: 'Revenue',
+          value: this.fmtCurrency(rev),
           subtitle: 'This month',
           change: this.calculateChange(rev, prevRev, 'currency'),
-          changeType: this.getChangeType(rev, prevRev, true)
-        }
-      ]
+          changeType: this.getChangeType(rev, prevRev, true),
+        },
+      ],
     };
   }
 
@@ -444,22 +660,42 @@ export class DashboardService {
   private getDateRanges() {
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const currentMonthEnd = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+    );
     const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    
+    const prevMonthEnd = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      0,
+      23,
+      59,
+      59,
+    );
+
     return {
       currentMonthStart,
       currentMonthEnd,
       prevMonthStart,
-      prevMonthEnd
+      prevMonthEnd,
     };
   }
 
-  private calculateChange(current: number, previous: number, type: 'number' | 'percentage' | 'currency'): string {
+  private calculateChange(
+    current: number,
+    previous: number,
+    type: 'number' | 'percentage' | 'currency',
+  ): string {
     if (previous === 0) {
       if (current === 0) return 'Same as last month';
-      return type === 'currency' ? `+$${this.fmt(current)} this month` : `+${current} this month`;
+      return type === 'currency'
+        ? `+$${this.fmt(current)} this month`
+        : `+${current} this month`;
     }
 
     const diff = current - previous;
@@ -480,15 +716,19 @@ export class DashboardService {
     return `${diff > 0 ? '+' : ''}${diff} from last month`;
   }
 
-  private getChangeType(current: number, previous: number, higherIsBetter: boolean): 'positive' | 'negative' | 'neutral' {
+  private getChangeType(
+    current: number,
+    previous: number,
+    higherIsBetter: boolean,
+  ): 'positive' | 'negative' | 'neutral' {
     if (previous === 0 || current === previous) return 'neutral';
-    
+
     const isIncrease = current > previous;
-    
+
     if (higherIsBetter) {
       return isIncrease ? 'positive' : 'negative';
     }
-    
+
     // higherIsBetter is false (e.g., expenses, pending requests)
     return isIncrease ? 'negative' : 'positive';
   }
@@ -503,12 +743,16 @@ export class DashboardService {
       const now = new Date();
       month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
-    
-    const summary = await this.prisma.monthlyAttendanceSummary.findMany({ where: { month } });
+
+    const summary = await this.prisma.monthlyAttendanceSummary.findMany({
+      where: { month },
+    });
     if (summary.length === 0) return 0;
     const present = summary.reduce((s, x) => s + x.totalPresent, 0);
     const absent = summary.reduce((s, x) => s + x.totalAbsent, 0);
-    return present + absent > 0 ? Math.round((present / (present + absent)) * 10000) / 100 : 0;
+    return present + absent > 0
+      ? Math.round((present / (present + absent)) * 10000) / 100
+      : 0;
   }
 
   private getSubtitle(role: string) {
@@ -535,69 +779,103 @@ export class DashboardService {
     // Convert underscore to space and capitalize each word
     return actionType
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
   }
 
   private extractBulkMarkPresentReason(description: string | null): string {
     if (!description) return '';
-    
+
     // New format: "{count} employees - {reason}" or "{count} employees"
-    const newFormatMatch = description.match(/^(\d+)\s+employees(?:\s+-\s+(.+))?$/);
+    const newFormatMatch = description.match(
+      /^(\d+)\s+employees(?:\s+-\s+(.+))?$/,
+    );
     if (newFormatMatch) {
       const count = newFormatMatch[1];
       const reason = newFormatMatch[2]?.trim() || '';
       return reason ? `${count} employees - ${reason}` : `${count} employees`;
     }
-    
+
     // Old format: Extract count and reason from old descriptions
     // Pattern 1: "Bulk checkin: {count} employee(s) ... - Reason: {reason}"
-    const oldFormatMatch1 = description.match(/Bulk checkin:\s*(\d+)\s+employee\(s\).*?-\s+Reason:\s*(.+)$/);
+    const oldFormatMatch1 = description.match(
+      /Bulk checkin:\s*(\d+)\s+employee\(s\).*?-\s+Reason:\s*(.+)$/,
+    );
     if (oldFormatMatch1) {
       const count = oldFormatMatch1[1];
       const reason = oldFormatMatch1[2].trim();
       return `${count} employees - ${reason}`;
     }
-    
+
     // Pattern 2: "Bulk marked {count} employee(s) ... - Reason: {reason}"
-    const oldFormatMatch2 = description.match(/Bulk marked\s+(\d+)\s+employee\(s\).*?-\s+Reason:\s*(.+)$/);
+    const oldFormatMatch2 = description.match(
+      /Bulk marked\s+(\d+)\s+employee\(s\).*?-\s+Reason:\s*(.+)$/,
+    );
     if (oldFormatMatch2) {
       const count = oldFormatMatch2[1];
       const reason = oldFormatMatch2[2].trim();
       return `${count} employees - ${reason}`;
     }
-    
+
     // Pattern 3: Just extract reason if count pattern not found
     const reasonMatch = description.match(/- Reason:\s*(.+)$/);
     if (reasonMatch && reasonMatch[1]) {
       return reasonMatch[1].trim();
     }
-    
+
     // If no pattern matches, return as-is
     return description;
   }
 
   // ACTIVITY FEED
-  async getActivityFeed(userId: number, department: string, role: string, userType?: string, limit: number = 20) {
+  async getActivityFeed(
+    userId: number,
+    department: string,
+    role: string,
+    userType?: string,
+    limit: number = 20,
+  ) {
     // Check if user is Admin
-    if (userType === 'admin' || !department || department === 'Admin' || role === 'admin') {
+    if (
+      userType === 'admin' ||
+      !department ||
+      department === 'Admin' ||
+      role === 'admin'
+    ) {
       return await this.getAdminActivities(limit);
     }
 
     // Get activities based on department - using JWT token data directly
     let activities: any[] = [];
-    
-    if (department === 'HR') activities = await this.getHrActivitiesOptimized(userId, role, limit);
-    else if (department === 'Sales') activities = await this.getSalesActivitiesOptimized(userId, role, limit);
-    else if (department === 'Production') activities = await this.getProductionActivitiesOptimized(userId, role, limit);
-    else if (department === 'Marketing') activities = await this.getMarketingActivitiesOptimized(userId, role, limit);
-    else if (department === 'Accounts') activities = await this.getAccountantActivitiesOptimized(userId, role, limit);
+
+    if (department === 'HR')
+      activities = await this.getHrActivitiesOptimized(userId, role, limit);
+    else if (department === 'Sales')
+      activities = await this.getSalesActivitiesOptimized(userId, role, limit);
+    else if (department === 'Production')
+      activities = await this.getProductionActivitiesOptimized(
+        userId,
+        role,
+        limit,
+      );
+    else if (department === 'Marketing')
+      activities = await this.getMarketingActivitiesOptimized(
+        userId,
+        role,
+        limit,
+      );
+    else if (department === 'Accounts')
+      activities = await this.getAccountantActivitiesOptimized(
+        userId,
+        role,
+        limit,
+      );
 
     return {
       department,
       role,
       activities: activities.slice(0, limit),
-      total: activities.length
+      total: activities.length,
     };
   }
 
@@ -609,7 +887,7 @@ export class DashboardService {
       accountsActivities,
       productionActivities,
       hrActivities,
-      marketingActivities
+      marketingActivities,
     ] = await Promise.all([
       // Sales - Focus on deals closed and lead conversions (most important)
       this.getSalesActivitiesForAdmin(limit * 2), // Get more to prioritize
@@ -620,49 +898,68 @@ export class DashboardService {
       // HR - Employee management actions
       this.getHrActivitiesForAdmin(limit),
       // Marketing - Campaign launches
-      this.getMarketingActivitiesForAdmin(limit)
+      this.getMarketingActivitiesForAdmin(limit),
     ]);
 
     // Combine and prioritize activities
     const allActivities = [
       // Priority 1: Deals Closed (highest priority - revenue events)
-      ...salesActivities.filter(a => a.type === 'Deal Closed'),
+      ...salesActivities.filter((a) => a.type === 'Deal Closed'),
       // Priority 2: Revenue Recorded
-      ...accountsActivities.filter(a => a.type === 'Revenue'),
+      ...accountsActivities.filter((a) => a.type === 'Revenue'),
       // Priority 3: Large Expenses (filter by amount threshold)
-      ...accountsActivities.filter(a => a.type === 'Expense' && this.isLargeAmount(a.description)),
+      ...accountsActivities.filter(
+        (a) => a.type === 'Expense' && this.isLargeAmount(a.description),
+      ),
       // Priority 4: Lead Converted
-      ...salesActivities.filter(a => a.title === 'Lead Converted'),
+      ...salesActivities.filter((a) => a.title === 'Lead Converted'),
       // Priority 5: Project Completed
-      ...productionActivities.filter(a => a.title?.toLowerCase().includes('completed')),
+      ...productionActivities.filter((a) =>
+        a.title?.toLowerCase().includes('completed'),
+      ),
       // Priority 6: Large Transactions
-      ...accountsActivities.filter(a => a.type === 'Transaction' && this.isLargeAmount(a.description)),
+      ...accountsActivities.filter(
+        (a) => a.type === 'Transaction' && this.isLargeAmount(a.description),
+      ),
       // Priority 7: Other Revenue/Expense activities
-      ...accountsActivities.filter(a => a.type === 'Revenue' || (a.type === 'Expense' && !this.isLargeAmount(a.description))),
+      ...accountsActivities.filter(
+        (a) =>
+          a.type === 'Revenue' ||
+          (a.type === 'Expense' && !this.isLargeAmount(a.description)),
+      ),
       // Priority 8: Project status changes
-      ...productionActivities.filter(a => !a.title?.toLowerCase().includes('completed')),
+      ...productionActivities.filter(
+        (a) => !a.title?.toLowerCase().includes('completed'),
+      ),
       // Priority 9: HR important actions (employee added, terminated, etc.)
-      ...hrActivities.filter(a => this.isImportantHrAction(a.title)),
+      ...hrActivities.filter((a) => this.isImportantHrAction(a.title)),
       // Priority 10: Campaign activities
       ...marketingActivities,
       // Priority 11: Other sales activities
-      ...salesActivities.filter(a => a.type !== 'Deal Closed' && a.title !== 'Lead Converted'),
+      ...salesActivities.filter(
+        (a) => a.type !== 'Deal Closed' && a.title !== 'Lead Converted',
+      ),
       // Priority 12: Other HR activities
-      ...hrActivities.filter(a => !this.isImportantHrAction(a.title)),
+      ...hrActivities.filter((a) => !this.isImportantHrAction(a.title)),
       // Priority 13: Other transactions
-      ...accountsActivities.filter(a => a.type === 'Transaction' && !this.isLargeAmount(a.description))
+      ...accountsActivities.filter(
+        (a) => a.type === 'Transaction' && !this.isLargeAmount(a.description),
+      ),
     ];
 
     // Sort by creation date (most recent first) and limit
     const sortedActivities = allActivities
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .slice(0, limit);
 
     return {
       department: 'Admin',
       role: 'admin',
       activities: sortedActivities,
-      total: sortedActivities.length
+      total: sortedActivities.length,
     };
   }
 
@@ -671,10 +968,7 @@ export class DashboardService {
     const [leads, crackedLeads] = await Promise.all([
       this.prisma.lead.findMany({
         where: {
-          OR: [
-            { status: 'cracked' },
-            { status: 'in_progress' }
-          ]
+          OR: [{ status: 'cracked' }, { status: 'in_progress' }],
         },
         take: limit,
         orderBy: { updatedAt: 'desc' },
@@ -685,12 +979,12 @@ export class DashboardService {
           status: true,
           updatedAt: true,
           crackedBy: {
-            select: { firstName: true, lastName: true, id: true }
+            select: { firstName: true, lastName: true, id: true },
           },
           assignedTo: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
       }),
       this.prisma.crackedLead.findMany({
         take: limit,
@@ -700,19 +994,19 @@ export class DashboardService {
           amount: true,
           crackedAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
+            select: { firstName: true, lastName: true, id: true },
           },
           lead: {
-            select: { name: true, email: true }
-          }
-        }
-      })
+            select: { name: true, email: true },
+          },
+        },
+      }),
     ]);
 
     const activities: any[] = [];
 
     // Process Cracked Leads (Deals Closed) - Highest priority
-    crackedLeads.forEach(cracked => {
+    crackedLeads.forEach((cracked) => {
       activities.push({
         id: `cracked_lead_${cracked.id}`,
         type: 'Deal Closed',
@@ -721,25 +1015,31 @@ export class DashboardService {
         createdAt: cracked.crackedAt,
         actor: `${cracked.employee.firstName} ${cracked.employee.lastName}`,
         department: 'Sales',
-        relatedEntity: { type: 'cracked_lead', id: cracked.id }
+        relatedEntity: { type: 'cracked_lead', id: cracked.id },
       });
     });
 
     // Process Lead Conversions
-    leads.filter(l => l.status === 'cracked' && l.crackedBy).forEach(lead => {
-      if (lead.crackedBy) {
-        activities.push({
-          id: `lead_${lead.id}`,
-          type: 'Lead Activity',
-          title: 'Lead Converted',
-          description: `Lead "${lead.name || lead.email}" was converted by ${lead.crackedBy.firstName} ${lead.crackedBy.lastName}`,
-          createdAt: lead.updatedAt,
-          actor: `${lead.crackedBy.firstName} ${lead.crackedBy.lastName}`,
-          department: 'Sales',
-          relatedEntity: { type: 'lead', id: lead.id, name: lead.name || lead.email }
-        });
-      }
-    });
+    leads
+      .filter((l) => l.status === 'cracked' && l.crackedBy)
+      .forEach((lead) => {
+        if (lead.crackedBy) {
+          activities.push({
+            id: `lead_${lead.id}`,
+            type: 'Lead Activity',
+            title: 'Lead Converted',
+            description: `Lead "${lead.name || lead.email}" was converted by ${lead.crackedBy.firstName} ${lead.crackedBy.lastName}`,
+            createdAt: lead.updatedAt,
+            actor: `${lead.crackedBy.firstName} ${lead.crackedBy.lastName}`,
+            department: 'Sales',
+            relatedEntity: {
+              type: 'lead',
+              id: lead.id,
+              name: lead.name || lead.email,
+            },
+          });
+        }
+      });
 
     return activities;
   }
@@ -754,9 +1054,9 @@ export class DashboardService {
           amount: true,
           createdAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
       }),
       this.prisma.expense.findMany({
         take: limit,
@@ -766,9 +1066,9 @@ export class DashboardService {
           amount: true,
           createdAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
       }),
       this.prisma.transaction.findMany({
         take: limit,
@@ -779,15 +1079,15 @@ export class DashboardService {
           amount: true,
           createdAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
-      })
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
+      }),
     ]);
 
     const activities: any[] = [];
 
-    revenues.forEach(revenue => {
+    revenues.forEach((revenue) => {
       if (revenue.employee) {
         activities.push({
           id: `revenue_${revenue.id}`,
@@ -797,12 +1097,12 @@ export class DashboardService {
           createdAt: revenue.createdAt,
           actor: `${revenue.employee.firstName} ${revenue.employee.lastName}`,
           department: 'Accounts',
-          relatedEntity: { type: 'revenue', id: revenue.id }
+          relatedEntity: { type: 'revenue', id: revenue.id },
         });
       }
     });
 
-    expenses.forEach(expense => {
+    expenses.forEach((expense) => {
       if (expense.employee) {
         activities.push({
           id: `expense_${expense.id}`,
@@ -812,12 +1112,12 @@ export class DashboardService {
           createdAt: expense.createdAt,
           actor: `${expense.employee.firstName} ${expense.employee.lastName}`,
           department: 'Accounts',
-          relatedEntity: { type: 'expense', id: expense.id }
+          relatedEntity: { type: 'expense', id: expense.id },
         });
       }
     });
 
-    transactions.forEach(transaction => {
+    transactions.forEach((transaction) => {
       if (transaction.employee) {
         activities.push({
           id: `transaction_${transaction.id}`,
@@ -827,7 +1127,7 @@ export class DashboardService {
           createdAt: transaction.createdAt,
           actor: `${transaction.employee.firstName} ${transaction.employee.lastName}`,
           department: 'Accounts',
-          relatedEntity: { type: 'transaction', id: transaction.id }
+          relatedEntity: { type: 'transaction', id: transaction.id },
         });
       }
     });
@@ -838,7 +1138,7 @@ export class DashboardService {
   private async getProductionActivitiesForAdmin(limit: number) {
     const projects = await this.prisma.project.findMany({
       where: {
-        team: { productionUnitId: { not: null } }
+        team: { productionUnitId: { not: null } },
       },
       take: limit,
       orderBy: { updatedAt: 'desc' },
@@ -848,33 +1148,36 @@ export class DashboardService {
         updatedAt: true,
         projectLogs: {
           where: {
-            developer: { department: { name: 'Production' } }
+            developer: { department: { name: 'Production' } },
           },
           take: 1,
           orderBy: { createdAt: 'desc' },
           select: {
             developer: {
-              select: { firstName: true, lastName: true, id: true }
-            }
-          }
-        }
-      }
+              select: { firstName: true, lastName: true, id: true },
+            },
+          },
+        },
+      },
     });
 
     const activities: any[] = [];
 
-    projects.forEach(project => {
+    projects.forEach((project) => {
       const latestLog = project.projectLogs[0];
       if (latestLog) {
         activities.push({
           id: `project_${project.id}`,
           type: 'Project Activity',
-          title: project.status === 'completed' ? 'Project Completed' : `Project ${project.status}`,
+          title:
+            project.status === 'completed'
+              ? 'Project Completed'
+              : `Project ${project.status}`,
           description: `Project status changed to ${project.status} by ${latestLog.developer.firstName} ${latestLog.developer.lastName}`,
           createdAt: project.updatedAt,
           actor: `${latestLog.developer.firstName} ${latestLog.developer.lastName}`,
           department: 'Production',
-          relatedEntity: { type: 'project', id: project.id }
+          relatedEntity: { type: 'project', id: project.id },
         });
       }
     });
@@ -889,9 +1192,9 @@ export class DashboardService {
       where: {
         hr: {
           employee: {
-            department: { name: 'HR' }
-          }
-        }
+            department: { name: 'HR' },
+          },
+        },
       },
       select: {
         id: true,
@@ -901,24 +1204,25 @@ export class DashboardService {
         hr: {
           select: {
             employee: {
-              select: { firstName: true, lastName: true, id: true }
-            }
-          }
+              select: { firstName: true, lastName: true, id: true },
+            },
+          },
         },
         affectedEmployee: {
-          select: { firstName: true, lastName: true, id: true }
-        }
-      }
+          select: { firstName: true, lastName: true, id: true },
+        },
+      },
     });
 
     const activities: any[] = [];
 
-    hrLogs.forEach(log => {
+    hrLogs.forEach((log) => {
       const isBulkMarkPresent = log.actionType === 'bulk_mark_present';
-      const description = isBulkMarkPresent 
+      const description = isBulkMarkPresent
         ? this.extractBulkMarkPresentReason(log.description)
-        : (log.description || `${log.hr.employee.firstName} ${log.hr.employee.lastName} performed ${this.formatActionType(log.actionType)}`);
-      
+        : log.description ||
+          `${log.hr.employee.firstName} ${log.hr.employee.lastName} performed ${this.formatActionType(log.actionType)}`;
+
       activities.push({
         id: `hr_log_${log.id}`,
         type: 'HR Activity',
@@ -927,11 +1231,13 @@ export class DashboardService {
         createdAt: log.createdAt,
         actor: `${log.hr.employee.firstName} ${log.hr.employee.lastName}`,
         department: 'HR',
-        relatedEntity: log.affectedEmployee ? {
-          type: 'employee',
-          id: log.affectedEmployee.id,
-          name: `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}`
-        } : null
+        relatedEntity: log.affectedEmployee
+          ? {
+              type: 'employee',
+              id: log.affectedEmployee.id,
+              name: `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}`,
+            }
+          : null,
       });
     });
 
@@ -944,10 +1250,10 @@ export class DashboardService {
         marketingUnit: {
           marketingEmployees: {
             some: {
-              employee: { department: { name: 'Marketing' } }
-            }
-          }
-        }
+              employee: { department: { name: 'Marketing' } },
+            },
+          },
+        },
       },
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -960,23 +1266,23 @@ export class DashboardService {
           select: {
             marketingEmployees: {
               where: {
-                employee: { department: { name: 'Marketing' } }
+                employee: { department: { name: 'Marketing' } },
               },
               take: 1,
               select: {
                 employee: {
-                  select: { firstName: true, lastName: true, id: true }
-                }
-              }
-            }
-          }
-        }
-      }
+                  select: { firstName: true, lastName: true, id: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     const activities: any[] = [];
 
-    campaigns.forEach(campaign => {
+    campaigns.forEach((campaign) => {
       const employee = campaign.marketingUnit.marketingEmployees[0]?.employee;
       if (employee) {
         activities.push({
@@ -987,7 +1293,11 @@ export class DashboardService {
           createdAt: campaign.createdAt,
           actor: `${employee.firstName} ${employee.lastName}`,
           department: 'Marketing',
-          relatedEntity: { type: 'campaign', id: campaign.id, name: campaign.campaignName }
+          relatedEntity: {
+            type: 'campaign',
+            id: campaign.id,
+            name: campaign.campaignName,
+          },
         });
       }
     });
@@ -1001,23 +1311,34 @@ export class DashboardService {
     // Pattern: $5.4M, $743.4K, $10000, etc.
     const amountMatch = description.match(/\$([\d,]+(?:\.\d+)?)([KM])?/);
     if (!amountMatch) return false;
-    
+
     let amount = parseFloat(amountMatch[1].replace(/,/g, ''));
     const suffix = amountMatch[2];
     const multiplier = suffix === 'K' ? 1000 : suffix === 'M' ? 1000000 : 1;
     amount = amount * multiplier;
-    
+
     return amount >= 10000;
   }
 
   private isImportantHrAction(title: string): boolean {
-    const importantActions = ['employee added', 'employee terminated', 'employee updated', 'salary updated'];
-    return importantActions.some(action => title.toLowerCase().includes(action));
+    const importantActions = [
+      'employee added',
+      'employee terminated',
+      'employee updated',
+      'salary updated',
+    ];
+    return importantActions.some((action) =>
+      title.toLowerCase().includes(action),
+    );
   }
 
   // OPTIMIZED HR Activities - Direct department filtering, no user lookup
   // Only includes activities PERFORMED BY HR employees (HR Logs), not HR Requests
-  private async getHrActivitiesOptimized(userId: number, role: string, limit: number) {
+  private async getHrActivitiesOptimized(
+    userId: number,
+    role: string,
+    limit: number,
+  ) {
     // Only fetch HR Logs - activities performed by HR employees
     const hrLogs = await this.prisma.hRLog.findMany({
       take: limit,
@@ -1025,9 +1346,9 @@ export class DashboardService {
       where: {
         hr: {
           employee: {
-            department: { name: 'HR' }
-          }
-        }
+            department: { name: 'HR' },
+          },
+        },
       },
       select: {
         id: true,
@@ -1037,26 +1358,27 @@ export class DashboardService {
         hr: {
           select: {
             employee: {
-              select: { firstName: true, lastName: true, id: true }
-            }
-          }
+              select: { firstName: true, lastName: true, id: true },
+            },
+          },
         },
         affectedEmployee: {
-          select: { firstName: true, lastName: true, id: true }
-        }
-      }
+          select: { firstName: true, lastName: true, id: true },
+        },
+      },
     });
 
     const activities: any[] = [];
 
     // Process HR Logs - only activities performed by HR employees
-    hrLogs.forEach(log => {
+    hrLogs.forEach((log) => {
       // For bulk_mark_present, extract only the reason from description
       const isBulkMarkPresent = log.actionType === 'bulk_mark_present';
-      const description = isBulkMarkPresent 
+      const description = isBulkMarkPresent
         ? this.extractBulkMarkPresentReason(log.description)
-        : (log.description || `${log.hr.employee.firstName} ${log.hr.employee.lastName} performed ${this.formatActionType(log.actionType)}`);
-      
+        : log.description ||
+          `${log.hr.employee.firstName} ${log.hr.employee.lastName} performed ${this.formatActionType(log.actionType)}`;
+
       activities.push({
         id: `hr_log_${log.id}`,
         type: 'HR Activity',
@@ -1064,30 +1386,39 @@ export class DashboardService {
         description,
         createdAt: log.createdAt,
         actor: `${log.hr.employee.firstName} ${log.hr.employee.lastName}`,
-        relatedEntity: log.affectedEmployee ? {
-          type: 'employee',
-          id: log.affectedEmployee.id,
-          name: `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}`
-        } : null
+        relatedEntity: log.affectedEmployee
+          ? {
+              type: 'employee',
+              id: log.affectedEmployee.id,
+              name: `${log.affectedEmployee.firstName} ${log.affectedEmployee.lastName}`,
+            }
+          : null,
       });
     });
 
     // Sort and limit
     return activities
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .slice(0, limit);
   }
 
   // OPTIMIZED Sales Activities - Direct department filtering
-  private async getSalesActivitiesOptimized(userId: number, role: string, limit: number) {
+  private async getSalesActivitiesOptimized(
+    userId: number,
+    role: string,
+    limit: number,
+  ) {
     // Build where clause based on role
     let leadWhere: any = {
       OR: [
         { assignedTo: { department: { name: 'Sales' } } },
         { crackedBy: { department: { name: 'Sales' } } },
         { startedBy: { department: { name: 'Sales' } } },
-        { closedBy: { department: { name: 'Sales' } } }
-      ]
+        { closedBy: { department: { name: 'Sales' } } },
+      ],
     };
 
     if (role === 'unit_head') {
@@ -1112,27 +1443,32 @@ export class DashboardService {
           status: true,
           updatedAt: true,
           assignedTo: {
-            select: { firstName: true, lastName: true, id: true }
+            select: { firstName: true, lastName: true, id: true },
           },
           crackedBy: {
-            select: { firstName: true, lastName: true, id: true }
+            select: { firstName: true, lastName: true, id: true },
           },
           startedBy: {
-            select: { firstName: true, lastName: true, id: true }
+            select: { firstName: true, lastName: true, id: true },
           },
           closedBy: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
       }),
 
       // Cracked Leads - Direct department filter
       this.prisma.crackedLead.findMany({
         where: {
           employee: { department: { name: 'Sales' } },
-          lead: role === 'unit_head' ? { salesUnit: { headId: userId } } :
-                role === 'team_lead' ? { assignedTo: { teamLeadId: userId } } :
-                role !== 'dep_manager' ? { assignedToId: userId } : {}
+          lead:
+            role === 'unit_head'
+              ? { salesUnit: { headId: userId } }
+              : role === 'team_lead'
+                ? { assignedTo: { teamLeadId: userId } }
+                : role !== 'dep_manager'
+                  ? { assignedToId: userId }
+                  : {},
         },
         take: limit,
         orderBy: { crackedAt: 'desc' },
@@ -1141,35 +1477,43 @@ export class DashboardService {
           amount: true,
           crackedAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
+            select: { firstName: true, lastName: true, id: true },
           },
           lead: {
-            select: { name: true, email: true }
-          }
-        }
-      })
+            select: { name: true, email: true },
+          },
+        },
+      }),
     ]);
 
     const activities: any[] = [];
 
     // Process Leads
-    leads.forEach(lead => {
-      const actor = lead.crackedBy || lead.assignedTo || lead.startedBy || lead.closedBy;
+    leads.forEach((lead) => {
+      const actor =
+        lead.crackedBy || lead.assignedTo || lead.startedBy || lead.closedBy;
       if (actor) {
         activities.push({
           id: `lead_${lead.id}`,
           type: 'Lead Activity',
-          title: lead.status === 'cracked' ? 'Lead Converted' : `Lead ${lead.status}`,
+          title:
+            lead.status === 'cracked'
+              ? 'Lead Converted'
+              : `Lead ${lead.status}`,
           description: `Lead "${lead.name || lead.email}" was ${lead.status === 'cracked' ? 'converted' : lead.status} by ${actor.firstName} ${actor.lastName}`,
           createdAt: lead.updatedAt,
           actor: `${actor.firstName} ${actor.lastName}`,
-          relatedEntity: { type: 'lead', id: lead.id, name: lead.name || lead.email }
+          relatedEntity: {
+            type: 'lead',
+            id: lead.id,
+            name: lead.name || lead.email,
+          },
         });
       }
     });
 
     // Process Cracked Leads
-    crackedLeads.forEach(cracked => {
+    crackedLeads.forEach((cracked) => {
       activities.push({
         id: `cracked_lead_${cracked.id}`,
         type: 'Deal Closed',
@@ -1177,34 +1521,41 @@ export class DashboardService {
         description: `Deal closed for $${cracked.amount} by ${cracked.employee.firstName} ${cracked.employee.lastName}`,
         createdAt: cracked.crackedAt,
         actor: `${cracked.employee.firstName} ${cracked.employee.lastName}`,
-        relatedEntity: { type: 'cracked_lead', id: cracked.id }
+        relatedEntity: { type: 'cracked_lead', id: cracked.id },
       });
     });
 
     return activities
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .slice(0, limit);
   }
 
   // OPTIMIZED Production Activities
-  private async getProductionActivitiesOptimized(userId: number, role: string, limit: number) {
+  private async getProductionActivitiesOptimized(
+    userId: number,
+    role: string,
+    limit: number,
+  ) {
     // Get team IDs if needed (only for team_lead role)
     let teamIds: number[] = [];
     if (role === 'team_lead') {
       const teams = await this.prisma.team.findMany({
         where: { teamLeadId: userId },
-        select: { id: true }
+        select: { id: true },
       });
-      teamIds = teams.map(t => t.id);
+      teamIds = teams.map((t) => t.id);
     }
 
     // Build project where clause
     let projectWhere: any = {
       projectLogs: {
         some: {
-          developer: { department: { name: 'Production' } }
-        }
-      }
+          developer: { department: { name: 'Production' } },
+        },
+      },
     };
 
     if (role === 'unit_head') {
@@ -1212,7 +1563,10 @@ export class DashboardService {
     } else if (role === 'team_lead' && teamIds.length > 0) {
       projectWhere = { ...projectWhere, teamId: { in: teamIds } };
     } else if (role !== 'dep_manager') {
-      projectWhere = { ...projectWhere, projectLogs: { some: { developerId: userId } } };
+      projectWhere = {
+        ...projectWhere,
+        projectLogs: { some: { developerId: userId } },
+      };
     }
 
     // Single query for projects only (no tasks)
@@ -1226,23 +1580,23 @@ export class DashboardService {
         updatedAt: true,
         projectLogs: {
           where: {
-            developer: { department: { name: 'Production' } }
+            developer: { department: { name: 'Production' } },
           },
           take: 1,
           orderBy: { createdAt: 'desc' },
           select: {
             developer: {
-              select: { firstName: true, lastName: true, id: true }
-            }
-          }
-        }
-      }
+              select: { firstName: true, lastName: true, id: true },
+            },
+          },
+        },
+      },
     });
 
     const activities: any[] = [];
 
     // Process Projects
-    projects.forEach(project => {
+    projects.forEach((project) => {
       const latestLog = project.projectLogs[0];
       if (latestLog) {
         activities.push({
@@ -1252,27 +1606,34 @@ export class DashboardService {
           description: `Project status changed to ${project.status} by ${latestLog.developer.firstName} ${latestLog.developer.lastName}`,
           createdAt: project.updatedAt,
           actor: `${latestLog.developer.firstName} ${latestLog.developer.lastName}`,
-          relatedEntity: { type: 'project', id: project.id }
+          relatedEntity: { type: 'project', id: project.id },
         });
       }
     });
 
     return activities
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .slice(0, limit);
   }
 
   // OPTIMIZED Marketing Activities
-  private async getMarketingActivitiesOptimized(userId: number, role: string, limit: number) {
+  private async getMarketingActivitiesOptimized(
+    userId: number,
+    role: string,
+    limit: number,
+  ) {
     // Build campaign where clause
     let campaignWhere: any = {
       marketingUnit: {
         marketingEmployees: {
           some: {
-            employee: { department: { name: 'Marketing' } }
-          }
-        }
-      }
+            employee: { department: { name: 'Marketing' } },
+          },
+        },
+      },
     };
 
     if (role === 'unit_head') {
@@ -1280,8 +1641,8 @@ export class DashboardService {
         ...campaignWhere,
         marketingUnit: {
           ...campaignWhere.marketingUnit,
-          headId: userId
-        }
+          headId: userId,
+        },
       };
     }
 
@@ -1299,23 +1660,23 @@ export class DashboardService {
           select: {
             marketingEmployees: {
               where: {
-                employee: { department: { name: 'Marketing' } }
+                employee: { department: { name: 'Marketing' } },
               },
               take: 1,
               select: {
                 employee: {
-                  select: { firstName: true, lastName: true, id: true }
-                }
-              }
-            }
-          }
-        }
-      }
+                  select: { firstName: true, lastName: true, id: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     const activities: any[] = [];
 
-    campaigns.forEach(campaign => {
+    campaigns.forEach((campaign) => {
       const employee = campaign.marketingUnit.marketingEmployees[0]?.employee;
       if (employee) {
         activities.push({
@@ -1325,7 +1686,11 @@ export class DashboardService {
           description: `Campaign "${campaign.campaignName}" ${campaign.status === 'Running' ? 'launched' : campaign.status.toLowerCase()} by ${employee.firstName} ${employee.lastName}`,
           createdAt: campaign.createdAt,
           actor: `${employee.firstName} ${employee.lastName}`,
-          relatedEntity: { type: 'campaign', id: campaign.id, name: campaign.campaignName }
+          relatedEntity: {
+            type: 'campaign',
+            id: campaign.id,
+            name: campaign.campaignName,
+          },
         });
       }
     });
@@ -1334,13 +1699,17 @@ export class DashboardService {
   }
 
   // OPTIMIZED Accountant Activities - Single parallel query
-  private async getAccountantActivitiesOptimized(userId: number, role: string, limit: number) {
+  private async getAccountantActivitiesOptimized(
+    userId: number,
+    role: string,
+    limit: number,
+  ) {
     // Single parallel query for all financial activities
     const [transactions, revenues, expenses] = await Promise.all([
       // Transactions
       this.prisma.transaction.findMany({
         where: {
-          employee: { department: { name: 'Accounts' } }
+          employee: { department: { name: 'Accounts' } },
         },
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -1350,15 +1719,15 @@ export class DashboardService {
           amount: true,
           createdAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
       }),
 
       // Revenues
       this.prisma.revenue.findMany({
         where: {
-          employee: { department: { name: 'Accounts' } }
+          employee: { department: { name: 'Accounts' } },
         },
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -1367,15 +1736,15 @@ export class DashboardService {
           amount: true,
           createdAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
       }),
 
       // Expenses
       this.prisma.expense.findMany({
         where: {
-          employee: { department: { name: 'Accounts' } }
+          employee: { department: { name: 'Accounts' } },
         },
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -1384,16 +1753,16 @@ export class DashboardService {
           amount: true,
           createdAt: true,
           employee: {
-            select: { firstName: true, lastName: true, id: true }
-          }
-        }
-      })
+            select: { firstName: true, lastName: true, id: true },
+          },
+        },
+      }),
     ]);
 
     const activities: any[] = [];
 
     // Process Transactions
-    transactions.forEach(transaction => {
+    transactions.forEach((transaction) => {
       if (transaction.employee) {
         activities.push({
           id: `transaction_${transaction.id}`,
@@ -1402,13 +1771,13 @@ export class DashboardService {
           description: `${transaction.transactionType} transaction of $${transaction.amount} processed by ${transaction.employee.firstName} ${transaction.employee.lastName}`,
           createdAt: transaction.createdAt,
           actor: `${transaction.employee.firstName} ${transaction.employee.lastName}`,
-          relatedEntity: { type: 'transaction', id: transaction.id }
+          relatedEntity: { type: 'transaction', id: transaction.id },
         });
       }
     });
 
     // Process Revenues
-    revenues.forEach(revenue => {
+    revenues.forEach((revenue) => {
       if (revenue.employee) {
         activities.push({
           id: `revenue_${revenue.id}`,
@@ -1417,13 +1786,13 @@ export class DashboardService {
           description: `Revenue of $${revenue.amount} recorded by ${revenue.employee.firstName} ${revenue.employee.lastName}`,
           createdAt: revenue.createdAt,
           actor: `${revenue.employee.firstName} ${revenue.employee.lastName}`,
-          relatedEntity: { type: 'revenue', id: revenue.id }
+          relatedEntity: { type: 'revenue', id: revenue.id },
         });
       }
     });
 
     // Process Expenses
-    expenses.forEach(expense => {
+    expenses.forEach((expense) => {
       if (expense.employee) {
         activities.push({
           id: `expense_${expense.id}`,
@@ -1432,13 +1801,16 @@ export class DashboardService {
           description: `Expense of $${expense.amount} recorded by ${expense.employee.firstName} ${expense.employee.lastName}`,
           createdAt: expense.createdAt,
           actor: `${expense.employee.firstName} ${expense.employee.lastName}`,
-          relatedEntity: { type: 'expense', id: expense.id }
+          relatedEntity: { type: 'expense', id: expense.id },
         });
       }
     });
 
     return activities
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .slice(0, limit);
   }
 
@@ -1490,7 +1862,7 @@ export class DashboardService {
       accAllRevenue,
       accAllExpenses,
       accPrevRevenue,
-      accPrevExpenses
+      accPrevExpenses,
     ] = await Promise.all([
       // Admin metrics
       this.prisma.employee.count(),
@@ -1498,65 +1870,196 @@ export class DashboardService {
         where: {
           date: { gte: today, lt: tomorrow },
           OR: [{ status: 'present' }, { checkin: { not: null } }],
-          employee: { status: 'active' }
+          employee: { status: 'active' },
         },
         select: { employeeId: true },
-        distinct: ['employeeId']
+        distinct: ['employeeId'],
       }),
       this.prisma.department.count(),
       this.prisma.employee.count({
-        where: { createdAt: { lt: dateRanges.currentMonthStart } }
+        where: { createdAt: { lt: dateRanges.currentMonthStart } },
       }),
       this.prisma.attendanceLog.findMany({
         where: {
           date: {
-            gte: new Date(dateRanges.prevMonthStart.getFullYear(), dateRanges.prevMonthStart.getMonth(), dateRanges.prevMonthStart.getDate()),
-            lt: new Date(dateRanges.prevMonthStart.getFullYear(), dateRanges.prevMonthStart.getMonth(), dateRanges.prevMonthStart.getDate() + 1)
+            gte: new Date(
+              dateRanges.prevMonthStart.getFullYear(),
+              dateRanges.prevMonthStart.getMonth(),
+              dateRanges.prevMonthStart.getDate(),
+            ),
+            lt: new Date(
+              dateRanges.prevMonthStart.getFullYear(),
+              dateRanges.prevMonthStart.getMonth(),
+              dateRanges.prevMonthStart.getDate() + 1,
+            ),
           },
           OR: [{ status: 'present' }, { checkin: { not: null } }],
-          employee: { status: 'active' }
+          employee: { status: 'active' },
         },
         select: { employeeId: true },
-        distinct: ['employeeId']
+        distinct: ['employeeId'],
       }),
       this.prisma.department.count({
-        where: { createdAt: { lt: dateRanges.currentMonthStart } }
+        where: { createdAt: { lt: dateRanges.currentMonthStart } },
       }),
       // Sales dep_manager (all leads, no filtering)
       this.prisma.lead.count(),
       this.prisma.lead.count({ where: { status: 'in_progress' } }),
       this.prisma.crackedLead.count(),
       this.prisma.crackedLead.aggregate({ _sum: { amount: true } }),
-      this.prisma.lead.count({ where: { createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } } }),
-      this.prisma.crackedLead.count({ where: { lead: { createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, crackedAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } } }),
-      this.prisma.crackedLead.aggregate({ where: { lead: { createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, crackedAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, _sum: { amount: true } }),
+      this.prisma.lead.count({
+        where: {
+          createdAt: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+      }),
+      this.prisma.crackedLead.count({
+        where: {
+          lead: {
+            createdAt: {
+              gte: dateRanges.prevMonthStart,
+              lt: dateRanges.currentMonthStart,
+            },
+          },
+          crackedAt: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+      }),
+      this.prisma.crackedLead.aggregate({
+        where: {
+          lead: {
+            createdAt: {
+              gte: dateRanges.prevMonthStart,
+              lt: dateRanges.currentMonthStart,
+            },
+          },
+          crackedAt: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+        _sum: { amount: true },
+      }),
       // HR dep_manager
       this.prisma.employee.count({ where: { status: 'active' } }),
       this.getAttendanceRate(),
-      this.prisma.leaveLog.count({ where: { status: 'Approved', startDate: { lte: today }, endDate: { gte: today } } }),
+      this.prisma.leaveLog.count({
+        where: {
+          status: 'Approved',
+          startDate: { lte: today },
+          endDate: { gte: today },
+        },
+      }),
       this.prisma.hrRequest.count({ where: { status: 'Pending' } }),
-      this.prisma.employee.count({ where: { status: 'active', startDate: { lt: dateRanges.currentMonthStart } } }),
-      this.getAttendanceRate(dateRanges.prevMonthStart, dateRanges.currentMonthStart),
-      this.prisma.hrRequest.count({ where: { status: 'Pending', requestedOn: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } } }),
-      this.prisma.leaveLog.count({ where: { status: 'Approved', startDate: { lte: new Date(today.getTime() - 86400000) }, endDate: { gte: new Date(today.getTime() - 86400000) } } }),
+      this.prisma.employee.count({
+        where: {
+          status: 'active',
+          startDate: { lt: dateRanges.currentMonthStart },
+        },
+      }),
+      this.getAttendanceRate(
+        dateRanges.prevMonthStart,
+        dateRanges.currentMonthStart,
+      ),
+      this.prisma.hrRequest.count({
+        where: {
+          status: 'Pending',
+          requestedOn: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+      }),
+      this.prisma.leaveLog.count({
+        where: {
+          status: 'Approved',
+          startDate: { lte: new Date(today.getTime() - 86400000) },
+          endDate: { gte: new Date(today.getTime() - 86400000) },
+        },
+      }),
       // Production dep_manager
-      this.prisma.project.count({ where: { team: { productionUnitId: { not: null } } } }),
-      this.prisma.project.count({ where: { team: { productionUnitId: { not: null } }, createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } } }),
+      this.prisma.project.count({
+        where: { team: { productionUnitId: { not: null } } },
+      }),
+      this.prisma.project.count({
+        where: {
+          team: { productionUnitId: { not: null } },
+          createdAt: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+      }),
       this.prisma.productionUnit.count(),
-      this.prisma.productionUnit.count({ where: { createdAt: { lt: dateRanges.currentMonthStart } } }),
-      this.prisma.project.count({ where: { status: 'in_progress', team: { productionUnitId: { not: null } } } }),
-      this.prisma.project.count({ where: { status: 'in_progress', team: { productionUnitId: { not: null } }, createdAt: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } } }),
+      this.prisma.productionUnit.count({
+        where: { createdAt: { lt: dateRanges.currentMonthStart } },
+      }),
+      this.prisma.project.count({
+        where: {
+          status: 'in_progress',
+          team: { productionUnitId: { not: null } },
+        },
+      }),
+      this.prisma.project.count({
+        where: {
+          status: 'in_progress',
+          team: { productionUnitId: { not: null } },
+          createdAt: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+      }),
       this.prisma.production.findFirst({
         orderBy: { projectsCompleted: 'desc' },
-        select: { projectsCompleted: true, employee: { select: { firstName: true, lastName: true } } }
+        select: {
+          projectsCompleted: true,
+          employee: { select: { firstName: true, lastName: true } },
+        },
       }),
       // Accounts dep_manager
-      this.prisma.revenue.aggregate({ where: { receivedOn: { gte: dateRanges.currentMonthStart, lte: dateRanges.currentMonthEnd } }, _sum: { amount: true } }),
-      this.prisma.expense.aggregate({ where: { paidOn: { gte: dateRanges.currentMonthStart, lte: dateRanges.currentMonthEnd } }, _sum: { amount: true } }),
+      this.prisma.revenue.aggregate({
+        where: {
+          receivedOn: {
+            gte: dateRanges.currentMonthStart,
+            lte: dateRanges.currentMonthEnd,
+          },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: {
+          paidOn: {
+            gte: dateRanges.currentMonthStart,
+            lte: dateRanges.currentMonthEnd,
+          },
+        },
+        _sum: { amount: true },
+      }),
       this.prisma.revenue.aggregate({ _sum: { amount: true } }),
       this.prisma.expense.aggregate({ _sum: { amount: true } }),
-      this.prisma.revenue.aggregate({ where: { receivedOn: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, _sum: { amount: true } }),
-      this.prisma.expense.aggregate({ where: { paidOn: { gte: dateRanges.prevMonthStart, lt: dateRanges.currentMonthStart } }, _sum: { amount: true } })
+      this.prisma.revenue.aggregate({
+        where: {
+          receivedOn: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: {
+          paidOn: {
+            gte: dateRanges.prevMonthStart,
+            lt: dateRanges.currentMonthStart,
+          },
+        },
+        _sum: { amount: true },
+      }),
     ]);
 
     const activeToday = activeTodayLogs.length;
@@ -1564,24 +2067,29 @@ export class DashboardService {
 
     // Calculate active rate
     const totalActiveEmployees = await this.prisma.employee.count({
-      where: { status: 'active' }
+      where: { status: 'active' },
     });
-    const activeRate = totalActiveEmployees > 0 
-      ? Math.round((activeToday / totalActiveEmployees) * 100) 
-      : 0;
+    const activeRate =
+      totalActiveEmployees > 0
+        ? Math.round((activeToday / totalActiveEmployees) * 100)
+        : 0;
 
     // System Health
     const systemHealth = 99.9;
     const prevSystemHealth = 99.8;
 
     // Sales calculations
-    const salesConversionRate = salesTotal > 0 ? ((salesCracked / salesTotal) * 100) : 0;
-    const salesPrevConversionRate = salesPrevTotal > 0 ? ((salesPrevCracked / salesPrevTotal) * 100) : 0;
+    const salesConversionRate =
+      salesTotal > 0 ? (salesCracked / salesTotal) * 100 : 0;
+    const salesPrevConversionRate =
+      salesPrevTotal > 0 ? (salesPrevCracked / salesPrevTotal) * 100 : 0;
 
     // Accounts calculations
     const accRev = Number(accRevenue._sum.amount || 0);
     const accExp = Number(accExpenses._sum.amount || 0);
-    const accProfit = Number(accAllRevenue._sum.amount || 0) - Number(accAllExpenses._sum.amount || 0);
+    const accProfit =
+      Number(accAllRevenue._sum.amount || 0) -
+      Number(accAllExpenses._sum.amount || 0);
     const accPrevRev = Number(accPrevRevenue._sum.amount || 0);
     const accPrevExp = Number(accPrevExpenses._sum.amount || 0);
     const accCurrentMonthProfit = accRev - accExp;
@@ -1596,7 +2104,7 @@ export class DashboardService {
         subtitle: 'Registered users',
         change: this.calculateChange(totalUsers, prevTotalUsers, 'number'),
         changeType: this.getChangeType(totalUsers, prevTotalUsers, true),
-        department: 'Admin'
+        department: 'Admin',
       },
       {
         id: 2,
@@ -1604,27 +2112,39 @@ export class DashboardService {
         value: activeToday.toString(),
         subtitle: 'Currently online',
         change: `${activeRate}% active rate`,
-        changeType: (activeRate >= 70 ? 'positive' : activeRate >= 50 ? 'neutral' : 'negative') as 'positive' | 'negative' | 'neutral',
-        department: 'Admin'
+        changeType:
+          activeRate >= 70
+            ? 'positive'
+            : activeRate >= 50
+              ? 'neutral'
+              : 'negative',
+        department: 'Admin',
       },
       {
         id: 3,
         title: 'Departments',
         value: departments.toString(),
         subtitle: 'Active departments',
-        change: departments === prevDepartments ? 'All operational' : this.calculateChange(departments, prevDepartments, 'number'),
+        change:
+          departments === prevDepartments
+            ? 'All operational'
+            : this.calculateChange(departments, prevDepartments, 'number'),
         changeType: this.getChangeType(departments, prevDepartments, true),
-        department: 'Admin'
+        department: 'Admin',
       },
       {
         id: 4,
         title: 'System Health',
         value: `${systemHealth}%`,
         subtitle: 'Server uptime',
-        change: this.calculateChange(systemHealth, prevSystemHealth, 'percentage'),
+        change: this.calculateChange(
+          systemHealth,
+          prevSystemHealth,
+          'percentage',
+        ),
         changeType: this.getChangeType(systemHealth, prevSystemHealth, true),
-        department: 'Admin'
-      }
+        department: 'Admin',
+      },
     ];
 
     const salesCards = [
@@ -1635,25 +2155,41 @@ export class DashboardService {
         subtitle: `Active: ${salesActive}`,
         change: this.calculateChange(salesTotal, salesPrevTotal, 'number'),
         changeType: this.getChangeType(salesTotal, salesPrevTotal, true),
-        department: 'Sales'
+        department: 'Sales',
       },
       {
         id: 6,
         title: 'Conversion Rate',
         value: `${salesConversionRate.toFixed(2)}%`,
         subtitle: 'Cracked / Total',
-        change: this.calculateChange(salesConversionRate, salesPrevConversionRate, 'percentage'),
-        changeType: this.getChangeType(salesConversionRate, salesPrevConversionRate, true),
-        department: 'Sales'
+        change: this.calculateChange(
+          salesConversionRate,
+          salesPrevConversionRate,
+          'percentage',
+        ),
+        changeType: this.getChangeType(
+          salesConversionRate,
+          salesPrevConversionRate,
+          true,
+        ),
+        department: 'Sales',
       },
       {
         id: 7,
         title: 'Revenue',
         value: `$${this.fmt(Number(salesRevenue._sum.amount || 0))}`,
         subtitle: 'Total revenue',
-        change: this.calculateChange(Number(salesRevenue._sum.amount || 0), Number(salesPrevRevenue._sum.amount || 0), 'currency'),
-        changeType: this.getChangeType(Number(salesRevenue._sum.amount || 0), Number(salesPrevRevenue._sum.amount || 0), true),
-        department: 'Sales'
+        change: this.calculateChange(
+          Number(salesRevenue._sum.amount || 0),
+          Number(salesPrevRevenue._sum.amount || 0),
+          'currency',
+        ),
+        changeType: this.getChangeType(
+          Number(salesRevenue._sum.amount || 0),
+          Number(salesPrevRevenue._sum.amount || 0),
+          true,
+        ),
+        department: 'Sales',
       },
       {
         id: 8,
@@ -1662,8 +2198,8 @@ export class DashboardService {
         subtitle: 'Cracked leads',
         change: this.calculateChange(salesCracked, salesPrevCracked, 'number'),
         changeType: this.getChangeType(salesCracked, salesPrevCracked, true),
-        department: 'Sales'
-      }
+        department: 'Sales',
+      },
     ];
 
     const hrCards = [
@@ -1674,16 +2210,20 @@ export class DashboardService {
         subtitle: 'Active employees',
         change: this.calculateChange(hrEmployees, hrPrevEmployees, 'number'),
         changeType: this.getChangeType(hrEmployees, hrPrevEmployees, true),
-        department: 'HR'
+        department: 'HR',
       },
       {
         id: 10,
         title: 'Attendance Rate',
         value: `${hrAttendance}%`,
         subtitle: 'This month',
-        change: this.calculateChange(hrAttendance, hrPrevAttendance, 'percentage'),
+        change: this.calculateChange(
+          hrAttendance,
+          hrPrevAttendance,
+          'percentage',
+        ),
         changeType: this.getChangeType(hrAttendance, hrPrevAttendance, true),
-        department: 'HR'
+        department: 'HR',
       },
       {
         id: 11,
@@ -1692,7 +2232,7 @@ export class DashboardService {
         subtitle: 'All pending',
         change: this.calculateChange(hrPending, hrPrevPending, 'number'),
         changeType: this.getChangeType(hrPending, hrPrevPending, false),
-        department: 'HR'
+        department: 'HR',
       },
       {
         id: 12,
@@ -1701,8 +2241,8 @@ export class DashboardService {
         subtitle: 'Currently on leave',
         change: this.calculateChange(hrOnLeave, hrPrevOnLeave, 'number'),
         changeType: this.getChangeType(hrOnLeave, hrPrevOnLeave, false),
-        department: 'HR'
-      }
+        department: 'HR',
+      },
     ];
 
     const productionCards = [
@@ -1711,37 +2251,63 @@ export class DashboardService {
         title: 'Total Projects',
         value: prodTotalProjects.toString(),
         subtitle: 'All projects',
-        change: this.calculateChange(prodTotalProjects, prodPrevTotalProjects, 'number'),
-        changeType: this.getChangeType(prodTotalProjects, prodPrevTotalProjects, true),
-        department: 'Production'
+        change: this.calculateChange(
+          prodTotalProjects,
+          prodPrevTotalProjects,
+          'number',
+        ),
+        changeType: this.getChangeType(
+          prodTotalProjects,
+          prodPrevTotalProjects,
+          true,
+        ),
+        department: 'Production',
       },
       {
         id: 14,
         title: 'Units',
         value: prodProductionUnits.toString(),
         subtitle: 'Total units',
-        change: this.calculateChange(prodProductionUnits, prodPrevProductionUnits, 'number'),
-        changeType: this.getChangeType(prodProductionUnits, prodPrevProductionUnits, true),
-        department: 'Production'
+        change: this.calculateChange(
+          prodProductionUnits,
+          prodPrevProductionUnits,
+          'number',
+        ),
+        changeType: this.getChangeType(
+          prodProductionUnits,
+          prodPrevProductionUnits,
+          true,
+        ),
+        department: 'Production',
       },
       {
         id: 15,
         title: 'Active Projects',
         value: prodActiveProjects.toString(),
         subtitle: 'In progress',
-        change: this.calculateChange(prodActiveProjects, prodPrevActiveProjects, 'number'),
-        changeType: this.getChangeType(prodActiveProjects, prodPrevActiveProjects, true),
-        department: 'Production'
+        change: this.calculateChange(
+          prodActiveProjects,
+          prodPrevActiveProjects,
+          'number',
+        ),
+        changeType: this.getChangeType(
+          prodActiveProjects,
+          prodPrevActiveProjects,
+          true,
+        ),
+        department: 'Production',
       },
       {
         id: 16,
         title: 'Most Completed',
         value: (prodMostCompleted?.projectsCompleted || 0).toString(),
-        subtitle: prodMostCompleted ? `${prodMostCompleted.employee.firstName} ${prodMostCompleted.employee.lastName}` : 'No data',
+        subtitle: prodMostCompleted
+          ? `${prodMostCompleted.employee.firstName} ${prodMostCompleted.employee.lastName}`
+          : 'No data',
         change: prodMostCompleted ? 'Top performer' : 'No Performer',
         changeType: 'neutral' as const,
-        department: 'Production'
-      }
+        department: 'Production',
+      },
     ];
 
     const accountsCards = [
@@ -1750,9 +2316,17 @@ export class DashboardService {
         title: 'Profit',
         value: this.fmtCurrency(accProfit),
         subtitle: 'All time',
-        change: this.calculateChange(accCurrentMonthProfit, accPrevMonthProfit, 'currency'),
-        changeType: this.getChangeType(accCurrentMonthProfit, accPrevMonthProfit, true),
-        department: 'Accounts'
+        change: this.calculateChange(
+          accCurrentMonthProfit,
+          accPrevMonthProfit,
+          'currency',
+        ),
+        changeType: this.getChangeType(
+          accCurrentMonthProfit,
+          accPrevMonthProfit,
+          true,
+        ),
+        department: 'Accounts',
       },
       {
         id: 18,
@@ -1761,16 +2335,24 @@ export class DashboardService {
         subtitle: 'This month',
         change: this.calculateChange(accExp, accPrevExp, 'currency'),
         changeType: this.getChangeType(accExp, accPrevExp, false),
-        department: 'Accounts'
+        department: 'Accounts',
       },
       {
         id: 19,
         title: 'Cash Flow',
         value: this.fmtCurrency(accRev - accExp),
         subtitle: 'This month',
-        change: this.calculateChange(accRev - accExp, accPrevRev - accPrevExp, 'currency'),
-        changeType: this.getChangeType(accRev - accExp, accPrevRev - accPrevExp, true),
-        department: 'Accounts'
+        change: this.calculateChange(
+          accRev - accExp,
+          accPrevRev - accPrevExp,
+          'currency',
+        ),
+        changeType: this.getChangeType(
+          accRev - accExp,
+          accPrevRev - accPrevExp,
+          true,
+        ),
+        department: 'Accounts',
       },
       {
         id: 20,
@@ -1779,8 +2361,8 @@ export class DashboardService {
         subtitle: 'This month',
         change: this.calculateChange(accRev, accPrevRev, 'currency'),
         changeType: this.getChangeType(accRev, accPrevRev, true),
-        department: 'Accounts'
-      }
+        department: 'Accounts',
+      },
     ];
 
     return {
@@ -1791,16 +2373,26 @@ export class DashboardService {
         Sales: salesCards,
         HR: hrCards,
         Production: productionCards,
-        Accounts: accountsCards
-      }
+        Accounts: accountsCards,
+      },
     };
   }
 
   // HR REQUESTS - Optimized with single query and direct Prisma relations
-  async getHrRequests(userId: number, department: string, role: string, userType?: string, limit: number = 10) {
+  async getHrRequests(
+    userId: number,
+    department: string,
+    role: string,
+    userType?: string,
+    limit: number = 10,
+  ) {
     // Check if user is Admin
-    const isAdmin = userType === 'admin' || !department || department === 'Admin' || role === 'admin';
-    
+    const isAdmin =
+      userType === 'admin' ||
+      !department ||
+      department === 'Admin' ||
+      role === 'admin';
+
     if (isAdmin) {
       return await this.getAdminRequests(limit);
     }
@@ -1811,7 +2403,7 @@ export class DashboardService {
         department,
         role,
         requests: [],
-        total: 0
+        total: 0,
       };
     }
 
@@ -1824,27 +2416,27 @@ export class DashboardService {
       where = {
         OR: [
           // Sales unit employees (through salesDepartment)
-          { 
-            employee: { 
-              salesDepartment: { 
-                salesUnit: { headId: userId } 
-              } 
-            } 
+          {
+            employee: {
+              salesDepartment: {
+                salesUnit: { headId: userId },
+              },
+            },
           },
           // Production unit employees (through production)
-          { 
-            employee: { 
-              production: { 
-                productionUnit: { headId: userId } 
-              } 
-            } 
-          }
-        ]
+          {
+            employee: {
+              production: {
+                productionUnit: { headId: userId },
+              },
+            },
+          },
+        ],
       };
     } else if (role === 'team_lead') {
       // Team lead: See requests from their team members (direct relation - NO query needed!)
       where = {
-        employee: { teamLeadId: userId }
+        employee: { teamLeadId: userId },
       };
     }
     // For dep_manager, where remains empty (all requests)
@@ -1867,15 +2459,15 @@ export class DashboardService {
             firstName: true,
             lastName: true,
             department: {
-              select: { name: true }
-            }
-          }
-        }
-      }
+              select: { name: true },
+            },
+          },
+        },
+      },
     });
 
     // Transform to frontend format
-    const requests = hrRequests.map(request => ({
+    const requests = hrRequests.map((request) => ({
       id: request.id.toString(),
       title: request.subject || request.requestType || 'HR Request',
       employee: `${request.employee.firstName} ${request.employee.lastName}`,
@@ -1884,14 +2476,14 @@ export class DashboardService {
       status: this.mapRequestStatus(request.status),
       priority: this.mapRequestPriority(request.priority),
       submittedDate: this.getRelativeTime(request.requestedOn),
-      description: request.description || ''
+      description: request.description || '',
     }));
 
     return {
       department,
       role,
       requests,
-      total: requests.length
+      total: requests.length,
     };
   }
 
@@ -1916,13 +2508,13 @@ export class DashboardService {
                   firstName: true,
                   lastName: true,
                   department: {
-                    select: { name: true }
-                  }
-                }
-              }
-            }
-          }
-        }
+                    select: { name: true },
+                  },
+                },
+              },
+            },
+          },
+        },
       }),
       // Employee-to-HR requests (HrRequest table) - same as HR users see
       this.prisma.hrRequest.findMany({
@@ -1941,19 +2533,19 @@ export class DashboardService {
               firstName: true,
               lastName: true,
               department: {
-                select: { name: true }
-              }
-            }
-          }
-        }
-      })
+                select: { name: true },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     // Transform HR-to-Admin requests
-    const hrToAdminRequests = adminRequests.map(request => ({
+    const hrToAdminRequests = adminRequests.map((request) => ({
       id: request.id.toString(),
       title: this.mapAdminRequestType(request.type) || 'Admin Request',
-      employee: request.hr?.employee 
+      employee: request.hr?.employee
         ? `${request.hr.employee.firstName} ${request.hr.employee.lastName}`
         : 'HR Employee',
       department: request.hr?.employee?.department?.name || 'HR',
@@ -1961,11 +2553,11 @@ export class DashboardService {
       status: this.mapAdminRequestStatus(request.status),
       priority: 'Medium' as const, // AdminRequests don't have priority, default to Medium
       submittedDate: this.getRelativeTime(request.createdAt),
-      description: request.description || ''
+      description: request.description || '',
     }));
 
     // Transform Employee-to-HR requests (exactly same format as HR users see)
-    const employeeToHrRequests = hrRequests.map(request => ({
+    const employeeToHrRequests = hrRequests.map((request) => ({
       id: request.id.toString(),
       title: request.subject || request.requestType || 'HR Request',
       employee: `${request.employee.firstName} ${request.employee.lastName}`,
@@ -1974,7 +2566,7 @@ export class DashboardService {
       status: this.mapRequestStatus(request.status),
       priority: this.mapRequestPriority(request.priority),
       submittedDate: this.getRelativeTime(request.requestedOn),
-      description: request.description || ''
+      description: request.description || '',
     }));
 
     return {
@@ -1982,16 +2574,16 @@ export class DashboardService {
       role: 'admin',
       requestsByType: {
         employeeToHr: employeeToHrRequests,
-        hrToAdmin: hrToAdminRequests
+        hrToAdmin: hrToAdminRequests,
       },
-      total: employeeToHrRequests.length + hrToAdminRequests.length
+      total: employeeToHrRequests.length + hrToAdminRequests.length,
     };
   }
 
   // Helper methods for Admin Requests
   private mapAdminRequestType(type: string | null): string {
     if (!type) return 'Admin Request';
-    
+
     const typeStr = type.toString();
     if (typeStr === 'salary_increase') return 'Salary Increase Request';
     if (typeStr === 'late_approval') return 'Late Approval Request';
@@ -1999,18 +2591,22 @@ export class DashboardService {
     return 'Admin Request';
   }
 
-  private mapAdminRequestTypeToStandard(type: string | null): 'Leave' | 'Salary' | 'Training' | 'Complaint' | 'Other' {
+  private mapAdminRequestTypeToStandard(
+    type: string | null,
+  ): 'Leave' | 'Salary' | 'Training' | 'Complaint' | 'Other' {
     if (!type) return 'Other';
-    
+
     const typeStr = type.toString();
     if (typeStr === 'salary_increase') return 'Salary';
     if (typeStr === 'late_approval') return 'Leave';
     return 'Other';
   }
 
-  private mapAdminRequestStatus(status: any): 'Pending' | 'Approved' | 'Rejected' | 'Under Review' {
+  private mapAdminRequestStatus(
+    status: any,
+  ): 'Pending' | 'Approved' | 'Rejected' | 'Under Review' {
     if (!status) return 'Pending';
-    
+
     const statusStr = status.toString().toLowerCase();
     if (statusStr === 'approved') return 'Approved';
     if (statusStr === 'declined') return 'Rejected';
@@ -2019,31 +2615,43 @@ export class DashboardService {
   }
 
   // Helper methods for HR Requests
-  private mapRequestType(requestType: string | null): 'Leave' | 'Salary' | 'Training' | 'Complaint' | 'Other' {
+  private mapRequestType(
+    requestType: string | null,
+  ): 'Leave' | 'Salary' | 'Training' | 'Complaint' | 'Other' {
     if (!requestType) return 'Other';
-    
+
     const type = requestType.toLowerCase();
     if (type.includes('leave')) return 'Leave';
-    if (type.includes('salary') || type.includes('payroll') || type.includes('pay')) return 'Salary';
+    if (
+      type.includes('salary') ||
+      type.includes('payroll') ||
+      type.includes('pay')
+    )
+      return 'Salary';
     if (type.includes('training')) return 'Training';
     if (type.includes('complaint')) return 'Complaint';
     return 'Other';
   }
 
-  private mapRequestStatus(status: any): 'Pending' | 'Approved' | 'Rejected' | 'Under Review' {
+  private mapRequestStatus(
+    status: any,
+  ): 'Pending' | 'Approved' | 'Rejected' | 'Under Review' {
     if (!status) return 'Pending';
-    
+
     const statusStr = status.toString();
     if (statusStr === 'Pending') return 'Pending';
     if (statusStr === 'Resolved') return 'Approved';
     if (statusStr === 'Rejected') return 'Rejected';
-    if (statusStr === 'In_Progress' || statusStr === 'In Progress') return 'Under Review';
+    if (statusStr === 'In_Progress' || statusStr === 'In Progress')
+      return 'Under Review';
     return 'Pending';
   }
 
-  private mapRequestPriority(priority: any): 'Low' | 'Medium' | 'High' | 'Urgent' {
+  private mapRequestPriority(
+    priority: any,
+  ): 'Low' | 'Medium' | 'High' | 'Urgent' {
     if (!priority) return 'Low';
-    
+
     const priorityStr = priority.toString();
     if (priorityStr === 'Urgent') return 'Urgent';
     if (priorityStr === 'High') return 'High';
@@ -2059,13 +2667,16 @@ export class DashboardService {
     const diffDays = Math.floor(diffMs / 86400000);
 
     if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffMins < 60)
+      return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24)
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    
+
     const diffWeeks = Math.floor(diffDays / 7);
-    if (diffWeeks < 4) return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
-    
+    if (diffWeeks < 4)
+      return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
+
     const diffMonths = Math.floor(diffDays / 30);
     return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
   }
@@ -2077,22 +2688,38 @@ export class DashboardService {
     role: string,
     userType?: string,
     period: 'daily' | 'monthly' = 'daily',
-    filterDepartment?: string
+    filterDepartment?: string,
   ) {
     // Check if user is Admin
-    const isAdmin = userType === 'admin' || !department || department === 'Admin' || role === 'admin';
-    
+    const isAdmin =
+      userType === 'admin' ||
+      !department ||
+      department === 'Admin' ||
+      role === 'admin';
+
     if (period === 'monthly') {
-      return await this.getMonthlyAttendanceTrends(isAdmin, department, filterDepartment);
+      return await this.getMonthlyAttendanceTrends(
+        isAdmin,
+        department,
+        filterDepartment,
+      );
     } else {
-      return await this.getDailyAttendanceTrends(isAdmin, department, filterDepartment);
+      return await this.getDailyAttendanceTrends(
+        isAdmin,
+        department,
+        filterDepartment,
+      );
     }
   }
 
-  private async getDailyAttendanceTrends(isAdmin: boolean, department?: string, filterDepartment?: string) {
+  private async getDailyAttendanceTrends(
+    isAdmin: boolean,
+    department?: string,
+    filterDepartment?: string,
+  ) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Get last 7 days
     const endDate = new Date(today);
     const startDate = new Date(today);
@@ -2105,7 +2732,12 @@ export class DashboardService {
     prevStartDate.setDate(prevStartDate.getDate() - 6);
 
     if (isAdmin && !filterDepartment) {
-      return await this.getAdminDailyTrends(startDate, endDate, prevStartDate, prevEndDate);
+      return await this.getAdminDailyTrends(
+        startDate,
+        endDate,
+        prevStartDate,
+        prevEndDate,
+      );
     }
 
     // Department-specific view
@@ -2113,36 +2745,44 @@ export class DashboardService {
     if (!targetDept) {
       throw new Error('Department is required for non-admin users');
     }
-    return await this.getDepartmentDailyTrends(targetDept, startDate, endDate, prevStartDate, prevEndDate);
+    return await this.getDepartmentDailyTrends(
+      targetDept,
+      startDate,
+      endDate,
+      prevStartDate,
+      prevEndDate,
+    );
   }
 
   private async getAdminDailyTrends(
     startDate: Date,
     endDate: Date,
     prevStartDate: Date,
-    prevEndDate: Date
+    prevEndDate: Date,
   ) {
     // Get all departments
     const departments = await this.prisma.department.findMany({
       where: { name: { not: 'Admin' } },
-      select: { name: true }
+      select: { name: true },
     });
 
-    const deptNames = departments.map(d => d.name);
-    
+    const deptNames = departments.map((d) => d.name);
+
     // Get all employees by department
     const employeesByDept = await this.prisma.employee.groupBy({
       by: ['departmentId'],
       where: {
         status: 'active',
-        department: { name: { in: deptNames } }
+        department: { name: { in: deptNames } },
       },
-      _count: true
+      _count: true,
     });
 
     const deptMap = new Map<number, string>();
     for (const dept of departments) {
-      const deptRecord = await this.prisma.department.findFirst({ where: { name: dept.name } });
+      const deptRecord = await this.prisma.department.findFirst({
+        where: { name: dept.name },
+      });
       if (deptRecord) deptMap.set(deptRecord.id, dept.name);
     }
 
@@ -2152,14 +2792,14 @@ export class DashboardService {
         date: { gte: startDate, lte: endDate },
         employee: {
           status: 'active',
-          department: { name: { in: deptNames } }
-        }
+          department: { name: { in: deptNames } },
+        },
       },
       include: {
         employee: {
-          include: { department: { select: { name: true } } }
-        }
-      }
+          include: { department: { select: { name: true } } },
+        },
+      },
     });
 
     const prevAttendanceLogs = await this.prisma.attendanceLog.findMany({
@@ -2167,43 +2807,45 @@ export class DashboardService {
         date: { gte: prevStartDate, lte: prevEndDate },
         employee: {
           status: 'active',
-          department: { name: { in: deptNames } }
-        }
+          department: { name: { in: deptNames } },
+        },
       },
       include: {
         employee: {
-          include: { department: { select: { name: true } } }
-        }
-      }
+          include: { department: { select: { name: true } } },
+        },
+      },
     });
 
     // Get leave logs for context
     const leaveLogs = await this.prisma.leaveLog.findMany({
       where: {
         status: 'Approved',
-        OR: [
-          { startDate: { lte: endDate }, endDate: { gte: startDate } }
-        ]
+        OR: [{ startDate: { lte: endDate }, endDate: { gte: startDate } }],
       },
       include: {
         employee: {
-          include: { department: { select: { name: true } } }
-        }
-      }
+          include: { department: { select: { name: true } } },
+        },
+      },
     });
 
     // Process data by date
     const dataMap = new Map<string, any>();
     const totalEmployees = await this.prisma.employee.count({
-      where: { status: 'active', department: { name: { in: deptNames } } }
+      where: { status: 'active', department: { name: { in: deptNames } } },
     });
 
     // Initialize all dates
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(startDate);
+      d <= endDate;
+      d.setDate(d.getDate() + 1)
+    ) {
       const dateKey = d.toISOString().split('T')[0];
       const dayOfWeek = d.getDay();
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      
+
       dataMap.set(dateKey, {
         date: dateKey,
         present: 0,
@@ -2213,12 +2855,12 @@ export class DashboardService {
         late: 0,
         byDepartment: {} as Record<string, any>,
         isWeekend,
-        isHoliday: false
+        isHoliday: false,
       });
     }
 
     // Process current period attendance
-    attendanceLogs.forEach(log => {
+    attendanceLogs.forEach((log) => {
       if (!log.date) return;
       const dateKey = log.date.toISOString().split('T')[0];
       const data = dataMap.get(dateKey);
@@ -2243,13 +2885,17 @@ export class DashboardService {
     });
 
     // Process leave logs
-    leaveLogs.forEach(leave => {
+    leaveLogs.forEach((leave) => {
       const start = new Date(leave.startDate);
       const end = new Date(leave.endDate);
       const startTime = Math.max(start.getTime(), startDate.getTime());
       const endTime = Math.min(end.getTime(), endDate.getTime());
-      
-      for (let d = new Date(startTime); d.getTime() <= endTime; d.setDate(d.getDate() + 1)) {
+
+      for (
+        let d = new Date(startTime);
+        d.getTime() <= endTime;
+        d.setDate(d.getDate() + 1)
+      ) {
         const dateKey = d.toISOString().split('T')[0];
         const data = dataMap.get(dateKey);
         if (data) {
@@ -2262,7 +2908,7 @@ export class DashboardService {
     const deptEmployeeCounts = new Map<string, number>();
     for (const dept of departments) {
       const count = await this.prisma.employee.count({
-        where: { status: 'active', department: { name: dept.name } }
+        where: { status: 'active', department: { name: dept.name } },
       });
       deptEmployeeCounts.set(dept.name, count);
     }
@@ -2274,14 +2920,21 @@ export class DashboardService {
     let bestDay: { date: string; rate: number } | undefined;
     let worstDay: { date: string; rate: number } | undefined;
 
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(startDate);
+      d <= endDate;
+      d.setDate(d.getDate() + 1)
+    ) {
       const dateKey = d.toISOString().split('T')[0];
       const dayData = dataMap.get(dateKey);
       if (!dayData) continue;
 
       const present = dayData.present;
       const absent = dayData.absent;
-      const attendanceRate = totalEmployees > 0 ? Math.round((present / totalEmployees) * 100 * 100) / 100 : 0;
+      const attendanceRate =
+        totalEmployees > 0
+          ? Math.round((present / totalEmployees) * 100 * 100) / 100
+          : 0;
 
       if (!bestDay || attendanceRate > bestDay.rate) {
         bestDay = { date: dateKey, rate: attendanceRate };
@@ -2294,7 +2947,20 @@ export class DashboardService {
       totalAbsent += absent;
 
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthNames = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       const dayName = dayNames[d.getDay()];
       const monthName = monthNames[d.getMonth()];
       const dayNum = d.getDate();
@@ -2303,12 +2969,20 @@ export class DashboardService {
       const byDept: Record<string, any> = {};
       for (const [deptName, deptData] of Object.entries(dayData.byDepartment)) {
         const deptTotal = deptEmployeeCounts.get(deptName) || 0;
-        const deptDataTyped = deptData as { present: number; absent: number; employees?: number };
+        const deptDataTyped = deptData as {
+          present: number;
+          absent: number;
+          employees?: number;
+        };
         byDept[deptName] = {
-          rate: deptTotal > 0 ? Math.round((deptDataTyped.present / deptTotal) * 100 * 100) / 100 : 0,
+          rate:
+            deptTotal > 0
+              ? Math.round((deptDataTyped.present / deptTotal) * 100 * 100) /
+                100
+              : 0,
           present: deptDataTyped.present,
           absent: deptDataTyped.absent,
-          employees: deptTotal
+          employees: deptTotal,
         };
       }
 
@@ -2326,18 +3000,22 @@ export class DashboardService {
         chartValue: attendanceRate,
         isWeekend: dayData.isWeekend,
         isHoliday: dayData.isHoliday,
-        byDepartment: byDept
+        byDepartment: byDept,
       });
     }
 
     // Calculate previous period for comparison
     const prevDataMap = new Map<string, any>();
-    for (let d = new Date(prevStartDate); d <= prevEndDate; d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(prevStartDate);
+      d <= prevEndDate;
+      d.setDate(d.getDate() + 1)
+    ) {
       const dateKey = d.toISOString().split('T')[0];
       prevDataMap.set(dateKey, { present: 0, absent: 0 });
     }
 
-    prevAttendanceLogs.forEach(log => {
+    prevAttendanceLogs.forEach((log) => {
       if (!log.date) return;
       const dateKey = log.date.toISOString().split('T')[0];
       const prevData = prevDataMap.get(dateKey);
@@ -2352,26 +3030,43 @@ export class DashboardService {
 
     let prevTotalPresent = 0;
     let prevTotalAbsent = 0;
-    prevDataMap.forEach(prevData => {
+    prevDataMap.forEach((prevData) => {
       prevTotalPresent += prevData.present;
       prevTotalAbsent += prevData.absent;
     });
 
-    const avgRate = data.length > 0 
-      ? Math.round((data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) * 100) / 100
-      : 0;
-    const prevAvgRate = totalEmployees > 0
-      ? Math.round((prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) * 100 * 100) / 100
-      : 0;
+    const avgRate =
+      data.length > 0
+        ? Math.round(
+            (data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) *
+              100,
+          ) / 100
+        : 0;
+    const prevAvgRate =
+      totalEmployees > 0
+        ? Math.round(
+            (prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) *
+              100 *
+              100,
+          ) / 100
+        : 0;
     const change = avgRate - prevAvgRate;
-    const changePercent = prevAvgRate > 0 ? Math.round((change / prevAvgRate) * 100 * 100) / 100 : 0;
+    const changePercent =
+      prevAvgRate > 0
+        ? Math.round((change / prevAvgRate) * 100 * 100) / 100
+        : 0;
 
     // Calculate department summaries
-    const deptSummaries: Record<string, { rate: number; employees: number }> = {};
+    const deptSummaries: Record<string, { rate: number; employees: number }> =
+      {};
     for (const [deptName, count] of deptEmployeeCounts.entries()) {
-      const deptPresent = data.reduce((sum, d) => sum + (d.byDepartment[deptName]?.present || 0), 0);
+      const deptPresent = data.reduce(
+        (sum, d) => sum + (d.byDepartment[deptName]?.present || 0),
+        0,
+      );
       const deptAvgPresent = deptPresent / data.length;
-      const deptRate = count > 0 ? Math.round((deptAvgPresent / count) * 100 * 100) / 100 : 0;
+      const deptRate =
+        count > 0 ? Math.round((deptAvgPresent / count) * 100 * 100) / 100 : 0;
       deptSummaries[deptName] = { rate: deptRate, employees: count };
     }
 
@@ -2386,21 +3081,21 @@ export class DashboardService {
           averagePresent: Math.round(totalPresent / data.length),
           averageAbsent: Math.round(totalAbsent / data.length),
           bestDay,
-          worstDay
+          worstDay,
         },
-        byDepartment: deptSummaries
+        byDepartment: deptSummaries,
       },
       data,
       metadata: {
         dateRange: {
           start: startDate.toISOString().split('T')[0],
-          end: endDate.toISOString().split('T')[0]
+          end: endDate.toISOString().split('T')[0],
         },
         totalDays: data.length,
-        workingDays: data.filter(d => !d.isWeekend).length,
-        weekendDays: data.filter(d => d.isWeekend).length,
-        generatedAt: new Date().toISOString()
-      }
+        workingDays: data.filter((d) => !d.isWeekend).length,
+        weekendDays: data.filter((d) => d.isWeekend).length,
+        generatedAt: new Date().toISOString(),
+      },
     };
   }
 
@@ -2409,11 +3104,11 @@ export class DashboardService {
     startDate: Date,
     endDate: Date,
     prevStartDate: Date,
-    prevEndDate: Date
+    prevEndDate: Date,
   ) {
     // Get employees in department
     const totalEmployees = await this.prisma.employee.count({
-      where: { status: 'active', department: { name: department } }
+      where: { status: 'active', department: { name: department } },
     });
 
     // Get attendance logs
@@ -2422,9 +3117,9 @@ export class DashboardService {
         date: { gte: startDate, lte: endDate },
         employee: {
           status: 'active',
-          department: { name: department }
-        }
-      }
+          department: { name: department },
+        },
+      },
     });
 
     const prevAttendanceLogs = await this.prisma.attendanceLog.findMany({
@@ -2432,9 +3127,9 @@ export class DashboardService {
         date: { gte: prevStartDate, lte: prevEndDate },
         employee: {
           status: 'active',
-          department: { name: department }
-        }
-      }
+          department: { name: department },
+        },
+      },
     });
 
     // Get leave logs
@@ -2442,16 +3137,18 @@ export class DashboardService {
       where: {
         status: 'Approved',
         employee: { department: { name: department } },
-        OR: [
-          { startDate: { lte: endDate }, endDate: { gte: startDate } }
-        ]
-      }
+        OR: [{ startDate: { lte: endDate }, endDate: { gte: startDate } }],
+      },
     });
 
     // Process data by date
     const dataMap = new Map<string, any>();
 
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(startDate);
+      d <= endDate;
+      d.setDate(d.getDate() + 1)
+    ) {
       const dateKey = d.toISOString().split('T')[0];
       const dayOfWeek = d.getDay();
       dataMap.set(dateKey, {
@@ -2461,11 +3158,11 @@ export class DashboardService {
         remote: 0,
         late: 0,
         isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-        isHoliday: false
+        isHoliday: false,
       });
     }
 
-    attendanceLogs.forEach(log => {
+    attendanceLogs.forEach((log) => {
       if (!log.date) return;
       const dateKey = log.date.toISOString().split('T')[0];
       const data = dataMap.get(dateKey);
@@ -2482,13 +3179,17 @@ export class DashboardService {
       }
     });
 
-    leaveLogs.forEach(leave => {
+    leaveLogs.forEach((leave) => {
       const start = new Date(leave.startDate);
       const end = new Date(leave.endDate);
       const startTime = Math.max(start.getTime(), startDate.getTime());
       const endTime = Math.min(end.getTime(), endDate.getTime());
-      
-      for (let d = new Date(startTime); d.getTime() <= endTime; d.setDate(d.getDate() + 1)) {
+
+      for (
+        let d = new Date(startTime);
+        d.getTime() <= endTime;
+        d.setDate(d.getDate() + 1)
+      ) {
         const dateKey = d.toISOString().split('T')[0];
         const data = dataMap.get(dateKey);
         if (data) {
@@ -2504,14 +3205,21 @@ export class DashboardService {
     let bestDay: { date: string; rate: number } | undefined;
     let worstDay: { date: string; rate: number } | undefined;
 
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(startDate);
+      d <= endDate;
+      d.setDate(d.getDate() + 1)
+    ) {
       const dateKey = d.toISOString().split('T')[0];
       const dayData = dataMap.get(dateKey);
       if (!dayData) continue;
 
       const present = dayData.present;
       const absent = dayData.absent;
-      const attendanceRate = totalEmployees > 0 ? Math.round((present / totalEmployees) * 100 * 100) / 100 : 0;
+      const attendanceRate =
+        totalEmployees > 0
+          ? Math.round((present / totalEmployees) * 100 * 100) / 100
+          : 0;
 
       if (!bestDay || attendanceRate > bestDay.rate) {
         bestDay = { date: dateKey, rate: attendanceRate };
@@ -2524,7 +3232,20 @@ export class DashboardService {
       totalAbsent += absent;
 
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthNames = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       const dayName = dayNames[d.getDay()];
       const monthName = monthNames[d.getMonth()];
       const dayNum = d.getDate();
@@ -2542,18 +3263,22 @@ export class DashboardService {
         late: dayData.late || 0,
         chartValue: attendanceRate,
         isWeekend: dayData.isWeekend,
-        isHoliday: dayData.isHoliday
+        isHoliday: dayData.isHoliday,
       });
     }
 
     // Calculate previous period
     const prevDataMap = new Map<string, any>();
-    for (let d = new Date(prevStartDate); d <= prevEndDate; d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(prevStartDate);
+      d <= prevEndDate;
+      d.setDate(d.getDate() + 1)
+    ) {
       const dateKey = d.toISOString().split('T')[0];
       prevDataMap.set(dateKey, { present: 0, absent: 0 });
     }
 
-    prevAttendanceLogs.forEach(log => {
+    prevAttendanceLogs.forEach((log) => {
       if (!log.date) return;
       const dateKey = log.date.toISOString().split('T')[0];
       const prevData = prevDataMap.get(dateKey);
@@ -2568,19 +3293,31 @@ export class DashboardService {
 
     let prevTotalPresent = 0;
     let prevTotalAbsent = 0;
-    prevDataMap.forEach(prevData => {
+    prevDataMap.forEach((prevData) => {
       prevTotalPresent += prevData.present;
       prevTotalAbsent += prevData.absent;
     });
 
-    const avgRate = data.length > 0 
-      ? Math.round((data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) * 100) / 100
-      : 0;
-    const prevAvgRate = totalEmployees > 0
-      ? Math.round((prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) * 100 * 100) / 100
-      : 0;
+    const avgRate =
+      data.length > 0
+        ? Math.round(
+            (data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) *
+              100,
+          ) / 100
+        : 0;
+    const prevAvgRate =
+      totalEmployees > 0
+        ? Math.round(
+            (prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) *
+              100 *
+              100,
+          ) / 100
+        : 0;
     const change = avgRate - prevAvgRate;
-    const changePercent = prevAvgRate > 0 ? Math.round((change / prevAvgRate) * 100 * 100) / 100 : 0;
+    const changePercent =
+      prevAvgRate > 0
+        ? Math.round((change / prevAvgRate) * 100 * 100) / 100
+        : 0;
 
     return {
       department,
@@ -2593,35 +3330,44 @@ export class DashboardService {
           averagePresent: Math.round(totalPresent / data.length),
           averageAbsent: Math.round(totalAbsent / data.length),
           bestDay,
-          worstDay
+          worstDay,
         },
         previousPeriod: {
           averageAttendanceRate: prevAvgRate,
           totalEmployees,
           averagePresent: Math.round(prevTotalPresent / prevDataMap.size),
-          averageAbsent: Math.round(prevTotalAbsent / prevDataMap.size)
+          averageAbsent: Math.round(prevTotalAbsent / prevDataMap.size),
         },
         change: {
           rate: change,
-          trend: change > 0 ? 'up' as const : change < 0 ? 'down' as const : 'neutral' as const,
-          percentage: changePercent
-        }
+          trend:
+            change > 0
+              ? ('up' as const)
+              : change < 0
+                ? ('down' as const)
+                : ('neutral' as const),
+          percentage: changePercent,
+        },
       },
       data,
       metadata: {
         dateRange: {
           start: startDate.toISOString().split('T')[0],
-          end: endDate.toISOString().split('T')[0]
+          end: endDate.toISOString().split('T')[0],
         },
         totalDays: data.length,
-        workingDays: data.filter(d => !d.isWeekend).length,
-        weekendDays: data.filter(d => d.isWeekend).length,
-        generatedAt: new Date().toISOString()
-      }
+        workingDays: data.filter((d) => !d.isWeekend).length,
+        weekendDays: data.filter((d) => d.isWeekend).length,
+        generatedAt: new Date().toISOString(),
+      },
     };
   }
 
-  private async getMonthlyAttendanceTrends(isAdmin: boolean, department?: string, filterDepartment?: string) {
+  private async getMonthlyAttendanceTrends(
+    isAdmin: boolean,
+    department?: string,
+    filterDepartment?: string,
+  ) {
     const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth() + 1;
@@ -2635,7 +3381,7 @@ export class DashboardService {
       months.push({
         year,
         month,
-        monthStr: `${year}-${String(month).padStart(2, '0')}`
+        monthStr: `${year}-${String(month).padStart(2, '0')}`,
       });
     }
 
@@ -2650,31 +3396,33 @@ export class DashboardService {
     return await this.getDepartmentMonthlyTrends(targetDept, months);
   }
 
-  private async getAdminMonthlyTrends(months: { year: number; month: number; monthStr: string }[]) {
+  private async getAdminMonthlyTrends(
+    months: { year: number; month: number; monthStr: string }[],
+  ) {
     const departments = await this.prisma.department.findMany({
       where: { name: { not: 'Admin' } },
-      select: { name: true }
+      select: { name: true },
     });
 
-    const deptNames = departments.map(d => d.name);
+    const deptNames = departments.map((d) => d.name);
     const totalEmployees = await this.prisma.employee.count({
-      where: { status: 'active', department: { name: { in: deptNames } } }
+      where: { status: 'active', department: { name: { in: deptNames } } },
     });
 
     // Get monthly summaries for all departments
     const summaries = await this.prisma.monthlyAttendanceSummary.findMany({
       where: {
-        month: { in: months.map(m => m.monthStr) },
+        month: { in: months.map((m) => m.monthStr) },
         employee: {
           status: 'active',
-          department: { name: { in: deptNames } }
-        }
+          department: { name: { in: deptNames } },
+        },
       },
       include: {
         employee: {
-          include: { department: { select: { name: true } } }
-        }
-      }
+          include: { department: { select: { name: true } } },
+        },
+      },
     });
 
     // Process data by month
@@ -2684,16 +3432,31 @@ export class DashboardService {
     let bestMonth: { date: string; rate: number } | undefined;
     let worstMonth: { date: string; rate: number } | undefined;
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
     for (const monthInfo of months) {
-      const monthSummaries = summaries.filter(s => s.month === monthInfo.monthStr);
-      
+      const monthSummaries = summaries.filter(
+        (s) => s.month === monthInfo.monthStr,
+      );
+
       let monthPresent = 0;
       let monthAbsent = 0;
       const deptBreakdown: Record<string, any> = {};
 
-      monthSummaries.forEach(summary => {
+      monthSummaries.forEach((summary) => {
         const deptName = summary.employee.department.name;
         monthPresent += summary.totalPresent;
         monthAbsent += summary.totalAbsent;
@@ -2705,9 +3468,12 @@ export class DashboardService {
         deptBreakdown[deptName].absent += summary.totalAbsent;
       });
 
-      const attendanceRate = totalEmployees > 0 
-        ? Math.round((monthPresent / (monthPresent + monthAbsent)) * 100 * 100) / 100 
-        : 0;
+      const attendanceRate =
+        totalEmployees > 0
+          ? Math.round(
+              (monthPresent / (monthPresent + monthAbsent)) * 100 * 100,
+            ) / 100
+          : 0;
 
       if (!bestMonth || attendanceRate > bestMonth.rate) {
         bestMonth = { date: monthInfo.monthStr, rate: attendanceRate };
@@ -2723,16 +3489,21 @@ export class DashboardService {
       const deptRates: Record<string, any> = {};
       for (const [deptName, deptData] of Object.entries(deptBreakdown)) {
         const deptTotal = await this.prisma.employee.count({
-          where: { status: 'active', department: { name: deptName } }
+          where: { status: 'active', department: { name: deptName } },
         });
-        const deptRate = deptTotal > 0 
-          ? Math.round((deptData.present / (deptData.present + deptData.absent)) * 100 * 100) / 100 
-          : 0;
+        const deptRate =
+          deptTotal > 0
+            ? Math.round(
+                (deptData.present / (deptData.present + deptData.absent)) *
+                  100 *
+                  100,
+              ) / 100
+            : 0;
         deptRates[deptName] = {
           rate: deptRate,
           present: deptData.present,
           absent: deptData.absent,
-          employees: deptTotal
+          employees: deptTotal,
         };
       }
 
@@ -2751,58 +3522,79 @@ export class DashboardService {
         totalLate: 0, // Would need late data
         workingDays: 22, // Approximate
         chartValue: attendanceRate,
-        byDepartment: deptRates
+        byDepartment: deptRates,
       });
     }
 
-    const avgRate = data.length > 0 
-      ? Math.round((data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) * 100) / 100
-      : 0;
+    const avgRate =
+      data.length > 0
+        ? Math.round(
+            (data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) *
+              100,
+          ) / 100
+        : 0;
 
     // Previous period (12 months before)
-    const prevMonths = months.map(m => {
+    const prevMonths = months.map((m) => {
       const date = new Date(m.year, m.month - 1 - 12, 1);
       return {
         year: date.getFullYear(),
         month: date.getMonth() + 1,
-        monthStr: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        monthStr: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
       };
     });
 
     const prevSummaries = await this.prisma.monthlyAttendanceSummary.findMany({
       where: {
-        month: { in: prevMonths.map(m => m.monthStr) },
+        month: { in: prevMonths.map((m) => m.monthStr) },
         employee: {
           status: 'active',
-          department: { name: { in: deptNames } }
-        }
-      }
+          department: { name: { in: deptNames } },
+        },
+      },
     });
 
     let prevTotalPresent = 0;
     let prevTotalAbsent = 0;
-    prevSummaries.forEach(s => {
+    prevSummaries.forEach((s) => {
       prevTotalPresent += s.totalPresent;
       prevTotalAbsent += s.totalAbsent;
     });
 
-    const prevAvgRate = totalEmployees > 0
-      ? Math.round((prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) * 100 * 100) / 100
-      : 0;
+    const prevAvgRate =
+      totalEmployees > 0
+        ? Math.round(
+            (prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) *
+              100 *
+              100,
+          ) / 100
+        : 0;
     const change = avgRate - prevAvgRate;
-    const changePercent = prevAvgRate > 0 ? Math.round((change / prevAvgRate) * 100 * 100) / 100 : 0;
+    const changePercent =
+      prevAvgRate > 0
+        ? Math.round((change / prevAvgRate) * 100 * 100) / 100
+        : 0;
 
     // Department summaries
-    const deptSummaries: Record<string, { rate: number; employees: number }> = {};
+    const deptSummaries: Record<string, { rate: number; employees: number }> =
+      {};
     for (const dept of departments) {
-      const deptPresent = data.reduce((sum, d) => sum + (d.byDepartment[dept.name]?.present || 0), 0);
-      const deptAbsent = data.reduce((sum, d) => sum + (d.byDepartment[dept.name]?.absent || 0), 0);
+      const deptPresent = data.reduce(
+        (sum, d) => sum + (d.byDepartment[dept.name]?.present || 0),
+        0,
+      );
+      const deptAbsent = data.reduce(
+        (sum, d) => sum + (d.byDepartment[dept.name]?.absent || 0),
+        0,
+      );
       const deptTotal = await this.prisma.employee.count({
-        where: { status: 'active', department: { name: dept.name } }
+        where: { status: 'active', department: { name: dept.name } },
       });
-      const deptRate = (deptPresent + deptAbsent) > 0 
-        ? Math.round((deptPresent / (deptPresent + deptAbsent)) * 100 * 100) / 100 
-        : 0;
+      const deptRate =
+        deptPresent + deptAbsent > 0
+          ? Math.round((deptPresent / (deptPresent + deptAbsent)) * 100 * 100) /
+            100
+          : 0;
       deptSummaries[dept.name] = { rate: deptRate, employees: deptTotal };
     }
 
@@ -2817,38 +3609,38 @@ export class DashboardService {
           averagePresent: Math.round(totalPresent / data.length),
           averageAbsent: Math.round(totalAbsent / data.length),
           bestDay: bestMonth,
-          worstDay: worstMonth
+          worstDay: worstMonth,
         },
-        byDepartment: deptSummaries
+        byDepartment: deptSummaries,
       },
       data,
       metadata: {
         dateRange: {
           start: months[0].monthStr,
-          end: months[months.length - 1].monthStr
+          end: months[months.length - 1].monthStr,
         },
         totalMonths: data.length,
-        generatedAt: new Date().toISOString()
-      }
+        generatedAt: new Date().toISOString(),
+      },
     };
   }
 
   private async getDepartmentMonthlyTrends(
     department: string,
-    months: { year: number; month: number; monthStr: string }[]
+    months: { year: number; month: number; monthStr: string }[],
   ) {
     const totalEmployees = await this.prisma.employee.count({
-      where: { status: 'active', department: { name: department } }
+      where: { status: 'active', department: { name: department } },
     });
 
     const summaries = await this.prisma.monthlyAttendanceSummary.findMany({
       where: {
-        month: { in: months.map(m => m.monthStr) },
+        month: { in: months.map((m) => m.monthStr) },
         employee: {
           status: 'active',
-          department: { name: department }
-        }
-      }
+          department: { name: department },
+        },
+      },
     });
 
     const data: any[] = [];
@@ -2857,20 +3649,53 @@ export class DashboardService {
     let bestMonth: { date: string; rate: number } | undefined;
     let worstMonth: { date: string; rate: number } | undefined;
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
     for (const monthInfo of months) {
-      const monthSummaries = summaries.filter(s => s.month === monthInfo.monthStr);
-      
-      let monthPresent = monthSummaries.reduce((sum, s) => sum + s.totalPresent, 0);
-      let monthAbsent = monthSummaries.reduce((sum, s) => sum + s.totalAbsent, 0);
-      let monthLeave = monthSummaries.reduce((sum, s) => sum + s.totalLeaveDays, 0);
-      let monthLate = monthSummaries.reduce((sum, s) => sum + s.totalLateDays, 0);
-      let monthRemote = monthSummaries.reduce((sum, s) => sum + s.totalRemoteDays, 0);
+      const monthSummaries = summaries.filter(
+        (s) => s.month === monthInfo.monthStr,
+      );
 
-      const attendanceRate = totalEmployees > 0 
-        ? Math.round((monthPresent / (monthPresent + monthAbsent)) * 100 * 100) / 100 
-        : 0;
+      const monthPresent = monthSummaries.reduce(
+        (sum, s) => sum + s.totalPresent,
+        0,
+      );
+      const monthAbsent = monthSummaries.reduce(
+        (sum, s) => sum + s.totalAbsent,
+        0,
+      );
+      const monthLeave = monthSummaries.reduce(
+        (sum, s) => sum + s.totalLeaveDays,
+        0,
+      );
+      const monthLate = monthSummaries.reduce(
+        (sum, s) => sum + s.totalLateDays,
+        0,
+      );
+      const monthRemote = monthSummaries.reduce(
+        (sum, s) => sum + s.totalRemoteDays,
+        0,
+      );
+
+      const attendanceRate =
+        totalEmployees > 0
+          ? Math.round(
+              (monthPresent / (monthPresent + monthAbsent)) * 100 * 100,
+            ) / 100
+          : 0;
 
       if (!bestMonth || attendanceRate > bestMonth.rate) {
         bestMonth = { date: monthInfo.monthStr, rate: attendanceRate };
@@ -2896,42 +3721,60 @@ export class DashboardService {
         totalRemote: monthRemote,
         totalLate: monthLate,
         workingDays: 22, // Approximate
-        chartValue: attendanceRate
+        chartValue: attendanceRate,
       });
     }
 
-    const avgRate = data.length > 0 
-      ? Math.round((data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) * 100) / 100
-      : 0;
+    const avgRate =
+      data.length > 0
+        ? Math.round(
+            (data.reduce((sum, d) => sum + d.attendanceRate, 0) / data.length) *
+              100,
+          ) / 100
+        : 0;
 
     // Previous period
-    const prevMonths = months.map(m => {
+    const prevMonths = months.map((m) => {
       const date = new Date(m.year, m.month - 1 - 12, 1);
       return {
         year: date.getFullYear(),
         month: date.getMonth() + 1,
-        monthStr: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        monthStr: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
       };
     });
 
     const prevSummaries = await this.prisma.monthlyAttendanceSummary.findMany({
       where: {
-        month: { in: prevMonths.map(m => m.monthStr) },
+        month: { in: prevMonths.map((m) => m.monthStr) },
         employee: {
           status: 'active',
-          department: { name: department }
-        }
-      }
+          department: { name: department },
+        },
+      },
     });
 
-    let prevTotalPresent = prevSummaries.reduce((sum, s) => sum + s.totalPresent, 0);
-    let prevTotalAbsent = prevSummaries.reduce((sum, s) => sum + s.totalAbsent, 0);
+    const prevTotalPresent = prevSummaries.reduce(
+      (sum, s) => sum + s.totalPresent,
+      0,
+    );
+    const prevTotalAbsent = prevSummaries.reduce(
+      (sum, s) => sum + s.totalAbsent,
+      0,
+    );
 
-    const prevAvgRate = totalEmployees > 0
-      ? Math.round((prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) * 100 * 100) / 100
-      : 0;
+    const prevAvgRate =
+      totalEmployees > 0
+        ? Math.round(
+            (prevTotalPresent / (prevTotalPresent + prevTotalAbsent)) *
+              100 *
+              100,
+          ) / 100
+        : 0;
     const change = avgRate - prevAvgRate;
-    const changePercent = prevAvgRate > 0 ? Math.round((change / prevAvgRate) * 100 * 100) / 100 : 0;
+    const changePercent =
+      prevAvgRate > 0
+        ? Math.round((change / prevAvgRate) * 100 * 100) / 100
+        : 0;
 
     return {
       department,
@@ -2944,29 +3787,34 @@ export class DashboardService {
           averagePresent: Math.round(totalPresent / data.length),
           averageAbsent: Math.round(totalAbsent / data.length),
           bestDay: bestMonth,
-          worstDay: worstMonth
+          worstDay: worstMonth,
         },
         previousPeriod: {
           averageAttendanceRate: prevAvgRate,
           totalEmployees,
           averagePresent: Math.round(prevTotalPresent / prevMonths.length),
-          averageAbsent: Math.round(prevTotalAbsent / prevMonths.length)
+          averageAbsent: Math.round(prevTotalAbsent / prevMonths.length),
         },
         change: {
           rate: change,
-          trend: change > 0 ? 'up' as const : change < 0 ? 'down' as const : 'neutral' as const,
-          percentage: changePercent
-        }
+          trend:
+            change > 0
+              ? ('up' as const)
+              : change < 0
+                ? ('down' as const)
+                : ('neutral' as const),
+          percentage: changePercent,
+        },
       },
       data,
       metadata: {
         dateRange: {
           start: months[0].monthStr,
-          end: months[months.length - 1].monthStr
+          end: months[months.length - 1].monthStr,
         },
         totalMonths: data.length,
-        generatedAt: new Date().toISOString()
-      }
+        generatedAt: new Date().toISOString(),
+      },
     };
   }
 
@@ -2975,55 +3823,63 @@ export class DashboardService {
     // Get all departments (excluding Admin)
     const departments = await this.prisma.department.findMany({
       where: { name: { not: 'Admin' } },
-      select: { id: true, name: true }
+      select: { id: true, name: true },
     });
 
     // Get employee counts by department
     const employeeCounts = await this.prisma.employee.groupBy({
       by: ['departmentId'],
       where: {
-        status: 'active' // Only count active employees
+        status: 'active', // Only count active employees
       },
       _count: {
-        id: true
-      }
+        id: true,
+      },
     });
 
     // Create a map of department ID to count
     const countMap = new Map<number, number>();
-    employeeCounts.forEach(item => {
+    employeeCounts.forEach((item) => {
       countMap.set(item.departmentId, item._count.id);
     });
 
     // Build response with department names and counts
-    const departmentsWithCounts = departments.map(dept => ({
+    const departmentsWithCounts = departments.map((dept) => ({
       department: dept.name,
-      count: countMap.get(dept.id) || 0
+      count: countMap.get(dept.id) || 0,
     }));
 
     // Calculate total
-    const total = departmentsWithCounts.reduce((sum, dept) => sum + dept.count, 0);
+    const total = departmentsWithCounts.reduce(
+      (sum, dept) => sum + dept.count,
+      0,
+    );
 
     return {
       departments: departmentsWithCounts,
-      total
+      total,
     };
   }
 
-  async getCurrentProjects(userId: number, role: string, department: string, userType?: string) {
+  async getCurrentProjects(
+    userId: number,
+    role: string,
+    department: string,
+    userType?: string,
+  ) {
     // Handle Admin users - they can see all projects (Production and Sales)
     if (userType === 'admin') {
       // Admin sees all projects - no filter needed
       const projectWhere = {};
-      
+
       // Get running projects (in_progress, onhold, or null/pending_assignment)
       const runningProjects = await this.prisma.project.findMany({
         where: {
           ...projectWhere,
           OR: [
             { status: { in: ['in_progress', 'onhold'] } },
-            { status: null } // Include pending_assignment projects as running
-          ]
+            { status: null }, // Include pending_assignment projects as running
+          ],
         } as any,
         select: {
           id: true,
@@ -3033,11 +3889,11 @@ export class DashboardService {
           deadline: true,
           team: {
             select: {
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
-        orderBy: { updatedAt: 'desc' }
+        orderBy: { updatedAt: 'desc' },
       });
 
       // Get completed projects if needed
@@ -3047,7 +3903,7 @@ export class DashboardService {
         completedProjects = await this.prisma.project.findMany({
           where: {
             ...projectWhere,
-            status: 'completed'
+            status: 'completed',
           },
           select: {
             id: true,
@@ -3057,16 +3913,19 @@ export class DashboardService {
             deadline: true,
             team: {
               select: {
-                name: true
-              }
-            }
+                name: true,
+              },
+            },
           },
           take: remainingSlots,
-          orderBy: { updatedAt: 'desc' }
+          orderBy: { updatedAt: 'desc' },
         });
       }
 
-      const allProjects = [...runningProjects, ...completedProjects].slice(0, 5);
+      const allProjects = [...runningProjects, ...completedProjects].slice(
+        0,
+        5,
+      );
       return this.mapProjectsToResponse(allProjects);
     }
 
@@ -3103,12 +3962,12 @@ export class DashboardService {
             teams: {
               select: {
                 id: true,
-                teamLeadId: true
-              }
-            }
-          }
-        }
-      }
+                teamLeadId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (role === 'dep_manager') {
@@ -3120,12 +3979,13 @@ export class DashboardService {
       if (userSalesDept?.salesUnitId) {
         const unitSalesReps = await this.prisma.salesDepartment.findMany({
           where: { salesUnitId: userSalesDept.salesUnitId },
-          select: { employeeId: true }
+          select: { employeeId: true },
         });
-        const salesRepIds = unitSalesReps.map(sd => sd.employeeId);
-        projectWhere = salesRepIds.length > 0 
-          ? { salesRepId: { in: salesRepIds } } 
-          : { salesRepId: -1 }; // No access if no sales reps in unit
+        const salesRepIds = unitSalesReps.map((sd) => sd.employeeId);
+        projectWhere =
+          salesRepIds.length > 0
+            ? { salesRepId: { in: salesRepIds } }
+            : { salesRepId: -1 }; // No access if no sales reps in unit
       } else {
         return { projects: [] }; // No sales unit assigned
       }
@@ -3135,23 +3995,24 @@ export class DashboardService {
         // Get team members (sales reps in the team)
         const teamMembers = await this.prisma.employee.findMany({
           where: { teamLeadId: userId },
-          select: { id: true }
+          select: { id: true },
         });
-        const teamMemberIds = teamMembers.map(m => m.id);
-        
+        const teamMemberIds = teamMembers.map((m) => m.id);
+
         // Get sales departments for team members
         const teamSalesDepts = await this.prisma.salesDepartment.findMany({
-          where: { 
+          where: {
             employeeId: { in: [...teamMemberIds, userId] },
-            salesUnitId: userSalesDept.salesUnitId
+            salesUnitId: userSalesDept.salesUnitId,
           },
-          select: { employeeId: true }
+          select: { employeeId: true },
         });
-        const teamSalesRepIds = teamSalesDepts.map(sd => sd.employeeId);
-        
-        projectWhere = teamSalesRepIds.length > 0 
-          ? { salesRepId: { in: teamSalesRepIds } } 
-          : { salesRepId: -1 }; // No access if no sales reps in team
+        const teamSalesRepIds = teamSalesDepts.map((sd) => sd.employeeId);
+
+        projectWhere =
+          teamSalesRepIds.length > 0
+            ? { salesRepId: { in: teamSalesRepIds } }
+            : { salesRepId: -1 }; // No access if no sales reps in team
       } else {
         return { projects: [] }; // No sales unit assigned
       }
@@ -3169,9 +4030,9 @@ export class DashboardService {
         ...projectWhere,
         OR: [
           { status: { in: ['in_progress', 'onhold'] } },
-          { status: null } // Include pending_assignment projects as running
-        ]
-      } as any,
+          { status: null }, // Include pending_assignment projects as running
+        ],
+      },
       select: {
         id: true,
         description: true,
@@ -3180,11 +4041,11 @@ export class DashboardService {
         deadline: true,
         team: {
           select: {
-            name: true
-          }
-        }
+            name: true,
+          },
+        },
       },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { updatedAt: 'desc' },
     });
 
     // If we have less than 5 running projects, get completed projects to fill up to 5
@@ -3193,7 +4054,7 @@ export class DashboardService {
       completedProjects = await this.prisma.project.findMany({
         where: {
           ...projectWhere,
-          status: 'completed'
+          status: 'completed',
         },
         select: {
           id: true,
@@ -3203,12 +4064,12 @@ export class DashboardService {
           deadline: true,
           team: {
             select: {
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
         take: remainingSlots,
-        orderBy: { updatedAt: 'desc' } // Most recent completed first
+        orderBy: { updatedAt: 'desc' }, // Most recent completed first
       });
     }
 
@@ -3230,10 +4091,11 @@ export class DashboardService {
     } else if (role === 'team_lead') {
       const teams = await this.prisma.team.findMany({
         where: { teamLeadId: userId },
-        select: { id: true }
+        select: { id: true },
       });
-      const teamIds = teams.map(t => t.id);
-      projectWhere = teamIds.length > 0 ? { teamId: { in: teamIds } } : { teamId: -1 };
+      const teamIds = teams.map((t) => t.id);
+      projectWhere =
+        teamIds.length > 0 ? { teamId: { in: teamIds } } : { teamId: -1 };
     } else if (role === 'dep_manager') {
       // Department manager can see all Production projects (with or without teams)
       // No filter needed - they see all Production projects
@@ -3242,13 +4104,13 @@ export class DashboardService {
       // For senior/junior: Get their team's current project or projects they're working on
       const employee = await this.prisma.employee.findUnique({
         where: { id: userId },
-        select: { teamLeadId: true }
+        select: { teamLeadId: true },
       });
 
       if (employee?.teamLeadId) {
         const team = await this.prisma.team.findFirst({
           where: { teamLeadId: employee.teamLeadId },
-          select: { id: true }
+          select: { id: true },
         });
         if (team) {
           projectWhere = { teamId: team.id };
@@ -3269,9 +4131,9 @@ export class DashboardService {
         ...projectWhere,
         OR: [
           { status: { in: ['in_progress', 'onhold'] } },
-          { status: null } // Include pending_assignment projects as running
-        ]
-      } as any,
+          { status: null }, // Include pending_assignment projects as running
+        ],
+      },
       select: {
         id: true,
         description: true,
@@ -3280,11 +4142,11 @@ export class DashboardService {
         deadline: true,
         team: {
           select: {
-            name: true
-          }
-        }
+            name: true,
+          },
+        },
       },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { updatedAt: 'desc' },
     });
 
     // If we have less than 5 running projects, get completed projects to fill up to 5
@@ -3293,7 +4155,7 @@ export class DashboardService {
       completedProjects = await this.prisma.project.findMany({
         where: {
           ...projectWhere,
-          status: 'completed'
+          status: 'completed',
         },
         select: {
           id: true,
@@ -3303,12 +4165,12 @@ export class DashboardService {
           deadline: true,
           team: {
             select: {
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
         take: remainingSlots,
-        orderBy: { updatedAt: 'desc' } // Most recent completed first
+        orderBy: { updatedAt: 'desc' }, // Most recent completed first
       });
     }
 
@@ -3319,13 +4181,15 @@ export class DashboardService {
   }
 
   private mapProjectsToResponse(projects: any[]): { projects: any[] } {
-    const mappedProjects = projects.map(project => {
+    const mappedProjects = projects.map((project) => {
       const progress = project.liveProgress ? Number(project.liveProgress) : 0;
-      const deadline = project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : '';
-      
+      const deadline = project.deadline
+        ? new Date(project.deadline).toISOString().split('T')[0]
+        : '';
+
       // Determine status based on progress and deadline
       let status: 'on-track' | 'ahead' | 'delayed' = 'on-track';
-      
+
       // For completed projects, set status based on completion
       if (project.status === 'completed') {
         status = 'on-track'; // Completed projects are considered on-track
@@ -3334,12 +4198,17 @@ export class DashboardService {
         today.setHours(0, 0, 0, 0);
         const deadlineDate = new Date(project.deadline);
         deadlineDate.setHours(0, 0, 0, 0);
-        const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        
+        const daysUntilDeadline = Math.ceil(
+          (deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+        );
+
         // Calculate expected progress (assuming 30 days project timeline as baseline)
         const daysSinceStart = 30 - daysUntilDeadline;
-        const expectedProgress = Math.max(0, Math.min(100, (daysSinceStart / 30) * 100));
-        
+        const expectedProgress = Math.max(
+          0,
+          Math.min(100, (daysSinceStart / 30) * 100),
+        );
+
         if (progress >= expectedProgress + 10) {
           status = 'ahead';
         } else if (progress < expectedProgress - 10 || daysUntilDeadline < 0) {
@@ -3361,7 +4230,7 @@ export class DashboardService {
         progress: project.status === 'completed' ? 100 : Math.round(progress),
         status,
         deadline,
-        team: project.team?.name || 'Unassigned Team'
+        team: project.team?.name || 'Unassigned Team',
       };
     });
 
@@ -3377,11 +4246,13 @@ export class DashboardService {
     period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly',
     fromDate?: string,
     toDate?: string,
-    unit?: string
+    unit?: string,
   ) {
     // Check if user is in Sales department
     if (department !== 'Sales' && userType !== 'admin') {
-      throw new ForbiddenException('Access denied. Only Sales department users can access sales trends.');
+      throw new ForbiddenException(
+        'Access denied. Only Sales department users can access sales trends.',
+      );
     }
 
     // Get user's sales department info for hierarchical filtering
@@ -3396,16 +4267,21 @@ export class DashboardService {
             teams: {
               select: {
                 id: true,
-                teamLeadId: true
-              }
-            }
-          }
-        }
-      }
+                teamLeadId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Build hierarchical filters based on role
-    const leadFilters = await this.getSalesHierarchicalFilters(role, userId, userSalesDept, unit);
+    const leadFilters = await this.getSalesHierarchicalFilters(
+      role,
+      userId,
+      userSalesDept,
+      unit,
+    );
 
     // Calculate date range
     const dateRange = this.calculateSalesDateRange(period, fromDate, toDate);
@@ -3414,57 +4290,58 @@ export class DashboardService {
     // Get all leads in the date range for conversion rate calculation
     const allLeadsWhere = {
       ...leadFilters,
-      createdAt: { gte: startDate, lte: endDate }
+      createdAt: { gte: startDate, lte: endDate },
     };
 
     // Get cracked leads (closed/won deals) in the date range
     const crackedLeadsWhere = {
       lead: {
-        ...leadFilters
+        ...leadFilters,
       },
-      crackedAt: { gte: startDate, lte: endDate }
+      crackedAt: { gte: startDate, lte: endDate },
     };
 
     // Fetch data
-    const [allLeads, crackedLeads, prevAllLeads, prevCrackedLeads] = await Promise.all([
-      this.prisma.lead.findMany({
-        where: allLeadsWhere,
-        select: { id: true, createdAt: true }
-      }),
-      this.prisma.crackedLead.findMany({
-        where: crackedLeadsWhere,
-        select: {
-          id: true,
-          amount: true,
-          crackedAt: true,
-          lead: {
-            select: {
-              createdAt: true
-            }
-          }
-        }
-      }),
-      // Previous period data
-      this.prisma.lead.findMany({
-        where: {
-          ...leadFilters,
-          createdAt: { gte: prevStartDate, lte: prevEndDate }
-        },
-        select: { id: true }
-      }),
-      this.prisma.crackedLead.findMany({
-        where: {
-          lead: {
-            ...leadFilters
+    const [allLeads, crackedLeads, prevAllLeads, prevCrackedLeads] =
+      await Promise.all([
+        this.prisma.lead.findMany({
+          where: allLeadsWhere,
+          select: { id: true, createdAt: true },
+        }),
+        this.prisma.crackedLead.findMany({
+          where: crackedLeadsWhere,
+          select: {
+            id: true,
+            amount: true,
+            crackedAt: true,
+            lead: {
+              select: {
+                createdAt: true,
+              },
+            },
           },
-          crackedAt: { gte: prevStartDate, lte: prevEndDate }
-        },
-        select: {
-          id: true,
-          amount: true
-        }
-      })
-    ]);
+        }),
+        // Previous period data
+        this.prisma.lead.findMany({
+          where: {
+            ...leadFilters,
+            createdAt: { gte: prevStartDate, lte: prevEndDate },
+          },
+          select: { id: true },
+        }),
+        this.prisma.crackedLead.findMany({
+          where: {
+            lead: {
+              ...leadFilters,
+            },
+            crackedAt: { gte: prevStartDate, lte: prevEndDate },
+          },
+          select: {
+            id: true,
+            amount: true,
+          },
+        }),
+      ]);
 
     // Group data by period
     const data = this.groupSalesDataByPeriod(
@@ -3472,52 +4349,77 @@ export class DashboardService {
       allLeads,
       period,
       startDate,
-      endDate
+      endDate,
     );
 
     // Calculate summary statistics
-    const currentRevenue = crackedLeads.reduce((sum, cl) => sum + Number(cl.amount || 0), 0);
+    const currentRevenue = crackedLeads.reduce(
+      (sum, cl) => sum + Number(cl.amount || 0),
+      0,
+    );
     const currentDeals = crackedLeads.length;
     const currentTotalLeads = allLeads.length;
-    const currentConversionRate = currentTotalLeads > 0 ? (currentDeals / currentTotalLeads) * 100 : 0;
-    const currentAvgDealSize = currentDeals > 0 ? currentRevenue / currentDeals : 0;
+    const currentConversionRate =
+      currentTotalLeads > 0 ? (currentDeals / currentTotalLeads) * 100 : 0;
+    const currentAvgDealSize =
+      currentDeals > 0 ? currentRevenue / currentDeals : 0;
 
-    const prevRevenue = prevCrackedLeads.reduce((sum, cl) => sum + Number(cl.amount || 0), 0);
+    const prevRevenue = prevCrackedLeads.reduce(
+      (sum, cl) => sum + Number(cl.amount || 0),
+      0,
+    );
     const prevDeals = prevCrackedLeads.length;
     const prevTotalLeads = prevAllLeads.length;
-    const prevConversionRate = prevTotalLeads > 0 ? (prevDeals / prevTotalLeads) * 100 : 0;
+    const prevConversionRate =
+      prevTotalLeads > 0 ? (prevDeals / prevTotalLeads) * 100 : 0;
     const prevAvgDealSize = prevDeals > 0 ? prevRevenue / prevDeals : 0;
 
     // Find best and worst periods
-    let bestPeriod: { date: string; revenue: number; label: string } | undefined;
-    let worstPeriod: { date: string; revenue: number; label: string } | undefined;
+    let bestPeriod:
+      | { date: string; revenue: number; label: string }
+      | undefined;
+    let worstPeriod:
+      | { date: string; revenue: number; label: string }
+      | undefined;
 
-    data.forEach(point => {
+    data.forEach((point) => {
       if (!bestPeriod || point.revenue > bestPeriod.revenue) {
         bestPeriod = {
           date: point.date,
           revenue: point.revenue,
-          label: point.fullLabel
+          label: point.fullLabel,
         };
       }
       if (!worstPeriod || point.revenue < worstPeriod.revenue) {
         worstPeriod = {
           date: point.date,
           revenue: point.revenue,
-          label: point.fullLabel
+          label: point.fullLabel,
         };
       }
     });
 
     // Calculate changes
     const revenueChange = currentRevenue - prevRevenue;
-    const revenueChangePercent = prevRevenue > 0 ? (revenueChange / prevRevenue) * 100 : 0;
+    const revenueChangePercent =
+      prevRevenue > 0 ? (revenueChange / prevRevenue) * 100 : 0;
     const dealsChange = currentDeals - prevDeals;
-    const dealsChangePercent = prevDeals > 0 ? (dealsChange / prevDeals) * 100 : 0;
-    const trend = revenueChange > 0 ? 'up' as const : revenueChange < 0 ? 'down' as const : 'neutral' as const;
+    const dealsChangePercent =
+      prevDeals > 0 ? (dealsChange / prevDeals) * 100 : 0;
+    const trend =
+      revenueChange > 0
+        ? ('up' as const)
+        : revenueChange < 0
+          ? ('down' as const)
+          : ('neutral' as const);
 
     // Build metadata
-    const metadata = this.buildSalesMetadata(period, startDate, endDate, data.length);
+    const metadata = this.buildSalesMetadata(
+      period,
+      startDate,
+      endDate,
+      data.length,
+    );
 
     return {
       status: 'success',
@@ -3531,24 +4433,24 @@ export class DashboardService {
           averageDealSize: Math.round(currentAvgDealSize),
           conversionRate: Math.round(currentConversionRate * 100) / 100,
           bestMonth: bestPeriod,
-          worstMonth: worstPeriod
+          worstMonth: worstPeriod,
         },
         previousPeriod: {
           totalRevenue: Math.round(prevRevenue),
           totalDeals: prevDeals,
           averageDealSize: Math.round(prevAvgDealSize),
-          conversionRate: Math.round(prevConversionRate * 100) / 100
+          conversionRate: Math.round(prevConversionRate * 100) / 100,
         },
         change: {
           revenue: Math.round(revenueChange),
           revenuePercentage: Math.round(revenueChangePercent * 100) / 100,
           deals: dealsChange,
           dealsPercentage: Math.round(dealsChangePercent * 100) / 100,
-          trend
-        }
+          trend,
+        },
       },
       data,
-      metadata
+      metadata,
     };
   }
 
@@ -3556,14 +4458,14 @@ export class DashboardService {
     role: string,
     userId: number,
     userSalesDept: any,
-    unitFilter?: string
+    unitFilter?: string,
   ): Promise<any> {
     // Admin and dep_manager can see all (unless unit filter is specified)
     if (role === 'dep_manager' || role === 'admin') {
       if (unitFilter) {
         // Find unit by name
         const unit = await this.prisma.salesUnit.findFirst({
-          where: { name: unitFilter }
+          where: { name: unitFilter },
         });
         if (unit) {
           return { salesUnitId: unit.id };
@@ -3586,19 +4488,19 @@ export class DashboardService {
         // Get team members
         const teamMembers = await this.prisma.employee.findMany({
           where: { teamLeadId: userId },
-          select: { id: true }
+          select: { id: true },
         });
-        const teamMemberIds = teamMembers.map(m => m.id);
+        const teamMemberIds = teamMembers.map((m) => m.id);
         return {
           salesUnitId,
-          assignedToId: { in: [...teamMemberIds, userId] }
+          assignedToId: { in: [...teamMemberIds, userId] },
         };
 
       case 'senior':
       case 'junior':
         return {
           salesUnitId,
-          assignedToId: userId
+          assignedToId: userId,
         };
 
       default:
@@ -3609,8 +4511,13 @@ export class DashboardService {
   private calculateSalesDateRange(
     period: string,
     fromDate?: string,
-    toDate?: string
-  ): { startDate: Date; endDate: Date; prevStartDate: Date; prevEndDate: Date } {
+    toDate?: string,
+  ): {
+    startDate: Date;
+    endDate: Date;
+    prevStartDate: Date;
+    prevEndDate: Date;
+  } {
     const now = new Date();
     now.setHours(23, 59, 59, 999);
 
@@ -3632,7 +4539,7 @@ export class DashboardService {
           break;
         case 'weekly':
           startDate = new Date(now);
-          startDate.setDate(startDate.getDate() - (11 * 7)); // Last 12 weeks
+          startDate.setDate(startDate.getDate() - 11 * 7); // Last 12 weeks
           startDate.setHours(0, 0, 0, 0);
           break;
         case 'monthly':
@@ -3667,18 +4574,21 @@ export class DashboardService {
     allLeads: any[],
     period: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): any[] {
-    const dataMap = new Map<string, { revenue: number; deals: number; leads: number }>();
+    const dataMap = new Map<
+      string,
+      { revenue: number; deals: number; leads: number }
+    >();
 
     // Initialize data map with all periods
     const periods = this.generatePeriods(period, startDate, endDate);
-    periods.forEach(p => {
+    periods.forEach((p) => {
       dataMap.set(p.key, { revenue: 0, deals: 0, leads: 0 });
     });
 
     // Aggregate cracked leads (deals)
-    crackedLeads.forEach(cl => {
+    crackedLeads.forEach((cl) => {
       if (!cl.crackedAt) return;
       const periodKey = this.getPeriodKey(cl.crackedAt, period);
       const data = dataMap.get(periodKey);
@@ -3689,7 +4599,7 @@ export class DashboardService {
     });
 
     // Aggregate all leads for conversion rate
-    allLeads.forEach(lead => {
+    allLeads.forEach((lead) => {
       if (!lead.createdAt) return;
       const periodKey = this.getPeriodKey(lead.createdAt, period);
       const data = dataMap.get(periodKey);
@@ -3699,10 +4609,23 @@ export class DashboardService {
     });
 
     // Convert to array and format
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     const data: any[] = [];
 
-    periods.forEach(periodInfo => {
+    periods.forEach((periodInfo) => {
       const periodData = dataMap.get(periodInfo.key);
       if (!periodData) return;
 
@@ -3724,53 +4647,76 @@ export class DashboardService {
         monthNumber: periodInfo.monthNumber,
         year: periodInfo.year,
         weekNumber: periodInfo.weekNumber,
-        quarterNumber: periodInfo.quarterNumber
+        quarterNumber: periodInfo.quarterNumber,
       });
     });
 
     return data;
   }
 
-  private generatePeriods(period: string, startDate: Date, endDate: Date): any[] {
+  private generatePeriods(
+    period: string,
+    startDate: Date,
+    endDate: Date,
+  ): any[] {
     const periods: any[] = [];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
     switch (period) {
       case 'daily':
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        for (
+          let d = new Date(startDate);
+          d <= endDate;
+          d.setDate(d.getDate() + 1)
+        ) {
           const dateKey = d.toISOString().split('T')[0];
-          const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+          const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][
+            d.getDay()
+          ];
           const monthName = monthNames[d.getMonth()];
           periods.push({
             key: dateKey,
             label: `${dayName.substring(0, 3)}`,
             fullLabel: `${dayName}, ${monthName} ${d.getDate()}`,
             monthNumber: d.getMonth() + 1,
-            year: d.getFullYear()
+            year: d.getFullYear(),
           });
         }
         break;
 
       case 'weekly':
-        let currentWeek = new Date(startDate);
+        const currentWeek = new Date(startDate);
         while (currentWeek <= endDate) {
           const weekStart = new Date(currentWeek);
           weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week (Sunday)
           const weekEnd = new Date(weekStart);
           weekEnd.setDate(weekEnd.getDate() + 6);
-          
+
           const year = weekStart.getFullYear();
           const weekNumber = this.getWeekNumber(weekStart);
           const key = `${year}-W${String(weekNumber).padStart(2, '0')}`;
-          
+
           periods.push({
             key,
             label: `W${weekNumber}`,
             fullLabel: `Week ${weekNumber}, ${year}`,
             weekNumber,
-            year
+            year,
           });
-          
+
           currentWeek.setDate(currentWeek.getDate() + 7);
         }
         break;
@@ -3787,10 +4733,14 @@ export class DashboardService {
             label: monthNames[month - 1],
             fullLabel: `${monthNames[month - 1]} ${year}`,
             monthNumber: month,
-            year
+            year,
           });
           // Move to next month
-          currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+          currentMonth = new Date(
+            currentMonth.getFullYear(),
+            currentMonth.getMonth() + 1,
+            1,
+          );
         }
         break;
 
@@ -3809,21 +4759,29 @@ export class DashboardService {
             label: `Q${quarter}`,
             fullLabel: `Q${quarter} ${year}`,
             quarterNumber: quarter,
-            year
+            year,
           });
           // Move to next quarter
-          currentQuarter = new Date(currentQuarter.getFullYear(), currentQuarter.getMonth() + 3, 1);
+          currentQuarter = new Date(
+            currentQuarter.getFullYear(),
+            currentQuarter.getMonth() + 3,
+            1,
+          );
         }
         break;
 
       case 'yearly':
-        for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year++) {
+        for (
+          let year = startDate.getFullYear();
+          year <= endDate.getFullYear();
+          year++
+        ) {
           const key = `${year}`;
           periods.push({
             key,
             label: `${year}`,
             fullLabel: `${year}`,
-            year
+            year,
           });
         }
         break;
@@ -3856,25 +4814,27 @@ export class DashboardService {
   }
 
   private getWeekNumber(date: Date): number {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const d = new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+    );
     const dayNum = d.getUTCDay() || 7;
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   }
 
   private buildSalesMetadata(
     period: string,
     startDate: Date,
     endDate: Date,
-    dataLength: number
+    dataLength: number,
   ): any {
     const metadata: any = {
       dateRange: {
         start: startDate.toISOString().split('T')[0],
-        end: endDate.toISOString().split('T')[0]
+        end: endDate.toISOString().split('T')[0],
       },
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
     };
 
     switch (period) {
@@ -3909,11 +4869,13 @@ export class DashboardService {
     fromDate?: string,
     toDate?: string,
     unit?: string,
-    metric: 'deals' | 'revenue' | 'conversion_rate' | 'leads' = 'deals'
+    metric: 'deals' | 'revenue' | 'conversion_rate' | 'leads' = 'deals',
   ) {
     // Check if user is in Sales department
     if (department !== 'Sales' && userType !== 'admin') {
-      throw new ForbiddenException('Access denied. Only Sales department users can access top performers.');
+      throw new ForbiddenException(
+        'Access denied. Only Sales department users can access top performers.',
+      );
     }
 
     // Validate limit
@@ -3933,23 +4895,31 @@ export class DashboardService {
             teams: {
               select: {
                 id: true,
-                teamLeadId: true
-              }
-            }
-          }
-        }
-      }
+                teamLeadId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Build hierarchical filters to get employees in scope
-    const employeeFilters = await this.getTopPerformersEmployeeFilters(role, userId, userSalesDept, unit);
+    const employeeFilters = await this.getTopPerformersEmployeeFilters(
+      role,
+      userId,
+      userSalesDept,
+      unit,
+    );
 
     // Calculate date range
     const dateRange = this.calculateSalesDateRange(period, fromDate, toDate);
     const { startDate, endDate, prevStartDate, prevEndDate } = dateRange;
 
     // Get all employees in scope
-    const employees = await this.getEmployeesInScope(employeeFilters, userSalesDept);
+    const employees = await this.getEmployeesInScope(
+      employeeFilters,
+      userSalesDept,
+    );
 
     if (employees.length === 0) {
       return {
@@ -3962,68 +4932,69 @@ export class DashboardService {
           totalTeamMembers: 0,
           periodStart: startDate.toISOString().split('T')[0],
           periodEnd: endDate.toISOString().split('T')[0],
-          averagePerformance: 0
+          averagePerformance: 0,
         },
         data: [],
         metadata: {
-          generatedAt: new Date().toISOString()
-        }
+          generatedAt: new Date().toISOString(),
+        },
       };
     }
 
-    const employeeIds = employees.map(e => e.id);
+    const employeeIds = employees.map((e) => e.id);
 
     // Get performance data for current period
-    const [crackedLeads, allLeads, prevCrackedLeads, prevAllLeads] = await Promise.all([
-      // Current period cracked leads
-      this.prisma.crackedLead.findMany({
-        where: {
-          closedBy: { in: employeeIds },
-          crackedAt: { gte: startDate, lte: endDate }
-        },
-        select: {
-          id: true,
-          amount: true,
-          closedBy: true,
-          crackedAt: true
-        }
-      }),
-      // Current period all leads
-      this.prisma.lead.findMany({
-        where: {
-          assignedToId: { in: employeeIds },
-          createdAt: { gte: startDate, lte: endDate }
-        },
-        select: {
-          id: true,
-          assignedToId: true,
-          createdAt: true
-        }
-      }),
-      // Previous period cracked leads
-      this.prisma.crackedLead.findMany({
-        where: {
-          closedBy: { in: employeeIds },
-          crackedAt: { gte: prevStartDate, lte: prevEndDate }
-        },
-        select: {
-          id: true,
-          amount: true,
-          closedBy: true
-        }
-      }),
-      // Previous period all leads
-      this.prisma.lead.findMany({
-        where: {
-          assignedToId: { in: employeeIds },
-          createdAt: { gte: prevStartDate, lte: prevEndDate }
-        },
-        select: {
-          id: true,
-          assignedToId: true
-        }
-      })
-    ]);
+    const [crackedLeads, allLeads, prevCrackedLeads, prevAllLeads] =
+      await Promise.all([
+        // Current period cracked leads
+        this.prisma.crackedLead.findMany({
+          where: {
+            closedBy: { in: employeeIds },
+            crackedAt: { gte: startDate, lte: endDate },
+          },
+          select: {
+            id: true,
+            amount: true,
+            closedBy: true,
+            crackedAt: true,
+          },
+        }),
+        // Current period all leads
+        this.prisma.lead.findMany({
+          where: {
+            assignedToId: { in: employeeIds },
+            createdAt: { gte: startDate, lte: endDate },
+          },
+          select: {
+            id: true,
+            assignedToId: true,
+            createdAt: true,
+          },
+        }),
+        // Previous period cracked leads
+        this.prisma.crackedLead.findMany({
+          where: {
+            closedBy: { in: employeeIds },
+            crackedAt: { gte: prevStartDate, lte: prevEndDate },
+          },
+          select: {
+            id: true,
+            amount: true,
+            closedBy: true,
+          },
+        }),
+        // Previous period all leads
+        this.prisma.lead.findMany({
+          where: {
+            assignedToId: { in: employeeIds },
+            createdAt: { gte: prevStartDate, lte: prevEndDate },
+          },
+          select: {
+            id: true,
+            assignedToId: true,
+          },
+        }),
+      ]);
 
     // Calculate performance metrics for each employee
     const performanceData = this.calculateEmployeePerformance(
@@ -4031,7 +5002,7 @@ export class DashboardService {
       crackedLeads,
       allLeads,
       prevCrackedLeads,
-      prevAllLeads
+      prevAllLeads,
     );
 
     // Rank by selected metric
@@ -4041,9 +5012,11 @@ export class DashboardService {
     const topPerformers = rankedData.slice(0, limit);
 
     // Calculate average performance
-    const averagePerformance = rankedData.length > 0
-      ? rankedData.reduce((sum, emp) => sum + emp.value, 0) / rankedData.length
-      : 0;
+    const averagePerformance =
+      rankedData.length > 0
+        ? rankedData.reduce((sum, emp) => sum + emp.value, 0) /
+          rankedData.length
+        : 0;
 
     return {
       status: 'success',
@@ -4055,12 +5028,12 @@ export class DashboardService {
         totalTeamMembers: employees.length,
         periodStart: startDate.toISOString().split('T')[0],
         periodEnd: endDate.toISOString().split('T')[0],
-        averagePerformance: Math.round(averagePerformance * 100) / 100
+        averagePerformance: Math.round(averagePerformance * 100) / 100,
       },
       data: topPerformers,
       metadata: {
-        generatedAt: new Date().toISOString()
-      }
+        generatedAt: new Date().toISOString(),
+      },
     };
   }
 
@@ -4068,7 +5041,7 @@ export class DashboardService {
     role: string,
     userId: number,
     userSalesDept: any,
-    unitFilter?: string
+    unitFilter?: string,
   ): Promise<any> {
     // Admin and dep_manager can see all employees (unless unit filter is specified)
     if (role === 'dep_manager' || role === 'admin') {
@@ -4078,9 +5051,9 @@ export class DashboardService {
           where: { name: unitFilter },
           include: {
             salesEmployees: {
-              select: { employeeId: true }
-            }
-          }
+              select: { employeeId: true },
+            },
+          },
         });
         if (unit) {
           return { salesUnitId: unit.id };
@@ -4103,19 +5076,19 @@ export class DashboardService {
         // Get team members
         const teamMembers = await this.prisma.employee.findMany({
           where: { teamLeadId: userId },
-          select: { id: true }
+          select: { id: true },
         });
-        const teamMemberIds = teamMembers.map(m => m.id);
+        const teamMemberIds = teamMembers.map((m) => m.id);
         return {
           salesUnitId,
-          id: { in: [...teamMemberIds, userId] }
+          id: { in: [...teamMemberIds, userId] },
         };
 
       case 'senior':
       case 'junior':
         return {
           salesUnitId,
-          id: userId
+          id: userId,
         };
 
       default:
@@ -4123,19 +5096,22 @@ export class DashboardService {
     }
   }
 
-  private async getEmployeesInScope(filters: any, userSalesDept: any): Promise<any[]> {
+  private async getEmployeesInScope(
+    filters: any,
+    userSalesDept: any,
+  ): Promise<any[]> {
     // Build where clause for employees
     const where: any = {
       status: 'active',
-      department: { name: 'Sales' }
+      department: { name: 'Sales' },
     };
 
     // Apply filters
     if (filters.salesUnitId) {
       where.salesDepartment = {
         some: {
-          salesUnitId: filters.salesUnitId
-        }
+          salesUnitId: filters.salesUnitId,
+        },
       };
     }
 
@@ -4156,8 +5132,8 @@ export class DashboardService {
       select: {
         id: true,
         firstName: true,
-        lastName: true
-      }
+        lastName: true,
+      },
     });
 
     return employees;
@@ -4168,25 +5144,28 @@ export class DashboardService {
     crackedLeads: any[],
     allLeads: any[],
     prevCrackedLeads: any[],
-    prevAllLeads: any[]
+    prevAllLeads: any[],
   ): any[] {
-    const performanceMap = new Map<number, {
-      employeeId: number;
-      employeeName: string;
-      deals: number;
-      revenue: number;
-      leads: number;
-      conversionRate: number;
-      averageDealSize: number;
-      prevDeals: number;
-      prevRevenue: number;
-      prevLeads: number;
-      prevConversionRate: number;
-      prevAverageDealSize: number;
-    }>();
+    const performanceMap = new Map<
+      number,
+      {
+        employeeId: number;
+        employeeName: string;
+        deals: number;
+        revenue: number;
+        leads: number;
+        conversionRate: number;
+        averageDealSize: number;
+        prevDeals: number;
+        prevRevenue: number;
+        prevLeads: number;
+        prevConversionRate: number;
+        prevAverageDealSize: number;
+      }
+    >();
 
     // Initialize map
-    employees.forEach(emp => {
+    employees.forEach((emp) => {
       performanceMap.set(emp.id, {
         employeeId: emp.id,
         employeeName: `${emp.firstName} ${emp.lastName}`.trim(),
@@ -4199,12 +5178,12 @@ export class DashboardService {
         prevRevenue: 0,
         prevLeads: 0,
         prevConversionRate: 0,
-        prevAverageDealSize: 0
+        prevAverageDealSize: 0,
       });
     });
 
     // Aggregate current period data
-    crackedLeads.forEach(cl => {
+    crackedLeads.forEach((cl) => {
       const perf = performanceMap.get(cl.closedBy);
       if (perf) {
         perf.deals += 1;
@@ -4212,7 +5191,7 @@ export class DashboardService {
       }
     });
 
-    allLeads.forEach(lead => {
+    allLeads.forEach((lead) => {
       if (!lead.assignedToId) return;
       const perf = performanceMap.get(lead.assignedToId);
       if (perf) {
@@ -4221,7 +5200,7 @@ export class DashboardService {
     });
 
     // Aggregate previous period data
-    prevCrackedLeads.forEach(cl => {
+    prevCrackedLeads.forEach((cl) => {
       const perf = performanceMap.get(cl.closedBy);
       if (perf) {
         perf.prevDeals += 1;
@@ -4229,7 +5208,7 @@ export class DashboardService {
       }
     });
 
-    prevAllLeads.forEach(lead => {
+    prevAllLeads.forEach((lead) => {
       if (!lead.assignedToId) return;
       const perf = performanceMap.get(lead.assignedToId);
       if (perf) {
@@ -4239,14 +5218,17 @@ export class DashboardService {
 
     // Calculate derived metrics
     const performanceData: any[] = [];
-    performanceMap.forEach(perf => {
+    performanceMap.forEach((perf) => {
       // Current period metrics
-      perf.conversionRate = perf.leads > 0 ? (perf.deals / perf.leads) * 100 : 0;
+      perf.conversionRate =
+        perf.leads > 0 ? (perf.deals / perf.leads) * 100 : 0;
       perf.averageDealSize = perf.deals > 0 ? perf.revenue / perf.deals : 0;
 
       // Previous period metrics
-      perf.prevConversionRate = perf.prevLeads > 0 ? (perf.prevDeals / perf.prevLeads) * 100 : 0;
-      perf.prevAverageDealSize = perf.prevDeals > 0 ? perf.prevRevenue / perf.prevDeals : 0;
+      perf.prevConversionRate =
+        perf.prevLeads > 0 ? (perf.prevDeals / perf.prevLeads) * 100 : 0;
+      perf.prevAverageDealSize =
+        perf.prevDeals > 0 ? perf.prevRevenue / perf.prevDeals : 0;
 
       performanceData.push(perf);
     });
@@ -4256,7 +5238,7 @@ export class DashboardService {
 
   private rankEmployeesByMetric(
     performanceData: any[],
-    metric: 'deals' | 'revenue' | 'conversion_rate' | 'leads'
+    metric: 'deals' | 'revenue' | 'conversion_rate' | 'leads',
   ): any[] {
     // Map metric to value
     const getValue = (emp: any) => {
@@ -4322,8 +5304,14 @@ export class DashboardService {
       const value = getValue(emp);
       const prevValue = getPrevValue(emp);
       const change = value - prevValue;
-      const changePercent = prevValue > 0 ? (change / prevValue) * 100 : (value > 0 ? 100 : 0);
-      const trend = change > 0 ? 'up' as const : change < 0 ? 'down' as const : 'neutral' as const;
+      const changePercent =
+        prevValue > 0 ? (change / prevValue) * 100 : value > 0 ? 100 : 0;
+      const trend =
+        change > 0
+          ? ('up' as const)
+          : change < 0
+            ? ('down' as const)
+            : ('neutral' as const);
 
       return {
         employeeId: emp.employeeId,
@@ -4334,14 +5322,14 @@ export class DashboardService {
           revenue: Math.round(emp.revenue),
           leads: emp.leads,
           conversionRate: Math.round(emp.conversionRate * 100) / 100,
-          averageDealSize: Math.round(emp.averageDealSize)
+          averageDealSize: Math.round(emp.averageDealSize),
         },
         rank: index + 1,
         change: {
           value: Math.round(change * 100) / 100,
           percentage: Math.round(changePercent * 100) / 100,
-          trend
-        }
+          trend,
+        },
       };
     });
   }
@@ -4350,61 +5338,77 @@ export class DashboardService {
   async getCrossDepartmentTopPerformers(
     period: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' = 'monthly',
     fromDate?: string,
-    toDate?: string
+    toDate?: string,
   ) {
     // Calculate date range
     const dateRange = this.calculateSalesDateRange(period, fromDate, toDate);
     const { startDate, endDate } = dateRange;
 
     // Run all department queries in parallel for maximum performance
-    const [salesPerformer, marketingPerformer, productionPerformer, hrPerformer, accountingPerformer] = await Promise.all([
+    const [
+      salesPerformer,
+      marketingPerformer,
+      productionPerformer,
+      hrPerformer,
+      accountingPerformer,
+    ] = await Promise.all([
       this.getSalesTopPerformer(startDate, endDate),
       this.getMarketingTopPerformer(startDate, endDate),
       this.getProductionTopPerformer(startDate, endDate),
       this.getHrTopPerformer(startDate, endDate),
-      this.getAccountingTopPerformer(startDate, endDate)
+      this.getAccountingTopPerformer(startDate, endDate),
     ]);
 
     // Ensure we have at least one performer from each department
     // If a department has no data, get a fallback employee with 0% performance
     const allPerformers: any[] = [];
-    
+
     // Collect departments that need fallbacks
     const fallbackPromises: Promise<any>[] = [];
     const fallbackDepartments: string[] = [];
-    
+
     if (salesPerformer) {
       allPerformers.push(salesPerformer);
     } else {
-      fallbackPromises.push(this.getFallbackPerformer('Sales', startDate, endDate));
+      fallbackPromises.push(
+        this.getFallbackPerformer('Sales', startDate, endDate),
+      );
       fallbackDepartments.push('Sales');
     }
 
     if (marketingPerformer) {
       allPerformers.push(marketingPerformer);
     } else {
-      fallbackPromises.push(this.getFallbackPerformer('Marketing', startDate, endDate));
+      fallbackPromises.push(
+        this.getFallbackPerformer('Marketing', startDate, endDate),
+      );
       fallbackDepartments.push('Marketing');
     }
 
     if (productionPerformer) {
       allPerformers.push(productionPerformer);
     } else {
-      fallbackPromises.push(this.getFallbackPerformer('Production', startDate, endDate));
+      fallbackPromises.push(
+        this.getFallbackPerformer('Production', startDate, endDate),
+      );
       fallbackDepartments.push('Production');
     }
 
     if (hrPerformer) {
       allPerformers.push(hrPerformer);
     } else {
-      fallbackPromises.push(this.getFallbackPerformer('HR', startDate, endDate));
+      fallbackPromises.push(
+        this.getFallbackPerformer('HR', startDate, endDate),
+      );
       fallbackDepartments.push('HR');
     }
 
     if (accountingPerformer) {
       allPerformers.push(accountingPerformer);
     } else {
-      fallbackPromises.push(this.getFallbackPerformer('Accounts', startDate, endDate));
+      fallbackPromises.push(
+        this.getFallbackPerformer('Accounts', startDate, endDate),
+      );
       fallbackDepartments.push('Accounts');
     }
 
@@ -4419,7 +5423,9 @@ export class DashboardService {
     }
 
     // Sort by performance percentage (descending)
-    allPerformers.sort((a, b) => b.performancePercentage - a.performancePercentage);
+    allPerformers.sort(
+      (a, b) => b.performancePercentage - a.performancePercentage,
+    );
 
     // Assign ranks
     allPerformers.forEach((performer, index) => {
@@ -4427,9 +5433,11 @@ export class DashboardService {
     });
 
     // Calculate average performance
-    const averagePerformance = allPerformers.length > 0
-      ? allPerformers.reduce((sum, p) => sum + p.performancePercentage, 0) / allPerformers.length
-      : 0;
+    const averagePerformance =
+      allPerformers.length > 0
+        ? allPerformers.reduce((sum, p) => sum + p.performancePercentage, 0) /
+          allPerformers.length
+        : 0;
 
     return {
       status: 'success',
@@ -4438,16 +5446,19 @@ export class DashboardService {
         totalDepartments: allPerformers.length,
         periodStart: startDate.toISOString().split('T')[0],
         periodEnd: endDate.toISOString().split('T')[0],
-        averagePerformance: Math.round(averagePerformance * 100) / 100
+        averagePerformance: Math.round(averagePerformance * 100) / 100,
       },
       data: allPerformers,
       metadata: {
-        generatedAt: new Date().toISOString()
-      }
+        generatedAt: new Date().toISOString(),
+      },
     };
   }
 
-  private async getSalesTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+  private async getSalesTopPerformer(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any | null> {
     // Use database aggregation for better performance
     const topPerformerData = await this.prisma.crackedLead.groupBy({
       by: ['closedBy'],
@@ -4455,15 +5466,15 @@ export class DashboardService {
         crackedAt: { gte: startDate, lte: endDate },
         employee: {
           status: 'active',
-          department: { name: 'Sales' }
-        }
+          department: { name: 'Sales' },
+        },
       },
       _count: { id: true },
       _sum: { amount: true },
       orderBy: {
-        _count: { id: 'desc' }
+        _count: { id: 'desc' },
       },
-      take: 1
+      take: 1,
     });
 
     if (topPerformerData.length === 0) return null;
@@ -4481,22 +5492,23 @@ export class DashboardService {
           firstName: true,
           lastName: true,
           department: { select: { name: true } },
-          role: { select: { name: true } }
-        }
+          role: { select: { name: true } },
+        },
       }),
       this.prisma.lead.count({
         where: {
           assignedToId: topEmployeeId,
-          createdAt: { gte: startDate, lte: endDate }
-        }
-      })
+          createdAt: { gte: startDate, lte: endDate },
+        },
+      }),
     ]);
 
     if (!employee) return null;
 
     const conversionRate = leadsCount > 0 ? (deals / leadsCount) * 100 : 0;
     const targetDeals = 10;
-    const performancePercentage = targetDeals > 0 ? (deals / targetDeals) * 100 : 0;
+    const performancePercentage =
+      targetDeals > 0 ? (deals / targetDeals) * 100 : 0;
 
     return {
       employeeId: employee.id,
@@ -4508,30 +5520,39 @@ export class DashboardService {
         deals,
         revenue: Math.round(revenue),
         leads: leadsCount,
-        conversionRate: Math.round(conversionRate * 100) / 100
-      }
+        conversionRate: Math.round(conversionRate * 100) / 100,
+      },
     };
   }
 
-  private async getMarketingTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+  private async getMarketingTopPerformer(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any | null> {
     // First get active marketing employees to filter campaigns
-    const marketingEmployeeIds = await this.prisma.employee.findMany({
-      where: {
-        status: 'active',
-        department: { name: 'Marketing' }
-      },
-      select: { id: true }
-    }).then(emps => emps.map(e => e.id));
+    const marketingEmployeeIds = await this.prisma.employee
+      .findMany({
+        where: {
+          status: 'active',
+          department: { name: 'Marketing' },
+        },
+        select: { id: true },
+      })
+      .then((emps) => emps.map((e) => e.id));
 
     if (marketingEmployeeIds.length === 0) return null;
 
     // Get marketing units for these employees
-    const marketingUnits = await this.prisma.marketing.findMany({
-      where: {
-        employeeId: { in: marketingEmployeeIds }
-      },
-      select: { marketingUnitId: true }
-    }).then(units => units.map(u => u.marketingUnitId).filter(id => id !== null) as number[]);
+    const marketingUnits = await this.prisma.marketing
+      .findMany({
+        where: {
+          employeeId: { in: marketingEmployeeIds },
+        },
+        select: { marketingUnitId: true },
+      })
+      .then((units) =>
+        units.map((u) => u.marketingUnitId).filter((id) => id !== null),
+      );
 
     if (marketingUnits.length === 0) return null;
 
@@ -4540,13 +5561,13 @@ export class DashboardService {
       by: ['unitId'],
       where: {
         startDate: { gte: startDate, lte: endDate },
-        unitId: { in: marketingUnits }
+        unitId: { in: marketingUnits },
       },
       _count: { id: true },
       orderBy: {
-        _count: { id: 'desc' }
+        _count: { id: 'desc' },
       },
-      take: 1
+      take: 1,
     });
 
     if (campaignCounts.length === 0) return null;
@@ -4559,7 +5580,7 @@ export class DashboardService {
       this.prisma.marketing.findFirst({
         where: {
           marketingUnitId: topUnitId,
-          employeeId: { in: marketingEmployeeIds }
+          employeeId: { in: marketingEmployeeIds },
         },
         include: {
           employee: {
@@ -4568,40 +5589,44 @@ export class DashboardService {
               firstName: true,
               lastName: true,
               department: { select: { name: true } },
-              role: { select: { name: true } }
-            }
-          }
-        }
+              role: { select: { name: true } },
+            },
+          },
+        },
       }),
       this.prisma.lead.findMany({
         where: {
           createdAt: { gte: startDate, lte: endDate },
-          source: { in: ['PPC', 'SMM'] }
+          source: { in: ['PPC', 'SMM'] },
         },
         select: {
-          qualityRating: true
-        }
-      })
+          qualityRating: true,
+        },
+      }),
     ]);
 
     if (!marketingEmployee) return null;
 
     const emp = marketingEmployee.employee;
     const qualityMap: { [key: string]: number } = {
-      'excellent': 5,
-      'very_good': 4,
-      'good': 3,
-      'bad': 2,
-      'useless': 1
+      excellent: 5,
+      very_good: 4,
+      good: 3,
+      bad: 2,
+      useless: 1,
     };
     const totalQuality = leadsData.reduce((sum, lead) => {
-      const quality = lead.qualityRating ? qualityMap[lead.qualityRating] || 3 : 3;
+      const quality = lead.qualityRating
+        ? qualityMap[lead.qualityRating] || 3
+        : 3;
       return sum + quality;
     }, 0);
-    const avgLeadQuality = leadsData.length > 0 ? totalQuality / leadsData.length : 3;
+    const avgLeadQuality =
+      leadsData.length > 0 ? totalQuality / leadsData.length : 3;
 
     const targetCampaigns = 6;
-    const performancePercentage = targetCampaigns > 0 ? (campaignsRun / targetCampaigns) * 100 : 0;
+    const performancePercentage =
+      targetCampaigns > 0 ? (campaignsRun / targetCampaigns) * 100 : 0;
 
     return {
       employeeId: emp.id,
@@ -4612,30 +5637,33 @@ export class DashboardService {
       metrics: {
         campaignsRun,
         leadQualityScore: Math.round(avgLeadQuality * 10) / 10,
-        leadGeneration: leadsData.length
-      }
+        leadGeneration: leadsData.length,
+      },
     };
   }
 
-  private async getProductionTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+  private async getProductionTopPerformer(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any | null> {
     // Use aggregation to count projects by developer (from project logs)
     const projectCounts = await this.prisma.projectLog.groupBy({
       by: ['developerId'],
       where: {
         project: {
           status: 'completed',
-          updatedAt: { gte: startDate, lte: endDate }
+          updatedAt: { gte: startDate, lte: endDate },
         },
         developer: {
           status: 'active',
-          department: { name: 'Production' }
-        }
+          department: { name: 'Production' },
+        },
       },
       _count: { projectId: true },
       orderBy: {
-        _count: { projectId: 'desc' }
+        _count: { projectId: 'desc' },
       },
-      take: 1
+      take: 1,
     });
 
     if (projectCounts.length === 0) return null;
@@ -4652,35 +5680,38 @@ export class DashboardService {
           firstName: true,
           lastName: true,
           department: { select: { name: true } },
-          role: { select: { name: true } }
-        }
+          role: { select: { name: true } },
+        },
       }),
       Promise.all([
         this.prisma.projectTask.count({
           where: {
             assignedTo: topEmployeeId,
             status: 'completed',
-            completedOn: { gte: startDate, lte: endDate }
-          }
+            completedOn: { gte: startDate, lte: endDate },
+          },
         }),
         this.prisma.projectTask.count({
           where: {
             assignedTo: topEmployeeId,
-            createdAt: { lte: endDate }
-          }
-        })
-      ])
+            createdAt: { lte: endDate },
+          },
+        }),
+      ]),
     ]);
 
     if (!employee) return null;
 
     const [tasksCompleted, totalTasks] = taskStats;
-    const taskCompletionRate = totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0;
+    const taskCompletionRate =
+      totalTasks > 0 ? (tasksCompleted / totalTasks) * 100 : 0;
 
     const targetProjects = 10;
-    const projectsPercentage = targetProjects > 0 ? (projectsCompleted / targetProjects) * 100 : 0;
-    const taskCompletionPercentage = taskCompletionRate / 90 * 100;
-    const performancePercentage = (projectsPercentage * 0.6 + taskCompletionPercentage * 0.4);
+    const projectsPercentage =
+      targetProjects > 0 ? (projectsCompleted / targetProjects) * 100 : 0;
+    const taskCompletionPercentage = (taskCompletionRate / 90) * 100;
+    const performancePercentage =
+      projectsPercentage * 0.6 + taskCompletionPercentage * 0.4;
 
     return {
       employeeId: employee.id,
@@ -4692,12 +5723,15 @@ export class DashboardService {
         projectsCompleted,
         taskCompletion: Math.round(taskCompletionRate * 100) / 100,
         tasksCompleted,
-        totalTasks
-      }
+        totalTasks,
+      },
     };
   }
 
-  private async getHrTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+  private async getHrTopPerformer(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any | null> {
     // Use aggregation to find top HR performer by requests processed
     const requestCounts = await this.prisma.hrRequest.groupBy({
       by: ['assignedTo'],
@@ -4706,14 +5740,14 @@ export class DashboardService {
         resolvedOn: { gte: startDate, lte: endDate },
         assignedToEmployee: {
           status: 'active',
-          department: { name: 'HR' }
-        }
+          department: { name: 'HR' },
+        },
       },
       _count: { id: true },
       orderBy: {
-        _count: { id: 'desc' }
+        _count: { id: 'desc' },
       },
-      take: 1
+      take: 1,
     });
 
     if (requestCounts.length === 0 || !requestCounts[0].assignedTo) return null;
@@ -4730,15 +5764,15 @@ export class DashboardService {
           firstName: true,
           lastName: true,
           department: { select: { name: true } },
-          role: { select: { name: true } }
-        }
+          role: { select: { name: true } },
+        },
       }),
       this.prisma.employee.count({
         where: {
           createdAt: { gte: startDate, lte: endDate },
-          status: 'active'
-        }
-      })
+          status: 'active',
+        },
+      }),
     ]);
 
     if (!employee) return null;
@@ -4747,16 +5781,21 @@ export class DashboardService {
     const hrCount = await this.prisma.employee.count({
       where: {
         status: 'active',
-        department: { name: 'HR' }
-      }
+        department: { name: 'HR' },
+      },
     });
     const recruitmentsPerHr = Math.ceil(recruitments / Math.max(hrCount, 1));
 
     const targetRequests = 40;
     const targetRecruitments = 6;
-    const requestsPercentage = targetRequests > 0 ? (requestsProcessed / targetRequests) * 100 : 0;
-    const recruitmentsPercentage = targetRecruitments > 0 ? (recruitmentsPerHr / targetRecruitments) * 100 : 0;
-    const performancePercentage = (requestsPercentage * 0.5 + recruitmentsPercentage * 0.5);
+    const requestsPercentage =
+      targetRequests > 0 ? (requestsProcessed / targetRequests) * 100 : 0;
+    const recruitmentsPercentage =
+      targetRecruitments > 0
+        ? (recruitmentsPerHr / targetRecruitments) * 100
+        : 0;
+    const performancePercentage =
+      requestsPercentage * 0.5 + recruitmentsPercentage * 0.5;
 
     return {
       employeeId: employee.id,
@@ -4767,12 +5806,15 @@ export class DashboardService {
       metrics: {
         recruitments: recruitmentsPerHr,
         requestProcessing: requestsProcessed,
-        employeeSatisfaction: 4.3 // Placeholder - would need actual satisfaction data
-      }
+        employeeSatisfaction: 4.3, // Placeholder - would need actual satisfaction data
+      },
     };
   }
 
-  private async getAccountingTopPerformer(startDate: Date, endDate: Date): Promise<any | null> {
+  private async getAccountingTopPerformer(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any | null> {
     // Use aggregation to find top accountant by transactions processed
     const transactionCounts = await this.prisma.transaction.groupBy({
       by: ['employeeId'],
@@ -4781,18 +5823,19 @@ export class DashboardService {
         status: 'completed',
         employee: {
           status: 'active',
-          department: { name: 'Accounts' }
-        }
+          department: { name: 'Accounts' },
+        },
       },
       _count: { id: true },
       _sum: { amount: true },
       orderBy: {
-        _count: { id: 'desc' }
+        _count: { id: 'desc' },
       },
-      take: 1
+      take: 1,
     });
 
-    if (transactionCounts.length === 0 || !transactionCounts[0].employeeId) return null;
+    if (transactionCounts.length === 0 || !transactionCounts[0].employeeId)
+      return null;
 
     const topEmployeeId = transactionCounts[0].employeeId;
     const transactionsProcessed = transactionCounts[0]._count.id;
@@ -4807,20 +5850,23 @@ export class DashboardService {
           firstName: true,
           lastName: true,
           department: { select: { name: true } },
-          role: { select: { name: true } }
-        }
+          role: { select: { name: true } },
+        },
       }),
       this.prisma.invoice.count({
         where: {
-          createdAt: { gte: startDate, lte: endDate }
-        }
-      })
+          createdAt: { gte: startDate, lte: endDate },
+        },
+      }),
     ]);
 
     if (!employee) return null;
 
     const targetTransactions = 50;
-    const performancePercentage = targetTransactions > 0 ? (transactionsProcessed / targetTransactions) * 100 : 0;
+    const performancePercentage =
+      targetTransactions > 0
+        ? (transactionsProcessed / targetTransactions) * 100
+        : 0;
 
     return {
       employeeId: employee.id,
@@ -4831,36 +5877,40 @@ export class DashboardService {
       metrics: {
         transactionsProcessed,
         transactionAmount: Math.round(transactionAmount),
-        invoicesProcessed
-      }
+        invoicesProcessed,
+      },
     };
   }
 
   // Helper method to get a fallback performer when department has no data
-  private async getFallbackPerformer(departmentName: string, startDate: Date, endDate: Date): Promise<any | null> {
+  private async getFallbackPerformer(
+    departmentName: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<any | null> {
     // Get any active employee from the department as fallback
     const employee = await this.prisma.employee.findFirst({
       where: {
         status: 'active',
-        department: { name: departmentName }
+        department: { name: departmentName },
       },
       select: {
         id: true,
         firstName: true,
         lastName: true,
         department: { select: { name: true } },
-        role: { select: { name: true } }
+        role: { select: { name: true } },
       },
       orderBy: {
-        createdAt: 'desc' // Get most recently added employee
-      }
+        createdAt: 'desc', // Get most recently added employee
+      },
     });
 
     if (!employee) return null;
 
     // Return with 0% performance and empty metrics
     const emptyMetrics: any = {};
-    
+
     // Set department-specific empty metrics
     switch (departmentName) {
       case 'Sales':
@@ -4898,8 +5948,7 @@ export class DashboardService {
       department: employee.department.name,
       role: employee.role.name,
       performancePercentage: 0,
-      metrics: emptyMetrics
+      metrics: emptyMetrics,
     };
   }
 }
-

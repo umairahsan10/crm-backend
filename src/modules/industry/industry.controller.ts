@@ -12,11 +12,16 @@ import {
   ParseIntPipe,
   Patch,
   HttpCode,
-  HttpStatus
+  HttpStatus,
 } from '@nestjs/common';
 import { IndustryService } from './industry.service';
 import { CreateIndustryDto, UpdateIndustryDto } from './dto/industry.dto';
-import { GetIndustriesDto, IndustryResponseDto, IndustryListResponseDto, IndustryStatsDto } from './dto/industry-query.dto';
+import {
+  GetIndustriesDto,
+  IndustryResponseDto,
+  IndustryListResponseDto,
+  IndustryStatsDto,
+} from './dto/industry-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../common/guards/departments.guard';
@@ -24,7 +29,14 @@ import { BlockProductionGuard } from '../../common/guards/block-production.guard
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Departments } from '../../common/decorators/departments.decorator';
 import { RoleName } from '@prisma/client';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiParam,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -50,17 +62,26 @@ export class IndustryController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard)
   @Departments('Sales', 'Marketing', 'Admin')
   @ApiOperation({ summary: 'Create a new industry' })
-  @ApiResponse({ status: 201, description: 'Industry created successfully', type: IndustryResponseDto })
+  @ApiResponse({
+    status: 201,
+    description: 'Industry created successfully',
+    type: IndustryResponseDto,
+  })
   @ApiResponse({ status: 409, description: 'Industry already exists' })
   async createIndustry(
     @Body() createIndustryDto: CreateIndustryDto,
-    @Request() req: AuthenticatedRequest
-  ): Promise<{ status: string; message: string; data: { industry: IndustryResponseDto } }> {
-    const industry = await this.industryService.createIndustry(createIndustryDto);
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{
+    status: string;
+    message: string;
+    data: { industry: IndustryResponseDto };
+  }> {
+    const industry =
+      await this.industryService.createIndustry(createIndustryDto);
     return {
       status: 'success',
       message: 'Industry created successfully',
-      data: { industry }
+      data: { industry },
     };
   }
 
@@ -75,25 +96,63 @@ export class IndustryController {
     RoleName.unit_head,
     RoleName.team_lead,
     RoleName.senior,
-    RoleName.junior
+    RoleName.junior,
   )
   @ApiOperation({ summary: 'Get all industries with filters and pagination' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name or description' })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean, description: 'Filter by active status' })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Field to sort by' })
-  @ApiQuery({ name: 'sortOrder', required: false, type: String, description: 'Sort order asc or desc' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of items per page' })
-  @ApiResponse({ status: 200, description: 'Industries retrieved successfully', type: IndustryListResponseDto })
-   async getIndustries(
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by name or description',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    type: Boolean,
+    description: 'Filter by active status',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Field to sort by',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    type: String,
+    description: 'Sort order asc or desc',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Industries retrieved successfully',
+    type: IndustryListResponseDto,
+  })
+  async getIndustries(
     @Query() query: GetIndustriesDto,
-    @Request() req: AuthenticatedRequest
-  ): Promise<{ status: string; message: string; data: IndustryListResponseDto }> {
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{
+    status: string;
+    message: string;
+    data: IndustryListResponseDto;
+  }> {
     const result = await this.industryService.getIndustries(query);
     return {
       status: 'success',
       message: 'Industries retrieved successfully',
-      data: result
+      data: result,
     };
   }
 
@@ -104,15 +163,21 @@ export class IndustryController {
   @Get('active')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get only active industries' })
-  @ApiResponse({ status: 200, description: 'Active industries retrieved', type: [IndustryResponseDto] })
-  async getActiveIndustries(
-    @Request() req: AuthenticatedRequest
-  ): Promise<{ status: string; message: string; data: { industries: IndustryResponseDto[] } }> {
+  @ApiResponse({
+    status: 200,
+    description: 'Active industries retrieved',
+    type: [IndustryResponseDto],
+  })
+  async getActiveIndustries(@Request() req: AuthenticatedRequest): Promise<{
+    status: string;
+    message: string;
+    data: { industries: IndustryResponseDto[] };
+  }> {
     const industries = await this.industryService.getActiveIndustries();
     return {
       status: 'success',
       message: 'Active industries retrieved successfully',
-      data: { industries }
+      data: { industries },
     };
   }
 
@@ -122,21 +187,21 @@ export class IndustryController {
    */
   @Get('stats')
   @UseGuards(JwtAuthGuard, BlockProductionGuard, RolesGuard)
-  @Roles(
-    RoleName.dep_manager,
-    RoleName.unit_head,
-    RoleName.team_lead
-  )
+  @Roles(RoleName.dep_manager, RoleName.unit_head, RoleName.team_lead)
   @ApiOperation({ summary: 'Get industry statistics' })
-  @ApiResponse({ status: 200, description: 'Industry statistics retrieved successfully', type: IndustryStatsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Industry statistics retrieved successfully',
+    type: IndustryStatsDto,
+  })
   async getIndustryStats(
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ status: string; message: string; data: IndustryStatsDto }> {
     const stats = await this.industryService.getIndustryStats();
     return {
       status: 'success',
       message: 'Industry statistics retrieved successfully',
-      data: stats
+      data: stats,
     };
   }
 
@@ -151,21 +216,29 @@ export class IndustryController {
     RoleName.unit_head,
     RoleName.team_lead,
     RoleName.senior,
-    RoleName.junior
+    RoleName.junior,
   )
   @ApiOperation({ summary: 'Get single industry by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
-  @ApiResponse({ status: 200, description: 'Industry retrieved successfully', type: IndustryResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Industry retrieved successfully',
+    type: IndustryResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Industry not found' })
   async getIndustryById(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
-  ): Promise<{ status: string; message: string; data: { industry: IndustryResponseDto } }> {
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{
+    status: string;
+    message: string;
+    data: { industry: IndustryResponseDto };
+  }> {
     const industry = await this.industryService.getIndustryById(id);
     return {
       status: 'success',
       message: 'Industry retrieved successfully',
-      data: { industry }
+      data: { industry },
     };
   }
 
@@ -179,18 +252,29 @@ export class IndustryController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an industry' })
   @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
-  @ApiResponse({ status: 200, description: 'Industry updated successfully', type: IndustryResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Industry updated successfully',
+    type: IndustryResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Industry not found' })
   async updateIndustry(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateIndustryDto: UpdateIndustryDto,
-    @Request() req: AuthenticatedRequest
-  ): Promise<{ status: string; message: string; data: { industry: IndustryResponseDto } }> {
-    const industry = await this.industryService.updateIndustry(id, updateIndustryDto);
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{
+    status: string;
+    message: string;
+    data: { industry: IndustryResponseDto };
+  }> {
+    const industry = await this.industryService.updateIndustry(
+      id,
+      updateIndustryDto,
+    );
     return {
       status: 'success',
       message: 'Industry updated successfully',
-      data: { industry }
+      data: { industry },
     };
   }
 
@@ -204,16 +288,19 @@ export class IndustryController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft delete (deactivate) an industry' })
   @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
-  @ApiResponse({ status: 200, description: 'Industry deactivated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Industry deactivated successfully',
+  })
   @ApiResponse({ status: 404, description: 'Industry not found' })
   async softDeleteIndustry(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ status: string; message: string }> {
     const result = await this.industryService.softDeleteIndustry(id);
     return {
       status: 'success',
-      message: result.message
+      message: result.message,
     };
   }
 
@@ -227,17 +314,25 @@ export class IndustryController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reactivate an industry' })
   @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
-  @ApiResponse({ status: 200, description: 'Industry reactivated successfully', type: IndustryResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Industry reactivated successfully',
+    type: IndustryResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Industry not found' })
   async reactivateIndustry(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
-  ): Promise<{ status: string; message: string; data: { industry: IndustryResponseDto } }> {
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{
+    status: string;
+    message: string;
+    data: { industry: IndustryResponseDto };
+  }> {
     const industry = await this.industryService.reactivateIndustry(id);
     return {
       status: 'success',
       message: 'Industry reactivated successfully',
-      data: { industry }
+      data: { industry },
     };
   }
 
@@ -252,25 +347,28 @@ export class IndustryController {
   @ApiOperation({ summary: 'Hard delete an industry' })
   @ApiParam({ name: 'id', type: Number, description: 'Industry ID' })
   @ApiResponse({ status: 200, description: 'Industry deleted successfully' })
-  @ApiResponse({ status: 400, description: 'Cannot delete industry due to dependencies' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot delete industry due to dependencies',
+  })
   @ApiResponse({ status: 404, description: 'Industry not found' })
   async deleteIndustry(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedRequest
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ status: string; message: string; dependencies?: any }> {
     const result = await this.industryService.deleteIndustry(id);
-    
+
     if (!result.success) {
       return {
         status: 'error',
         message: result.message,
-        dependencies: result.dependencies
+        dependencies: result.dependencies,
       };
     }
 
     return {
       status: 'success',
-      message: result.message
+      message: result.message,
     };
   }
 }

@@ -1,8 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { CreateAdminDto } from './dto/create-admin.dto';
-import { AdminResponseDto, AdminListResponseDto } from './dto/admin-response.dto';
+import {
+  AdminResponseDto,
+  AdminListResponseDto,
+} from './dto/admin-response.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -14,7 +22,10 @@ export class AdminService {
   /**
    * Get all admins with pagination
    */
-  async getAllAdmins(page: number = 1, limit: number = 10): Promise<AdminListResponseDto> {
+  async getAllAdmins(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<AdminListResponseDto> {
     const skip = (page - 1) * limit;
 
     try {
@@ -78,7 +89,10 @@ export class AdminService {
   /**
    * Update an admin
    */
-  async updateAdmin(id: number, dto: UpdateAdminDto): Promise<AdminResponseDto> {
+  async updateAdmin(
+    id: number,
+    dto: UpdateAdminDto,
+  ): Promise<AdminResponseDto> {
     // Check if admin exists
     const existingAdmin = await this.prisma.admin.findUnique({
       where: { id },
@@ -91,14 +105,16 @@ export class AdminService {
     // Check if email is being updated and if it already exists
     if (dto.email && dto.email !== existingAdmin.email) {
       const emailExists = await this.prisma.admin.findFirst({
-        where: { 
+        where: {
           email: dto.email,
-          id: { not: id } // Exclude current admin
+          id: { not: id }, // Exclude current admin
         },
       });
 
       if (emailExists) {
-        throw new BadRequestException(`Admin with email ${dto.email} already exists`);
+        throw new BadRequestException(
+          `Admin with email ${dto.email} already exists`,
+        );
       }
     }
 
@@ -148,7 +164,9 @@ export class AdminService {
     });
 
     if (existingAdmin) {
-      throw new BadRequestException(`Admin with email ${dto.email} already exists`);
+      throw new BadRequestException(
+        `Admin with email ${dto.email} already exists`,
+      );
     }
 
     try {
@@ -185,7 +203,10 @@ export class AdminService {
   /**
    * Delete an admin user
    */
-  async deleteAdmin(id: number, currentAdminId: number): Promise<{ message: string }> {
+  async deleteAdmin(
+    id: number,
+    currentAdminId: number,
+  ): Promise<{ message: string }> {
     // Prevent self-deletion
     if (id === currentAdminId) {
       throw new BadRequestException('You cannot delete your own account');
@@ -203,7 +224,9 @@ export class AdminService {
     // Check if this is the last admin (prevent deleting the last admin)
     const adminCount = await this.prisma.admin.count();
     if (adminCount <= 1) {
-      throw new BadRequestException('Cannot delete the last admin. At least one admin must exist.');
+      throw new BadRequestException(
+        'Cannot delete the last admin. At least one admin must exist.',
+      );
     }
 
     try {

@@ -1,9 +1,11 @@
-import { Module, Global, OnModuleInit } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
-import { PrismaService } from '../prisma/prisma.service';
+import { DatabaseModule } from './database/database.module';
+import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { databaseValidationSchema } from './config/validation.schema';
 import { EmployeeModule } from './modules/employee/employee.module';
 import { CommunicationModule } from './modules/communication/communication.module';
 import { CompanyModule } from './modules/company/company.module';
@@ -20,16 +22,25 @@ import { DepartmentsModule } from './modules/Departments/departments.module';
 import { RolesModule } from './modules/Roles/roles.module';
 import { IndustryModule } from './modules/industry/industry.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
-import { setPrismaService } from './common/constants/department-name.enum';
+import { DepartmentNamesModule } from './common/services/department-names.module';
+import { JwtConfigModule } from './config/jwt.module';
 
-@Global() // Make this module global so PrismaService is available everywhere
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
       expandVariables: true,
+      validationSchema: databaseValidationSchema,
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: false,
+      },
     }),
+    DatabaseModule, // Global DatabaseModule provides database configuration
+    PrismaModule, // Global PrismaModule provides PrismaService everywhere
+    DepartmentNamesModule, // Global DepartmentNamesModule provides DepartmentNamesService everywhere
+    JwtConfigModule, // Global JwtConfigModule provides JwtConfigService everywhere
     ScheduleModule.forRoot(),
     AuthModule,
     EmployeeModule,
@@ -50,14 +61,8 @@ import { setPrismaService } from './common/constants/department-name.enum';
     DashboardModule,
   ],
   controllers: [AppController],
-  providers: [PrismaService],
-  exports: [PrismaService], // Export PrismaService so it can be used by guards
 })
-export class AppModule implements OnModuleInit {
-  constructor(private readonly prismaService: PrismaService) {}
-
-  async onModuleInit() {
-    // Initialize the PrismaService for the department names utility
-    setPrismaService(this.prismaService);
-  }
+export class AppModule {
+  // DepartmentNamesService is now properly injected via DepartmentNamesModule
+  // No need for manual initialization or global variable patterns
 }

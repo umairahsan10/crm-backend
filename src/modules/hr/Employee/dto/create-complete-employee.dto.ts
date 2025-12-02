@@ -1,14 +1,14 @@
 import {
-  IsString, 
-  IsEmail, 
-  IsOptional, 
-  IsEnum, 
-  IsInt, 
-  IsBoolean, 
-  IsDateString, 
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  IsInt,
+  IsBoolean,
+  IsDateString,
   IsNumber,
   ValidateNested,
-  IsObject
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -33,7 +33,10 @@ export class EmployeeDataDto {
   @IsString()
   phone?: string;
 
-  @ApiProperty({ enum: ['male', 'female', 'others'], description: 'Gender of the employee' })
+  @ApiProperty({
+    enum: ['male', 'female', 'others'],
+    description: 'Gender of the employee',
+  })
   @IsEnum(['male', 'female', 'others'])
   gender: 'male' | 'female' | 'others';
 
@@ -53,13 +56,19 @@ export class EmployeeDataDto {
   @ApiPropertyOptional({ description: 'Manager ID (if applicable)' })
   @IsOptional()
   @IsInt()
-  @IsValidRoleHierarchy({ message: 'Invalid role hierarchy: Manager assignment not allowed for this role' })
+  @IsValidRoleHierarchy({
+    message:
+      'Invalid role hierarchy: Manager assignment not allowed for this role',
+  })
   managerId?: number;
 
   @ApiPropertyOptional({ description: 'Team lead ID (if applicable)' })
   @IsOptional()
   @IsInt()
-  @IsValidRoleHierarchy({ message: 'Invalid role hierarchy: Team Lead assignment not allowed for this role' })
+  @IsValidRoleHierarchy({
+    message:
+      'Invalid role hierarchy: Team Lead assignment not allowed for this role',
+  })
   teamLeadId?: number;
 
   @ApiPropertyOptional({ description: 'Residential address' })
@@ -72,7 +81,10 @@ export class EmployeeDataDto {
   @IsBoolean()
   maritalStatus?: boolean;
 
-  @ApiPropertyOptional({ enum: ['active', 'terminated', 'inactive'], description: 'Employment status' })
+  @ApiPropertyOptional({
+    enum: ['active', 'terminated', 'inactive'],
+    description: 'Employment status',
+  })
   @IsOptional()
   @IsEnum(['active', 'terminated', 'inactive'])
   status?: 'active' | 'terminated' | 'inactive';
@@ -87,12 +99,17 @@ export class EmployeeDataDto {
   @IsDateString()
   endDate?: string;
 
-  @ApiPropertyOptional({ enum: ['hybrid', 'on_site', 'remote'], description: 'Work mode' })
+  @ApiPropertyOptional({
+    enum: ['hybrid', 'on_site', 'remote'],
+    description: 'Work mode',
+  })
   @IsOptional()
   @IsEnum(['hybrid', 'on_site', 'remote'])
   modeOfWork?: 'hybrid' | 'on_site' | 'remote';
 
-  @ApiPropertyOptional({ description: 'Number of remote work days allowed per month' })
+  @ApiPropertyOptional({
+    description: 'Number of remote work days allowed per month',
+  })
   @IsOptional()
   @IsInt()
   remoteDaysAllowed?: number;
@@ -117,7 +134,10 @@ export class EmployeeDataDto {
   @IsString()
   shiftEnd?: string;
 
-  @ApiPropertyOptional({ enum: ['full_time', 'part_time'], description: 'Type of employment' })
+  @ApiPropertyOptional({
+    enum: ['full_time', 'part_time'],
+    description: 'Type of employment',
+  })
   @IsOptional()
   @IsEnum(['full_time', 'part_time'])
   employmentType?: 'full_time' | 'part_time';
@@ -127,7 +147,10 @@ export class EmployeeDataDto {
   @IsDateString()
   dateOfConfirmation?: string;
 
-  @ApiPropertyOptional({ enum: ['probation', 'permanent', 'notice'], description: 'Employment period type' })
+  @ApiPropertyOptional({
+    enum: ['probation', 'permanent', 'notice'],
+    description: 'Employment period type',
+  })
   @IsOptional()
   @IsEnum(['probation', 'permanent', 'notice'])
   periodType?: 'probation' | 'permanent' | 'notice';
@@ -144,12 +167,27 @@ export class EmployeeDataDto {
 
 // HR Department DTO
 export class HrDataDto {
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() attendancePermission?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  attendancePermission?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() salaryPermission?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() commissionPermission?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() employeeAddPermission?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() terminationsHandle?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() monthlyRequestApprovals?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  commissionPermission?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  employeeAddPermission?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  terminationsHandle?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  monthlyRequestApprovals?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() targetsSet?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() bonusesSet?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() shiftTimingSet?: boolean;
@@ -173,7 +211,10 @@ export class SalesDataDto {
   withholdFlag: boolean;
 
   @ApiPropertyOptional() @IsOptional() @IsNumber() targetAmount?: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() chargebackDeductions?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  chargebackDeductions?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() refundDeductions?: number;
 }
 
@@ -193,13 +234,25 @@ export class ProductionDataDto {
 
 // Accountant Department DTO
 export class AccountantDataDto {
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() liabilitiesPermission?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  liabilitiesPermission?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() salaryPermission?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() salesPermission?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() invoicesPermission?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() expensesPermission?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  invoicesPermission?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  expensesPermission?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() assetsPermission?: boolean;
-  @ApiPropertyOptional() @IsOptional() @IsBoolean() revenuesPermission?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  revenuesPermission?: boolean;
 }
 
 /** =======================
@@ -217,28 +270,57 @@ export class BankAccountDataDto {
 
 // Department Data Container
 export class DepartmentDataDto {
-  @ApiPropertyOptional({ type: HrDataDto }) @IsOptional() @ValidateNested() @Type(() => HrDataDto) hr?: HrDataDto;
-  @ApiPropertyOptional({ type: SalesDataDto }) @IsOptional() @ValidateNested() @Type(() => SalesDataDto) sales?: SalesDataDto;
-  @ApiPropertyOptional({ type: MarketingDataDto }) @IsOptional() @ValidateNested() @Type(() => MarketingDataDto) marketing?: MarketingDataDto;
-  @ApiPropertyOptional({ type: ProductionDataDto }) @IsOptional() @ValidateNested() @Type(() => ProductionDataDto) production?: ProductionDataDto;
-  @ApiPropertyOptional({ type: AccountantDataDto }) @IsOptional() @ValidateNested() @Type(() => AccountantDataDto) accountant?: AccountantDataDto;
+  @ApiPropertyOptional({ type: HrDataDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => HrDataDto)
+  hr?: HrDataDto;
+  @ApiPropertyOptional({ type: SalesDataDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SalesDataDto)
+  sales?: SalesDataDto;
+  @ApiPropertyOptional({ type: MarketingDataDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MarketingDataDto)
+  marketing?: MarketingDataDto;
+  @ApiPropertyOptional({ type: ProductionDataDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProductionDataDto)
+  production?: ProductionDataDto;
+  @ApiPropertyOptional({ type: AccountantDataDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AccountantDataDto)
+  accountant?: AccountantDataDto;
 }
 
 // Main Complete Employee DTO
 export class CreateCompleteEmployeeDto {
-  @ApiProperty({ type: EmployeeDataDto, description: 'Core employee information' })
+  @ApiProperty({
+    type: EmployeeDataDto,
+    description: 'Core employee information',
+  })
   @ValidateNested()
   @Type(() => EmployeeDataDto)
   employee: EmployeeDataDto;
 
-  @ApiPropertyOptional({ type: DepartmentDataDto, description: 'Department-specific data (based on role)' })
+  @ApiPropertyOptional({
+    type: DepartmentDataDto,
+    description: 'Department-specific data (based on role)',
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => DepartmentDataDto)
   @IsObject()
   departmentData?: DepartmentDataDto;
 
-  @ApiPropertyOptional({ type: BankAccountDataDto, description: 'Bank account information' })
+  @ApiPropertyOptional({
+    type: BankAccountDataDto,
+    description: 'Bank account information',
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => BankAccountDataDto)
