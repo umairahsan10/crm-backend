@@ -11,7 +11,14 @@ import {
   ParseIntPipe,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+} from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { CreateBulkNotificationDto } from './dto/create-bulk-notification.dto';
@@ -38,49 +45,80 @@ export class NotificationsController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new notification' })
-  @ApiResponse({ status: 201, type: [NotificationResponseDto], description: 'Notification(s) created successfully' })
+  @ApiResponse({
+    status: 201,
+    type: [NotificationResponseDto],
+    description: 'Notification(s) created successfully',
+  })
   async createNotification(
     @Body() createNotificationDto: CreateNotificationDto,
     @Request() req: AuthenticatedRequest,
   ): Promise<NotificationResponseDto[]> {
-    return this.notificationsService.createNotification(createNotificationDto, req.user.id);
+    return this.notificationsService.createNotification(
+      createNotificationDto,
+      req.user.id,
+    );
   }
 
   @Post('bulk')
-  @ApiOperation({ summary: 'Create a bulk notification to all employees or a specific department' })
-  @ApiResponse({ status: 201, description: 'Bulk notifications created successfully' })
+  @ApiOperation({
+    summary:
+      'Create a bulk notification to all employees or a specific department',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bulk notifications created successfully',
+  })
   async createBulkNotification(
     @Body() createBulkNotificationDto: CreateBulkNotificationDto,
     @Request() req: AuthenticatedRequest,
   ): Promise<{ message: string; recipientCount: number }> {
-    return this.notificationsService.createBulkNotification(createBulkNotificationDto, req.user.id);
+    return this.notificationsService.createBulkNotification(
+      createBulkNotificationDto,
+      req.user.id,
+    );
   }
 
   @Get('bulk')
   @ApiOperation({ summary: 'Get summary of all bulk notifications sent' })
-  @ApiQuery({ name: 'departmentId', required: false, description: 'Filter by department ID' })
+  @ApiQuery({
+    name: 'departmentId',
+    required: false,
+    description: 'Filter by department ID',
+  })
   @ApiQuery({
     name: 'notificationType',
     required: false,
     enum: ['bulk_all', 'bulk_department'],
     description: 'Filter by bulk notification type',
   })
-  @ApiResponse({ status: 200, description: 'List of bulk notification summaries' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bulk notification summaries',
+  })
   async getBulkNotificationSummary(
     @Request() req: AuthenticatedRequest,
     @Query('departmentId') departmentId?: string,
-    @Query('notificationType') notificationType?: 'bulk_all' | 'bulk_department',
+    @Query('notificationType')
+    notificationType?: 'bulk_all' | 'bulk_department',
   ): Promise<any[]> {
     const filters = {
       departmentId: departmentId ? parseInt(departmentId) : undefined,
       notificationType,
     };
-    return this.notificationsService.getBulkNotificationSummary(req.user.id, filters);
+    return this.notificationsService.getBulkNotificationSummary(
+      req.user.id,
+      filters,
+    );
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all notifications' })
-  @ApiResponse({ status: 200, type: [NotificationResponseDto], description: 'List of all notifications' })
+  @ApiResponse({
+    status: 200,
+    type: [NotificationResponseDto],
+    description: 'List of all notifications',
+  })
   async getAllNotifications(
     @Request() req: AuthenticatedRequest,
   ): Promise<NotificationResponseDto[]> {
@@ -101,19 +139,30 @@ export class NotificationsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a notification' })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, type: NotificationResponseDto, description: 'Updated notification details' })
+  @ApiResponse({
+    status: 200,
+    type: NotificationResponseDto,
+    description: 'Updated notification details',
+  })
   async updateNotification(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateNotificationDto: UpdateNotificationDto,
     @Request() req: AuthenticatedRequest,
   ): Promise<NotificationResponseDto> {
-    return this.notificationsService.updateNotification(id, updateNotificationDto, req.user.id);
+    return this.notificationsService.updateNotification(
+      id,
+      updateNotificationDto,
+      req.user.id,
+    );
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a notification' })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Notification deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification deleted successfully',
+  })
   async deleteNotification(
     @Param('id', ParseIntPipe) id: number,
     @Request() req: AuthenticatedRequest,
@@ -142,8 +191,14 @@ export class NotificationsController {
   }
 
   @Get('unread/count')
-  @ApiOperation({ summary: 'Get unread notifications count for the current employee' })
-  @ApiResponse({ status: 200, description: 'Unread notification count', schema: { example: { count: 3 } } })
+  @ApiOperation({
+    summary: 'Get unread notifications count for the current employee',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Unread notification count',
+    schema: { example: { count: 3 } },
+  })
   async getUnreadCount(
     @Request() req: AuthenticatedRequest,
   ): Promise<{ count: number }> {
@@ -151,13 +206,21 @@ export class NotificationsController {
   }
 
   @Get('status/:status')
-  @ApiOperation({ summary: 'Get notifications by status for the current employee' })
-  @ApiParam({ name: 'status', description: 'Notification status (e.g. READ, UNREAD)' })
+  @ApiOperation({
+    summary: 'Get notifications by status for the current employee',
+  })
+  @ApiParam({
+    name: 'status',
+    description: 'Notification status (e.g. READ, UNREAD)',
+  })
   @ApiResponse({ status: 200, type: [NotificationResponseDto] })
   async getNotificationsByStatus(
     @Param('status') status: string,
     @Request() req: AuthenticatedRequest,
   ): Promise<NotificationResponseDto[]> {
-    return this.notificationsService.getNotificationsByStatus(status as any, req.user.id);
+    return this.notificationsService.getNotificationsByStatus(
+      status as any,
+      req.user.id,
+    );
   }
 }

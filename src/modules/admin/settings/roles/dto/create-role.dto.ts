@@ -19,4 +19,3 @@ export class CreateRoleDto {
   @IsString()
   description?: string;
 }
-

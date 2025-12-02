@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateReminderDto } from './dto/create-reminder.dto';
 import { UpdateReminderDto } from './dto/update-reminder.dto';
@@ -18,7 +24,7 @@ export class ReminderService {
       // Validate employee exists
       const employee = await this.prisma.employee.findUnique({
         where: { id: empId },
-        select: { id: true, firstName: true, lastName: true, email: true }
+        select: { id: true, firstName: true, lastName: true, email: true },
       });
 
       if (!employee) {
@@ -31,13 +37,23 @@ export class ReminderService {
       }
 
       // Validate recurrence pattern is provided if recurring
-      if (createReminderDto.isRecurring && !createReminderDto.recurrencePattern) {
-        throw new BadRequestException('Recurrence pattern is required when creating a recurring reminder');
+      if (
+        createReminderDto.isRecurring &&
+        !createReminderDto.recurrencePattern
+      ) {
+        throw new BadRequestException(
+          'Recurrence pattern is required when creating a recurring reminder',
+        );
       }
 
       // Validate recurrence pattern is not provided if not recurring
-      if (!createReminderDto.isRecurring && createReminderDto.recurrencePattern) {
-        throw new BadRequestException('Recurrence pattern should not be provided for non-recurring reminders');
+      if (
+        !createReminderDto.isRecurring &&
+        createReminderDto.recurrencePattern
+      ) {
+        throw new BadRequestException(
+          'Recurrence pattern should not be provided for non-recurring reminders',
+        );
       }
 
       const reminder = await this.prisma.reminders.create({
@@ -45,7 +61,10 @@ export class ReminderService {
           empId,
           title: createReminderDto.title,
           description: createReminderDto.description,
-          reminderDate: TimeStorageUtil.createTimeForStorageFromStrings(createReminderDto.reminderDate, '00:00:00'),
+          reminderDate: TimeStorageUtil.createTimeForStorageFromStrings(
+            createReminderDto.reminderDate,
+            '00:00:00',
+          ),
           reminderTime: createReminderDto.reminderTime,
           isRecurring: createReminderDto.isRecurring,
           recurrencePattern: createReminderDto.recurrencePattern,
@@ -69,7 +88,10 @@ export class ReminderService {
         data: reminder,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       console.error('Error creating reminder:', error);
@@ -85,7 +107,7 @@ export class ReminderService {
       // Validate employee exists
       const employee = await this.prisma.employee.findUnique({
         where: { id: empId },
-        select: { id: true }
+        select: { id: true },
       });
 
       if (!employee) {
@@ -138,10 +160,7 @@ export class ReminderService {
             },
           },
         },
-        orderBy: [
-          { reminderDate: 'asc' },
-          { reminderTime: 'asc' },
-        ],
+        orderBy: [{ reminderDate: 'asc' }, { reminderTime: 'asc' }],
       });
 
       return {
@@ -182,7 +201,9 @@ export class ReminderService {
       });
 
       if (!reminder) {
-        throw new NotFoundException('Reminder not found or you do not have permission to access it');
+        throw new NotFoundException(
+          'Reminder not found or you do not have permission to access it',
+        );
       }
 
       return {
@@ -202,7 +223,11 @@ export class ReminderService {
   /**
    * Update a reminder (only if it belongs to the authenticated user)
    */
-  async updateReminder(id: number, updateReminderDto: UpdateReminderDto, empId: number) {
+  async updateReminder(
+    id: number,
+    updateReminderDto: UpdateReminderDto,
+    empId: number,
+  ) {
     try {
       // Check if reminder exists and belongs to the user
       const existingReminder = await this.prisma.reminders.findFirst({
@@ -213,34 +238,62 @@ export class ReminderService {
       });
 
       if (!existingReminder) {
-        throw new NotFoundException('Reminder not found or you do not have permission to update it');
+        throw new NotFoundException(
+          'Reminder not found or you do not have permission to update it',
+        );
       }
 
       // Validate time format if provided
-      if (updateReminderDto.reminderTime && !this.isValidTimeFormat(updateReminderDto.reminderTime)) {
+      if (
+        updateReminderDto.reminderTime &&
+        !this.isValidTimeFormat(updateReminderDto.reminderTime)
+      ) {
         throw new BadRequestException('Reminder time must be in HH:MM format');
       }
 
       // Validate recurrence pattern logic
-      const isRecurring = updateReminderDto.isRecurring !== undefined ? updateReminderDto.isRecurring : existingReminder.isRecurring;
-      
-      if (isRecurring && updateReminderDto.isRecurring !== false && !updateReminderDto.recurrencePattern && !existingReminder.recurrencePattern) {
-        throw new BadRequestException('Recurrence pattern is required for recurring reminders');
+      const isRecurring =
+        updateReminderDto.isRecurring !== undefined
+          ? updateReminderDto.isRecurring
+          : existingReminder.isRecurring;
+
+      if (
+        isRecurring &&
+        updateReminderDto.isRecurring !== false &&
+        !updateReminderDto.recurrencePattern &&
+        !existingReminder.recurrencePattern
+      ) {
+        throw new BadRequestException(
+          'Recurrence pattern is required for recurring reminders',
+        );
       }
 
       if (!isRecurring && updateReminderDto.recurrencePattern) {
-        throw new BadRequestException('Recurrence pattern should not be provided for non-recurring reminders');
+        throw new BadRequestException(
+          'Recurrence pattern should not be provided for non-recurring reminders',
+        );
       }
 
       const updateData: any = {};
 
-      if (updateReminderDto.title !== undefined) updateData.title = updateReminderDto.title;
-      if (updateReminderDto.description !== undefined) updateData.description = updateReminderDto.description;
-      if (updateReminderDto.reminderDate !== undefined) updateData.reminderDate = TimeStorageUtil.createTimeForStorageFromStrings(updateReminderDto.reminderDate, '00:00:00');
-      if (updateReminderDto.reminderTime !== undefined) updateData.reminderTime = updateReminderDto.reminderTime;
-      if (updateReminderDto.isRecurring !== undefined) updateData.isRecurring = updateReminderDto.isRecurring;
-      if (updateReminderDto.recurrencePattern !== undefined) updateData.recurrencePattern = updateReminderDto.recurrencePattern;
-      if (updateReminderDto.status !== undefined) updateData.status = updateReminderDto.status;
+      if (updateReminderDto.title !== undefined)
+        updateData.title = updateReminderDto.title;
+      if (updateReminderDto.description !== undefined)
+        updateData.description = updateReminderDto.description;
+      if (updateReminderDto.reminderDate !== undefined)
+        updateData.reminderDate =
+          TimeStorageUtil.createTimeForStorageFromStrings(
+            updateReminderDto.reminderDate,
+            '00:00:00',
+          );
+      if (updateReminderDto.reminderTime !== undefined)
+        updateData.reminderTime = updateReminderDto.reminderTime;
+      if (updateReminderDto.isRecurring !== undefined)
+        updateData.isRecurring = updateReminderDto.isRecurring;
+      if (updateReminderDto.recurrencePattern !== undefined)
+        updateData.recurrencePattern = updateReminderDto.recurrencePattern;
+      if (updateReminderDto.status !== undefined)
+        updateData.status = updateReminderDto.status;
 
       // If setting to non-recurring, remove recurrence pattern
       if (updateReminderDto.isRecurring === false) {
@@ -268,7 +321,10 @@ export class ReminderService {
         data: updatedReminder,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       console.error('Error updating reminder:', error);
@@ -300,7 +356,9 @@ export class ReminderService {
       });
 
       if (!existingReminder) {
-        throw new NotFoundException('Reminder not found or you do not have permission to delete it');
+        throw new NotFoundException(
+          'Reminder not found or you do not have permission to delete it',
+        );
       }
 
       await this.prisma.reminders.delete({

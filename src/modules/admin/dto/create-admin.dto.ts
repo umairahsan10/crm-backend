@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsEmail, IsEnum, MinLength, IsNotEmpty, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsEnum,
+  MinLength,
+  IsNotEmpty,
+  IsOptional,
+} from 'class-validator';
 import { AdminRole } from '@prisma/client';
 
 export class CreateAdminDto {
@@ -51,4 +58,3 @@ export class CreateAdminDto {
   @IsEnum(AdminRole)
   role?: AdminRole;
 }
-

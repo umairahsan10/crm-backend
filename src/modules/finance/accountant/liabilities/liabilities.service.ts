@@ -1,17 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
-import { Prisma, TransactionType, TransactionStatus, PaymentWays, PaymentMethod } from '@prisma/client';
+import {
+  Prisma,
+  TransactionType,
+  TransactionStatus,
+  PaymentWays,
+  PaymentMethod,
+} from '@prisma/client';
 import { CreateLiabilityDto } from './dto/create-liability.dto';
 import { UpdateLiabilityDto } from './dto/update-liability.dto';
 import { MarkLiabilityPaidDto } from './dto/mark-liability-paid.dto';
-import { 
-  LiabilityResponseDto, 
-  LiabilityListResponseDto, 
+import {
+  LiabilityResponseDto,
+  LiabilityListResponseDto,
   LiabilityDetailResponseDto,
   LiabilityCreateResponseDto,
   LiabilityUpdateResponseDto,
   LiabilityMarkPaidResponseDto,
-  LiabilityErrorResponseDto 
+  LiabilityErrorResponseDto,
 } from './dto/liability-response.dto';
 
 @Injectable()
@@ -24,7 +30,9 @@ export class LiabilitiesService {
    * Helper method to get current date in PKT timezone
    */
   private getCurrentDateInPKT(): Date {
-    return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Karachi"}));
+    return new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+    );
   }
 
   /**
@@ -32,7 +40,7 @@ export class LiabilitiesService {
    */
   async createLiability(
     dto: CreateLiabilityDto,
-    currentUserId: number
+    currentUserId: number,
   ): Promise<LiabilityCreateResponseDto | LiabilityErrorResponseDto> {
     try {
       // Validate vendor if provided
@@ -44,7 +52,7 @@ export class LiabilitiesService {
           return {
             status: 'error',
             message: 'Vendor not found',
-            error_code: 'VENDOR_NOT_FOUND'
+            error_code: 'VENDOR_NOT_FOUND',
           };
         }
       }
@@ -55,7 +63,7 @@ export class LiabilitiesService {
         return {
           status: 'error',
           message: 'Due date must be in the future',
-          error_code: 'INVALID_DUE_DATE'
+          error_code: 'INVALID_DUE_DATE',
         };
       }
 
@@ -64,7 +72,7 @@ export class LiabilitiesService {
         // 1. Create transaction record first
         // Get the next available ID (largest ID + 1)
         const maxTransactionId = await prisma.transaction.aggregate({
-          _max: { id: true }
+          _max: { id: true },
         });
         const nextTransactionId = (maxTransactionId._max.id || 0) + 1;
 
@@ -85,7 +93,7 @@ export class LiabilitiesService {
         // 2. Create liability record
         // Get the next available ID (largest ID + 1)
         const maxLiabilityId = await prisma.liability.aggregate({
-          _max: { id: true }
+          _max: { id: true },
         });
         const nextLiabilityId = (maxLiabilityId._max.id || 0) + 1;
 
@@ -133,11 +141,8 @@ export class LiabilitiesService {
           transaction: this.mapTransactionToResponse(result.transaction),
         },
       };
-
     } catch (error) {
-      this.logger.error(
-        `Failed to create liability: ${error.message}`,
-      );
+      this.logger.error(`Failed to create liability: ${error.message}`);
 
       return {
         status: 'error',
@@ -159,7 +164,7 @@ export class LiabilitiesService {
       toDate?: string;
       createdBy?: number;
     },
-    query?: any
+    query?: any,
   ): Promise<LiabilityListResponseDto | LiabilityErrorResponseDto> {
     try {
       const whereClause: any = {};
@@ -197,7 +202,11 @@ export class LiabilitiesService {
         whereClause.OR = [
           { name: { contains: query.search, mode: 'insensitive' } },
           { category: { contains: query.search, mode: 'insensitive' } },
-          { transaction: { vendor: { name: { contains: query.search, mode: 'insensitive' } } } }
+          {
+            transaction: {
+              vendor: { name: { contains: query.search, mode: 'insensitive' } },
+            },
+          },
         ];
       }
 
@@ -228,26 +237,25 @@ export class LiabilitiesService {
           skip,
           take: limit,
         }),
-        this.prisma.liability.count({ where: whereClause })
+        this.prisma.liability.count({ where: whereClause }),
       ]);
 
       return {
         status: 'success',
         message: 'Liabilities retrieved successfully',
-        data: liabilities.map(liability => this.mapLiabilityToResponse(liability)),
+        data: liabilities.map((liability) =>
+          this.mapLiabilityToResponse(liability),
+        ),
         pagination: {
           page,
           limit,
           total,
           totalPages: Math.ceil(total / limit),
-          retrieved: liabilities.length
-        }
+          retrieved: liabilities.length,
+        },
       };
-
     } catch (error) {
-      this.logger.error(
-        `Failed to get liabilities: ${error.message}`,
-      );
+      this.logger.error(`Failed to get liabilities: ${error.message}`);
 
       return {
         status: 'error',
@@ -260,7 +268,9 @@ export class LiabilitiesService {
   /**
    * Gets a single liability by ID
    */
-  async getLiabilityById(id: number): Promise<LiabilityDetailResponseDto | LiabilityErrorResponseDto> {
+  async getLiabilityById(
+    id: number,
+  ): Promise<LiabilityDetailResponseDto | LiabilityErrorResponseDto> {
     try {
       const liability = await this.prisma.liability.findUnique({
         where: { id },
@@ -285,7 +295,7 @@ export class LiabilitiesService {
         return {
           status: 'error',
           message: 'Liability not found',
-          error_code: 'LIABILITY_NOT_FOUND'
+          error_code: 'LIABILITY_NOT_FOUND',
         };
       }
 
@@ -294,11 +304,8 @@ export class LiabilitiesService {
         message: 'Liability retrieved successfully',
         data: this.mapLiabilityToResponse(liability),
       };
-
     } catch (error) {
-      this.logger.error(
-        `Failed to get liability ${id}: ${error.message}`,
-      );
+      this.logger.error(`Failed to get liability ${id}: ${error.message}`);
 
       return {
         status: 'error',
@@ -313,19 +320,19 @@ export class LiabilitiesService {
    */
   async updateLiability(
     dto: UpdateLiabilityDto,
-    currentUserId: number
+    currentUserId: number,
   ): Promise<LiabilityUpdateResponseDto | LiabilityErrorResponseDto> {
     const { liability_id, ...updateData } = dto;
-    
+
     // Validate that ID exists
     if (!liability_id) {
       return {
         status: 'error',
         message: 'Liability ID is required',
-        error_code: 'MISSING_LIABILITY_ID'
+        error_code: 'MISSING_LIABILITY_ID',
       };
     }
-    
+
     try {
       // 1. Check if liability exists and is not paid
       const existingLiability = await this.prisma.liability.findUnique({
@@ -339,7 +346,7 @@ export class LiabilitiesService {
         return {
           status: 'error',
           message: 'Liability not found',
-          error_code: 'LIABILITY_NOT_FOUND'
+          error_code: 'LIABILITY_NOT_FOUND',
         };
       }
 
@@ -347,21 +354,26 @@ export class LiabilitiesService {
         return {
           status: 'error',
           message: 'Liability is already paid and cannot be updated',
-          error_code: 'LIABILITY_ALREADY_PAID'
+          error_code: 'LIABILITY_ALREADY_PAID',
         };
       }
 
       // 2. Check if linked transaction is completed
-      if (existingLiability.transaction.status === TransactionStatus.completed) {
+      if (
+        existingLiability.transaction.status === TransactionStatus.completed
+      ) {
         return {
           status: 'error',
           message: 'Linked transaction is already completed',
-          error_code: 'TRANSACTION_ALREADY_COMPLETED'
+          error_code: 'TRANSACTION_ALREADY_COMPLETED',
         };
       }
 
       // 3. Validate vendor if provided (allow null to clear vendor)
-      if (updateData.relatedVendorId !== undefined && updateData.relatedVendorId !== null) {
+      if (
+        updateData.relatedVendorId !== undefined &&
+        updateData.relatedVendorId !== null
+      ) {
         const vendor = await this.prisma.vendor.findUnique({
           where: { id: updateData.relatedVendorId },
         });
@@ -369,7 +381,7 @@ export class LiabilitiesService {
           return {
             status: 'error',
             message: 'Vendor not found',
-            error_code: 'VENDOR_NOT_FOUND'
+            error_code: 'VENDOR_NOT_FOUND',
           };
         }
       }
@@ -381,7 +393,7 @@ export class LiabilitiesService {
           return {
             status: 'error',
             message: 'Due date must be in the future',
-            error_code: 'INVALID_DUE_DATE'
+            error_code: 'INVALID_DUE_DATE',
           };
         }
       }
@@ -393,11 +405,16 @@ export class LiabilitiesService {
         };
 
         // Update liability fields
-        if (updateData.name !== undefined) liabilityUpdateData.name = updateData.name;
-        if (updateData.category !== undefined) liabilityUpdateData.category = updateData.category;
-        if (updateData.relatedVendorId !== undefined) liabilityUpdateData.relatedVendorId = updateData.relatedVendorId;
-        if (updateData.dueDate !== undefined) liabilityUpdateData.dueDate = new Date(updateData.dueDate);
-        if (updateData.amount !== undefined) liabilityUpdateData.amount = new Prisma.Decimal(updateData.amount);
+        if (updateData.name !== undefined)
+          liabilityUpdateData.name = updateData.name;
+        if (updateData.category !== undefined)
+          liabilityUpdateData.category = updateData.category;
+        if (updateData.relatedVendorId !== undefined)
+          liabilityUpdateData.relatedVendorId = updateData.relatedVendorId;
+        if (updateData.dueDate !== undefined)
+          liabilityUpdateData.dueDate = new Date(updateData.dueDate);
+        if (updateData.amount !== undefined)
+          liabilityUpdateData.amount = new Prisma.Decimal(updateData.amount);
 
         // Update liability
         const updatedLiability = await prisma.liability.update({
@@ -427,15 +444,24 @@ export class LiabilitiesService {
         };
         let shouldUpdateTransaction = false;
 
-        if (updateData.amount !== undefined && updateData.amount !== Number(existingLiability.amount)) {
+        if (
+          updateData.amount !== undefined &&
+          updateData.amount !== Number(existingLiability.amount)
+        ) {
           transactionUpdateData.amount = new Prisma.Decimal(updateData.amount);
           shouldUpdateTransaction = true;
         }
 
         // Handle vendor update - check if vendor actually changed (handles null/undefined cases)
         const currentVendorId = existingLiability.relatedVendorId ?? null;
-        const newVendorId = updateData.relatedVendorId !== undefined ? (updateData.relatedVendorId ?? null) : currentVendorId;
-        if (updateData.relatedVendorId !== undefined && currentVendorId !== newVendorId) {
+        const newVendorId =
+          updateData.relatedVendorId !== undefined
+            ? (updateData.relatedVendorId ?? null)
+            : currentVendorId;
+        if (
+          updateData.relatedVendorId !== undefined &&
+          currentVendorId !== newVendorId
+        ) {
           transactionUpdateData.vendorId = updateData.relatedVendorId; // Can be null to clear vendor
           shouldUpdateTransaction = true;
         }
@@ -480,10 +506,11 @@ export class LiabilitiesService {
         message: 'Liability updated successfully',
         data: {
           liability: this.mapLiabilityToResponse(result.liability),
-          transaction: result.transaction ? this.mapTransactionToResponse(result.transaction) : undefined,
+          transaction: result.transaction
+            ? this.mapTransactionToResponse(result.transaction)
+            : undefined,
         },
       };
-
     } catch (error) {
       this.logger.error(
         `Failed to update liability ${liability_id}: ${error.message}`,
@@ -502,19 +529,19 @@ export class LiabilitiesService {
    */
   async markLiabilityAsPaid(
     dto: MarkLiabilityPaidDto,
-    currentUserId: number
+    currentUserId: number,
   ): Promise<LiabilityMarkPaidResponseDto | LiabilityErrorResponseDto> {
     const { liability_id, ...markPaidData } = dto;
-    
+
     // Validate that ID exists
     if (!liability_id) {
       return {
         status: 'error',
         message: 'Liability ID is required',
-        error_code: 'MISSING_LIABILITY_ID'
+        error_code: 'MISSING_LIABILITY_ID',
       };
     }
-    
+
     try {
       // 1. Check if liability exists and is not already paid
       const existingLiability = await this.prisma.liability.findUnique({
@@ -540,7 +567,7 @@ export class LiabilitiesService {
         return {
           status: 'error',
           message: 'Liability not found',
-          error_code: 'LIABILITY_NOT_FOUND'
+          error_code: 'LIABILITY_NOT_FOUND',
         };
       }
 
@@ -548,7 +575,7 @@ export class LiabilitiesService {
         return {
           status: 'error',
           message: 'Liability is already paid',
-          error_code: 'LIABILITY_ALREADY_PAID'
+          error_code: 'LIABILITY_ALREADY_PAID',
         };
       }
 
@@ -606,7 +633,11 @@ export class LiabilitiesService {
           },
         });
 
-        return { liability: updatedLiability, transaction: updatedTransaction, expense };
+        return {
+          liability: updatedLiability,
+          transaction: updatedTransaction,
+          expense,
+        };
       });
 
       this.logger.log(
@@ -622,7 +653,6 @@ export class LiabilitiesService {
           expense: this.mapExpenseToResponse(result.expense),
         },
       };
-
     } catch (error) {
       this.logger.error(
         `Failed to mark liability ${liability_id} as paid: ${error.message}`,
@@ -639,7 +669,9 @@ export class LiabilitiesService {
   /**
    * Maps PaymentWays enum to PaymentMethod enum for expense records
    */
-  private mapPaymentWaysToPaymentMethod(paymentWays: PaymentWays): PaymentMethod {
+  private mapPaymentWaysToPaymentMethod(
+    paymentWays: PaymentWays,
+  ): PaymentMethod {
     switch (paymentWays) {
       case PaymentWays.cash:
         return PaymentMethod.cash;
@@ -672,13 +704,19 @@ export class LiabilitiesService {
       createdAt: liability.createdAt,
       updatedAt: liability.updatedAt,
       transaction: this.mapTransactionToResponse(liability.transaction),
-      vendor: liability.vendor ? this.mapVendorToResponse(liability.vendor) : null,
-      employee: liability.employee ? {
-        id: liability.employee.id,
-        firstName: liability.employee.firstName,
-        lastName: liability.employee.lastName,
-      } : null,
-      expense: liability.expense ? this.mapExpenseToResponse(liability.expense) : undefined,
+      vendor: liability.vendor
+        ? this.mapVendorToResponse(liability.vendor)
+        : null,
+      employee: liability.employee
+        ? {
+            id: liability.employee.id,
+            firstName: liability.employee.firstName,
+            lastName: liability.employee.lastName,
+          }
+        : null,
+      expense: liability.expense
+        ? this.mapExpenseToResponse(liability.expense)
+        : undefined,
     };
   }
 
@@ -762,7 +800,11 @@ export class LiabilitiesService {
   async getLiabilityStats(): Promise<any> {
     try {
       const currentDate = this.getCurrentDateInPKT();
-      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const firstDayOfMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      );
       const thirtyDaysFromNow = new Date(currentDate);
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
@@ -771,24 +813,44 @@ export class LiabilitiesService {
 
       // Total count and sum
       const totalLiabilities = allLiabilities.length;
-      const totalAmount = allLiabilities.reduce((sum, liability) => sum + Number(liability.amount), 0);
-      const averageLiability = totalLiabilities > 0 ? totalAmount / totalLiabilities : 0;
+      const totalAmount = allLiabilities.reduce(
+        (sum, liability) => sum + Number(liability.amount),
+        0,
+      );
+      const averageLiability =
+        totalLiabilities > 0 ? totalAmount / totalLiabilities : 0;
 
       // Paid vs Unpaid breakdown
       const paidLiabilities = allLiabilities.filter((l) => l.isPaid === true);
-      const unpaidLiabilities = allLiabilities.filter((l) => l.isPaid === false);
+      const unpaidLiabilities = allLiabilities.filter(
+        (l) => l.isPaid === false,
+      );
 
       const paidCount = paidLiabilities.length;
       const unpaidCount = unpaidLiabilities.length;
-      const paidAmount = paidLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
-      const unpaidAmount = unpaidLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+      const paidAmount = paidLiabilities.reduce(
+        (sum, l) => sum + Number(l.amount),
+        0,
+      );
+      const unpaidAmount = unpaidLiabilities.reduce(
+        (sum, l) => sum + Number(l.amount),
+        0,
+      );
 
       // Breakdown by category
-      const categoryBreakdown: Record<string, { count: number; amount: number; paid: number; unpaid: number }> = {};
+      const categoryBreakdown: Record<
+        string,
+        { count: number; amount: number; paid: number; unpaid: number }
+      > = {};
       allLiabilities.forEach((liability) => {
         const category = liability.category || 'Uncategorized';
         if (!categoryBreakdown[category]) {
-          categoryBreakdown[category] = { count: 0, amount: 0, paid: 0, unpaid: 0 };
+          categoryBreakdown[category] = {
+            count: 0,
+            amount: 0,
+            paid: 0,
+            unpaid: 0,
+          };
         }
         categoryBreakdown[category].count++;
         categoryBreakdown[category].amount += Number(liability.amount);
@@ -801,25 +863,39 @@ export class LiabilitiesService {
 
       // Overdue liabilities (unpaid and past due date)
       const overdueLiabilities = unpaidLiabilities.filter(
-        (l) => l.dueDate && new Date(l.dueDate) < currentDate
+        (l) => l.dueDate && new Date(l.dueDate) < currentDate,
       );
       const overdueCount = overdueLiabilities.length;
-      const overdueAmount = overdueLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+      const overdueAmount = overdueLiabilities.reduce(
+        (sum, l) => sum + Number(l.amount),
+        0,
+      );
 
       // Upcoming due liabilities (unpaid and due within 30 days)
       const upcomingLiabilities = unpaidLiabilities.filter(
-        (l) => l.dueDate && new Date(l.dueDate) >= currentDate && new Date(l.dueDate) <= thirtyDaysFromNow
+        (l) =>
+          l.dueDate &&
+          new Date(l.dueDate) >= currentDate &&
+          new Date(l.dueDate) <= thirtyDaysFromNow,
       );
       const upcomingCount = upcomingLiabilities.length;
-      const upcomingAmount = upcomingLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
+      const upcomingAmount = upcomingLiabilities.reduce(
+        (sum, l) => sum + Number(l.amount),
+        0,
+      );
 
       // This month's stats
       const thisMonthLiabilities = allLiabilities.filter(
-        (l) => l.createdAt >= firstDayOfMonth
+        (l) => l.createdAt >= firstDayOfMonth,
       );
       const thisMonthCount = thisMonthLiabilities.length;
-      const thisMonthAmount = thisMonthLiabilities.reduce((sum, l) => sum + Number(l.amount), 0);
-      const thisMonthPaid = thisMonthLiabilities.filter((l) => l.isPaid === true).length;
+      const thisMonthAmount = thisMonthLiabilities.reduce(
+        (sum, l) => sum + Number(l.amount),
+        0,
+      );
+      const thisMonthPaid = thisMonthLiabilities.filter(
+        (l) => l.isPaid === true,
+      ).length;
 
       return {
         status: 'success',
@@ -831,12 +907,18 @@ export class LiabilitiesService {
           paid: {
             count: paidCount,
             amount: Math.round(paidAmount * 100) / 100,
-            percentage: totalLiabilities > 0 ? Math.round((paidCount / totalLiabilities) * 100 * 100) / 100 : 0,
+            percentage:
+              totalLiabilities > 0
+                ? Math.round((paidCount / totalLiabilities) * 100 * 100) / 100
+                : 0,
           },
           unpaid: {
             count: unpaidCount,
             amount: Math.round(unpaidAmount * 100) / 100,
-            percentage: totalLiabilities > 0 ? Math.round((unpaidCount / totalLiabilities) * 100 * 100) / 100 : 0,
+            percentage:
+              totalLiabilities > 0
+                ? Math.round((unpaidCount / totalLiabilities) * 100 * 100) / 100
+                : 0,
           },
           byCategory: categoryBreakdown,
           overdue: {
@@ -855,7 +937,9 @@ export class LiabilitiesService {
         },
       };
     } catch (error) {
-      this.logger.error(`Error retrieving liability statistics: ${error.message}`);
+      this.logger.error(
+        `Error retrieving liability statistics: ${error.message}`,
+      );
       return {
         status: 'error',
         message: 'An error occurred while retrieving liability statistics',

@@ -4,16 +4,31 @@ import {
   OnModuleDestroy,
   Logger,
   INestApplication,
+  Optional,
+  Inject,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { DatabaseConfigService } from '../src/config/database.config';
 
+/**
+ * PrismaService
+ * 
+ * Database service extending PrismaClient with:
+ * - Config-driven connection management
+ * - PgBouncer connection pooling
+ * - Health monitoring
+ * - Graceful shutdown handling
+ * - Connection retry logic
+ * 
+ * Uses DatabaseConfigService for type-safe configuration.
+ * Falls back to environment variables if config service is not available.
+ */
 @Injectable()
 export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(PrismaService.name);
-  private static instance: PrismaService | null = null;
   private static isConnected = false;
   private static initialized = false; // Prevent multiple module inits
   private healthCheckInterval?: NodeJS.Timeout;
@@ -21,41 +36,116 @@ export class PrismaService
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAY = 5000; // 5 seconds
 
-  constructor() {
-    // Reuse PrismaClient across hot reloads
-    if (globalThis['__PRISMA_INSTANCE__']) {
-      console.log('[Prisma] Reusing existing Prisma instance (hot reload)');
-      return globalThis['__PRISMA_INSTANCE__'];
-    }
+  constructor(@Optional() @Inject(DatabaseConfigService) private configService?: DatabaseConfigService) {
+    // Compute database URL and log level before calling super()
+    // (super() must be called before accessing 'this' in derived classes)
+    const databaseUrl = configService
+      ? configService.getRuntimeUrl()
+      : PrismaService.getDatabaseUrlFromEnvStatic();
 
-    console.log('[Prisma] Creating new Prisma instance...');
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
-      throw new Error('DATABASE_URL environment variable is not set');
-    }
-    
-    // Use session pooling mode for PgBouncer to avoid prepared statement conflicts
-    // Disable prepared statements to prevent conflicts during hot reload
-    const urlWithParams = databaseUrl + (databaseUrl.includes('?') ? '&' : '?') + 'prepared_statements=false&connection_limit=10&pool_timeout=20&pgbouncer=true';
-    
+    const logLevel = PrismaService.getLogLevelStatic(configService);
+
     super({
       datasources: {
-        db: { url: urlWithParams },
+        db: { url: databaseUrl },
       },
-      log:
-        process.env.NODE_ENV === 'development'
-          ? ['warn', 'error']
-          : ['error'],
+      log: logLevel,
     });
 
-    console.log(`[Prisma] DATABASE_URL: ${process.env.DATABASE_URL}`);
-    console.log(`[Prisma] NODE_ENV: ${process.env.NODE_ENV}`);
+    this.logger.log('PrismaService instance created');
+    if (this.configService) {
+      this.logger.log('✅ Using DatabaseConfigService for configuration');
+    } else {
+      this.logger.warn('⚠️  DatabaseConfigService not available, falling back to process.env');
+      this.logger.warn('⚠️  This is not recommended. Please ensure DatabaseModule is imported in AppModule.');
+      this.logger.warn('⚠️  Direct environment variable access bypasses validation and type safety.');
+    }
+  }
 
-    if (process.env.NODE_ENV === 'development') {
-      globalThis['__PRISMA_INSTANCE__'] = this;
+  /**
+   * Get database URL from environment (fallback) - static version for constructor
+   * 
+   * @deprecated This method is a fallback when DatabaseConfigService is not available.
+   * It should not be used in normal operation. Ensure DatabaseModule is properly imported.
+   */
+  private static getDatabaseUrlFromEnvStatic(): string {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error(
+        'DATABASE_URL environment variable is not set. ' +
+        'Please ensure DatabaseModule is imported in AppModule or set DATABASE_URL in your environment.'
+      );
     }
 
-    PrismaService.instance = this;
+    // Build URL with PgBouncer parameters
+    // Note: These are hardcoded defaults. Use DatabaseConfigService for configurable values.
+    const urlWithParams =
+      databaseUrl +
+      (databaseUrl.includes('?') ? '&' : '?') +
+      'prepared_statements=false&connection_limit=10&pool_timeout=20&pgbouncer=true';
+    
+    return urlWithParams;
+  }
+
+  /**
+   * Get database URL from environment (fallback) - instance version with logging
+   * 
+   * @deprecated This method is a fallback when DatabaseConfigService is not available.
+   * It should not be used in normal operation. Ensure DatabaseModule is properly imported.
+   */
+  private getDatabaseUrlFromEnv(): string {
+    this.logger.warn('⚠️  Using process.env.DATABASE_URL fallback (not recommended)');
+    
+    const url = PrismaService.getDatabaseUrlFromEnvStatic();
+    
+    this.logger.warn('⚠️  Using hardcoded PgBouncer parameters. Consider using DatabaseConfigService for configuration.');
+    
+    return url;
+  }
+
+  /**
+   * Get log level based on environment - static version for constructor
+   */
+  private static getLogLevelStatic(configService?: DatabaseConfigService): ('warn' | 'error' | 'info' | 'query')[] {
+    if (configService) {
+      const env = configService.getEnvironment();
+      if (env === 'development') {
+        return configService.isLoggingEnabled()
+          ? ['warn', 'error', 'info']
+          : ['warn', 'error'];
+      }
+      return ['error'];
+    }
+
+    // Fallback to environment variable
+    return process.env.NODE_ENV === 'development'
+      ? ['warn', 'error']
+      : ['error'];
+  }
+
+  /**
+   * Get log level based on environment - instance version
+   */
+  private getLogLevel(): ('warn' | 'error' | 'info' | 'query')[] {
+    if (this.configService) {
+      const env = this.configService.getEnvironment();
+      if (env === 'development') {
+        return this.configService.isLoggingEnabled()
+          ? ['warn', 'error', 'info']
+          : ['warn', 'error'];
+      }
+      return ['error'];
+    }
+
+    // Fallback to environment variable
+    // Log warning only once during construction (not on every call)
+    if (process.env.NODE_ENV) {
+      this.logger.debug('Using process.env.NODE_ENV for log level configuration (fallback mode)');
+    }
+    
+    return process.env.NODE_ENV === 'development'
+      ? ['warn', 'error']
+      : ['error'];
   }
 
   async onModuleInit() {
@@ -108,7 +198,15 @@ export class PrismaService
   /** Regular health monitoring (dev only) */
   private startHealthCheck() {
     this.stopHealthCheck(); // Prevent multiple intervals
-    this.logger.log('Starting periodic Prisma health check (every 60s)');
+    
+    // Get health check interval from config service or use default
+    const interval = this.configService
+      ? this.configService.getHealthCheckInterval()
+      : 60000; // Default: 60 seconds (fallback if config service not available)
+    
+    const intervalSeconds = interval / 1000;
+    this.logger.log(`Starting periodic Prisma health check (every ${intervalSeconds}s)`);
+    
     this.healthCheckInterval = setInterval(async () => {
       try {
         // Use a simple query instead of raw query to avoid prepared statement conflicts
@@ -118,7 +216,15 @@ export class PrismaService
         PrismaService.isConnected = false;
         await this.connectWithRetry();
       }
-    }, 60000);
+    }, interval);
+    
+    // Log warning if using fallback
+    if (!this.configService) {
+      this.logger.warn(
+        `⚠️  Using default health check interval (${intervalSeconds}s). ` +
+        `Set DB_HEALTH_CHECK_INTERVAL environment variable or use DatabaseConfigService for configuration.`
+      );
+    }
   }
 
   private stopHealthCheck() {
@@ -177,13 +283,8 @@ export class PrismaService
       this.logger.log('Prisma disconnected cleanly');
     }
 
-    if (globalThis['__PRISMA_INSTANCE__']) {
-      this.logger.log('Removing global Prisma instance reference');
-      delete globalThis['__PRISMA_INSTANCE__'];
-    }
-
     PrismaService.initialized = false;
-    console.log('[Prisma] Cleanup completed');
+    this.logger.log('Prisma cleanup completed');
   }
 
   async enableShutdownHooks(app: INestApplication) {

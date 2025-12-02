@@ -14,4 +14,3 @@ export class ActivityFeedResponseDto {
   @ApiProperty({ description: 'Total activities count', example: 50 })
   total: number;
 }
-

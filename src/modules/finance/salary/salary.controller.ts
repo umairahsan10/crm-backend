@@ -1,4 +1,15 @@
-import { Controller, Post, Get, Param, Query, UseGuards, Patch, Body, Request, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+  Patch,
+  Body,
+  Request,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { FinanceSalaryService } from './salary.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
@@ -6,7 +17,15 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../../common/constants/permission.enum';
 import { Departments } from '../../../common/decorators/departments.decorator';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { FinanceMarkSalaryPaidDto } from './dto/mark-paid.dto';
 
 interface AuthenticatedRequest extends Request {
@@ -37,25 +56,27 @@ export class FinanceSalaryController {
 
   /**
    * Trigger automatic salary calculation for all active employees
-   * 
+   *
    * This endpoint manually triggers the salary calculation process that normally runs
    * via cron job on the 4th of every month. It calculates salary (base + bonus + commissions)
    * and deductions for all active employees and stores the results in net_salary_logs.
-   * 
+   *
    * Use cases:
    * - Manual salary processing outside the scheduled time
    * - Testing the salary calculation system
-   * 
+   *
    * @returns Success message confirming salary calculation completion
-   * 
+   *
    * Required Permissions: salary_permission
    */
   @Post('calculate-all')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Trigger salary calculation for all active employees' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiOperation({
+    summary: 'Trigger salary calculation for all active employees',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Salary calculation triggered for all employees',
     schema: {
       type: 'object',
@@ -72,15 +93,16 @@ export class FinanceSalaryController {
               employeeName: { type: 'string' },
               status: { type: 'string' },
               logId: { type: 'number', nullable: true },
-              error: { type: 'string', nullable: true }
-            }
-          }
-        }
-      }
-    }
+              error: { type: 'string', nullable: true },
+            },
+          },
+        },
+      },
+    },
   })
   async calculateAllSalaries() {
-    const data = await this.financeSalaryService.handleMonthlySalaryCalculation();
+    const data =
+      await this.financeSalaryService.handleMonthlySalaryCalculation();
     return data;
   }
 
@@ -91,14 +113,49 @@ export class FinanceSalaryController {
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
   @ApiOperation({ summary: 'Get paginated salaries for all employees' })
-  @ApiQuery({ name: 'month', description: 'Optional month (YYYY-MM)', required: false })
-  @ApiQuery({ name: 'page', description: 'Page number (defaults to 1)', required: false, type: Number })
-  @ApiQuery({ name: 'limit', description: 'Number of records per page (defaults to 20, max 100)', required: false, type: Number })
-  @ApiQuery({ name: 'departments', description: 'Comma-separated department IDs (e.g., "1,2,3")', required: false })
-  @ApiQuery({ name: 'status', description: 'Employee status filter (active, inactive, terminated)', required: false })
-  @ApiQuery({ name: 'minSalary', description: 'Minimum final salary filter', required: false, type: Number })
-  @ApiQuery({ name: 'maxSalary', description: 'Maximum final salary filter', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'All employee salaries returned successfully' })
+  @ApiQuery({
+    name: 'month',
+    description: 'Optional month (YYYY-MM)',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Page number (defaults to 1)',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Number of records per page (defaults to 20, max 100)',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'departments',
+    description: 'Comma-separated department IDs (e.g., "1,2,3")',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'status',
+    description: 'Employee status filter (active, inactive, terminated)',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'minSalary',
+    description: 'Minimum final salary filter',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'maxSalary',
+    description: 'Maximum final salary filter',
+    required: false,
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All employee salaries returned successfully',
+  })
   async getAllSalaries(@Query() query: GetAllSalariesQuery) {
     return await this.financeSalaryService.getAllSalaries(query);
   }
@@ -109,24 +166,41 @@ export class FinanceSalaryController {
   @Get('calculate')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Calculate salary preview for an employee (read-only)' })
-  @ApiQuery({ name: 'employeeId', description: 'Employee ID to calculate salary for', type: Number, required: true })
-  @ApiQuery({ name: 'endDate', description: 'Optional end date (YYYY-MM-DD). Defaults to current date.', required: false })
-  @ApiResponse({ status: 200, description: 'Salary preview calculated successfully' })
+  @ApiOperation({
+    summary: 'Calculate salary preview for an employee (read-only)',
+  })
+  @ApiQuery({
+    name: 'employeeId',
+    description: 'Employee ID to calculate salary for',
+    type: Number,
+    required: true,
+  })
+  @ApiQuery({
+    name: 'endDate',
+    description: 'Optional end date (YYYY-MM-DD). Defaults to current date.',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Salary preview calculated successfully',
+  })
   async calculateSalary(
     @Query('employeeId', ParseIntPipe) employeeId: number,
     @Query('endDate') endDate?: string,
   ) {
-    return await this.financeSalaryService.calculateSalaryForPreview(employeeId, endDate);
+    return await this.financeSalaryService.calculateSalaryForPreview(
+      employeeId,
+      endDate,
+    );
   }
 
   /**
    * Get sales employees with sales amount greater than 3000, ordered alphabetically
-   * 
+   *
    * This endpoint retrieves sales employees from the sales department who have
    * sales amount greater than 3000, ordered alphabetically by name.
    * Includes pagination and filtering support for sales amount and bonus.
-   * 
+   *
    * @param page - Page number (defaults to 1)
    * @param limit - Number of records per page (defaults to 20, max 100)
    * @param minSales - Minimum sales amount filter
@@ -134,19 +208,52 @@ export class FinanceSalaryController {
    * @param minBonus - Minimum bonus amount filter
    * @param maxBonus - Maximum bonus amount filter
    * @returns Paginated array of sales employees with id, name, sales amount, and bonus amount
-   * 
+   *
    * Required Permissions: salary_permission
    */
   @Get('bonus-display')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Get sales employees with sales amount > 3000 (paginated with filters)' })
-  @ApiQuery({ name: 'page', description: 'Page number (defaults to 1)', required: false, type: Number })
-  @ApiQuery({ name: 'limit', description: 'Number of records per page (defaults to 20, max 100)', required: false, type: Number })
-  @ApiQuery({ name: 'minSales', description: 'Minimum sales amount filter', required: false, type: Number })
-  @ApiQuery({ name: 'maxSales', description: 'Maximum sales amount filter', required: false, type: Number })
-  @ApiQuery({ name: 'minBonus', description: 'Minimum bonus amount filter', required: false, type: Number })
-  @ApiQuery({ name: 'maxBonus', description: 'Maximum bonus amount filter', required: false, type: Number })
+  @ApiOperation({
+    summary:
+      'Get sales employees with sales amount > 3000 (paginated with filters)',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Page number (defaults to 1)',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Number of records per page (defaults to 20, max 100)',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'minSales',
+    description: 'Minimum sales amount filter',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'maxSales',
+    description: 'Maximum sales amount filter',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'minBonus',
+    description: 'Minimum bonus amount filter',
+    required: false,
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'maxBonus',
+    description: 'Maximum bonus amount filter',
+    required: false,
+    type: Number,
+  })
   @ApiResponse({
     status: 200,
     description: 'Sales employees bonus display returned successfully',
@@ -192,15 +299,16 @@ export class FinanceSalaryController {
     const maxSalesNum = maxSales ? parseFloat(maxSales) : undefined;
     const minBonusNum = minBonus ? parseFloat(minBonus) : undefined;
     const maxBonusNum = maxBonus ? parseFloat(maxBonus) : undefined;
-    
-    const result = await this.financeSalaryService.getSalesEmployeesBonusDisplay(
-      pageNum,
-      limitNum,
-      minSalesNum,
-      maxSalesNum,
-      minBonusNum,
-      maxBonusNum,
-    );
+
+    const result =
+      await this.financeSalaryService.getSalesEmployeesBonusDisplay(
+        pageNum,
+        limitNum,
+        minSalesNum,
+        maxSalesNum,
+        minBonusNum,
+        maxBonusNum,
+      );
     return result;
   }
 
@@ -212,8 +320,15 @@ export class FinanceSalaryController {
   @Permissions(PermissionName.salary_permission)
   @ApiOperation({ summary: 'Get salary details for a specific employee' })
   @ApiParam({ name: 'id', description: 'Employee ID', type: Number })
-  @ApiQuery({ name: 'month', description: 'Optional month in YYYY-MM format', required: false })
-  @ApiResponse({ status: 200, description: 'Employee salary details returned successfully' })
+  @ApiQuery({
+    name: 'month',
+    description: 'Optional month in YYYY-MM format',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Employee salary details returned successfully',
+  })
   async getEmployeeSalary(
     @Param('id', ParseIntPipe) id: number,
     @Query('month') month?: string,
@@ -223,25 +338,38 @@ export class FinanceSalaryController {
 
   /**
    * Update bonus amount for sales employees with sales amount >= 3000
-   * 
+   *
    * This endpoint allows admins to update the bonus amount for sales employees
    * who have sales amount greater than or equal to 3000.
-   * 
+   *
    * @param employeeId - Employee ID to update bonus for
    * @param bonusAmount - New bonus amount to set
    * @returns Updated employee data with success message
-   * 
+   *
    * Required Permissions: Admin access (bypass using non-existent department)
    */
   @Patch('update-sales-bonus')
   @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Departments('Admin', 'NonExistentDepartment')
   @Permissions(PermissionName.salary_permission)
-  @ApiOperation({ summary: 'Update bonus amount for sales employees with sales >= 3000' })
-  @ApiBody({ description: 'Employee ID and bonus amount', schema: { example: { employee_id: 1, bonusAmount: 5000 } } })
-  @ApiResponse({ status: 200, description: 'Sales employee bonus updated successfully' })
-  async updateSalesEmployeeBonus(@Body() body: { employee_id: number; bonusAmount: number }) {
-    const result = await this.financeSalaryService.updateSalesEmployeeBonus(body.employee_id, body.bonusAmount);
+  @ApiOperation({
+    summary: 'Update bonus amount for sales employees with sales >= 3000',
+  })
+  @ApiBody({
+    description: 'Employee ID and bonus amount',
+    schema: { example: { employee_id: 1, bonusAmount: 5000 } },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sales employee bonus updated successfully',
+  })
+  async updateSalesEmployeeBonus(
+    @Body() body: { employee_id: number; bonusAmount: number },
+  ) {
+    const result = await this.financeSalaryService.updateSalesEmployeeBonus(
+      body.employee_id,
+      body.bonusAmount,
+    );
     return result;
   }
 
@@ -264,4 +392,4 @@ export class FinanceSalaryController {
       req.user.type,
     );
   }
-} 
+}

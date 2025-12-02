@@ -4,7 +4,10 @@ export class LateDetailsDto {
   @ApiProperty({ description: 'Number of minutes the employee was late' })
   minutes_late: number;
 
-  @ApiProperty({ description: 'Indicates whether a reason submission is required for the late arrival' })
+  @ApiProperty({
+    description:
+      'Indicates whether a reason submission is required for the late arrival',
+  })
   requires_reason: boolean;
 }
 
@@ -15,36 +18,80 @@ export class CheckinResponseDto {
   @ApiProperty({ description: 'Employee ID associated with this check-in' })
   employee_id: number;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Date of the check-in (YYYY-MM-DD)' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Date of the check-in (YYYY-MM-DD)',
+  })
   date: string | null;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Timestamp of check-in (ISO 8601)' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Timestamp of check-in (ISO 8601)',
+  })
   checkin: string | null;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Local timestamp of check-in after timezone conversion (ISO 8601 with offset implied by offset_minutes)' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Local timestamp of check-in after timezone conversion (ISO 8601 with offset implied by offset_minutes)',
+  })
   checkin_local?: string | null;
 
-  @ApiProperty({ enum: ['onsite', 'remote'], nullable: true, description: 'Mode of work for this check-in' })
+  @ApiProperty({
+    enum: ['onsite', 'remote'],
+    nullable: true,
+    description: 'Mode of work for this check-in',
+  })
   mode: 'onsite' | 'remote' | null;
 
-  @ApiProperty({ enum: ['present', 'late', 'half_day', 'absent'], nullable: true, description: 'Attendance status determined from check-in' })
+  @ApiProperty({
+    enum: ['present', 'late', 'half_day', 'absent'],
+    nullable: true,
+    description: 'Attendance status determined from check-in',
+  })
   status: 'present' | 'late' | 'half_day' | 'absent' | null;
 
-  @ApiProperty({ type: () => LateDetailsDto, nullable: true, description: 'Details about lateness if applicable' })
+  @ApiProperty({
+    type: () => LateDetailsDto,
+    nullable: true,
+    description: 'Details about lateness if applicable',
+  })
   late_details?: LateDetailsDto | null;
 
-  @ApiProperty({ type: String, required: false, description: 'Timezone used for conversion (IANA)', example: 'Asia/Karachi' })
+  @ApiProperty({
+    type: String,
+    required: false,
+    description: 'Timezone used for conversion (IANA)',
+    example: 'Asia/Karachi',
+  })
   timezone?: string;
 
-  @ApiProperty({ type: Number, required: false, description: 'UTC offset in minutes used for conversion', example: 300 })
+  @ApiProperty({
+    type: Number,
+    required: false,
+    description: 'UTC offset in minutes used for conversion',
+    example: 300,
+  })
   offset_minutes?: number;
 
-  @ApiProperty({ type: String, required: false, description: 'Local business date used for attendance (YYYY-MM-DD)' })
+  @ApiProperty({
+    type: String,
+    required: false,
+    description: 'Local business date used for attendance (YYYY-MM-DD)',
+  })
   local_date?: string;
 
-  @ApiProperty({ description: 'Timestamp when the check-in record was created (ISO 8601)' })
+  @ApiProperty({
+    description: 'Timestamp when the check-in record was created (ISO 8601)',
+  })
   created_at: string;
 
-  @ApiProperty({ description: 'Timestamp when the check-in record was last updated (ISO 8601)' })
+  @ApiProperty({
+    description:
+      'Timestamp when the check-in record was last updated (ISO 8601)',
+  })
   updated_at: string;
 }

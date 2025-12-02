@@ -27,4 +27,4 @@ export class GetLeaveLogsDto {
   @IsOptional()
   @IsDateString()
   end_date?: string;
-} 
+}

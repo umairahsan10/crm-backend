@@ -31,7 +31,9 @@ export class CreateHrDto {
   @IsBoolean()
   terminationsHandle?: boolean;
 
-  @ApiPropertyOptional({ description: 'Permission to approve monthly requests' })
+  @ApiPropertyOptional({
+    description: 'Permission to approve monthly requests',
+  })
   @IsOptional()
   @IsBoolean()
   monthlyRequestApprovals?: boolean;
@@ -53,7 +55,9 @@ export class CreateHrDto {
 }
 
 export class UpdateHrDto {
-  @ApiPropertyOptional({ description: 'Update permission to manage attendance' })
+  @ApiPropertyOptional({
+    description: 'Update permission to manage attendance',
+  })
   @IsOptional()
   @IsBoolean()
   attendancePermission?: boolean;
@@ -63,7 +67,9 @@ export class UpdateHrDto {
   @IsBoolean()
   salaryPermission?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to manage commissions' })
+  @ApiPropertyOptional({
+    description: 'Update permission to manage commissions',
+  })
   @IsOptional()
   @IsBoolean()
   commissionPermission?: boolean;
@@ -73,12 +79,16 @@ export class UpdateHrDto {
   @IsBoolean()
   employeeAddPermission?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to handle terminations' })
+  @ApiPropertyOptional({
+    description: 'Update permission to handle terminations',
+  })
   @IsOptional()
   @IsBoolean()
   terminationsHandle?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to approve monthly requests' })
+  @ApiPropertyOptional({
+    description: 'Update permission to approve monthly requests',
+  })
   @IsOptional()
   @IsBoolean()
   monthlyRequestApprovals?: boolean;
@@ -93,7 +103,9 @@ export class UpdateHrDto {
   @IsBoolean()
   bonusesSet?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to manage shift timings' })
+  @ApiPropertyOptional({
+    description: 'Update permission to manage shift timings',
+  })
   @IsOptional()
   @IsBoolean()
   shiftTimingSet?: boolean;
@@ -121,7 +133,9 @@ export class HrResponseDto {
   @ApiPropertyOptional({ description: 'Permission to handle terminations' })
   terminationsHandle?: boolean | null;
 
-  @ApiPropertyOptional({ description: 'Permission to approve monthly requests' })
+  @ApiPropertyOptional({
+    description: 'Permission to approve monthly requests',
+  })
   monthlyRequestApprovals?: boolean | null;
 
   @ApiPropertyOptional({ description: 'Permission to set targets' })
@@ -146,8 +160,8 @@ export class HrResponseDto {
       id: 1,
       firstName: 'John',
       lastName: 'Doe',
-      email: 'john.doe@example.com'
-    }
+      email: 'john.doe@example.com',
+    },
   })
   employee?: {
     id: number;

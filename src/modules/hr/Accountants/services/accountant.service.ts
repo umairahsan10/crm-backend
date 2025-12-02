@@ -1,8 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateAccountantDto } from '../dto/accountant.dto';
 import { UpdateAccountantDto } from '../dto/accountant.dto';
-import { AccountantResponseDto, AccountantListResponseDto } from '../dto/accountant.dto';
+import {
+  AccountantResponseDto,
+  AccountantListResponseDto,
+} from '../dto/accountant.dto';
 
 @Injectable()
 export class AccountantService {
@@ -14,14 +22,19 @@ export class AccountantService {
    * Create a new accountant record
    * Validates that the employee exists and is not already an accountant
    */
-  async createAccountant(dto: CreateAccountantDto, hrEmployeeId: number): Promise<AccountantResponseDto> {
+  async createAccountant(
+    dto: CreateAccountantDto,
+    hrEmployeeId: number,
+  ): Promise<AccountantResponseDto> {
     // Validate HR employee exists
     const hrEmployee = await this.prisma.employee.findUnique({
       where: { id: hrEmployeeId },
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -30,7 +43,9 @@ export class AccountantService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     // Check if employee exists
@@ -39,7 +54,9 @@ export class AccountantService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${dto.employeeId} not found`);
+      throw new NotFoundException(
+        `Employee with ID ${dto.employeeId} not found`,
+      );
     }
 
     // Check if employee is already an accountant
@@ -48,7 +65,9 @@ export class AccountantService {
     });
 
     if (existingAccountant) {
-      throw new BadRequestException(`Employee ${dto.employeeId} is already an accountant`);
+      throw new BadRequestException(
+        `Employee ${dto.employeeId} is already an accountant`,
+      );
     }
 
     try {
@@ -86,23 +105,37 @@ export class AccountantService {
       if (dto.revenuesPermission) permissions.push('Revenues');
 
       const logDescription = `Accountant record created for employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) - Permissions granted: ${permissions.length > 0 ? permissions.join(', ') : 'None'}`;
-      await this.createHrLog(hrEmployeeId, 'accountant_created', employee.id, logDescription);
+      await this.createHrLog(
+        hrEmployeeId,
+        'accountant_created',
+        employee.id,
+        logDescription,
+      );
 
-      this.logger.log(`Accountant record created for employee ${dto.employeeId}`);
+      this.logger.log(
+        `Accountant record created for employee ${dto.employeeId}`,
+      );
       return accountant;
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       this.logger.error(`Failed to create accountant record: ${error.message}`);
-      throw new BadRequestException(`Failed to create accountant record: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create accountant record: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get all accountant records with optional employee filtering
    */
-  async getAllAccountants(employeeId?: number): Promise<AccountantListResponseDto> {
+  async getAllAccountants(
+    employeeId?: number,
+  ): Promise<AccountantListResponseDto> {
     try {
       const where = employeeId ? { employeeId } : {};
 
@@ -131,7 +164,9 @@ export class AccountantService {
       };
     } catch (error) {
       this.logger.error(`Failed to get accountant records: ${error.message}`);
-      throw new BadRequestException(`Failed to get accountant records: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get accountant records: ${error.message}`,
+      );
     }
   }
 
@@ -155,7 +190,9 @@ export class AccountantService {
       });
 
       if (!accountant) {
-        throw new NotFoundException(`Accountant record with ID ${id} not found`);
+        throw new NotFoundException(
+          `Accountant record with ID ${id} not found`,
+        );
       }
 
       return accountant;
@@ -163,8 +200,12 @@ export class AccountantService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(`Failed to get accountant record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to get accountant record: ${error.message}`);
+      this.logger.error(
+        `Failed to get accountant record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to get accountant record: ${error.message}`,
+      );
     }
   }
 
@@ -172,14 +213,20 @@ export class AccountantService {
    * Update accountant record
    * Allows updating any column of the accountant table
    */
-  async updateAccountant(id: number, dto: UpdateAccountantDto, hrEmployeeId: number): Promise<AccountantResponseDto> {
+  async updateAccountant(
+    id: number,
+    dto: UpdateAccountantDto,
+    hrEmployeeId: number,
+  ): Promise<AccountantResponseDto> {
     // Validate HR employee exists
     const hrEmployee = await this.prisma.employee.findUnique({
       where: { id: hrEmployeeId },
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -188,7 +235,9 @@ export class AccountantService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     // Check if accountant record exists
@@ -214,26 +263,61 @@ export class AccountantService {
       // Track changes for logging
       const changes: string[] = [];
 
-      if (dto.liabilitiesPermission !== undefined && dto.liabilitiesPermission !== existingAccountant.liabilitiesPermission) {
-        changes.push(`Liabilities Permission: ${existingAccountant.liabilitiesPermission ? 'Yes' : 'No'} → ${dto.liabilitiesPermission ? 'Yes' : 'No'}`);
+      if (
+        dto.liabilitiesPermission !== undefined &&
+        dto.liabilitiesPermission !== existingAccountant.liabilitiesPermission
+      ) {
+        changes.push(
+          `Liabilities Permission: ${existingAccountant.liabilitiesPermission ? 'Yes' : 'No'} → ${dto.liabilitiesPermission ? 'Yes' : 'No'}`,
+        );
       }
-      if (dto.salaryPermission !== undefined && dto.salaryPermission !== existingAccountant.salaryPermission) {
-        changes.push(`Salary Permission: ${existingAccountant.salaryPermission ? 'Yes' : 'No'} → ${dto.salaryPermission ? 'Yes' : 'No'}`);
+      if (
+        dto.salaryPermission !== undefined &&
+        dto.salaryPermission !== existingAccountant.salaryPermission
+      ) {
+        changes.push(
+          `Salary Permission: ${existingAccountant.salaryPermission ? 'Yes' : 'No'} → ${dto.salaryPermission ? 'Yes' : 'No'}`,
+        );
       }
-      if (dto.salesPermission !== undefined && dto.salesPermission !== existingAccountant.salesPermission) {
-        changes.push(`Sales Permission: ${existingAccountant.salesPermission ? 'Yes' : 'No'} → ${dto.salesPermission ? 'Yes' : 'No'}`);
+      if (
+        dto.salesPermission !== undefined &&
+        dto.salesPermission !== existingAccountant.salesPermission
+      ) {
+        changes.push(
+          `Sales Permission: ${existingAccountant.salesPermission ? 'Yes' : 'No'} → ${dto.salesPermission ? 'Yes' : 'No'}`,
+        );
       }
-      if (dto.invoicesPermission !== undefined && dto.invoicesPermission !== existingAccountant.invoicesPermission) {
-        changes.push(`Invoices Permission: ${existingAccountant.invoicesPermission ? 'Yes' : 'No'} → ${dto.invoicesPermission ? 'Yes' : 'No'}`);
+      if (
+        dto.invoicesPermission !== undefined &&
+        dto.invoicesPermission !== existingAccountant.invoicesPermission
+      ) {
+        changes.push(
+          `Invoices Permission: ${existingAccountant.invoicesPermission ? 'Yes' : 'No'} → ${dto.invoicesPermission ? 'Yes' : 'No'}`,
+        );
       }
-      if (dto.expensesPermission !== undefined && dto.expensesPermission !== existingAccountant.expensesPermission) {
-        changes.push(`Expenses Permission: ${existingAccountant.expensesPermission ? 'Yes' : 'No'} → ${dto.expensesPermission ? 'Yes' : 'No'}`);
+      if (
+        dto.expensesPermission !== undefined &&
+        dto.expensesPermission !== existingAccountant.expensesPermission
+      ) {
+        changes.push(
+          `Expenses Permission: ${existingAccountant.expensesPermission ? 'Yes' : 'No'} → ${dto.expensesPermission ? 'Yes' : 'No'}`,
+        );
       }
-      if (dto.assetsPermission !== undefined && dto.assetsPermission !== existingAccountant.assetsPermission) {
-        changes.push(`Assets Permission: ${existingAccountant.assetsPermission ? 'Yes' : 'No'} → ${dto.assetsPermission ? 'Yes' : 'No'}`);
+      if (
+        dto.assetsPermission !== undefined &&
+        dto.assetsPermission !== existingAccountant.assetsPermission
+      ) {
+        changes.push(
+          `Assets Permission: ${existingAccountant.assetsPermission ? 'Yes' : 'No'} → ${dto.assetsPermission ? 'Yes' : 'No'}`,
+        );
       }
-      if (dto.revenuesPermission !== undefined && dto.revenuesPermission !== existingAccountant.revenuesPermission) {
-        changes.push(`Revenues Permission: ${existingAccountant.revenuesPermission ? 'Yes' : 'No'} → ${dto.revenuesPermission ? 'Yes' : 'No'}`);
+      if (
+        dto.revenuesPermission !== undefined &&
+        dto.revenuesPermission !== existingAccountant.revenuesPermission
+      ) {
+        changes.push(
+          `Revenues Permission: ${existingAccountant.revenuesPermission ? 'Yes' : 'No'} → ${dto.revenuesPermission ? 'Yes' : 'No'}`,
+        );
       }
 
       const accountant = await this.prisma.accountant.update({
@@ -260,20 +344,33 @@ export class AccountantService {
       });
 
       // Create HR log entry with detailed changes
-      const logDescription = changes.length > 0 
-        ? `Accountant record updated for employee ${existingAccountant.employee.firstName} ${existingAccountant.employee.lastName} (ID: ${existingAccountant.employee.id}) - Changes: ${changes.join(', ')}`
-        : `Accountant record updated for employee ${existingAccountant.employee.firstName} ${existingAccountant.employee.lastName} (ID: ${existingAccountant.employee.id}) - No changes detected`;
-      
-      await this.createHrLog(hrEmployeeId, 'accountant_updated', existingAccountant.employee.id, logDescription);
+      const logDescription =
+        changes.length > 0
+          ? `Accountant record updated for employee ${existingAccountant.employee.firstName} ${existingAccountant.employee.lastName} (ID: ${existingAccountant.employee.id}) - Changes: ${changes.join(', ')}`
+          : `Accountant record updated for employee ${existingAccountant.employee.firstName} ${existingAccountant.employee.lastName} (ID: ${existingAccountant.employee.id}) - No changes detected`;
+
+      await this.createHrLog(
+        hrEmployeeId,
+        'accountant_updated',
+        existingAccountant.employee.id,
+        logDescription,
+      );
 
       this.logger.log(`Accountant record ${id} updated successfully`);
       return accountant;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      this.logger.error(`Failed to update accountant record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to update accountant record: ${error.message}`);
+      this.logger.error(
+        `Failed to update accountant record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to update accountant record: ${error.message}`,
+      );
     }
   }
 
@@ -281,14 +378,19 @@ export class AccountantService {
    * Delete accountant record
    * Removes employee from accountant department
    */
-  async deleteAccountant(id: number, hrEmployeeId: number): Promise<{ message: string }> {
+  async deleteAccountant(
+    id: number,
+    hrEmployeeId: number,
+  ): Promise<{ message: string }> {
     // Validate HR employee exists
     const hrEmployee = await this.prisma.employee.findUnique({
       where: { id: hrEmployeeId },
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -297,7 +399,9 @@ export class AccountantService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     // Check if accountant record exists
@@ -340,12 +444,15 @@ export class AccountantService {
           where: { id },
         });
 
-        this.logger.log(`Accountant record ${id} deleted successfully for employee ${employeeId}`);
+        this.logger.log(
+          `Accountant record ${id} deleted successfully for employee ${employeeId}`,
+        );
       });
 
       // Create HR log entry with detailed accountant information
       const permissions: string[] = [];
-      if (accountantDetails.liabilitiesPermission) permissions.push('Liabilities');
+      if (accountantDetails.liabilitiesPermission)
+        permissions.push('Liabilities');
       if (accountantDetails.salaryPermission) permissions.push('Salary');
       if (accountantDetails.salesPermission) permissions.push('Sales');
       if (accountantDetails.invoicesPermission) permissions.push('Invoices');
@@ -354,24 +461,41 @@ export class AccountantService {
       if (accountantDetails.revenuesPermission) permissions.push('Revenues');
 
       const logDescription = `Accountant record deleted for employee ${existingAccountant.employee.firstName} ${existingAccountant.employee.lastName} (ID: ${existingAccountant.employee.id}, Email: ${existingAccountant.employee.email}) - Removed permissions: ${permissions.length > 0 ? permissions.join(', ') : 'None'}`;
-      await this.createHrLog(hrEmployeeId, 'accountant_deleted', existingAccountant.employee.id, logDescription);
+      await this.createHrLog(
+        hrEmployeeId,
+        'accountant_deleted',
+        existingAccountant.employee.id,
+        logDescription,
+      );
 
       return {
         message: `Employee ${existingAccountant.employee.firstName} ${existingAccountant.employee.lastName} removed from accountant department successfully`,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      this.logger.error(`Failed to delete accountant record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to delete accountant record: ${error.message}`);
+      this.logger.error(
+        `Failed to delete accountant record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to delete accountant record: ${error.message}`,
+      );
     }
   }
 
   /**
    * Helper method to create HR log entries
    */
-  private async createHrLog(hrEmployeeId: number, actionType: string, affectedEmployeeId: number, description: string) {
+  private async createHrLog(
+    hrEmployeeId: number,
+    actionType: string,
+    affectedEmployeeId: number,
+    description: string,
+  ) {
     try {
       const hrRecord = await this.prisma.hR.findUnique({
         where: { employeeId: hrEmployeeId },
@@ -386,13 +510,17 @@ export class AccountantService {
             description,
           },
         });
-        this.logger.log(`HR log created for action: ${actionType}, affected employee: ${affectedEmployeeId}`);
+        this.logger.log(
+          `HR log created for action: ${actionType}, affected employee: ${affectedEmployeeId}`,
+        );
       } else {
-        this.logger.warn(`No HR record found for HR employee ${hrEmployeeId}, skipping log creation`);
+        this.logger.warn(
+          `No HR record found for HR employee ${hrEmployeeId}, skipping log creation`,
+        );
       }
     } catch (error) {
       this.logger.error(`Failed to create HR log: ${error.message}`);
       // Don't fail the main operation if log creation fails
     }
   }
-} 
+}

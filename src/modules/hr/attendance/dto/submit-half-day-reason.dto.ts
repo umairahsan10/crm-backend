@@ -1,4 +1,11 @@
-import { IsInt, IsString, IsDateString, IsNotEmpty, Min, MaxLength } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  IsDateString,
+  IsNotEmpty,
+  Min,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -13,7 +20,8 @@ export class SubmitHalfDayReasonDto {
   emp_id: number;
 
   @ApiProperty({
-    description: 'Date for which the half-day or late arrival is being logged (ISO format)',
+    description:
+      'Date for which the half-day or late arrival is being logged (ISO format)',
     example: '2025-10-15',
   })
   @IsDateString()
@@ -51,10 +59,11 @@ export class SubmitHalfDayReasonDto {
   minutes_late: number;
 
   @ApiProperty({
-    description: 'Reason provided by the employee for being late or taking a half day',
+    description:
+      'Reason provided by the employee for being late or taking a half day',
     example: 'Car broke down on the way to work',
   })
   @IsString()
   @IsNotEmpty()
   reason: string;
-} 
+}

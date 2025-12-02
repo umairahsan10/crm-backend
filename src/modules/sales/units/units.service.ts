@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateSalesUnitDto } from './dto/create-unit.dto';
 import { UpdateSalesUnitDto } from './dto/update-unit.dto';
@@ -9,29 +15,34 @@ export class UnitsService {
   constructor(private prisma: PrismaService) {}
 
   async createUnit(createUnitDto: CreateSalesUnitDto) {
-    const { name, email, phone, address, headId, logoUrl, website } = createUnitDto;
+    const { name, email, phone, address, headId, logoUrl, website } =
+      createUnitDto;
 
     // Validate headId only if provided
     if (headId) {
-    // Check if employee exists
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: headId },
-      include: { role: true }
-    });
+      // Check if employee exists
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: headId },
+        include: { role: true },
+      });
 
-    if (!employee) {
-      throw new BadRequestException(`Employee with ID ${headId} does not exist`);
-    }
+      if (!employee) {
+        throw new BadRequestException(
+          `Employee with ID ${headId} does not exist`,
+        );
+      }
 
-    // Check if employee has unit_head role
-    if (employee.role.name !== 'unit_head') {
-      throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
+      // Check if employee has unit_head role
+      if (employee.role.name !== 'unit_head') {
+        throw new BadRequestException(
+          'Employee must have unit_head role to be assigned as unit head',
+        );
       }
     }
 
     // Check if email already exists
     const existingEmail = await this.prisma.salesUnit.findUnique({
-      where: { email }
+      where: { email },
     });
 
     if (existingEmail) {
@@ -40,7 +51,7 @@ export class UnitsService {
 
     // Check if phone already exists
     const existingPhone = await this.prisma.salesUnit.findUnique({
-      where: { phone }
+      where: { phone },
     });
 
     if (existingPhone) {
@@ -49,7 +60,7 @@ export class UnitsService {
 
     // Check if name already exists
     const existingName = await this.prisma.salesUnit.findUnique({
-      where: { name }
+      where: { name },
     });
 
     if (existingName) {
@@ -65,29 +76,29 @@ export class UnitsService {
         address,
         headId,
         logoUrl,
-        website
+        website,
         // createdAt and updatedAt are automatically handled by Prisma
-      }
+      },
     });
 
     return {
       success: true,
-      message: 'New Unit Created Successfully'
+      message: 'New Unit Created Successfully',
     };
   }
 
   async getAllUnits(user: any, query: SalesUnitsQueryDto) {
     const whereClause: any = await this.buildRoleBasedWhereClause(user);
-    
+
     // Apply all filters from query
     if (query.unitId) {
       whereClause.id = query.unitId;
     }
-    
+
     if (query.hasHead !== undefined) {
       whereClause.headId = query.hasHead ? { not: null } : null;
     }
-    
+
     if (query.hasTeams !== undefined) {
       if (query.hasTeams) {
         whereClause.teams = { some: {} };
@@ -95,7 +106,7 @@ export class UnitsService {
         whereClause.teams = { none: {} };
       }
     }
-    
+
     if (query.hasLeads !== undefined) {
       if (query.hasLeads) {
         whereClause.leads = { some: {} };
@@ -116,8 +127,8 @@ export class UnitsService {
     if (query.headEmail) {
       whereClause.head = {
         is: {
-          email: { contains: query.headEmail, mode: 'insensitive' }
-        }
+          email: { contains: query.headEmail, mode: 'insensitive' },
+        },
       };
     }
     if (query.headName) {
@@ -125,9 +136,9 @@ export class UnitsService {
         is: {
           OR: [
             { firstName: { contains: query.headName, mode: 'insensitive' } },
-            { lastName: { contains: query.headName, mode: 'insensitive' } }
-          ]
-        }
+            { lastName: { contains: query.headName, mode: 'insensitive' } },
+          ],
+        },
       };
     }
     if (query.unitName) {
@@ -139,7 +150,7 @@ export class UnitsService {
       whereClause.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
         { email: { contains: query.search, mode: 'insensitive' } },
-        { phone: { contains: query.search, mode: 'insensitive' } }
+        { phone: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
@@ -158,50 +169,53 @@ export class UnitsService {
     const [units, total] = await Promise.all([
       this.prisma.salesUnit.findMany({
         where: whereClause,
-      include: {
-        head: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true
-          }
+        include: {
+          head: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
           },
-          ...include
+          ...include,
         },
         orderBy,
         skip,
-        take
+        take,
       }),
-      this.prisma.salesUnit.count({ where: whereClause })
+      this.prisma.salesUnit.count({ where: whereClause }),
     ]);
 
     // Get counts for each unit
     const unitsWithCounts = await Promise.all(
       units.map(async (unit) => {
         const teamsCount = await this.prisma.team.count({
-          where: { salesUnitId: unit.id }
+          where: { salesUnitId: unit.id },
         });
 
         const employeesCount = await this.prisma.salesDepartment.count({
-          where: { salesUnitId: unit.id }
+          where: { salesUnitId: unit.id },
         });
 
         const leadsCount = await this.prisma.lead.count({
-          where: { salesUnitId: unit.id }
+          where: { salesUnitId: unit.id },
         });
 
         const crackedLeadsCount = await this.prisma.crackedLead.count({
-          where: { lead: { salesUnitId: unit.id } }
+          where: { lead: { salesUnitId: unit.id } },
         });
 
         const archiveLeadsCount = await this.prisma.archiveLead.count({
-          where: { unitId: unit.id }
+          where: { unitId: unit.id },
         });
 
         const totalLeadsForConversion = leadsCount + archiveLeadsCount;
-        const conversionRate = totalLeadsForConversion > 0
-          ? Math.round(((crackedLeadsCount / totalLeadsForConversion) * 100) * 100) / 100
-          : 0;
+        const conversionRate =
+          totalLeadsForConversion > 0
+            ? Math.round(
+                (crackedLeadsCount / totalLeadsForConversion) * 100 * 100,
+              ) / 100
+            : 0;
 
         return {
           id: unit.id,
@@ -214,11 +228,14 @@ export class UnitsService {
           website: unit.website,
           createdAt: unit.createdAt,
           updatedAt: unit.updatedAt,
-          head: unit.head && typeof unit.head === 'object' && 'id' in unit.head ? {
-            id: (unit.head as any).id,
-            firstName: (unit.head as any).firstName,
-            lastName: (unit.head as any).lastName
-          } : null,
+          head:
+            unit.head && typeof unit.head === 'object' && 'id' in unit.head
+              ? {
+                  id: (unit.head as any).id,
+                  firstName: (unit.head as any).firstName,
+                  lastName: (unit.head as any).lastName,
+                }
+              : null,
           teamsCount,
           employeesCount,
           leadsCount,
@@ -227,9 +244,9 @@ export class UnitsService {
           conversionRate,
           ...(unit.teams && { teams: unit.teams }),
           ...(unit.salesEmployees && { salesEmployees: unit.salesEmployees }),
-          ...(unit.leads && { leads: unit.leads })
+          ...(unit.leads && { leads: unit.leads }),
         };
-      })
+      }),
     );
 
     return {
@@ -239,9 +256,12 @@ export class UnitsService {
       pagination: {
         page: query.page || 1,
         limit: query.limit || 10,
-        totalPages: Math.ceil(total / (query.limit || 10))
+        totalPages: Math.ceil(total / (query.limit || 10)),
       },
-      message: unitsWithCounts.length > 0 ? 'Units retrieved successfully' : 'No units found'
+      message:
+        unitsWithCounts.length > 0
+          ? 'Units retrieved successfully'
+          : 'No units found',
     };
   }
 
@@ -260,10 +280,10 @@ export class UnitsService {
             role: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         teams: {
           include: {
@@ -276,14 +296,14 @@ export class UnitsService {
                 role: {
                   select: {
                     id: true,
-                    name: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!unit) {
@@ -294,7 +314,9 @@ export class UnitsService {
     if (user && user.role !== 'dep_manager') {
       const belongsToUnit = await this.checkUserBelongsToUnit(user, unit.id);
       if (!belongsToUnit) {
-        throw new ForbiddenException('You do not have access to this unit. You must be a member of this unit to view its details.');
+        throw new ForbiddenException(
+          'You do not have access to this unit. You must be a member of this unit to view its details.',
+        );
       }
     }
 
@@ -304,11 +326,14 @@ export class UnitsService {
     let filteredLeads: any = {
       active: [],
       cracked: [],
-      archived: []
+      archived: [],
     };
 
     // Role-based data filtering
-    if (user && ['unit_head', 'team_lead', 'senior', 'junior'].includes(user.role)) {
+    if (
+      user &&
+      ['unit_head', 'team_lead', 'senior', 'junior'].includes(user.role)
+    ) {
       // For unit_head - show all data if they are the head of this unit
       if (user.role === 'unit_head' && unit.headId === user.id) {
         filteredTeams = unit.teams;
@@ -316,7 +341,9 @@ export class UnitsService {
         filteredLeads = await this.getAllLeadsForUnit(unit.id);
       } else if (user.role === 'team_lead') {
         // Team leads see only teams they lead and related data
-        filteredTeams = unit.teams.filter(team => team.teamLeadId === user.id);
+        filteredTeams = unit.teams.filter(
+          (team) => team.teamLeadId === user.id,
+        );
         if (filteredTeams.length > 0) {
           filteredSalesEmployees = await this.getSalesEmployeesForUnit(unit.id);
           filteredLeads = await this.getLeadsForTeamLead(user.id, unit.id);
@@ -326,15 +353,18 @@ export class UnitsService {
         const isSalesEmployee = await this.prisma.salesDepartment.findFirst({
           where: {
             salesUnitId: unit.id,
-            employeeId: user.id
-          }
+            employeeId: user.id,
+          },
         });
 
         if (isSalesEmployee) {
           // Show all teams in the unit (they work in the unit)
           filteredTeams = unit.teams;
           // Show only themselves
-          filteredSalesEmployees = await this.getSalesEmployeesForUnit(unit.id, user.id);
+          filteredSalesEmployees = await this.getSalesEmployeesForUnit(
+            unit.id,
+            user.id,
+          );
           // Show only leads they are involved with
           filteredLeads = await this.getLeadsForEmployee(user.id, unit.id);
         } else {
@@ -352,32 +382,37 @@ export class UnitsService {
 
     // Get comprehensive counts
     const teamsCount = await this.prisma.team.count({
-      where: { salesUnitId: unit.id }
+      where: { salesUnitId: unit.id },
     });
 
     const employeesCount = await this.prisma.salesDepartment.count({
-      where: { salesUnitId: unit.id }
+      where: { salesUnitId: unit.id },
     });
 
     const leadsCount = await this.prisma.lead.count({
-      where: { salesUnitId: unit.id }
+      where: { salesUnitId: unit.id },
     });
 
     const crackedLeadsCount = await this.prisma.crackedLead.count({
       where: {
-        lead: { salesUnitId: unit.id }
-      }
+        lead: { salesUnitId: unit.id },
+      },
     });
 
     const archiveLeadsCount = await this.prisma.archiveLead.count({
-      where: { unitId: unit.id }
+      where: { unitId: unit.id },
     });
 
     // Calculate conversion rate (based on leads + completedLeads only for detail view)
-    const computedLeadsCount = Array.isArray(filteredLeads.active) ? filteredLeads.active.length : 0;
-    const computedCompletedCount = Array.isArray(filteredLeads.cracked) ? filteredLeads.cracked.length : 0;
+    const computedLeadsCount = Array.isArray(filteredLeads.active)
+      ? filteredLeads.active.length
+      : 0;
+    const computedCompletedCount = Array.isArray(filteredLeads.cracked)
+      ? filteredLeads.cracked.length
+      : 0;
     const totalLeads = computedLeadsCount + computedCompletedCount;
-    const conversionRate = totalLeads > 0 ? (computedCompletedCount / totalLeads) * 100 : 0;
+    const conversionRate =
+      totalLeads > 0 ? (computedCompletedCount / totalLeads) * 100 : 0;
 
     // Limit details; expose keys as leads and completedLeads (parity with teams)
     const limitedLeads = {
@@ -386,27 +421,33 @@ export class UnitsService {
         name: l.name,
         email: l.email,
         phone: l.phone,
-        assignedTo: l.assignedTo ? {
-          id: l.assignedTo.id,
-          firstName: l.assignedTo.firstName,
-          lastName: l.assignedTo.lastName
-        } : null
+        assignedTo: l.assignedTo
+          ? {
+              id: l.assignedTo.id,
+              firstName: l.assignedTo.firstName,
+              lastName: l.assignedTo.lastName,
+            }
+          : null,
       })),
       completedLeads: (filteredLeads.cracked || []).map((c: any) => ({
         id: c.id,
         crackedAt: c.crackedAt,
-        lead: c.lead ? {
-          id: c.lead.id,
-          name: c.lead.name,
-          email: c.lead.email,
-          phone: c.lead.phone
-        } : null,
-        employee: c.employee ? {
-          id: c.employee.id,
-          firstName: c.employee.firstName,
-          lastName: c.employee.lastName
-        } : null
-      }))
+        lead: c.lead
+          ? {
+              id: c.lead.id,
+              name: c.lead.name,
+              email: c.lead.email,
+              phone: c.lead.phone,
+            }
+          : null,
+        employee: c.employee
+          ? {
+              id: c.employee.id,
+              firstName: c.employee.firstName,
+              lastName: c.employee.lastName,
+            }
+          : null,
+      })),
     };
 
     return {
@@ -431,16 +472,14 @@ export class UnitsService {
           leadsCount: {
             leads: computedLeadsCount,
             completedLeads: computedCompletedCount,
-            total: totalLeads
+            total: totalLeads,
           },
-          conversionRate: Math.round(conversionRate * 100) / 100
-        }
+          conversionRate: Math.round(conversionRate * 100) / 100,
+        },
       },
-      message: 'Unit details retrieved successfully'
+      message: 'Unit details retrieved successfully',
     };
   }
-
-
 
   async getArchiveLeadsFromDeletedUnits(currentUser: any) {
     // Deprecated in parity mode: replaced by completed leads endpoint
@@ -452,8 +491,8 @@ export class UnitsService {
     const cracked = await this.prisma.crackedLead.findMany({
       where: {
         lead: {
-          salesUnitId: null
-        }
+          salesUnitId: null,
+        },
       },
       include: {
         lead: {
@@ -462,83 +501,93 @@ export class UnitsService {
             name: true,
             email: true,
             phone: true,
-            createdAt: true
-          }
+            createdAt: true,
+          },
         },
         employee: {
           select: {
             id: true,
             firstName: true,
-            lastName: true
-          }
-        }
+            lastName: true,
+          },
+        },
       },
       orderBy: {
-        crackedAt: 'desc'
-      }
+        crackedAt: 'desc',
+      },
     });
 
     return {
       success: true,
-      data: cracked.map(item => ({
+      data: cracked.map((item) => ({
         id: item.id,
         crackedAt: item.crackedAt,
         lead: item.lead,
-        closedBy: item.employee
+        closedBy: item.employee,
       })),
       total: cracked.length,
-      message: cracked.length > 0 ? 'Completed leads from deleted units retrieved successfully' : 'No completed leads found from deleted units'
+      message:
+        cracked.length > 0
+          ? 'Completed leads from deleted units retrieved successfully'
+          : 'No completed leads found from deleted units',
     };
   }
 
   async updateUnit(id: number, updateUnitDto: UpdateSalesUnitDto) {
     // Check if unit exists
     const existingUnit = await this.prisma.salesUnit.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingUnit) {
       throw new NotFoundException(`Unit with ID ${id} does not exist`);
     }
 
-    const { name, email, phone, address, headId, logoUrl, website } = updateUnitDto;
+    const { name, email, phone, address, headId, logoUrl, website } =
+      updateUnitDto;
 
     // Enhanced headId validation logic
     if (headId !== undefined && headId !== null) {
       // Check if employee exists and has unit_head role
       const employee = await this.prisma.employee.findUnique({
         where: { id: headId },
-        include: { role: true }
+        include: { role: true },
       });
 
       if (!employee) {
-        throw new BadRequestException(`Employee with ID ${headId} does not exist`);
+        throw new BadRequestException(
+          `Employee with ID ${headId} does not exist`,
+        );
       }
 
       if (employee.role.name !== 'unit_head') {
-        throw new BadRequestException('Employee must have unit_head role to be assigned as unit head');
+        throw new BadRequestException(
+          'Employee must have unit_head role to be assigned as unit head',
+        );
       }
 
       // Check if employee is already head of another unit
       const existingHeadAssignment = await this.prisma.salesUnit.findFirst({
-        where: { 
+        where: {
           headId: headId,
-          id: { not: id } // Exclude current unit
-        }
+          id: { not: id }, // Exclude current unit
+        },
       });
 
       if (existingHeadAssignment) {
-        throw new ConflictException(`Employee is already assigned as head of unit: ${existingHeadAssignment.name}`);
+        throw new ConflictException(
+          `Employee is already assigned as head of unit: ${existingHeadAssignment.name}`,
+        );
       }
     }
 
     // Check if email already exists (exclude current unit)
     if (email) {
       const existingEmail = await this.prisma.salesUnit.findFirst({
-        where: { 
+        where: {
           email,
-          id: { not: id } // Exclude current unit
-        }
+          id: { not: id }, // Exclude current unit
+        },
       });
 
       if (existingEmail) {
@@ -549,10 +598,10 @@ export class UnitsService {
     // Check if phone already exists (exclude current unit)
     if (phone) {
       const existingPhone = await this.prisma.salesUnit.findFirst({
-        where: { 
+        where: {
           phone,
-          id: { not: id } // Exclude current unit
-        }
+          id: { not: id }, // Exclude current unit
+        },
       });
 
       if (existingPhone) {
@@ -563,10 +612,10 @@ export class UnitsService {
     // Check if name already exists (exclude current unit)
     if (name) {
       const existingName = await this.prisma.salesUnit.findFirst({
-        where: { 
+        where: {
           name,
-          id: { not: id } // Exclude current unit
-        }
+          id: { not: id }, // Exclude current unit
+        },
       });
 
       if (existingName) {
@@ -576,7 +625,7 @@ export class UnitsService {
 
     // Update the sales unit (only provided fields)
     const updateData: any = {};
-    
+
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
@@ -593,10 +642,10 @@ export class UnitsService {
           select: {
             id: true,
             firstName: true,
-            lastName: true
-          }
-        }
-      }
+            lastName: true,
+          },
+        },
+      },
     });
 
     return {
@@ -605,15 +654,15 @@ export class UnitsService {
       data: {
         id: updatedUnit.id,
         name: updatedUnit.name,
-        head: updatedUnit.head
-      }
+        head: updatedUnit.head,
+      },
     };
   }
 
   async deleteUnit(id: number) {
     // Check if unit exists
     const existingUnit = await this.prisma.salesUnit.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingUnit) {
@@ -623,13 +672,13 @@ export class UnitsService {
     // Check for teams associated with this unit
     const teams = await this.prisma.team.findMany({
       where: { salesUnitId: id },
-      select: { id: true, name: true }
+      select: { id: true, name: true },
     });
 
     // Check for leads associated with this unit
     const leads = await this.prisma.lead.findMany({
       where: { salesUnitId: id },
-      select: { id: true, name: true, email: true }
+      select: { id: true, name: true, email: true },
     });
 
     // Check for sales employees associated with this unit
@@ -637,18 +686,19 @@ export class UnitsService {
       where: { salesUnitId: id },
       include: {
         employee: {
-          select: { id: true, firstName: true, lastName: true }
-        }
-      }
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
     });
 
     // Count archive leads associated with this unit
     const archiveLeadsCount = await this.prisma.archiveLead.count({
-      where: { unitId: id }
+      where: { unitId: id },
     });
 
     // Check if there are any dependencies
-    const hasDependencies = teams.length > 0 || leads.length > 0 || salesEmployees.length > 0;
+    const hasDependencies =
+      teams.length > 0 || leads.length > 0 || salesEmployees.length > 0;
 
     if (hasDependencies) {
       // Return detailed dependency information
@@ -658,32 +708,32 @@ export class UnitsService {
         dependencies: {
           teams: {
             count: teams.length,
-            details: teams.map(team => ({
+            details: teams.map((team) => ({
               id: team.id,
-              name: team.name
-            }))
+              name: team.name,
+            })),
           },
           leads: {
             count: leads.length,
-            details: leads.map(lead => ({
+            details: leads.map((lead) => ({
               id: lead.id,
               name: lead.name,
-              email: lead.email
-            }))
+              email: lead.email,
+            })),
           },
           employees: {
             count: salesEmployees.length,
-            details: salesEmployees.map(emp => ({
+            details: salesEmployees.map((emp) => ({
               id: emp.employee.id,
               firstName: emp.employee.firstName,
-              lastName: emp.employee.lastName
-            }))
-          }
+              lastName: emp.employee.lastName,
+            })),
+          },
         },
         archiveLeads: {
           count: archiveLeadsCount,
-          message: `${archiveLeadsCount} archived leads will be assigned unit ID null`
-        }
+          message: `${archiveLeadsCount} archived leads will be assigned unit ID null`,
+        },
       };
     }
 
@@ -692,35 +742,38 @@ export class UnitsService {
     if (archiveLeadsCount > 0) {
       await this.prisma.archiveLead.updateMany({
         where: { unitId: id },
-        data: { unitId: null }
+        data: { unitId: null },
       });
     }
 
     // Delete the unit
     await this.prisma.salesUnit.delete({
-      where: { id }
+      where: { id },
     });
 
     return {
       success: true,
-      message: `Unit deleted successfully. ${archiveLeadsCount} archived leads have been assigned unit ID null.`
+      message: `Unit deleted successfully. ${archiveLeadsCount} archived leads have been assigned unit ID null.`,
     };
   }
 
-  private async checkUserBelongsToUnit(user: any, unitId: number): Promise<boolean> {
+  private async checkUserBelongsToUnit(
+    user: any,
+    unitId: number,
+  ): Promise<boolean> {
     // Admin users have access to all units
     if (user?.type === 'admin' || user?.role === 'admin') {
       return true;
     }
-    
+
     switch (user.role) {
       case 'unit_head':
         // Check if user is the head of this unit
         const unit = await this.prisma.salesUnit.findFirst({
           where: {
             id: unitId,
-            headId: user.id
-          }
+            headId: user.id,
+          },
         });
         return !!unit;
 
@@ -729,8 +782,8 @@ export class UnitsService {
         const teamLeadCheck = await this.prisma.team.findFirst({
           where: {
             salesUnitId: unitId,
-            teamLeadId: user.id
-          }
+            teamLeadId: user.id,
+          },
         });
         return !!teamLeadCheck;
 
@@ -740,8 +793,8 @@ export class UnitsService {
         const salesEmployeeCheck = await this.prisma.salesDepartment.findFirst({
           where: {
             salesUnitId: unitId,
-            employeeId: user.id
-          }
+            employeeId: user.id,
+          },
         });
         return !!salesEmployeeCheck;
 
@@ -755,12 +808,12 @@ export class UnitsService {
     if (user?.type === 'admin' || user?.role === 'admin') {
       return {}; // Can see all units
     }
-    
+
     // If no user provided, deny access
     if (!user || !user.role) {
       throw new ForbiddenException('Insufficient permissions');
     }
-    
+
     switch (user.role) {
       case 'dep_manager':
         return {}; // Can see all units
@@ -770,9 +823,9 @@ export class UnitsService {
         return {
           teams: {
             some: {
-              teamLeadId: user.id
-            }
-          }
+              teamLeadId: user.id,
+            },
+          },
         }; // Units where they lead teams
       case 'senior':
       case 'junior':
@@ -780,9 +833,9 @@ export class UnitsService {
         return {
           salesEmployees: {
             some: {
-              employeeId: user.id
-            }
-          }
+              employeeId: user.id,
+            },
+          },
         }; // Units where they are sales employees
       default:
         throw new ForbiddenException('Insufficient permissions');
@@ -791,36 +844,36 @@ export class UnitsService {
 
   private buildIncludeClause(include?: string): any {
     const includeClause: any = {};
-    
+
     if (include?.includes('employees')) {
       includeClause.salesEmployees = {
         include: {
           employee: {
             include: {
-              role: true
-            }
-          }
-        }
+              role: true,
+            },
+          },
+        },
       };
     }
-    
+
     if (include?.includes('teams')) {
       includeClause.teams = {
         include: {
-          teamLead: true
-        }
+          teamLead: true,
+        },
       };
     }
-    
+
     if (include?.includes('leads')) {
       includeClause.leads = {
         include: {
           assignedTo: true,
-          crackedBy: true
-        }
+          crackedBy: true,
+        },
       };
     }
-    
+
     return includeClause;
   }
 
@@ -843,12 +896,12 @@ export class UnitsService {
             role: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
-        }
-      }
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -862,23 +915,23 @@ export class UnitsService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           startedBy: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       }),
       // Cracked leads
       this.prisma.crackedLead.findMany({
         where: {
-          lead: { salesUnitId: unitId }
+          lead: { salesUnitId: unitId },
         },
         include: {
           lead: {
@@ -886,18 +939,18 @@ export class UnitsService {
               id: true,
               name: true,
               email: true,
-              phone: true
-            }
+              phone: true,
+            },
           },
           employee: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { crackedAt: 'desc' }
+        orderBy: { crackedAt: 'desc' },
       }),
       // Archived leads
       this.prisma.archiveLead.findMany({
@@ -907,18 +960,18 @@ export class UnitsService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { archivedOn: 'desc' }
-      })
+        orderBy: { archivedOn: 'desc' },
+      }),
     ]);
 
     return {
       active: activeLeads,
       cracked: crackedLeads,
-      archived: archivedLeads
+      archived: archivedLeads,
     };
   }
 
@@ -927,12 +980,12 @@ export class UnitsService {
     const teams = await this.prisma.team.findMany({
       where: {
         salesUnitId: unitId,
-        teamLeadId: teamLeadId
+        teamLeadId: teamLeadId,
       },
-      select: { id: true }
+      select: { id: true },
     });
 
-    const teamIds = teams.map(team => team.id);
+    const teamIds = teams.map((team) => team.id);
 
     const [activeLeads, crackedLeads, archivedLeads] = await Promise.all([
       // Active leads assigned to team members
@@ -940,27 +993,27 @@ export class UnitsService {
         where: {
           salesUnitId: unitId,
           assignedTo: {
-            teamLeadId: teamLeadId
-          }
+            teamLeadId: teamLeadId,
+          },
         },
         include: {
           assignedTo: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       }),
       // Cracked leads by team members
       this.prisma.crackedLead.findMany({
         where: {
           lead: { salesUnitId: unitId },
           employee: {
-            teamLeadId: teamLeadId
-          }
+            teamLeadId: teamLeadId,
+          },
         },
         include: {
           lead: {
@@ -968,44 +1021,44 @@ export class UnitsService {
               id: true,
               name: true,
               email: true,
-              phone: true
-            }
+              phone: true,
+            },
           },
           employee: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { crackedAt: 'desc' }
+        orderBy: { crackedAt: 'desc' },
       }),
       // Archived leads by team members
       this.prisma.archiveLead.findMany({
         where: {
           unitId: unitId,
           employee: {
-            teamLeadId: teamLeadId
-          }
+            teamLeadId: teamLeadId,
+          },
         },
         include: {
           employee: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { archivedOn: 'desc' }
-      })
+        orderBy: { archivedOn: 'desc' },
+      }),
     ]);
 
     return {
       active: activeLeads,
       cracked: crackedLeads,
-      archived: archivedLeads
+      archived: archivedLeads,
     };
   }
 
@@ -1015,24 +1068,24 @@ export class UnitsService {
       this.prisma.lead.findMany({
         where: {
           salesUnitId: unitId,
-          assignedToId: employeeId
+          assignedToId: employeeId,
         },
         include: {
           assignedTo: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       }),
       // Cracked leads by this employee
       this.prisma.crackedLead.findMany({
         where: {
           lead: { salesUnitId: unitId },
-          closedBy: employeeId
+          closedBy: employeeId,
         },
         include: {
           lead: {
@@ -1040,42 +1093,42 @@ export class UnitsService {
               id: true,
               name: true,
               email: true,
-              phone: true
-            }
+              phone: true,
+            },
           },
           employee: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { crackedAt: 'desc' }
+        orderBy: { crackedAt: 'desc' },
       }),
       // Archived leads by this employee
       this.prisma.archiveLead.findMany({
         where: {
           unitId: unitId,
-          assignedTo: employeeId
+          assignedTo: employeeId,
         },
         include: {
           employee: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
-        orderBy: { archivedOn: 'desc' }
-      })
+        orderBy: { archivedOn: 'desc' },
+      }),
     ]);
 
     return {
       active: activeLeads,
       cracked: crackedLeads,
-      archived: archivedLeads
+      archived: archivedLeads,
     };
   }
 
@@ -1087,91 +1140,94 @@ export class UnitsService {
       employees = await this.prisma.employee.findMany({
         where: {
           role: {
-            name: 'unit_head'
+            name: 'unit_head',
           },
           department: {
-            name: 'Sales'
+            name: 'Sales',
           },
           status: 'active',
           salesUnitHead: {
-            some: {}
-          }
+            some: {},
+          },
         },
         include: {
           salesUnitHead: {
             select: {
               id: true,
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
         orderBy: {
-          firstName: 'asc'
-        }
+          firstName: 'asc',
+        },
       });
     } else if (assigned === false) {
       // Get only unassigned heads
       employees = await this.prisma.employee.findMany({
         where: {
           role: {
-            name: 'unit_head'
+            name: 'unit_head',
           },
           department: {
-            name: 'Sales'
+            name: 'Sales',
           },
           status: 'active',
           salesUnitHead: {
-            none: {}
-          }
+            none: {},
+          },
         },
         orderBy: {
-          firstName: 'asc'
-        }
+          firstName: 'asc',
+        },
       });
     } else {
       // Get all heads (default behavior)
       employees = await this.prisma.employee.findMany({
         where: {
           role: {
-            name: 'unit_head'
+            name: 'unit_head',
           },
           department: {
-            name: 'Sales'
+            name: 'Sales',
           },
-          status: 'active'
+          status: 'active',
         },
         include: {
           salesUnitHead: {
             select: {
               id: true,
-              name: true
-            }
-          }
+              name: true,
+            },
+          },
         },
         orderBy: {
-          firstName: 'asc'
-        }
+          firstName: 'asc',
+        },
       });
     }
 
     // Format the response
-    const heads = employees.map(employee => ({
+    const heads = employees.map((employee) => ({
       id: employee.id,
       firstName: employee.firstName,
       lastName: employee.lastName,
       email: employee.email,
-      currentUnit: employee.salesUnitHead && employee.salesUnitHead.length > 0 ? {
-        id: employee.salesUnitHead[0].id,
-        name: employee.salesUnitHead[0].name
-      } : null
+      currentUnit:
+        employee.salesUnitHead && employee.salesUnitHead.length > 0
+          ? {
+              id: employee.salesUnitHead[0].id,
+              name: employee.salesUnitHead[0].name,
+            }
+          : null,
     }));
 
     return {
       success: true,
       message: 'Unit heads retrieved successfully',
       data: {
-        heads
-      }
+        heads,
+      },
     };
   }
 
@@ -1201,56 +1257,59 @@ export class UnitsService {
             role: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         salesUnit: {
           select: {
             id: true,
-            name: true
-          }
+            name: true,
+          },
         },
         productionUnit: {
           select: {
             id: true,
-            name: true
-          }
+            name: true,
+          },
         },
         marketingUnit: {
           select: {
             id: true,
-            name: true
-          }
-        }
+            name: true,
+          },
+        },
       },
-      orderBy: [
-        { name: 'asc' }
-      ]
+      orderBy: [{ name: 'asc' }],
     });
 
     return {
       success: true,
-      data: teams.map(team => ({
+      data: teams.map((team) => ({
         id: team.id,
         name: team.name,
         employeeCount: team.employeeCount,
         teamLead: team.teamLead,
-        isAssigned: team.salesUnitId !== null || team.productionUnitId !== null || team.marketingUnitId !== null,
-        currentUnit: team.salesUnit || team.productionUnit || team.marketingUnit
+        isAssigned:
+          team.salesUnitId !== null ||
+          team.productionUnitId !== null ||
+          team.marketingUnitId !== null,
+        currentUnit:
+          team.salesUnit || team.productionUnit || team.marketingUnit,
       })),
       total: teams.length,
-      message: teams.length > 0 
-        ? 'Available teams retrieved successfully' 
-        : 'No available teams found'
+      message:
+        teams.length > 0
+          ? 'Available teams retrieved successfully'
+          : 'No available teams found',
     };
   }
 
   async addTeamToUnit(unitId: number, teamId: number) {
     // Validate unit exists
     const unit = await this.prisma.salesUnit.findUnique({
-      where: { id: unitId }
+      where: { id: unitId },
     });
 
     if (!unit) {
@@ -1259,7 +1318,7 @@ export class UnitsService {
 
     // Validate team exists
     const team = await this.prisma.team.findUnique({
-      where: { id: teamId }
+      where: { id: teamId },
     });
 
     if (!team) {
@@ -1267,29 +1326,33 @@ export class UnitsService {
     }
 
     // Check if team is orphan (not assigned to any unit)
-    if (team.salesUnitId !== null || team.productionUnitId !== null || team.marketingUnitId !== null) {
+    if (
+      team.salesUnitId !== null ||
+      team.productionUnitId !== null ||
+      team.marketingUnitId !== null
+    ) {
       throw new BadRequestException(
         `Team "${team.name}" (ID: ${teamId}) is already assigned to a unit. ` +
-        `Only orphan teams (not assigned to any unit) can be assigned to a sales unit.`
+          `Only orphan teams (not assigned to any unit) can be assigned to a sales unit.`,
       );
     }
 
     // Assign team to unit
     await this.prisma.team.update({
       where: { id: teamId },
-      data: { salesUnitId: unitId }
+      data: { salesUnitId: unitId },
     });
 
     return {
       success: true,
-      message: `Team "${team.name}" successfully assigned to unit "${unit.name}"`
+      message: `Team "${team.name}" successfully assigned to unit "${unit.name}"`,
     };
   }
 
   async removeTeamFromUnit(unitId: number, teamId: number) {
     // Validate unit exists
     const unit = await this.prisma.salesUnit.findUnique({
-      where: { id: unitId }
+      where: { id: unitId },
     });
 
     if (!unit) {
@@ -1298,7 +1361,7 @@ export class UnitsService {
 
     // Validate team exists
     const team = await this.prisma.team.findUnique({
-      where: { id: teamId }
+      where: { id: teamId },
     });
 
     if (!team) {
@@ -1308,19 +1371,19 @@ export class UnitsService {
     // Verify team belongs to this unit
     if (team.salesUnitId !== unitId) {
       throw new BadRequestException(
-        `Team "${team.name}" (ID: ${teamId}) does not belong to unit "${unit.name}" (ID: ${unitId})`
+        `Team "${team.name}" (ID: ${teamId}) does not belong to unit "${unit.name}" (ID: ${unitId})`,
       );
     }
 
     // Remove team from unit
     await this.prisma.team.update({
       where: { id: teamId },
-      data: { salesUnitId: null }
+      data: { salesUnitId: null },
     });
 
     return {
       success: true,
-      message: `Team "${team.name}" successfully removed from unit "${unit.name}"`
+      message: `Team "${team.name}" successfully removed from unit "${unit.name}"`,
     };
   }
 }

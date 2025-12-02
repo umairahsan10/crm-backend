@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
 @Injectable()
@@ -23,8 +29,8 @@ export class ProjectAssignmentGuard implements CanActivate {
       where: { id: projectId },
       include: {
         unitHead: true,
-        team: true
-      }
+        team: true,
+      },
     });
 
     if (!project) {
@@ -33,9 +39,11 @@ export class ProjectAssignmentGuard implements CanActivate {
 
     // Check assignment permissions based on role
     const canAssign = await this.checkAssignmentPermission(user, project);
-    
+
     if (!canAssign) {
-      throw new ForbiddenException('Insufficient permissions for project assignment');
+      throw new ForbiddenException(
+        'Insufficient permissions for project assignment',
+      );
     }
 
     // Attach project to request
@@ -43,7 +51,10 @@ export class ProjectAssignmentGuard implements CanActivate {
     return true;
   }
 
-  private async checkAssignmentPermission(user: any, project: any): Promise<boolean> {
+  private async checkAssignmentPermission(
+    user: any,
+    project: any,
+  ): Promise<boolean> {
     // Manager (dep_manager) - Can assign unit heads
     if (user.role === 'dep_manager') {
       return true;

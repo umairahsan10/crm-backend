@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsEnum, IsInt, Min, Max, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+  IsDateString,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RequestType, AdminRequestStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
@@ -26,14 +34,20 @@ export class UpdateAdminRequestDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ enum: RequestType, description: 'Updated request type' })
+  @ApiPropertyOptional({
+    enum: RequestType,
+    description: 'Updated request type',
+  })
   @IsOptional()
   @IsEnum(RequestType)
   type?: RequestType;
 }
 
 export class UpdateAdminRequestStatusDto {
-  @ApiProperty({ enum: AdminRequestStatus, description: 'New status of the admin request' })
+  @ApiProperty({
+    enum: AdminRequestStatus,
+    description: 'New status of the admin request',
+  })
   @IsEnum(AdminRequestStatus)
   status: AdminRequestStatus;
 }
@@ -50,10 +64,16 @@ export class AdminRequestResponseDto {
   @ApiPropertyOptional({ description: 'Description of the admin request' })
   description: string | null;
 
-  @ApiPropertyOptional({ enum: RequestType, description: 'Type of admin request' })
+  @ApiPropertyOptional({
+    enum: RequestType,
+    description: 'Type of admin request',
+  })
   type: RequestType | null;
 
-  @ApiPropertyOptional({ enum: AdminRequestStatus, description: 'Current status of the request' })
+  @ApiPropertyOptional({
+    enum: AdminRequestStatus,
+    description: 'Current status of the request',
+  })
   status: AdminRequestStatus | null;
 
   @ApiProperty({ description: 'Record creation timestamp' })
@@ -75,9 +95,9 @@ export class AdminRequestResponseDto {
         email: 'jane.smith@company.com',
         phone: '+1234567890',
         department: { id: 2, name: 'HR', description: 'Human Resources' },
-        role: { id: 3, name: 'dep_manager', description: 'Department Manager' }
-      }
-    }
+        role: { id: 3, name: 'dep_manager', description: 'Department Manager' },
+      },
+    },
   })
   hr?: {
     id: number;
@@ -119,9 +139,9 @@ export class AdminRequestResponseDto {
         phone: '+1234567890',
         status: 'active',
         department: { id: 1, name: 'Development' },
-        role: { id: 2, name: 'senior' }
-      }
-    }
+        role: { id: 2, name: 'senior' },
+      },
+    },
   })
   hrLog?: {
     id: number;
@@ -150,11 +170,11 @@ export class AdminRequestResponseDto {
 }
 
 export class PaginationDto {
-  @ApiPropertyOptional({ 
-    description: 'Page number (1-based)', 
-    minimum: 1, 
+  @ApiPropertyOptional({
+    description: 'Page number (1-based)',
+    minimum: 1,
     default: 1,
-    example: 1 
+    example: 1,
   })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
@@ -162,12 +182,12 @@ export class PaginationDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ 
-    description: 'Number of items per page', 
-    minimum: 1, 
-    maximum: 100, 
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    minimum: 1,
+    maximum: 100,
     default: 10,
-    example: 10 
+    example: 10,
   })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
@@ -176,26 +196,26 @@ export class PaginationDto {
   @Max(100)
   limit?: number = 10;
 
-  @ApiPropertyOptional({ 
-    description: 'Filter requests from this date (ISO format)', 
-    example: '2025-10-01' 
+  @ApiPropertyOptional({
+    description: 'Filter requests from this date (ISO format)',
+    example: '2025-10-01',
   })
   @IsOptional()
   @IsDateString()
   fromDate?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Filter requests to this date (ISO format)', 
-    example: '2025-10-31' 
+  @ApiPropertyOptional({
+    description: 'Filter requests to this date (ISO format)',
+    example: '2025-10-31',
   })
   @IsOptional()
   @IsDateString()
   toDate?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     enum: AdminRequestStatus,
-    description: 'Filter requests by status', 
-    example: 'pending' 
+    description: 'Filter requests by status',
+    example: 'pending',
   })
   @IsOptional()
   @IsEnum(AdminRequestStatus)
@@ -229,22 +249,34 @@ export class LimitedAdminRequestResponseDto {
   @ApiPropertyOptional({ description: 'Description of the admin request' })
   description: string | null;
 
-  @ApiPropertyOptional({ enum: RequestType, description: 'Type of admin request' })
+  @ApiPropertyOptional({
+    enum: RequestType,
+    description: 'Type of admin request',
+  })
   type: RequestType | null;
 
-  @ApiPropertyOptional({ enum: AdminRequestStatus, description: 'Current status of the request' })
+  @ApiPropertyOptional({
+    enum: AdminRequestStatus,
+    description: 'Current status of the request',
+  })
   status: AdminRequestStatus | null;
 
   @ApiPropertyOptional({ description: 'Related HR ID' })
   hrId: number | null;
 
-  @ApiPropertyOptional({ description: 'First name of HR employee who created the request' })
+  @ApiPropertyOptional({
+    description: 'First name of HR employee who created the request',
+  })
   hrFirstName: string | null;
 
-  @ApiPropertyOptional({ description: 'Last name of HR employee who created the request' })
+  @ApiPropertyOptional({
+    description: 'Last name of HR employee who created the request',
+  })
   hrLastName: string | null;
 
-  @ApiPropertyOptional({ description: 'Email of HR employee who created the request' })
+  @ApiPropertyOptional({
+    description: 'Email of HR employee who created the request',
+  })
   hrEmail: string | null;
 
   @ApiPropertyOptional({ description: 'Related HR log ID' })
@@ -258,7 +290,10 @@ export class LimitedAdminRequestResponseDto {
 }
 
 export class AdminRequestListResponseDto {
-  @ApiProperty({ type: [LimitedAdminRequestResponseDto], description: 'List of admin requests' })
+  @ApiProperty({
+    type: [LimitedAdminRequestResponseDto],
+    description: 'List of admin requests',
+  })
   adminRequests: LimitedAdminRequestResponseDto[];
 
   @ApiProperty({ description: 'Total number of admin requests' })

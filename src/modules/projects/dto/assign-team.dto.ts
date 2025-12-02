@@ -1,4 +1,10 @@
-import { IsNumber, IsPositive, IsDateString, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsNumber,
+  IsPositive,
+  IsDateString,
+  IsOptional,
+  IsEnum,
+} from 'class-validator';
 import { DifficultyLevel } from './update-project-details.dto';
 
 export class AssignProjectTeamDto {

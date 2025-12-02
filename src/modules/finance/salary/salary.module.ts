@@ -8,4 +8,4 @@ import { MonthlySalaryCronTrigger } from './triggers/monthly-salary-cron.trigger
   providers: [FinanceSalaryService, MonthlySalaryCronTrigger],
   exports: [FinanceSalaryService],
 })
-export class FinanceSalaryModule {} 
+export class FinanceSalaryModule {}

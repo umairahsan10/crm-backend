@@ -25,4 +25,3 @@ export class CreateDepartmentDto {
   @IsInt()
   managerId?: number;
 }
-

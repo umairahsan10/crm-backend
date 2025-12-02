@@ -11,7 +11,16 @@ import { MeetingModule } from './meeting/meeting.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
-  imports: [ProjectChatsModule, ChatParticipantsModule, ChatMessagesModule, EmployeeModule, ComplaintsModule, ReminderModule, MeetingModule, NotificationsModule],
+  imports: [
+    ProjectChatsModule,
+    ChatParticipantsModule,
+    ChatMessagesModule,
+    EmployeeModule,
+    ComplaintsModule,
+    ReminderModule,
+    MeetingModule,
+    NotificationsModule,
+  ],
   controllers: [CommunicationController],
   providers: [CommunicationService],
 })

@@ -13,7 +13,14 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { ComplaintsService } from './complaints.service';
 import { CreateComplaintDto } from './dto/create-complaint.dto';
 import { ComplaintHrActionDto } from './dto/hr-action.dto';
@@ -32,7 +39,10 @@ export class ComplaintsController {
   @Get()
   @Departments('HR', 'Admin')
   @ApiOperation({ summary: 'Retrieve all complaints' })
-  @ApiResponse({ status: 200, description: 'List of all complaints retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all complaints retrieved successfully',
+  })
   async getAllComplaints() {
     return this.complaintsService.getAllComplaints();
   }
@@ -49,17 +59,33 @@ export class ComplaintsController {
   @Get('priority/:priority')
   @Departments('HR', 'Admin')
   @ApiOperation({ summary: 'Filter complaints by priority' })
-  @ApiParam({ name: 'priority', enum: ComplaintPriority, description: 'Complaint priority level' })
-  @ApiResponse({ status: 200, description: 'Complaints filtered by priority retrieved successfully' })
-  async getComplaintsByPriority(@Param('priority') priority: ComplaintPriority) {
+  @ApiParam({
+    name: 'priority',
+    enum: ComplaintPriority,
+    description: 'Complaint priority level',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Complaints filtered by priority retrieved successfully',
+  })
+  async getComplaintsByPriority(
+    @Param('priority') priority: ComplaintPriority,
+  ) {
     return this.complaintsService.getComplaintsByPriority(priority);
   }
 
   @Get('status/:status')
   @Departments('HR', 'Admin')
   @ApiOperation({ summary: 'Filter complaints by status' })
-  @ApiParam({ name: 'status', enum: ComplaintStatus, description: 'Complaint status' })
-  @ApiResponse({ status: 200, description: 'Complaints filtered by status retrieved successfully' })
+  @ApiParam({
+    name: 'status',
+    enum: ComplaintStatus,
+    description: 'Complaint status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Complaints filtered by status retrieved successfully',
+  })
   async getComplaintsByStatus(@Param('status') status: ComplaintStatus) {
     return this.complaintsService.getComplaintsByStatus(status);
   }
@@ -75,34 +101,58 @@ export class ComplaintsController {
 
   @Put(':id/action')
   @Departments('HR')
-  @ApiOperation({ summary: 'Update complaint with HR action (assign, change status, add notes, etc.)' })
+  @ApiOperation({
+    summary:
+      'Update complaint with HR action (assign, change status, add notes, etc.)',
+  })
   @ApiParam({ name: 'id', type: Number, description: 'Complaint ID' })
-  @ApiQuery({ name: 'hrEmployeeId', type: Number, required: true, description: 'HR employee ID taking action' })
-  @ApiResponse({ status: 200, description: 'Complaint action updated successfully' })
+  @ApiQuery({
+    name: 'hrEmployeeId',
+    type: Number,
+    required: true,
+    description: 'HR employee ID taking action',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Complaint action updated successfully',
+  })
   async updateComplaintAction(
     @Param('id', ParseIntPipe) id: number,
     @Body() hrActionDto: ComplaintHrActionDto,
     @Query('hrEmployeeId', ParseIntPipe) hrEmployeeId: number,
   ) {
     if (!hrEmployeeId) {
-      throw new BadRequestException('HR Employee ID is required for taking actions');
+      throw new BadRequestException(
+        'HR Employee ID is required for taking actions',
+      );
     }
 
-    return this.complaintsService.updateComplaintAction(id, hrActionDto, hrEmployeeId);
+    return this.complaintsService.updateComplaintAction(
+      id,
+      hrActionDto,
+      hrEmployeeId,
+    );
   }
 
   @Delete(':id')
   @Departments('HR', 'Admin')
   @ApiOperation({ summary: 'Delete complaint by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'Complaint ID' })
-  @ApiQuery({ name: 'hrEmployeeId', type: Number, required: true, description: 'HR employee ID performing the deletion' })
+  @ApiQuery({
+    name: 'hrEmployeeId',
+    type: Number,
+    required: true,
+    description: 'HR employee ID performing the deletion',
+  })
   @ApiResponse({ status: 200, description: 'Complaint deleted successfully' })
   async deleteComplaint(
     @Param('id', ParseIntPipe) id: number,
     @Query('hrEmployeeId', ParseIntPipe) hrEmployeeId: number,
   ) {
     if (!hrEmployeeId) {
-      throw new BadRequestException('HR Employee ID is required for deleting complaints');
+      throw new BadRequestException(
+        'HR Employee ID is required for deleting complaints',
+      );
     }
 
     return this.complaintsService.deleteComplaint(id, hrEmployeeId);

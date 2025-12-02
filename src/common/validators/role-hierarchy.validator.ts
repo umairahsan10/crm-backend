@@ -1,15 +1,19 @@
-import { registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import {
+  registerDecorator,
+  ValidationOptions,
+  ValidationArguments,
+} from 'class-validator';
 
 /**
  * Custom validator to ensure role-based hierarchy constraints
- * 
+ *
  * Rules:
  * - team_lead: Can't have team_lead, only unit_head and dep_manager
- * - unit_head: Can't have team_lead or unit_head, only dep_manager  
+ * - unit_head: Can't have team_lead or unit_head, only dep_manager
  * - dep_manager: Can't have anyone above (no team_lead, unit_head, dep_manager)
  */
 export function IsValidRoleHierarchy(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidRoleHierarchy',
       target: object.constructor,

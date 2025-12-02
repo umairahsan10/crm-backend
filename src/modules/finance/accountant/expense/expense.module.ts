@@ -7,4 +7,4 @@ import { ExpenseService } from './expense.service';
   providers: [ExpenseService],
   exports: [ExpenseService],
 })
-export class ExpenseModule {} 
+export class ExpenseModule {}

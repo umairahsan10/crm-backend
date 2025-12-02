@@ -1,9 +1,20 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { FinanceService } from '../../finance/finance.service';
-import { SalaryDeductionDto, DeductionCalculationDto, SalaryDeductionResponseDto } from './dto/salary-deduction.dto';
+import {
+  SalaryDeductionDto,
+  DeductionCalculationDto,
+  SalaryDeductionResponseDto,
+} from './dto/salary-deduction.dto';
 import { MarkSalaryPaidDto } from './dto/mark-salary-paid.dto';
-import { Prisma, PaymentWays, PaymentMethod, SalaryStatus, TransactionType, TransactionStatus } from '@prisma/client';
+import {
+  Prisma,
+  PaymentWays,
+  PaymentMethod,
+  SalaryStatus,
+  TransactionType,
+  TransactionStatus,
+} from '@prisma/client';
 
 @Injectable()
 export class SalaryService {
@@ -12,25 +23,37 @@ export class SalaryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly financeService: FinanceService,
-  ) { }
+  ) {}
 
   /**
    * Helper method to get current date in PKT timezone
    */
   private getCurrentDateInPKT(): Date {
-    return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
+    return new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+    );
   }
 
-  async calculateSalaryDeductions(dto: SalaryDeductionDto): Promise<SalaryDeductionResponseDto> {
-    this.logger.log(`Calculating salary deductions for ${dto.employeeId ? 'employee ' + dto.employeeId : 'all employees'}`);
+  async calculateSalaryDeductions(
+    dto: SalaryDeductionDto,
+  ): Promise<SalaryDeductionResponseDto> {
+    this.logger.log(
+      `Calculating salary deductions for ${dto.employeeId ? 'employee ' + dto.employeeId : 'all employees'}`,
+    );
 
     // Use the finance service to calculate deductions
     if (dto.employeeId) {
       // Calculate for specific employee
       const currentDate = new Date();
-      const calculationMonth = dto.month || `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+      const calculationMonth =
+        dto.month ||
+        `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
-      const deductionResult = await this.financeService.calculateEmployeeDeductions(dto.employeeId, calculationMonth);
+      const deductionResult =
+        await this.financeService.calculateEmployeeDeductions(
+          dto.employeeId,
+          calculationMonth,
+        );
 
       // Get employee details
       const employee = await this.prisma.employee.findUnique({
@@ -56,7 +79,8 @@ export class SalaryService {
         refundDeduction: deductionResult.refundDeduction || 0,
         totalDeduction: deductionResult.totalDeduction,
         netSalary: deductionResult.baseSalary, // Base salary without deductions
-        finalSalary: deductionResult.baseSalary - deductionResult.totalDeduction, // Salary after deductions
+        finalSalary:
+          deductionResult.baseSalary - deductionResult.totalDeduction, // Salary after deductions
       };
 
       return {
@@ -69,42 +93,47 @@ export class SalaryService {
       };
     } else {
       // Calculate for all employees
-      const result = await this.financeService.calculateAllEmployeesDeductions(dto.month);
+      const result = await this.financeService.calculateAllEmployeesDeductions(
+        dto.month,
+      );
 
       // Transform the results to match the expected format
-      const calculations: DeductionCalculationDto[] = result.results.map(deductionResult => {
-        return {
-          employeeId: deductionResult.employeeId,
-          employeeName: `Employee ${deductionResult.employeeId}`, // Will be enhanced with actual names
-          baseSalary: deductionResult.baseSalary,
-          perDaySalary: deductionResult.perDaySalary,
-          month: result.month,
-          totalPresent: 0, // Not calculated in finance service
-          totalAbsent: deductionResult.totalAbsent,
-          totalLateDays: deductionResult.totalLateDays,
-          totalHalfDays: deductionResult.totalHalfDays,
-          monthlyLatesDays: deductionResult.monthlyLatesDays,
-          absentDeduction: deductionResult.absentDeduction,
-          lateDeduction: deductionResult.lateDeduction,
-          halfDayDeduction: deductionResult.halfDayDeduction,
-          chargebackDeduction: deductionResult.chargebackDeduction || 0,
-          refundDeduction: deductionResult.refundDeduction || 0,
-          totalDeduction: deductionResult.totalDeduction,
-          netSalary: deductionResult.baseSalary, // Base salary without deductions
-          finalSalary: deductionResult.baseSalary - deductionResult.totalDeduction, // Salary after deductions
-        };
-      });
+      const calculations: DeductionCalculationDto[] = result.results.map(
+        (deductionResult) => {
+          return {
+            employeeId: deductionResult.employeeId,
+            employeeName: `Employee ${deductionResult.employeeId}`, // Will be enhanced with actual names
+            baseSalary: deductionResult.baseSalary,
+            perDaySalary: deductionResult.perDaySalary,
+            month: result.month,
+            totalPresent: 0, // Not calculated in finance service
+            totalAbsent: deductionResult.totalAbsent,
+            totalLateDays: deductionResult.totalLateDays,
+            totalHalfDays: deductionResult.totalHalfDays,
+            monthlyLatesDays: deductionResult.monthlyLatesDays,
+            absentDeduction: deductionResult.absentDeduction,
+            lateDeduction: deductionResult.lateDeduction,
+            halfDayDeduction: deductionResult.halfDayDeduction,
+            chargebackDeduction: deductionResult.chargebackDeduction || 0,
+            refundDeduction: deductionResult.refundDeduction || 0,
+            totalDeduction: deductionResult.totalDeduction,
+            netSalary: deductionResult.baseSalary, // Base salary without deductions
+            finalSalary:
+              deductionResult.baseSalary - deductionResult.totalDeduction, // Salary after deductions
+          };
+        },
+      );
 
       // Get employee names for better display
-      const employeeIds = result.results.map(r => r.employeeId);
+      const employeeIds = result.results.map((r) => r.employeeId);
       const employees = await this.prisma.employee.findMany({
         where: { id: { in: employeeIds } },
         select: { id: true, firstName: true, lastName: true },
       });
 
       // Update employee names
-      calculations.forEach(calc => {
-        const employee = employees.find(emp => emp.id === calc.employeeId);
+      calculations.forEach((calc) => {
+        const employee = employees.find((emp) => emp.id === calc.employeeId);
         if (employee) {
           calc.employeeName = `${employee.firstName} ${employee.lastName}`;
         }
@@ -115,17 +144,26 @@ export class SalaryService {
         summary: {
           totalEmployees: result.totalEmployees,
           totalDeductions: result.totalDeductions,
-          totalNetSalary: calculations.reduce((sum, calc) => sum + calc.finalSalary, 0),
+          totalNetSalary: calculations.reduce(
+            (sum, calc) => sum + calc.finalSalary,
+            0,
+          ),
         },
       };
     }
   }
 
   /**
- * Sets or updates the base salary for an employee with proper permission checks.
- * Admins can set any salary, HR employees have restrictions.
- */
-  async updateSalary(employeeId: number, amount: number, currentUserId: number, isAdmin: boolean, description?: string) {
+   * Sets or updates the base salary for an employee with proper permission checks.
+   * Admins can set any salary, HR employees have restrictions.
+   */
+  async updateSalary(
+    employeeId: number,
+    amount: number,
+    currentUserId: number,
+    isAdmin: boolean,
+    description?: string,
+  ) {
     // 1. Check if employee exists and is active
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
@@ -136,7 +174,7 @@ export class SalaryService {
       return {
         status: 'error',
         message: 'Employee does not exist',
-        error_code: 'EMPLOYEE_NOT_FOUND'
+        error_code: 'EMPLOYEE_NOT_FOUND',
       };
     }
 
@@ -144,7 +182,7 @@ export class SalaryService {
       return {
         status: 'error',
         message: 'Employee is not active',
-        error_code: 'EMPLOYEE_INACTIVE'
+        error_code: 'EMPLOYEE_INACTIVE',
       };
     }
 
@@ -158,7 +196,7 @@ export class SalaryService {
       return {
         status: 'error',
         message: 'Account record does not exist for employee',
-        error_code: 'ACCOUNT_NOT_FOUND'
+        error_code: 'ACCOUNT_NOT_FOUND',
       };
     }
 
@@ -169,7 +207,7 @@ export class SalaryService {
         return {
           status: 'error',
           message: 'HR cannot set their own salary',
-          error_code: 'SELF_SALARY_RESTRICTION'
+          error_code: 'SELF_SALARY_RESTRICTION',
         };
       }
 
@@ -183,7 +221,7 @@ export class SalaryService {
         return {
           status: 'error',
           message: 'HR cannot set salary of another HR with salary permission',
-          error_code: 'HR_PERMISSION_RESTRICTION'
+          error_code: 'HR_PERMISSION_RESTRICTION',
         };
       }
     }
@@ -227,12 +265,14 @@ export class SalaryService {
         return {
           status: 'error',
           message: 'HR record not found for current user',
-          error_code: 'HR_RECORD_NOT_FOUND'
+          error_code: 'HR_RECORD_NOT_FOUND',
         };
       }
 
       // Generate description if not provided
-      const logDescription = description || `Salary updated from ${previousSalary.toFixed(2)} to ${newSalary.toFixed(2)}`;
+      const logDescription =
+        description ||
+        `Salary updated from ${previousSalary.toFixed(2)} to ${newSalary.toFixed(2)}`;
 
       // Create HR log entry
       await this.prisma.hRLog.create({
@@ -257,14 +297,17 @@ export class SalaryService {
         updated_by: currentUserId,
       };
     }
-
   }
 
   /**
    * Marks a salary as paid for an employee
    * Updates net_salary_logs, creates transaction and expense records
    */
-  async markSalaryPaid(dto: MarkSalaryPaidDto, currentUserId: number, isAdmin: boolean = false) {
+  async markSalaryPaid(
+    dto: MarkSalaryPaidDto,
+    currentUserId: number,
+    isAdmin: boolean = false,
+  ) {
     const { employee_id, type } = dto;
     const paymentMethod = type || PaymentWays.cash;
 
@@ -384,7 +427,9 @@ export class SalaryService {
             },
           });
         } catch (transactionError) {
-          this.logger.error(`Transaction creation failed: ${transactionError.message}`);
+          this.logger.error(
+            `Transaction creation failed: ${transactionError.message}`,
+          );
           throw new Error('TRANSACTION_CREATION_FAILED');
         }
 
@@ -427,7 +472,6 @@ export class SalaryService {
           paid_on: result.salaryLog.paidOn,
         },
       };
-
     } catch (error) {
       this.logger.error(
         `Failed to mark salary as paid for employee ${employee_id}: ${error.message}`,
@@ -454,7 +498,9 @@ export class SalaryService {
   /**
    * Maps PaymentWays enum to PaymentMethod enum for expense records
    */
-  private mapPaymentWaysToPaymentMethod(paymentWays: PaymentWays): PaymentMethod {
+  private mapPaymentWaysToPaymentMethod(
+    paymentWays: PaymentWays,
+  ): PaymentMethod {
     switch (paymentWays) {
       case PaymentWays.cash:
         return PaymentMethod.cash;
@@ -492,4 +538,4 @@ export class SalaryService {
         return 'An error occurred while processing the salary payment';
     }
   }
-} 
+}

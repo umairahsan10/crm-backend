@@ -37,10 +37,14 @@ export class EmployeeResponseDto {
   @ApiPropertyOptional({ description: 'Residential address of the employee' })
   address?: string | null;
 
-  @ApiPropertyOptional({ description: 'Marital status (true = married, false = single)' })
+  @ApiPropertyOptional({
+    description: 'Marital status (true = married, false = single)',
+  })
   maritalStatus?: boolean | null;
 
-  @ApiProperty({ description: 'Employment status (e.g., active, terminated, inactive)' })
+  @ApiProperty({
+    description: 'Employment status (e.g., active, terminated, inactive)',
+  })
   status: string;
 
   @ApiPropertyOptional({ description: 'Employment start date' })
@@ -49,10 +53,14 @@ export class EmployeeResponseDto {
   @ApiPropertyOptional({ description: 'Employment end date if applicable' })
   endDate?: Date | null;
 
-  @ApiPropertyOptional({ description: 'Work mode (hybrid, on_site, or remote)' })
+  @ApiPropertyOptional({
+    description: 'Work mode (hybrid, on_site, or remote)',
+  })
   modeOfWork?: string | null;
 
-  @ApiPropertyOptional({ description: 'Number of remote days allowed per month' })
+  @ApiPropertyOptional({
+    description: 'Number of remote days allowed per month',
+  })
   remoteDaysAllowed?: number | null;
 
   @ApiPropertyOptional({ description: 'Date of birth' })
@@ -67,13 +75,17 @@ export class EmployeeResponseDto {
   @ApiPropertyOptional({ description: 'Shift end time (HH:mm format)' })
   shiftEnd?: string | null;
 
-  @ApiPropertyOptional({ description: 'Type of employment (full_time or part_time)' })
+  @ApiPropertyOptional({
+    description: 'Type of employment (full_time or part_time)',
+  })
   employmentType?: string | null;
 
   @ApiPropertyOptional({ description: 'Date of confirmation' })
   dateOfConfirmation?: Date | null;
 
-  @ApiPropertyOptional({ description: 'Employment period type (probation, permanent, or notice)' })
+  @ApiPropertyOptional({
+    description: 'Employment period type (probation, permanent, or notice)',
+  })
   periodType?: string | null;
 
   @ApiPropertyOptional({ description: 'Bonus amount if applicable' })
@@ -89,7 +101,11 @@ export class EmployeeResponseDto {
   @ApiPropertyOptional({
     type: () => Object,
     description: 'Department details associated with the employee',
-    example: { id: 3, name: 'Marketing', description: 'Marketing & communications team' },
+    example: {
+      id: 3,
+      name: 'Marketing',
+      description: 'Marketing & communications team',
+    },
   })
   department?: {
     id: number;
@@ -100,7 +116,11 @@ export class EmployeeResponseDto {
   @ApiPropertyOptional({
     type: () => Object,
     description: 'Role details associated with the employee',
-    example: { id: 7, name: 'Team Lead', description: 'Leads a small development team' },
+    example: {
+      id: 7,
+      name: 'Team Lead',
+      description: 'Leads a small development team',
+    },
   })
   role?: {
     id: number;
@@ -111,7 +131,12 @@ export class EmployeeResponseDto {
   @ApiPropertyOptional({
     type: () => Object,
     description: 'Manager details if assigned',
-    example: { id: 2, firstName: 'Sarah', lastName: 'Ali', email: 'sarah@company.com' },
+    example: {
+      id: 2,
+      firstName: 'Sarah',
+      lastName: 'Ali',
+      email: 'sarah@company.com',
+    },
   })
   manager?: {
     id: number;
@@ -123,7 +148,12 @@ export class EmployeeResponseDto {
   @ApiPropertyOptional({
     type: () => Object,
     description: 'Team lead details if assigned',
-    example: { id: 5, firstName: 'Ahmed', lastName: 'Raza', email: 'ahmed@company.com' },
+    example: {
+      id: 5,
+      firstName: 'Ahmed',
+      lastName: 'Raza',
+      email: 'ahmed@company.com',
+    },
   })
   teamLead?: {
     id: number;
@@ -152,7 +182,9 @@ export class LimitedEmployeeResponseDto {
   @ApiProperty({ description: 'Role ID assigned to the employee' })
   roleId: number;
 
-  @ApiProperty({ description: 'Employment status (e.g., active, terminated, inactive)' })
+  @ApiProperty({
+    description: 'Employment status (e.g., active, terminated, inactive)',
+  })
   status: string;
 
   @ApiPropertyOptional({ description: 'Employment start date' })
@@ -188,7 +220,10 @@ export class LimitedEmployeeResponseDto {
 }
 
 export class EmployeesListResponseDto {
-  @ApiProperty({ type: [LimitedEmployeeResponseDto], description: 'List of employees in the current page' })
+  @ApiProperty({
+    type: [LimitedEmployeeResponseDto],
+    description: 'List of employees in the current page',
+  })
   employees: LimitedEmployeeResponseDto[];
 
   @ApiProperty({ description: 'Total number of employees found' })

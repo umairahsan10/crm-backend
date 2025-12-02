@@ -1,8 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateAccountantPermissionDto } from './dto/create-accountant-permission.dto';
 import { UpdateAccountantPermissionDto } from './dto/update-accountant-permission.dto';
-import { AccountantPermissionResponseDto, AccountantPermissionsListResponseDto } from './dto/accountant-permission-response.dto';
+import {
+  AccountantPermissionResponseDto,
+  AccountantPermissionsListResponseDto,
+} from './dto/accountant-permission-response.dto';
 
 @Injectable()
 export class AccountantPermissionsService {
@@ -13,7 +21,11 @@ export class AccountantPermissionsService {
   /**
    * Get all accountant records with pagination
    */
-  async getAllAccountantPermissions(page: number = 1, limit: number = 10, employeeId?: number): Promise<AccountantPermissionsListResponseDto> {
+  async getAllAccountantPermissions(
+    page: number = 1,
+    limit: number = 10,
+    employeeId?: number,
+  ): Promise<AccountantPermissionsListResponseDto> {
     const skip = (page - 1) * limit;
     const where = employeeId ? { employeeId } : {};
 
@@ -49,14 +61,18 @@ export class AccountantPermissionsService {
       };
     } catch (error) {
       this.logger.error(`Failed to get accountant records: ${error.message}`);
-      throw new BadRequestException(`Failed to get accountant records: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get accountant records: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get accountant record by ID
    */
-  async getAccountantPermissionById(id: number): Promise<AccountantPermissionResponseDto> {
+  async getAccountantPermissionById(
+    id: number,
+  ): Promise<AccountantPermissionResponseDto> {
     const accountant = await this.prisma.accountant.findUnique({
       where: { id },
       include: {
@@ -81,14 +97,18 @@ export class AccountantPermissionsService {
   /**
    * Create a new accountant record
    */
-  async createAccountantPermission(dto: CreateAccountantPermissionDto): Promise<AccountantPermissionResponseDto> {
+  async createAccountantPermission(
+    dto: CreateAccountantPermissionDto,
+  ): Promise<AccountantPermissionResponseDto> {
     // Check if employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id: dto.employeeId },
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${dto.employeeId} not found`);
+      throw new NotFoundException(
+        `Employee with ID ${dto.employeeId} not found`,
+      );
     }
 
     // Check if employee is already an accountant
@@ -97,7 +117,9 @@ export class AccountantPermissionsService {
     });
 
     if (existingAccountant) {
-      throw new BadRequestException(`Employee ${dto.employeeId} is already an accountant`);
+      throw new BadRequestException(
+        `Employee ${dto.employeeId} is already an accountant`,
+      );
     }
 
     try {
@@ -124,21 +146,31 @@ export class AccountantPermissionsService {
         },
       });
 
-      this.logger.log(`Accountant record created for employee ${dto.employeeId}`);
+      this.logger.log(
+        `Accountant record created for employee ${dto.employeeId}`,
+      );
       return accountant;
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       this.logger.error(`Failed to create accountant record: ${error.message}`);
-      throw new BadRequestException(`Failed to create accountant record: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create accountant record: ${error.message}`,
+      );
     }
   }
 
   /**
    * Update accountant record
    */
-  async updateAccountantPermission(id: number, dto: UpdateAccountantPermissionDto): Promise<AccountantPermissionResponseDto> {
+  async updateAccountantPermission(
+    id: number,
+    dto: UpdateAccountantPermissionDto,
+  ): Promise<AccountantPermissionResponseDto> {
     // Check if accountant record exists
     const existingAccountant = await this.prisma.accountant.findUnique({
       where: { id },
@@ -152,13 +184,20 @@ export class AccountantPermissionsService {
       const updateData: any = {};
 
       // Only include fields that are provided
-      if (dto.liabilitiesPermission !== undefined) updateData.liabilitiesPermission = dto.liabilitiesPermission;
-      if (dto.salaryPermission !== undefined) updateData.salaryPermission = dto.salaryPermission;
-      if (dto.salesPermission !== undefined) updateData.salesPermission = dto.salesPermission;
-      if (dto.invoicesPermission !== undefined) updateData.invoicesPermission = dto.invoicesPermission;
-      if (dto.expensesPermission !== undefined) updateData.expensesPermission = dto.expensesPermission;
-      if (dto.assetsPermission !== undefined) updateData.assetsPermission = dto.assetsPermission;
-      if (dto.revenuesPermission !== undefined) updateData.revenuesPermission = dto.revenuesPermission;
+      if (dto.liabilitiesPermission !== undefined)
+        updateData.liabilitiesPermission = dto.liabilitiesPermission;
+      if (dto.salaryPermission !== undefined)
+        updateData.salaryPermission = dto.salaryPermission;
+      if (dto.salesPermission !== undefined)
+        updateData.salesPermission = dto.salesPermission;
+      if (dto.invoicesPermission !== undefined)
+        updateData.invoicesPermission = dto.invoicesPermission;
+      if (dto.expensesPermission !== undefined)
+        updateData.expensesPermission = dto.expensesPermission;
+      if (dto.assetsPermission !== undefined)
+        updateData.assetsPermission = dto.assetsPermission;
+      if (dto.revenuesPermission !== undefined)
+        updateData.revenuesPermission = dto.revenuesPermission;
 
       const accountant = await this.prisma.accountant.update({
         where: { id },
@@ -178,8 +217,12 @@ export class AccountantPermissionsService {
       this.logger.log(`Accountant record ${id} updated successfully`);
       return accountant;
     } catch (error) {
-      this.logger.error(`Failed to update accountant record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to update accountant record: ${error.message}`);
+      this.logger.error(
+        `Failed to update accountant record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to update accountant record: ${error.message}`,
+      );
     }
   }
 
@@ -204,9 +247,12 @@ export class AccountantPermissionsService {
       this.logger.log(`Accountant record ${id} deleted successfully`);
       return { message: 'Accountant record deleted successfully' };
     } catch (error) {
-      this.logger.error(`Failed to delete accountant record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to delete accountant record: ${error.message}`);
+      this.logger.error(
+        `Failed to delete accountant record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to delete accountant record: ${error.message}`,
+      );
     }
   }
 }
-

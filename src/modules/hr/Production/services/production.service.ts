@@ -1,8 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateProductionDto } from '../dto/production.dto';
 import { UpdateProductionDto } from '../dto/production.dto';
-import { ProductionResponseDto, ProductionsListResponseDto } from '../dto/production.dto';
+import {
+  ProductionResponseDto,
+  ProductionsListResponseDto,
+} from '../dto/production.dto';
 
 @Injectable()
 export class ProductionService {
@@ -14,14 +22,19 @@ export class ProductionService {
    * Create a new production record
    * Validates that the employee exists and is not already in production
    */
-  async createProduction(dto: CreateProductionDto, hrEmployeeId: number): Promise<ProductionResponseDto> {
+  async createProduction(
+    dto: CreateProductionDto,
+    hrEmployeeId: number,
+  ): Promise<ProductionResponseDto> {
     // Validate HR employee exists
     const hrEmployee = await this.prisma.employee.findUnique({
       where: { id: hrEmployeeId },
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -30,7 +43,9 @@ export class ProductionService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     // Check if employee exists
@@ -39,7 +54,9 @@ export class ProductionService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${dto.employeeId} not found`);
+      throw new NotFoundException(
+        `Employee with ID ${dto.employeeId} not found`,
+      );
     }
 
     // Check if employee is already in production
@@ -48,7 +65,9 @@ export class ProductionService {
     });
 
     if (existingProduction) {
-      throw new BadRequestException(`Employee ${dto.employeeId} is already in production department`);
+      throw new BadRequestException(
+        `Employee ${dto.employeeId} is already in production department`,
+      );
     }
 
     // Validate production unit if provided
@@ -60,7 +79,9 @@ export class ProductionService {
       });
 
       if (!productionUnit) {
-        throw new NotFoundException(`Production unit with ID ${dto.productionUnitId} not found`);
+        throw new NotFoundException(
+          `Production unit with ID ${dto.productionUnitId} not found`,
+        );
       }
       productionUnitName = productionUnit.name;
     }
@@ -93,23 +114,39 @@ export class ProductionService {
 
       // Create HR log entry with detailed information
       const logDescription = `Production record created for employee ${employee.firstName} ${employee.lastName} (ID: ${employee.id}, Email: ${employee.email}) - Production Unit: ${productionUnitName}, Specialization: ${dto.specialization || 'N/A'}, Projects Completed: ${dto.projectsCompleted || 0}`;
-      await this.createHrLog(hrEmployeeId, 'production_created', employee.id, logDescription);
+      await this.createHrLog(
+        hrEmployeeId,
+        'production_created',
+        employee.id,
+        logDescription,
+      );
 
-      this.logger.log(`Production record created for employee ${dto.employeeId}`);
+      this.logger.log(
+        `Production record created for employee ${dto.employeeId}`,
+      );
       return production;
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       this.logger.error(`Failed to create production record: ${error.message}`);
-      throw new BadRequestException(`Failed to create production record: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create production record: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get all production records with optional employee filtering
    */
-  async getAllProductions(employeeId?: number, page: number = 1, limit: number = 10): Promise<ProductionsListResponseDto> {
+  async getAllProductions(
+    employeeId?: number,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<ProductionsListResponseDto> {
     try {
       const where = employeeId ? { employeeId } : {};
       const skip = (page - 1) * limit;
@@ -151,7 +188,9 @@ export class ProductionService {
       };
     } catch (error) {
       this.logger.error(`Failed to get production records: ${error.message}`);
-      throw new BadRequestException(`Failed to get production records: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get production records: ${error.message}`,
+      );
     }
   }
 
@@ -181,7 +220,9 @@ export class ProductionService {
       });
 
       if (!production) {
-        throw new NotFoundException(`Production record with ID ${id} not found`);
+        throw new NotFoundException(
+          `Production record with ID ${id} not found`,
+        );
       }
 
       return production;
@@ -189,8 +230,12 @@ export class ProductionService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(`Failed to get production record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to get production record: ${error.message}`);
+      this.logger.error(
+        `Failed to get production record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to get production record: ${error.message}`,
+      );
     }
   }
 
@@ -198,14 +243,20 @@ export class ProductionService {
    * Update production record
    * Allows updating any column of the production table
    */
-  async updateProduction(id: number, dto: UpdateProductionDto, hrEmployeeId: number): Promise<ProductionResponseDto> {
+  async updateProduction(
+    id: number,
+    dto: UpdateProductionDto,
+    hrEmployeeId: number,
+  ): Promise<ProductionResponseDto> {
     // Validate HR employee exists
     const hrEmployee = await this.prisma.employee.findUnique({
       where: { id: hrEmployeeId },
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -214,7 +265,9 @@ export class ProductionService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     // Check if production record exists
@@ -250,7 +303,9 @@ export class ProductionService {
       });
 
       if (!productionUnit) {
-        throw new NotFoundException(`Production unit with ID ${dto.productionUnitId} not found`);
+        throw new NotFoundException(
+          `Production unit with ID ${dto.productionUnitId} not found`,
+        );
       }
       newProductionUnitName = productionUnit.name;
     }
@@ -258,15 +313,30 @@ export class ProductionService {
     try {
       // Track changes for logging
       const changes: string[] = [];
-      if (dto.specialization !== undefined && dto.specialization !== existingProduction.specialization) {
-        changes.push(`Specialization: ${existingProduction.specialization || 'N/A'} → ${dto.specialization}`);
+      if (
+        dto.specialization !== undefined &&
+        dto.specialization !== existingProduction.specialization
+      ) {
+        changes.push(
+          `Specialization: ${existingProduction.specialization || 'N/A'} → ${dto.specialization}`,
+        );
       }
-      if (dto.productionUnitId !== undefined && dto.productionUnitId !== existingProduction.productionUnitId) {
+      if (
+        dto.productionUnitId !== undefined &&
+        dto.productionUnitId !== existingProduction.productionUnitId
+      ) {
         const oldUnitName = existingProduction.productionUnit?.name || 'N/A';
-        changes.push(`Production Unit: ${oldUnitName} → ${newProductionUnitName}`);
+        changes.push(
+          `Production Unit: ${oldUnitName} → ${newProductionUnitName}`,
+        );
       }
-      if (dto.projectsCompleted !== undefined && dto.projectsCompleted !== existingProduction.projectsCompleted) {
-        changes.push(`Projects Completed: ${existingProduction.projectsCompleted || 0} → ${dto.projectsCompleted}`);
+      if (
+        dto.projectsCompleted !== undefined &&
+        dto.projectsCompleted !== existingProduction.projectsCompleted
+      ) {
+        changes.push(
+          `Projects Completed: ${existingProduction.projectsCompleted || 0} → ${dto.projectsCompleted}`,
+        );
       }
 
       const production = await this.prisma.production.update({
@@ -295,20 +365,33 @@ export class ProductionService {
       });
 
       // Create HR log entry with detailed changes
-      const logDescription = changes.length > 0 
-        ? `Production record updated for employee ${existingProduction.employee.firstName} ${existingProduction.employee.lastName} (ID: ${existingProduction.employee.id}) - Changes: ${changes.join(', ')}`
-        : `Production record updated for employee ${existingProduction.employee.firstName} ${existingProduction.employee.lastName} (ID: ${existingProduction.employee.id}) - No changes detected`;
-      
-      await this.createHrLog(hrEmployeeId, 'production_updated', existingProduction.employee.id, logDescription);
+      const logDescription =
+        changes.length > 0
+          ? `Production record updated for employee ${existingProduction.employee.firstName} ${existingProduction.employee.lastName} (ID: ${existingProduction.employee.id}) - Changes: ${changes.join(', ')}`
+          : `Production record updated for employee ${existingProduction.employee.firstName} ${existingProduction.employee.lastName} (ID: ${existingProduction.employee.id}) - No changes detected`;
+
+      await this.createHrLog(
+        hrEmployeeId,
+        'production_updated',
+        existingProduction.employee.id,
+        logDescription,
+      );
 
       this.logger.log(`Production record ${id} updated successfully`);
       return production;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      this.logger.error(`Failed to update production record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to update production record: ${error.message}`);
+      this.logger.error(
+        `Failed to update production record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to update production record: ${error.message}`,
+      );
     }
   }
 
@@ -316,14 +399,19 @@ export class ProductionService {
    * Delete production record and handle related cleanup
    * Removes employee from production and updates related tables
    */
-  async deleteProduction(id: number, hrEmployeeId: number): Promise<{ message: string }> {
+  async deleteProduction(
+    id: number,
+    hrEmployeeId: number,
+  ): Promise<{ message: string }> {
     // Validate HR employee exists
     const hrEmployee = await this.prisma.employee.findUnique({
       where: { id: hrEmployeeId },
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR Employee with ID ${hrEmployeeId} not found`);
+      throw new NotFoundException(
+        `HR Employee with ID ${hrEmployeeId} not found`,
+      );
     }
 
     // Get HR record
@@ -332,7 +420,9 @@ export class ProductionService {
     });
 
     if (!hrRecord) {
-      throw new NotFoundException(`HR record not found for employee ${hrEmployeeId}`);
+      throw new NotFoundException(
+        `HR record not found for employee ${hrEmployeeId}`,
+      );
     }
 
     // Check if production record exists
@@ -376,29 +466,48 @@ export class ProductionService {
           where: { id },
         });
 
-        this.logger.log(`Production record ${id} deleted successfully for employee ${employeeId}`);
+        this.logger.log(
+          `Production record ${id} deleted successfully for employee ${employeeId}`,
+        );
       });
 
       // Create HR log entry with detailed production information
       const logDescription = `Production record deleted for employee ${existingProduction.employee.firstName} ${existingProduction.employee.lastName} (ID: ${existingProduction.employee.id}, Email: ${existingProduction.employee.email}) - Production Unit: ${productionDetails.productionUnitName}, Specialization: ${productionDetails.specialization || 'N/A'}, Projects Completed: ${productionDetails.projectsCompleted || 0}`;
-      await this.createHrLog(hrEmployeeId, 'production_deleted', existingProduction.employee.id, logDescription);
+      await this.createHrLog(
+        hrEmployeeId,
+        'production_deleted',
+        existingProduction.employee.id,
+        logDescription,
+      );
 
       return {
         message: `Employee ${existingProduction.employee.firstName} ${existingProduction.employee.lastName} removed from production department successfully`,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      this.logger.error(`Failed to delete production record ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to delete production record: ${error.message}`);
+      this.logger.error(
+        `Failed to delete production record ${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to delete production record: ${error.message}`,
+      );
     }
   }
 
   /**
    * Helper method to create HR log entries
    */
-  private async createHrLog(hrEmployeeId: number, actionType: string, affectedEmployeeId: number, description: string) {
+  private async createHrLog(
+    hrEmployeeId: number,
+    actionType: string,
+    affectedEmployeeId: number,
+    description: string,
+  ) {
     try {
       const hrRecord = await this.prisma.hR.findUnique({
         where: { employeeId: hrEmployeeId },
@@ -413,13 +522,17 @@ export class ProductionService {
             description,
           },
         });
-        this.logger.log(`HR log created for action: ${actionType}, affected employee: ${affectedEmployeeId}`);
+        this.logger.log(
+          `HR log created for action: ${actionType}, affected employee: ${affectedEmployeeId}`,
+        );
       } else {
-        this.logger.warn(`No HR record found for HR employee ${hrEmployeeId}, skipping log creation`);
+        this.logger.warn(
+          `No HR record found for HR employee ${hrEmployeeId}, skipping log creation`,
+        );
       }
     } catch (error) {
       this.logger.error(`Failed to create HR log: ${error.message}`);
       // Don't fail the main operation if log creation fails
     }
   }
-} 
+}

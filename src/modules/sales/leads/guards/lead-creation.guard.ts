@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 
 @Injectable()
@@ -23,9 +28,9 @@ export class LeadCreationGuard implements CanActivate {
       where: { id: user.id },
       include: {
         department: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     });
 
     if (!employee) {
@@ -40,6 +45,8 @@ export class LeadCreationGuard implements CanActivate {
       return true;
     }
 
-    throw new ForbiddenException('Access denied. Only sales team and admin users can create leads.');
+    throw new ForbiddenException(
+      'Access denied. Only sales team and admin users can create leads.',
+    );
   }
 }

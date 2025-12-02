@@ -13,13 +13,25 @@ export class AttendanceLogResponseDto {
   @ApiProperty({ description: 'Last name of the employee' })
   employee_last_name: string;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Date of attendance (YYYY-MM-DD)' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Date of attendance (YYYY-MM-DD)',
+  })
   date: string | null;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Recorded check-in time (HH:mm:ss)' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Recorded check-in time (HH:mm:ss)',
+  })
   checkin: string | null;
 
-  @ApiProperty({ type: String, nullable: true, description: 'Recorded check-out time (HH:mm:ss)' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Recorded check-out time (HH:mm:ss)',
+  })
   checkout: string | null;
 
   @ApiProperty({
@@ -36,9 +48,13 @@ export class AttendanceLogResponseDto {
   })
   status: 'present' | 'absent' | 'late' | 'half_day' | 'leave' | null;
 
-  @ApiProperty({ description: 'Timestamp when this record was created (ISO 8601)' })
+  @ApiProperty({
+    description: 'Timestamp when this record was created (ISO 8601)',
+  })
   created_at: string;
 
-  @ApiProperty({ description: 'Timestamp when this record was last updated (ISO 8601)' })
+  @ApiProperty({
+    description: 'Timestamp when this record was last updated (ISO 8601)',
+  })
   updated_at: string;
 }

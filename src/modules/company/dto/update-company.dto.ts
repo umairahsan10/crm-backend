@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsNumber, IsEmail, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsEmail,
+  IsUrl,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateCompanyDto {
@@ -7,7 +13,10 @@ export class UpdateCompanyDto {
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ description: 'Company address', example: '123 Main St' })
+  @ApiPropertyOptional({
+    description: 'Company address',
+    example: '123 Main St',
+  })
   @IsOptional()
   @IsString()
   address?: string;
@@ -37,12 +46,18 @@ export class UpdateCompanyDto {
   @IsString()
   phone?: string;
 
-  @ApiPropertyOptional({ description: 'Email address', example: 'info@acme.com' })
+  @ApiPropertyOptional({
+    description: 'Email address',
+    example: 'info@acme.com',
+  })
   @IsOptional()
   @IsEmail()
   email?: string;
 
-  @ApiPropertyOptional({ description: 'Website URL', example: 'https://www.acme.com' })
+  @ApiPropertyOptional({
+    description: 'Website URL',
+    example: 'https://www.acme.com',
+  })
   @IsOptional()
   @IsUrl()
   website?: string;
@@ -57,7 +72,10 @@ export class UpdateCompanyDto {
   @IsNumber()
   monthlyLatesDays?: number;
 
-  @ApiPropertyOptional({ description: 'Absent deduction in salary', example: 500 })
+  @ApiPropertyOptional({
+    description: 'Absent deduction in salary',
+    example: 500,
+  })
   @IsOptional()
   @IsNumber()
   absentDeduction?: number;
@@ -67,32 +85,51 @@ export class UpdateCompanyDto {
   @IsNumber()
   lateDeduction?: number;
 
-  @ApiPropertyOptional({ description: 'Half-day deduction in salary', example: 250 })
+  @ApiPropertyOptional({
+    description: 'Half-day deduction in salary',
+    example: 250,
+  })
   @IsOptional()
   @IsNumber()
   halfDeduction?: number;
 
-  @ApiPropertyOptional({ description: 'Tax ID or registration number', example: 'TAX123456' })
+  @ApiPropertyOptional({
+    description: 'Tax ID or registration number',
+    example: 'TAX123456',
+  })
   @IsOptional()
   @IsString()
   taxId?: string;
 
-  @ApiPropertyOptional({ description: 'Late time threshold in minutes', example: 15 })
+  @ApiPropertyOptional({
+    description: 'Late time threshold in minutes',
+    example: 15,
+  })
   @IsOptional()
   @IsNumber()
   lateTime?: number;
 
-  @ApiPropertyOptional({ description: 'Half-day time threshold in hours', example: 4 })
+  @ApiPropertyOptional({
+    description: 'Half-day time threshold in hours',
+    example: 4,
+  })
   @IsOptional()
   @IsNumber()
   halfTime?: number;
 
-  @ApiPropertyOptional({ description: 'Absent time threshold in hours', example: 8 })
+  @ApiPropertyOptional({
+    description: 'Absent time threshold in hours',
+    example: 8,
+  })
   @IsOptional()
   @IsNumber()
   absentTime?: number;
 
-  @ApiPropertyOptional({ description: 'Company status', example: 'active', enum: ['active', 'inactive'] })
+  @ApiPropertyOptional({
+    description: 'Company status',
+    example: 'active',
+    enum: ['active', 'inactive'],
+  })
   @IsOptional()
   @IsString()
   status?: string;

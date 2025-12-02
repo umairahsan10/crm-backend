@@ -1,4 +1,10 @@
-import { IsNumber, IsOptional, IsString, IsDecimal, Min } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsDecimal,
+  Min,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -7,7 +13,10 @@ export class CreateAccountDto {
   @IsNumber()
   employeeId: number;
 
-  @ApiPropertyOptional({ description: 'Account title', example: 'Main Account' })
+  @ApiPropertyOptional({
+    description: 'Account title',
+    example: 'Main Account',
+  })
   @IsOptional()
   @IsString()
   accountTitle?: string;
@@ -17,12 +26,15 @@ export class CreateAccountDto {
   @IsString()
   bankName?: string;
 
-  @ApiPropertyOptional({ description: 'IBAN number', example: 'US64SVBKUS6S3300958879' })
+  @ApiPropertyOptional({
+    description: 'IBAN number',
+    example: 'US64SVBKUS6S3300958879',
+  })
   @IsOptional()
   @IsString()
   ibanNumber?: string;
 
-  @ApiPropertyOptional({ description: 'Base salary amount', example: 50000.00 })
+  @ApiPropertyOptional({ description: 'Base salary amount', example: 50000.0 })
   @IsOptional()
   @Transform(({ value }) => parseFloat(value))
   @IsDecimal()
@@ -31,7 +43,10 @@ export class CreateAccountDto {
 }
 
 export class UpdateAccountDto {
-  @ApiPropertyOptional({ description: 'Account title', example: 'Main Account' })
+  @ApiPropertyOptional({
+    description: 'Account title',
+    example: 'Main Account',
+  })
   @IsOptional()
   @IsString()
   accountTitle?: string;
@@ -41,15 +56,18 @@ export class UpdateAccountDto {
   @IsString()
   bankName?: string;
 
-  @ApiPropertyOptional({ description: 'IBAN number', example: 'US64SVBKUS6S3300958879' })
+  @ApiPropertyOptional({
+    description: 'IBAN number',
+    example: 'US64SVBKUS6S3300958879',
+  })
   @IsOptional()
   @IsString()
   ibanNumber?: string;
 
-  @ApiPropertyOptional({ description: 'Base salary amount', example: 50000.00 })
+  @ApiPropertyOptional({ description: 'Base salary amount', example: 50000.0 })
   @IsOptional()
   @Transform(({ value }) => parseFloat(value))
   @IsDecimal()
   @Min(0)
   baseSalary?: number;
-} 
+}

@@ -1,17 +1,30 @@
-import { IsOptional, IsString, IsBoolean, IsInt, Min, IsIn } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsInt,
+  Min,
+  IsIn,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // Query parameters for listing industries
 export class GetIndustriesDto {
   // Search by name
-  @ApiPropertyOptional({ description: 'Search by industry name', example: 'Software' })
+  @ApiPropertyOptional({
+    description: 'Search by industry name',
+    example: 'Software',
+  })
   @IsOptional()
   @IsString()
   search?: string;
 
   // Filter by active status
-  @ApiPropertyOptional({ description: 'Filter by active status', example: true })
+  @ApiPropertyOptional({
+    description: 'Filter by active status',
+    example: true,
+  })
   @IsOptional()
   @Transform(({ value }) => {
     if (value === 'true') return true;
@@ -25,24 +38,24 @@ export class GetIndustriesDto {
   @ApiPropertyOptional({
     description: 'Field to sort by',
     example: 'name',
-    enum: ['name', 'createdAt', 'updatedAt', 'id']
+    enum: ['name', 'createdAt', 'updatedAt', 'id'],
   })
   @IsOptional()
   @IsString()
   @IsIn(['name', 'createdAt', 'updatedAt', 'id'], {
-    message: 'sortBy must be one of: name, createdAt, updatedAt, id'
+    message: 'sortBy must be one of: name, createdAt, updatedAt, id',
   })
   sortBy?: string = 'name';
 
   @ApiPropertyOptional({
     description: 'Sort order',
     example: 'asc',
-    enum: ['asc', 'desc']
+    enum: ['asc', 'desc'],
   })
   @IsOptional()
   @IsString()
   @IsIn(['asc', 'desc'], {
-    message: 'sortOrder must be either asc or desc'
+    message: 'sortOrder must be either asc or desc',
   })
   sortOrder?: 'asc' | 'desc' = 'asc';
 
@@ -54,7 +67,11 @@ export class GetIndustriesDto {
   @Min(1, { message: 'Page must be at least 1' })
   page?: number = 1;
 
-  @ApiPropertyOptional({ description: 'Number of items per page', example: 20, minimum: 1 })
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    example: 20,
+    minimum: 1,
+  })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsInt()
@@ -70,20 +87,32 @@ export class IndustryResponseDto {
   @ApiProperty({ description: 'Industry name', example: 'Software' })
   name: string;
 
-  @ApiPropertyOptional({ description: 'Industry description', example: 'Software development companies' })
+  @ApiPropertyOptional({
+    description: 'Industry description',
+    example: 'Software development companies',
+  })
   description: string | null;
 
   @ApiProperty({ description: 'Whether the industry is active', example: true })
   isActive: boolean;
 
-  @ApiProperty({ description: 'Creation timestamp', example: '2025-10-14T04:00:00.000Z' })
+  @ApiProperty({
+    description: 'Creation timestamp',
+    example: '2025-10-14T04:00:00.000Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Last update timestamp', example: '2025-10-14T04:00:00.000Z' })
+  @ApiProperty({
+    description: 'Last update timestamp',
+    example: '2025-10-14T04:00:00.000Z',
+  })
   updatedAt: Date;
 
   // Statistics (optional, for detail view)
-  @ApiPropertyOptional({ description: 'Number of clients in this industry', example: 12 })
+  @ApiPropertyOptional({
+    description: 'Number of clients in this industry',
+    example: 12,
+  })
   clientsCount?: number;
 
   @ApiPropertyOptional({ description: 'Number of cracked leads', example: 5 })
@@ -91,12 +120,15 @@ export class IndustryResponseDto {
 }
 
 export class IndustryListResponseDto {
-  @ApiProperty({ description: 'List of industries', type: [IndustryResponseDto] })
+  @ApiProperty({
+    description: 'List of industries',
+    type: [IndustryResponseDto],
+  })
   industries: IndustryResponseDto[];
 
   @ApiProperty({
     description: 'Pagination info',
-    example: { page: 1, limit: 20, total: 50, totalPages: 3 }
+    example: { page: 1, limit: 20, total: 50, totalPages: 3 },
   })
   pagination: {
     page: number;
@@ -126,8 +158,8 @@ export class IndustryStatsDto {
     description: 'Top industries with stats',
     example: [
       { id: 1, name: 'Software', clientsCount: 12, crackedLeadsCount: 5 },
-      { id: 2, name: 'Retail', clientsCount: 8, crackedLeadsCount: 3 }
-    ]
+      { id: 2, name: 'Retail', clientsCount: 8, crackedLeadsCount: 3 },
+    ],
   })
   topIndustries: {
     id: number;
@@ -136,4 +168,3 @@ export class IndustryStatsDto {
     crackedLeadsCount: number;
   }[];
 }
-

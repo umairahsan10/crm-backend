@@ -12,12 +12,12 @@ import { LiabilitiesModule } from './accountant/liabilities/liabilities.module';
 
 @Module({
   imports: [
-    FinanceSalaryModule, 
+    FinanceSalaryModule,
     AccountantModule,
     AssetsModule,
     ExpenseModule,
     RevenueModule,
-    LiabilitiesModule
+    LiabilitiesModule,
   ],
   controllers: [FinanceController, AnalyticsController],
   providers: [FinanceService, AnalyticsService],

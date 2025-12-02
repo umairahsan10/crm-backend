@@ -1,4 +1,9 @@
-import { IsNotEmpty, IsString, IsOptional, IsDateString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsDateString,
+} from 'class-validator';
 
 export class CreateProjectLogDto {
   @IsNotEmpty({ message: 'Log entry is required' })

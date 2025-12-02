@@ -1,7 +1,17 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateIndustryDto, UpdateIndustryDto } from './dto/industry.dto';
-import { GetIndustriesDto, IndustryResponseDto, IndustryListResponseDto, IndustryStatsDto } from './dto/industry-query.dto';
+import {
+  GetIndustriesDto,
+  IndustryResponseDto,
+  IndustryListResponseDto,
+  IndustryStatsDto,
+} from './dto/industry-query.dto';
 
 @Injectable()
 export class IndustryService {
@@ -16,13 +26,15 @@ export class IndustryService {
       where: {
         name: {
           equals: dto.name,
-          mode: 'insensitive'
-        }
-      }
+          mode: 'insensitive',
+        },
+      },
     });
 
     if (existingIndustry) {
-      throw new ConflictException(`Industry with name "${dto.name}" already exists`);
+      throw new ConflictException(
+        `Industry with name "${dto.name}" already exists`,
+      );
     }
 
     // Create new industry
@@ -30,8 +42,8 @@ export class IndustryService {
       data: {
         name: dto.name,
         description: dto.description || null,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     return this.mapToResponseDto(industry);
@@ -40,7 +52,9 @@ export class IndustryService {
   /**
    * Get all industries with filters and pagination
    */
-  async getIndustries(query: GetIndustriesDto): Promise<IndustryListResponseDto> {
+  async getIndustries(
+    query: GetIndustriesDto,
+  ): Promise<IndustryListResponseDto> {
     const { search, isActive, sortBy, sortOrder, page, limit } = query;
 
     // Build where clause
@@ -50,7 +64,7 @@ export class IndustryService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
+        { description: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -72,23 +86,23 @@ export class IndustryService {
       skip,
       take: limit || 20,
       orderBy: {
-        [sortBy || 'name']: sortOrder || 'asc'
+        [sortBy || 'name']: sortOrder || 'asc',
       },
       include: {
         _count: {
           select: {
             clients: true,
-            crackedLeads: true
-          }
-        }
-      }
+            crackedLeads: true,
+          },
+        },
+      },
     });
 
     // Map to response DTOs
-    const industryDtos = industries.map(industry => ({
+    const industryDtos = industries.map((industry) => ({
       ...this.mapToResponseDto(industry),
       clientsCount: industry._count.clients,
-      crackedLeadsCount: industry._count.crackedLeads
+      crackedLeadsCount: industry._count.crackedLeads,
     }));
 
     return {
@@ -97,8 +111,8 @@ export class IndustryService {
         page: page || 1,
         limit: limit || 20,
         total,
-        totalPages
-      }
+        totalPages,
+      },
     };
   }
 
@@ -108,10 +122,10 @@ export class IndustryService {
   async getActiveIndustries(): Promise<IndustryResponseDto[]> {
     const industries = await this.prisma.industry.findMany({
       where: { isActive: true },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
     });
 
-    return industries.map(industry => this.mapToResponseDto(industry));
+    return industries.map((industry) => this.mapToResponseDto(industry));
   }
 
   /**
@@ -124,10 +138,10 @@ export class IndustryService {
         _count: {
           select: {
             clients: true,
-            crackedLeads: true
-          }
-        }
-      }
+            crackedLeads: true,
+          },
+        },
+      },
     });
 
     if (!industry) {
@@ -137,17 +151,20 @@ export class IndustryService {
     return {
       ...this.mapToResponseDto(industry),
       clientsCount: industry._count.clients,
-      crackedLeadsCount: industry._count.crackedLeads
+      crackedLeadsCount: industry._count.crackedLeads,
     };
   }
 
   /**
    * Update industry
    */
-  async updateIndustry(id: number, dto: UpdateIndustryDto): Promise<IndustryResponseDto> {
+  async updateIndustry(
+    id: number,
+    dto: UpdateIndustryDto,
+  ): Promise<IndustryResponseDto> {
     // Check if industry exists
     const existingIndustry = await this.prisma.industry.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingIndustry) {
@@ -160,14 +177,16 @@ export class IndustryService {
         where: {
           name: {
             equals: dto.name,
-            mode: 'insensitive'
+            mode: 'insensitive',
           },
-          id: { not: id }
-        }
+          id: { not: id },
+        },
       });
 
       if (duplicateIndustry) {
-        throw new ConflictException(`Industry with name "${dto.name}" already exists`);
+        throw new ConflictException(
+          `Industry with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -177,8 +196,8 @@ export class IndustryService {
       data: {
         ...(dto.name && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive })
-      }
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      },
     });
 
     return this.mapToResponseDto(updatedIndustry);
@@ -190,7 +209,7 @@ export class IndustryService {
   async softDeleteIndustry(id: number): Promise<{ message: string }> {
     // Check if industry exists
     const existingIndustry = await this.prisma.industry.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingIndustry) {
@@ -205,11 +224,11 @@ export class IndustryService {
     // Soft delete (set isActive = false)
     await this.prisma.industry.update({
       where: { id },
-      data: { isActive: false }
+      data: { isActive: false },
     });
 
     return {
-      message: `Industry "${existingIndustry.name}" has been deactivated successfully`
+      message: `Industry "${existingIndustry.name}" has been deactivated successfully`,
     };
   }
 
@@ -217,10 +236,12 @@ export class IndustryService {
    * Hard delete industry (for future implementation)
    * Currently disabled - checks dependencies
    */
-  async deleteIndustry(id: number): Promise<{ success: boolean; message: string; dependencies?: any }> {
+  async deleteIndustry(
+    id: number,
+  ): Promise<{ success: boolean; message: string; dependencies?: any }> {
     // Check if industry exists
     const existingIndustry = await this.prisma.industry.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingIndustry) {
@@ -229,11 +250,11 @@ export class IndustryService {
 
     // Check for dependencies
     const clientsCount = await this.prisma.client.count({
-      where: { industryId: id }
+      where: { industryId: id },
     });
 
     const crackedLeadsCount = await this.prisma.crackedLead.count({
-      where: { industryId: id }
+      where: { industryId: id },
     });
 
     const hasDependencies = clientsCount > 0 || crackedLeadsCount > 0;
@@ -241,26 +262,27 @@ export class IndustryService {
     if (hasDependencies) {
       return {
         success: false,
-        message: 'Cannot delete industry. Dependencies exist. Please reassign or remove dependencies first.',
+        message:
+          'Cannot delete industry. Dependencies exist. Please reassign or remove dependencies first.',
         dependencies: {
           clients: {
-            count: clientsCount
+            count: clientsCount,
           },
           crackedLeads: {
-            count: crackedLeadsCount
-          }
-        }
+            count: crackedLeadsCount,
+          },
+        },
       };
     }
 
     // If no dependencies, proceed with deletion
     await this.prisma.industry.delete({
-      where: { id }
+      where: { id },
     });
 
     return {
       success: true,
-      message: `Industry "${existingIndustry.name}" has been deleted successfully`
+      message: `Industry "${existingIndustry.name}" has been deleted successfully`,
     };
   }
 
@@ -271,17 +293,17 @@ export class IndustryService {
     // Total counts
     const totalIndustries = await this.prisma.industry.count();
     const activeIndustries = await this.prisma.industry.count({
-      where: { isActive: true }
+      where: { isActive: true },
     });
     const inactiveIndustries = totalIndustries - activeIndustries;
 
     // Total clients and cracked leads
     const totalClients = await this.prisma.client.count({
-      where: { 
-        industryId: { 
-          not: null 
-        } 
-      }
+      where: {
+        industryId: {
+          not: null,
+        },
+      },
     });
     // Count all cracked leads (industryId is required, not nullable)
     const totalCrackedLeads = await this.prisma.crackedLead.count();
@@ -293,19 +315,19 @@ export class IndustryService {
         _count: {
           select: {
             clients: true,
-            crackedLeads: true
-          }
-        }
-      }
+            crackedLeads: true,
+          },
+        },
+      },
     });
 
     const topIndustries = industriesWithCounts
-      .map(industry => ({
+      .map((industry) => ({
         id: industry.id,
         name: industry.name,
         clientsCount: industry._count.clients,
         crackedLeadsCount: industry._count.crackedLeads,
-        totalCount: industry._count.clients + industry._count.crackedLeads
+        totalCount: industry._count.clients + industry._count.crackedLeads,
       }))
       .sort((a, b) => b.totalCount - a.totalCount)
       .slice(0, 5)
@@ -317,7 +339,7 @@ export class IndustryService {
       inactiveIndustries,
       totalClients,
       totalCrackedLeads,
-      topIndustries
+      topIndustries,
     };
   }
 
@@ -327,7 +349,7 @@ export class IndustryService {
   async reactivateIndustry(id: number): Promise<IndustryResponseDto> {
     // Check if industry exists
     const existingIndustry = await this.prisma.industry.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingIndustry) {
@@ -342,7 +364,7 @@ export class IndustryService {
     // Reactivate
     const updatedIndustry = await this.prisma.industry.update({
       where: { id },
-      data: { isActive: true }
+      data: { isActive: true },
     });
 
     return this.mapToResponseDto(updatedIndustry);
@@ -358,8 +380,7 @@ export class IndustryService {
       description: industry.description,
       isActive: industry.isActive,
       createdAt: industry.createdAt,
-      updatedAt: industry.updatedAt
+      updatedAt: industry.updatedAt,
     };
   }
 }
-

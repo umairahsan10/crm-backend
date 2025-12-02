@@ -1,37 +1,70 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class MeetingResponseDto {
-  @ApiProperty({ description: 'Unique identifier for the meeting', example: 101 })
+  @ApiProperty({
+    description: 'Unique identifier for the meeting',
+    example: 101,
+  })
   id: number;
 
-  @ApiPropertyOptional({ description: 'Employee ID associated with the meeting', example: 25 })
+  @ApiPropertyOptional({
+    description: 'Employee ID associated with the meeting',
+    example: 25,
+  })
   employeeId?: number;
 
-  @ApiPropertyOptional({ description: 'Client ID associated with the meeting', example: 42 })
+  @ApiPropertyOptional({
+    description: 'Client ID associated with the meeting',
+    example: 42,
+  })
   clientId?: number;
 
-  @ApiPropertyOptional({ description: 'Project ID associated with the meeting', example: 7 })
+  @ApiPropertyOptional({
+    description: 'Project ID associated with the meeting',
+    example: 7,
+  })
   projectId?: number;
 
-  @ApiPropertyOptional({ description: 'Meeting topic or title', example: 'Quarterly Sales Strategy Discussion' })
+  @ApiPropertyOptional({
+    description: 'Meeting topic or title',
+    example: 'Quarterly Sales Strategy Discussion',
+  })
   topic?: string;
 
-  @ApiPropertyOptional({ description: 'Scheduled date and time for the meeting', example: '2025-10-20T15:00:00Z' })
+  @ApiPropertyOptional({
+    description: 'Scheduled date and time for the meeting',
+    example: '2025-10-20T15:00:00Z',
+  })
   dateTime?: Date;
 
-  @ApiPropertyOptional({ description: 'Current status of the meeting', example: 'SCHEDULED' })
+  @ApiPropertyOptional({
+    description: 'Current status of the meeting',
+    example: 'SCHEDULED',
+  })
   status?: string;
 
-  @ApiProperty({ description: 'Indicates whether automatic reminders are enabled', example: true })
+  @ApiProperty({
+    description: 'Indicates whether automatic reminders are enabled',
+    example: true,
+  })
   autoReminder: boolean;
 
-  @ApiProperty({ description: 'Link to join the meeting', example: 'https://zoom.us/j/123456789' })
+  @ApiProperty({
+    description: 'Link to join the meeting',
+    example: 'https://zoom.us/j/123456789',
+  })
   meetingLink: string;
 
-  @ApiProperty({ description: 'Date when the meeting record was created', example: '2025-10-10T12:00:00Z' })
+  @ApiProperty({
+    description: 'Date when the meeting record was created',
+    example: '2025-10-10T12:00:00Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Date when the meeting record was last updated', example: '2025-10-13T09:30:00Z' })
+  @ApiProperty({
+    description: 'Date when the meeting record was last updated',
+    example: '2025-10-13T09:30:00Z',
+  })
   updatedAt: Date;
 
   // Related data

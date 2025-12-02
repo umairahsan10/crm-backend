@@ -6,7 +6,7 @@ export enum StatsPeriod {
   DAILY = 'daily',
   WEEKLY = 'weekly',
   MONTHLY = 'monthly',
-  YEARLY = 'yearly'
+  YEARLY = 'yearly',
 }
 
 export class LeaveTypeStatsDto {
@@ -29,12 +29,18 @@ export class LeaveLogsStatsDto {
   @Type(() => Number)
   employee_id?: number;
 
-  @ApiPropertyOptional({ example: '2025-01-01', description: 'Start date for the range (ISO string)' })
+  @ApiPropertyOptional({
+    example: '2025-01-01',
+    description: 'Start date for the range (ISO string)',
+  })
   @IsOptional()
   @IsDateString()
   start_date?: string;
 
-  @ApiPropertyOptional({ example: '2025-03-31', description: 'End date for the range (ISO string)' })
+  @ApiPropertyOptional({
+    example: '2025-03-31',
+    description: 'End date for the range (ISO string)',
+  })
   @IsOptional()
   @IsDateString()
   end_date?: string;
@@ -59,7 +65,10 @@ export class LeaveLogsStatsDto {
 }
 
 export class PeriodStatsDto {
-  @ApiProperty({ example: '2025-01', description: 'Period label (e.g., month, week, or day)' })
+  @ApiProperty({
+    example: '2025-01',
+    description: 'Period label (e.g., month, week, or day)',
+  })
   period: string;
 
   @ApiProperty({ example: 10 })
@@ -102,7 +111,10 @@ export class EmployeeLeaveStatsDto {
 }
 
 export class LeaveLogsStatsResponseDto {
-  @ApiProperty({ example: 45, description: 'Total number of leave requests in the period' })
+  @ApiProperty({
+    example: 45,
+    description: 'Total number of leave requests in the period',
+  })
   total_leaves: number;
 
   @ApiProperty({ example: 5, description: 'Total number of pending leaves' })
@@ -114,21 +126,36 @@ export class LeaveLogsStatsResponseDto {
   @ApiProperty({ example: 5, description: 'Total number of rejected leaves' })
   rejected_leaves: number;
 
-  @ApiProperty({ example: 72, description: 'Total number of leave days across all requests' })
+  @ApiProperty({
+    example: 72,
+    description: 'Total number of leave days across all requests',
+  })
   total_leave_days: number;
 
   @ApiProperty({ example: 2.4, description: 'Average leave duration in days' })
   average_leave_duration: number;
 
-  @ApiProperty({ example: 'Sick Leave', description: 'Most commonly taken leave type' })
+  @ApiProperty({
+    example: 'Sick Leave',
+    description: 'Most commonly taken leave type',
+  })
   most_common_leave_type: string;
 
-  @ApiProperty({ type: [PeriodStatsDto], description: 'Statistics grouped by period (daily, weekly, etc.)' })
+  @ApiProperty({
+    type: [PeriodStatsDto],
+    description: 'Statistics grouped by period (daily, weekly, etc.)',
+  })
   period_stats: PeriodStatsDto[];
 
-  @ApiPropertyOptional({ type: [EmployeeLeaveStatsDto], description: 'Breakdown by employee (if included)' })
+  @ApiPropertyOptional({
+    type: [EmployeeLeaveStatsDto],
+    description: 'Breakdown by employee (if included)',
+  })
   employee_breakdown?: EmployeeLeaveStatsDto[];
 
-  @ApiPropertyOptional({ type: [LeaveTypeStatsDto], description: 'Breakdown by leave type (if included)' })
+  @ApiPropertyOptional({
+    type: [LeaveTypeStatsDto],
+    description: 'Breakdown by leave type (if included)',
+  })
   leave_type_breakdown?: LeaveTypeStatsDto[];
 }

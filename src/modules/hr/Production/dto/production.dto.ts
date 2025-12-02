@@ -2,38 +2,65 @@ import { IsString, IsOptional, IsInt, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateProductionDto {
-  @ApiProperty({ description: 'Employee ID for this production record', example: 101 })
+  @ApiProperty({
+    description: 'Employee ID for this production record',
+    example: 101,
+  })
   @IsInt()
   employeeId: number;
 
-  @ApiProperty({ description: 'Specialization of the employee', example: 'Quality Control', required: false })
+  @ApiProperty({
+    description: 'Specialization of the employee',
+    example: 'Quality Control',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   specialization?: string;
 
-  @ApiProperty({ description: 'Production unit ID', example: 5, required: false })
+  @ApiProperty({
+    description: 'Production unit ID',
+    example: 5,
+    required: false,
+  })
   @IsOptional()
   @IsInt()
   productionUnitId?: number;
 
-  @ApiProperty({ description: 'Number of projects completed', example: 12, required: false })
+  @ApiProperty({
+    description: 'Number of projects completed',
+    example: 12,
+    required: false,
+  })
   @IsOptional()
   @IsNumber()
   projectsCompleted?: number;
 }
 
 export class UpdateProductionDto {
-  @ApiProperty({ description: 'Specialization of the employee', example: 'Quality Control', required: false })
+  @ApiProperty({
+    description: 'Specialization of the employee',
+    example: 'Quality Control',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   specialization?: string;
 
-  @ApiProperty({ description: 'Production unit ID', example: 5, required: false })
+  @ApiProperty({
+    description: 'Production unit ID',
+    example: 5,
+    required: false,
+  })
   @IsOptional()
   @IsInt()
   productionUnitId?: number;
 
-  @ApiProperty({ description: 'Number of projects completed', example: 12, required: false })
+  @ApiProperty({
+    description: 'Number of projects completed',
+    example: 12,
+    required: false,
+  })
   @IsOptional()
   @IsNumber()
   projectsCompleted?: number;
@@ -43,22 +70,46 @@ export class ProductionResponseDto {
   @ApiProperty({ description: 'Production record ID', example: 1 })
   id: number;
 
-  @ApiProperty({ description: 'Employee ID associated with this record', example: 101 })
+  @ApiProperty({
+    description: 'Employee ID associated with this record',
+    example: 101,
+  })
   employeeId: number;
 
-  @ApiProperty({ description: 'Specialization', example: 'Quality Control', required: false, nullable: true })
+  @ApiProperty({
+    description: 'Specialization',
+    example: 'Quality Control',
+    required: false,
+    nullable: true,
+  })
   specialization?: string | null;
 
-  @ApiProperty({ description: 'Production unit ID', example: 5, required: false, nullable: true })
+  @ApiProperty({
+    description: 'Production unit ID',
+    example: 5,
+    required: false,
+    nullable: true,
+  })
   productionUnitId?: number | null;
 
-  @ApiProperty({ description: 'Projects completed', example: 12, required: false, nullable: true })
+  @ApiProperty({
+    description: 'Projects completed',
+    example: 12,
+    required: false,
+    nullable: true,
+  })
   projectsCompleted?: number | null;
 
-  @ApiProperty({ description: 'Record creation timestamp', example: '2025-10-16T12:00:00.000Z' })
+  @ApiProperty({
+    description: 'Record creation timestamp',
+    example: '2025-10-16T12:00:00.000Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Record last updated timestamp', example: '2025-10-16T12:30:00.000Z' })
+  @ApiProperty({
+    description: 'Record last updated timestamp',
+    example: '2025-10-16T12:30:00.000Z',
+  })
   updatedAt: Date;
 
   @ApiProperty({
@@ -96,10 +147,16 @@ export class ProductionResponseDto {
 }
 
 export class ProductionsListResponseDto {
-  @ApiProperty({ description: 'List of production records', type: [ProductionResponseDto] })
+  @ApiProperty({
+    description: 'List of production records',
+    type: [ProductionResponseDto],
+  })
   productions: ProductionResponseDto[];
 
-  @ApiProperty({ description: 'Total number of production records', example: 50 })
+  @ApiProperty({
+    description: 'Total number of production records',
+    example: 50,
+  })
   total: number;
 
   @ApiProperty({ description: 'Current page number', example: 1 })

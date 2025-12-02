@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateRoleDto } from '../dto/create-role.dto';
 import { UpdateRoleDto } from '../dto/update-role.dto';
@@ -20,7 +25,9 @@ export class RolesService {
     });
 
     if (existingRole) {
-      throw new BadRequestException(`Role with name "${dto.name}" already exists`);
+      throw new BadRequestException(
+        `Role with name "${dto.name}" already exists`,
+      );
     }
 
     try {
@@ -147,7 +154,9 @@ export class RolesService {
       });
 
       if (nameExists) {
-        throw new BadRequestException(`Role with name "${dto.name}" already exists`);
+        throw new BadRequestException(
+          `Role with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -156,7 +165,8 @@ export class RolesService {
 
       // Only include fields that are provided
       if (dto.name !== undefined) updateData.name = dto.name;
-      if (dto.description !== undefined) updateData.description = dto.description;
+      if (dto.description !== undefined)
+        updateData.description = dto.description;
 
       const role = await this.prisma.role.update({
         where: { id },
@@ -199,7 +209,9 @@ export class RolesService {
 
     // Check if role has employees
     if (role.employees.length > 0) {
-      throw new BadRequestException(`Cannot delete role "${role.name}" because it has ${role.employees.length} employee(s). Please reassign employees first.`);
+      throw new BadRequestException(
+        `Cannot delete role "${role.name}" because it has ${role.employees.length} employee(s). Please reassign employees first.`,
+      );
     }
 
     try {

@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsString, IsOptional, MinLength, MaxLength, IsBoolean } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  MinLength,
+  MaxLength,
+  IsBoolean,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // DTO for creating an industry
@@ -7,7 +14,7 @@ export class CreateIndustryDto {
     description: 'Name of the industry',
     minLength: 3,
     maxLength: 150,
-    example: 'Software'
+    example: 'Software',
   })
   @IsNotEmpty()
   @IsString()
@@ -18,7 +25,7 @@ export class CreateIndustryDto {
   @ApiPropertyOptional({
     description: 'Description of the industry',
     maxLength: 500,
-    example: 'Software development companies and IT service providers'
+    example: 'Software development companies and IT service providers',
   })
   @IsOptional()
   @IsString()
@@ -32,7 +39,7 @@ export class UpdateIndustryDto {
     description: 'Name of the industry',
     minLength: 3,
     maxLength: 150,
-    example: 'Software'
+    example: 'Software',
   })
   @IsOptional()
   @IsString()
@@ -43,7 +50,7 @@ export class UpdateIndustryDto {
   @ApiPropertyOptional({
     description: 'Description of the industry',
     maxLength: 500,
-    example: 'Software development companies and IT service providers'
+    example: 'Software development companies and IT service providers',
   })
   @IsOptional()
   @IsString()
@@ -52,10 +59,9 @@ export class UpdateIndustryDto {
 
   @ApiPropertyOptional({
     description: 'Whether the industry is active',
-    example: true
+    example: true,
   })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }
-

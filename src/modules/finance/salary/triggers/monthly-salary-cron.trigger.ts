@@ -23,7 +23,9 @@ export class MonthlySalaryCronTrigger {
         this.logger.warn('Database unhealthy, attempting reconnect...');
         const reconnected = await this.prisma.reconnectIfNeeded();
         if (!reconnected) {
-          this.logger.warn('Reconnect failed, skipping monthly salary calculation');
+          this.logger.warn(
+            'Reconnect failed, skipping monthly salary calculation',
+          );
           return false;
         }
       }
@@ -51,12 +53,16 @@ export class MonthlySalaryCronTrigger {
     }
 
     try {
-      this.logger.log('🕔 1:00 PM PKT reached - Starting monthly auto salary calculation for previous month');
+      this.logger.log(
+        '🕔 1:00 PM PKT reached - Starting monthly auto salary calculation for previous month',
+      );
 
       // Get current PKT date to determine previous month
       const now = new Date();
-      const pktTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
-      
+      const pktTime = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+      );
+
       // Get previous month (if current month is January, previous month is December of previous year)
       let previousYear = pktTime.getFullYear();
       let previousMonth = pktTime.getMonth() - 1; // 0-based: 0 = Jan, 11 = Dec
@@ -72,7 +78,10 @@ export class MonthlySalaryCronTrigger {
       );
 
       // Calculate salaries for previous month
-      const result = await this.financeSalaryService.calculateForSpecificMonth(previousYear, previousMonth);
+      const result = await this.financeSalaryService.calculateForSpecificMonth(
+        previousYear,
+        previousMonth,
+      );
 
       this.logger.log(
         `✅ Monthly salary calculation completed successfully: ${result.successful} successful, ${result.failed} failed`,
@@ -80,8 +89,13 @@ export class MonthlySalaryCronTrigger {
 
       return result;
     } catch (error) {
-      if (error.message?.includes("Can't reach database server") || (error as any).code === 'P1001') {
-        this.logger.warn(`❌ Database connection issue in monthly salary cron: ${error.message}`);
+      if (
+        error.message?.includes("Can't reach database server") ||
+        error.code === 'P1001'
+      ) {
+        this.logger.warn(
+          `❌ Database connection issue in monthly salary cron: ${error.message}`,
+        );
         return null;
       }
       this.logger.error(`❌ Monthly salary cron failed: ${error.message}`);
@@ -89,4 +103,3 @@ export class MonthlySalaryCronTrigger {
     }
   }
 }
-

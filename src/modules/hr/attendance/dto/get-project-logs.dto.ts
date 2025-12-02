@@ -37,4 +37,3 @@ export class GetProjectLogsDto {
   @IsDateString()
   end_date?: string;
 }
-

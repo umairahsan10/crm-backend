@@ -1,4 +1,11 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsEmail, IsNumber } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsEmail,
+  IsNumber,
+} from 'class-validator';
 import { LeadSource, LeadType } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -28,7 +35,10 @@ export class CreateLeadDto {
   @IsEnum(LeadType)
   type: LeadType;
 
-  @ApiProperty({ description: 'ID of the sales unit this lead belongs to', type: Number })
+  @ApiProperty({
+    description: 'ID of the sales unit this lead belongs to',
+    type: Number,
+  })
   @IsNotEmpty()
   @IsNumber()
   salesUnitId: number;

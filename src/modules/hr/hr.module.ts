@@ -11,16 +11,15 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { LogsModule } from './view_logs/logs.module';
 import { FinanceModule } from '../finance/finance.module';
 
-
 @Module({
   imports: [
-    FinanceModule, 
-    SalaryModule, 
-    EmployeeModule, 
-    SalesModule, 
-    ProductionModule, 
-    MarketingModule, 
-    HrManagementModule, 
+    FinanceModule,
+    SalaryModule,
+    EmployeeModule,
+    SalesModule,
+    ProductionModule,
+    MarketingModule,
+    HrManagementModule,
     AccountsModule,
     AccountantsModule,
     AttendanceModule,

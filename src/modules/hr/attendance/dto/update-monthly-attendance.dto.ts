@@ -1,10 +1,18 @@
-import { IsNumber, IsOptional, IsInt, Min, IsString, Matches } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsInt,
+  Min,
+  IsString,
+  Matches,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateMonthlyAttendanceDto {
   @ApiProperty({
-    description: 'ID of the employee whose monthly attendance record is being updated',
+    description:
+      'ID of the employee whose monthly attendance record is being updated',
     example: 101,
   })
   @IsNumber()
@@ -16,7 +24,9 @@ export class UpdateMonthlyAttendanceDto {
     example: '2025-01',
   })
   @IsString()
-  @Matches(/^\d{4}-\d{2}$/, { message: 'Month must be in YYYY-MM format (e.g., 2025-01)' })
+  @Matches(/^\d{4}-\d{2}$/, {
+    message: 'Month must be in YYYY-MM format (e.g., 2025-01)',
+  })
   month: string;
 
   @ApiPropertyOptional({
@@ -78,4 +88,4 @@ export class UpdateMonthlyAttendanceDto {
   @Min(0)
   @Type(() => Number)
   total_remote_days?: number;
-} 
+}

@@ -1,8 +1,16 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
-import { AdminDepartmentResponseDto, AdminDepartmentsListResponseDto } from './dto/department-response.dto';
+import {
+  AdminDepartmentResponseDto,
+  AdminDepartmentsListResponseDto,
+} from './dto/department-response.dto';
 
 @Injectable()
 export class DepartmentsService {
@@ -13,7 +21,11 @@ export class DepartmentsService {
   /**
    * Get all departments with pagination
    */
-  async getAllDepartments(page: number = 1, limit: number = 10, search?: string): Promise<AdminDepartmentsListResponseDto> {
+  async getAllDepartments(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+  ): Promise<AdminDepartmentsListResponseDto> {
     const skip = (page - 1) * limit;
     const where: any = {};
 
@@ -50,7 +62,7 @@ export class DepartmentsService {
       const totalPages = Math.ceil(total / limit);
 
       // Map departments to include manager email and employees count
-      const departmentsWithCount = departments.map(dept => ({
+      const departmentsWithCount = departments.map((dept) => ({
         id: dept.id,
         name: dept.name,
         description: dept.description,
@@ -70,7 +82,9 @@ export class DepartmentsService {
       };
     } catch (error) {
       this.logger.error(`Failed to get departments: ${error.message}`);
-      throw new BadRequestException(`Failed to get departments: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get departments: ${error.message}`,
+      );
     }
   }
 
@@ -114,14 +128,18 @@ export class DepartmentsService {
   /**
    * Create a new department
    */
-  async createDepartment(dto: CreateDepartmentDto): Promise<AdminDepartmentResponseDto> {
+  async createDepartment(
+    dto: CreateDepartmentDto,
+  ): Promise<AdminDepartmentResponseDto> {
     // Check if department name already exists
     const existingDepartment = await this.prisma.department.findUnique({
       where: { name: dto.name },
     });
 
     if (existingDepartment) {
-      throw new BadRequestException(`Department with name "${dto.name}" already exists`);
+      throw new BadRequestException(
+        `Department with name "${dto.name}" already exists`,
+      );
     }
 
     // Validate manager if provided
@@ -131,16 +149,22 @@ export class DepartmentsService {
       });
 
       if (!manager) {
-        throw new NotFoundException(`Manager with ID ${dto.managerId} not found`);
+        throw new NotFoundException(
+          `Manager with ID ${dto.managerId} not found`,
+        );
       }
 
       // Check if manager is already managing another department
-      const existingManagerDepartment = await this.prisma.department.findUnique({
-        where: { managerId: dto.managerId },
-      });
+      const existingManagerDepartment = await this.prisma.department.findUnique(
+        {
+          where: { managerId: dto.managerId },
+        },
+      );
 
       if (existingManagerDepartment) {
-        throw new BadRequestException(`Employee ${dto.managerId} is already managing department "${existingManagerDepartment.name}"`);
+        throw new BadRequestException(
+          `Employee ${dto.managerId} is already managing department "${existingManagerDepartment.name}"`,
+        );
       }
     }
 
@@ -166,7 +190,7 @@ export class DepartmentsService {
       });
 
       this.logger.log(`Department "${department.name}" created successfully`);
-      
+
       // Return with manager email and employees count
       return {
         id: department.id,
@@ -180,14 +204,19 @@ export class DepartmentsService {
       } as AdminDepartmentResponseDto;
     } catch (error) {
       this.logger.error(`Failed to create department: ${error.message}`);
-      throw new BadRequestException(`Failed to create department: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to create department: ${error.message}`,
+      );
     }
   }
 
   /**
    * Update a department
    */
-  async updateDepartment(id: number, dto: UpdateDepartmentDto): Promise<AdminDepartmentResponseDto> {
+  async updateDepartment(
+    id: number,
+    dto: UpdateDepartmentDto,
+  ): Promise<AdminDepartmentResponseDto> {
     // Check if department exists
     const existingDepartment = await this.prisma.department.findUnique({
       where: { id },
@@ -204,7 +233,9 @@ export class DepartmentsService {
       });
 
       if (nameExists) {
-        throw new BadRequestException(`Department with name "${dto.name}" already exists`);
+        throw new BadRequestException(
+          `Department with name "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -218,19 +249,24 @@ export class DepartmentsService {
         });
 
         if (!manager) {
-          throw new NotFoundException(`Manager with ID ${dto.managerId} not found`);
+          throw new NotFoundException(
+            `Manager with ID ${dto.managerId} not found`,
+          );
         }
 
         // Check if manager is already managing another department
-        const existingManagerDepartment = await this.prisma.department.findFirst({
-          where: { 
-            managerId: dto.managerId,
-            id: { not: id }
-          },
-        });
+        const existingManagerDepartment =
+          await this.prisma.department.findFirst({
+            where: {
+              managerId: dto.managerId,
+              id: { not: id },
+            },
+          });
 
         if (existingManagerDepartment) {
-          throw new BadRequestException(`Employee ${dto.managerId} is already managing department "${existingManagerDepartment.name}"`);
+          throw new BadRequestException(
+            `Employee ${dto.managerId} is already managing department "${existingManagerDepartment.name}"`,
+          );
         }
       }
     }
@@ -240,7 +276,8 @@ export class DepartmentsService {
 
       // Only include fields that are provided
       if (dto.name !== undefined) updateData.name = dto.name;
-      if (dto.description !== undefined) updateData.description = dto.description;
+      if (dto.description !== undefined)
+        updateData.description = dto.description;
       if (dto.managerId !== undefined) updateData.managerId = dto.managerId;
 
       const department = await this.prisma.department.update({
@@ -261,7 +298,7 @@ export class DepartmentsService {
       });
 
       this.logger.log(`Department ${id} updated successfully`);
-      
+
       // Return with manager email and employees count
       return {
         id: department.id,
@@ -275,7 +312,9 @@ export class DepartmentsService {
       } as AdminDepartmentResponseDto;
     } catch (error) {
       this.logger.error(`Failed to update department ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to update department: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update department: ${error.message}`,
+      );
     }
   }
 
@@ -297,7 +336,9 @@ export class DepartmentsService {
 
     // Check if department has employees
     if (department.employees.length > 0) {
-      throw new BadRequestException(`Cannot delete department "${department.name}" because it has ${department.employees.length} employee(s). Please reassign employees first.`);
+      throw new BadRequestException(
+        `Cannot delete department "${department.name}" because it has ${department.employees.length} employee(s). Please reassign employees first.`,
+      );
     }
 
     try {
@@ -309,8 +350,9 @@ export class DepartmentsService {
       return { message: 'Department deleted successfully' };
     } catch (error) {
       this.logger.error(`Failed to delete department ${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to delete department: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to delete department: ${error.message}`,
+      );
     }
   }
 }
-
