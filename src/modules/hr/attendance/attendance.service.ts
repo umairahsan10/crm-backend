@@ -2510,380 +2510,380 @@ export class AttendanceService {
    * Optimized version that uses pre-fetched attendance records
    */
   private async updateAttendanceForBulkMarkPresentOptimized(
-    tx: any,
-    employeeId: number,
-    date: Date,
-    wasAbsent: boolean = false,
-    status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
-    attendanceMap: Map<number, any>,
-  ): Promise<void> {
-    // Use pre-fetched attendance record
-    let attendance = attendanceMap.get(employeeId);
+  tx: any,
+  employeeId: number,
+  date: Date,
+  wasAbsent: boolean = false,
+  status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
+  attendanceMap: Map<number, any>,
+): Promise < void> {
+  // Use pre-fetched attendance record
+  let attendance = attendanceMap.get(employeeId);
 
-    if (!attendance) {
-      // Create new attendance record
-      attendance = await tx.attendance.create({
-        data: {
-          employeeId,
-          presentDays: 0,
-          absentDays: 0,
-          lateDays: 0,
-          leaveDays: 0,
-          remoteDays: 0,
-          quarterlyLeaves: 0,
-          monthlyLates: 0,
-          halfDays: 0,
-        },
-      });
-      // Update map for future use in same transaction
-      attendanceMap.set(employeeId, attendance);
-    }
+  if(!attendance) {
+    // Create new attendance record
+    attendance = await tx.attendance.create({
+      data: {
+        employeeId,
+        presentDays: 0,
+        absentDays: 0,
+        lateDays: 0,
+        leaveDays: 0,
+        remoteDays: 0,
+        quarterlyLeaves: 0,
+        monthlyLates: 0,
+        halfDays: 0,
+      },
+    });
+    // Update map for future use in same transaction
+    attendanceMap.set(employeeId, attendance);
+  }
 
     // Update counters based on status
     const updateData: any = {};
 
-    // Handle status-specific counters
-    if (status === 'absent') {
-      updateData.absentDays = (attendance.absentDays || 0) + 1;
-    } else {
-      updateData.presentDays = (attendance.presentDays || 0) + 1;
+  // Handle status-specific counters
+  if(status === 'absent') {
+  updateData.absentDays = (attendance.absentDays || 0) + 1;
+} else {
+  updateData.presentDays = (attendance.presentDays || 0) + 1;
 
-      if (status === 'late') {
-        updateData.lateDays = (attendance.lateDays || 0) + 1;
-        if ((attendance.monthlyLates ?? 0) > 0) {
-          updateData.monthlyLates = Math.max(
-            0,
-            (attendance.monthlyLates ?? 0) - 1,
-          );
-        }
-      } else if (status === 'half_day') {
-        updateData.halfDays = (attendance.halfDays || 0) + 1;
-      }
-
-      if (wasAbsent && attendance.absentDays && attendance.absentDays > 0) {
-        updateData.absentDays = Math.max(0, attendance.absentDays - 1);
-      }
+  if (status === 'late') {
+    updateData.lateDays = (attendance.lateDays || 0) + 1;
+    if ((attendance.monthlyLates ?? 0) > 0) {
+      updateData.monthlyLates = Math.max(
+        0,
+        (attendance.monthlyLates ?? 0) - 1,
+      );
     }
+  } else if (status === 'half_day') {
+    updateData.halfDays = (attendance.halfDays || 0) + 1;
+  }
 
-    await tx.attendance.update({
-      where: { id: attendance.id },
-      data: updateData,
-    });
+  if (wasAbsent && attendance.absentDays && attendance.absentDays > 0) {
+    updateData.absentDays = Math.max(0, attendance.absentDays - 1);
+  }
+}
+
+await tx.attendance.update({
+  where: { id: attendance.id },
+  data: updateData,
+});
   }
 
   /**
    * Optimized version that uses pre-fetched monthly summaries
    */
   private async updateMonthlyAttendanceForBulkMarkPresentOptimized(
-    tx: any,
-    employeeId: number,
-    date: Date,
-    wasAbsent: boolean = false,
-    status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
-    monthlySummaryMap: Map<string, any>,
-  ): Promise<void> {
-    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const summaryKey = `${employeeId}_${monthYear}`;
+  tx: any,
+  employeeId: number,
+  date: Date,
+  wasAbsent: boolean = false,
+  status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
+  monthlySummaryMap: Map<string, any>,
+): Promise < void> {
+  const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  const summaryKey = `${employeeId}_${monthYear}`;
 
-    // Use pre-fetched monthly summary
-    let monthlySummary = monthlySummaryMap.get(summaryKey);
+  // Use pre-fetched monthly summary
+  let monthlySummary = monthlySummaryMap.get(summaryKey);
 
-    if (!monthlySummary) {
-      // Create new monthly summary
+  if(!monthlySummary) {
+    // Create new monthly summary
+    monthlySummary = await tx.monthlyAttendanceSummary.create({
+      data: {
+        empId: employeeId,
+        month: monthYear,
+        totalPresent: 0,
+        totalAbsent: 0,
+        totalLeaveDays: 0,
+        totalLateDays: 0,
+        totalHalfDays: 0,
+        totalRemoteDays: 0,
+      },
+    });
+    // Update map for future use in same transaction
+    monthlySummaryMap.set(summaryKey, monthlySummary);
+  }
+
+    // Update monthly summary based on status
+    const updateData: any = {};
+
+  if(status === 'absent') {
+  updateData.totalAbsent = (monthlySummary.totalAbsent || 0) + 1;
+} else {
+  updateData.totalPresent = (monthlySummary.totalPresent || 0) + 1;
+
+  if (status === 'late') {
+    updateData.totalLateDays = (monthlySummary.totalLateDays || 0) + 1;
+  } else if (status === 'half_day') {
+    updateData.totalHalfDays = (monthlySummary.totalHalfDays || 0) + 1;
+  }
+
+  if (
+    wasAbsent &&
+    monthlySummary.totalAbsent &&
+    monthlySummary.totalAbsent > 0
+  ) {
+    updateData.totalAbsent = Math.max(0, monthlySummary.totalAbsent - 1);
+  }
+}
+
+await tx.monthlyAttendanceSummary.update({
+  where: { id: monthlySummary.id },
+  data: updateData,
+});
+  }
+
+  // Helper method to update attendance counters for status changes
+  private async updateAttendanceCountersForStatusChange(
+  tx: any,
+  employeeId: number,
+  oldStatus: string,
+  newStatus: string,
+): Promise < void> {
+  try {
+    // Find existing attendance record
+    const attendance = await tx.attendance.findFirst({
+      where: { employeeId: employeeId },
+    });
+
+    if(!attendance) {
+      console.warn(`No attendance record found for employee ${employeeId}`);
+      return;
+    }
+
+      const updateData: any = {};
+
+    // Decrease old status counter
+    switch(oldStatus) {
+        case 'present':
+    updateData.presentDays = { decrement: 1 };
+    break;
+    case 'late':
+    updateData.lateDays = { decrement: 1 };
+    updateData.monthlyLates = { decrement: 1 };
+    break;
+    case 'half_day':
+    updateData.halfDays = { decrement: 1 };
+    updateData.presentDays = { decrement: 1 }; // half_day counts as present
+    break;
+    case 'absent':
+    updateData.absentDays = { decrement: 1 };
+    break;
+  }
+
+      // Increase new status counter
+      switch(newStatus) {
+        case 'present':
+  updateData.presentDays = { increment: 1 };
+  break;
+  case 'late':
+  updateData.lateDays = { increment: 1 };
+  updateData.monthlyLates = { increment: 1 };
+  break;
+  case 'half_day':
+  updateData.halfDays = { increment: 1 };
+  updateData.presentDays = { increment: 1 }; // half_day counts as present
+  break;
+  case 'absent':
+  updateData.absentDays = { increment: 1 };
+  break;
+}
+
+// Update attendance record
+await tx.attendance.update({
+  where: { id: attendance.id },
+  data: updateData,
+});
+
+console.log(
+  `Updated attendance counters for employee ${employeeId}: ${oldStatus} -> ${newStatus}`,
+);
+    } catch (error) {
+  console.error('Error updating attendance counters:', error);
+  throw error;
+}
+  }
+
+  // Helper method to update monthly attendance summary for status changes
+  private async updateMonthlyAttendanceSummaryForStatusChange(
+  tx: any,
+  employeeId: number,
+  logDate: Date,
+  oldStatus: string,
+  newStatus: string,
+): Promise < void> {
+  try {
+    const month = logDate.toISOString().slice(0, 7); // YYYY-MM format
+
+    // Find existing monthly summary
+    let monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
+      where: {
+        empId: employeeId,
+        month: month,
+      },
+    });
+
+    if(!monthlySummary) {
+      // Create new monthly summary if it doesn't exist
       monthlySummary = await tx.monthlyAttendanceSummary.create({
         data: {
           empId: employeeId,
-          month: monthYear,
+          month: month,
           totalPresent: 0,
           totalAbsent: 0,
           totalLeaveDays: 0,
           totalLateDays: 0,
           totalHalfDays: 0,
           totalRemoteDays: 0,
+          generatedOn: new Date(),
         },
       });
-      // Update map for future use in same transaction
-      monthlySummaryMap.set(summaryKey, monthlySummary);
     }
-
-    // Update monthly summary based on status
-    const updateData: any = {};
-
-    if (status === 'absent') {
-      updateData.totalAbsent = (monthlySummary.totalAbsent || 0) + 1;
-    } else {
-      updateData.totalPresent = (monthlySummary.totalPresent || 0) + 1;
-
-      if (status === 'late') {
-        updateData.totalLateDays = (monthlySummary.totalLateDays || 0) + 1;
-      } else if (status === 'half_day') {
-        updateData.totalHalfDays = (monthlySummary.totalHalfDays || 0) + 1;
-      }
-
-      if (
-        wasAbsent &&
-        monthlySummary.totalAbsent &&
-        monthlySummary.totalAbsent > 0
-      ) {
-        updateData.totalAbsent = Math.max(0, monthlySummary.totalAbsent - 1);
-      }
-    }
-
-    await tx.monthlyAttendanceSummary.update({
-      where: { id: monthlySummary.id },
-      data: updateData,
-    });
-  }
-
-  // Helper method to update attendance counters for status changes
-  private async updateAttendanceCountersForStatusChange(
-    tx: any,
-    employeeId: number,
-    oldStatus: string,
-    newStatus: string,
-  ): Promise<void> {
-    try {
-      // Find existing attendance record
-      const attendance = await tx.attendance.findFirst({
-        where: { employeeId: employeeId },
-      });
-
-      if (!attendance) {
-        console.warn(`No attendance record found for employee ${employeeId}`);
-        return;
-      }
 
       const updateData: any = {};
 
-      // Decrease old status counter
-      switch (oldStatus) {
+    // Decrease old status counter
+    switch(oldStatus) {
         case 'present':
-          updateData.presentDays = { decrement: 1 };
-          break;
-        case 'late':
-          updateData.lateDays = { decrement: 1 };
-          updateData.monthlyLates = { decrement: 1 };
-          break;
-        case 'half_day':
-          updateData.halfDays = { decrement: 1 };
-          updateData.presentDays = { decrement: 1 }; // half_day counts as present
-          break;
-        case 'absent':
-          updateData.absentDays = { decrement: 1 };
-          break;
-      }
-
-      // Increase new status counter
-      switch (newStatus) {
-        case 'present':
-          updateData.presentDays = { increment: 1 };
-          break;
-        case 'late':
-          updateData.lateDays = { increment: 1 };
-          updateData.monthlyLates = { increment: 1 };
-          break;
-        case 'half_day':
-          updateData.halfDays = { increment: 1 };
-          updateData.presentDays = { increment: 1 }; // half_day counts as present
-          break;
-        case 'absent':
-          updateData.absentDays = { increment: 1 };
-          break;
-      }
-
-      // Update attendance record
-      await tx.attendance.update({
-        where: { id: attendance.id },
-        data: updateData,
-      });
-
-      console.log(
-        `Updated attendance counters for employee ${employeeId}: ${oldStatus} -> ${newStatus}`,
-      );
-    } catch (error) {
-      console.error('Error updating attendance counters:', error);
-      throw error;
-    }
+    updateData.totalPresent = { decrement: 1 };
+    break;
+    case 'late':
+    updateData.totalLateDays = { decrement: 1 };
+    break;
+    case 'half_day':
+    updateData.totalHalfDays = { decrement: 1 };
+    updateData.totalPresent = { decrement: 1 }; // half_day counts as present
+    break;
+    case 'absent':
+    updateData.totalAbsent = { decrement: 1 };
+    break;
   }
 
-  // Helper method to update monthly attendance summary for status changes
-  private async updateMonthlyAttendanceSummaryForStatusChange(
-    tx: any,
-    employeeId: number,
-    logDate: Date,
-    oldStatus: string,
-    newStatus: string,
-  ): Promise<void> {
-    try {
-      const month = logDate.toISOString().slice(0, 7); // YYYY-MM format
-
-      // Find existing monthly summary
-      let monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
-        where: {
-          empId: employeeId,
-          month: month,
-        },
-      });
-
-      if (!monthlySummary) {
-        // Create new monthly summary if it doesn't exist
-        monthlySummary = await tx.monthlyAttendanceSummary.create({
-          data: {
-            empId: employeeId,
-            month: month,
-            totalPresent: 0,
-            totalAbsent: 0,
-            totalLeaveDays: 0,
-            totalLateDays: 0,
-            totalHalfDays: 0,
-            totalRemoteDays: 0,
-            generatedOn: new Date(),
-          },
-        });
-      }
-
-      const updateData: any = {};
-
-      // Decrease old status counter
-      switch (oldStatus) {
-        case 'present':
-          updateData.totalPresent = { decrement: 1 };
-          break;
-        case 'late':
-          updateData.totalLateDays = { decrement: 1 };
-          break;
-        case 'half_day':
-          updateData.totalHalfDays = { decrement: 1 };
-          updateData.totalPresent = { decrement: 1 }; // half_day counts as present
-          break;
-        case 'absent':
-          updateData.totalAbsent = { decrement: 1 };
-          break;
-      }
-
       // Increase new status counter
-      switch (newStatus) {
+      switch(newStatus) {
         case 'present':
-          updateData.totalPresent = { increment: 1 };
-          break;
-        case 'late':
-          updateData.totalLateDays = { increment: 1 };
-          break;
-        case 'half_day':
-          updateData.totalHalfDays = { increment: 1 };
-          updateData.totalPresent = { increment: 1 }; // half_day counts as present
-          break;
-        case 'absent':
-          updateData.totalAbsent = { increment: 1 };
-          break;
-      }
+  updateData.totalPresent = { increment: 1 };
+  break;
+  case 'late':
+  updateData.totalLateDays = { increment: 1 };
+  break;
+  case 'half_day':
+  updateData.totalHalfDays = { increment: 1 };
+  updateData.totalPresent = { increment: 1 }; // half_day counts as present
+  break;
+  case 'absent':
+  updateData.totalAbsent = { increment: 1 };
+  break;
+}
 
-      // Update monthly summary
-      await tx.monthlyAttendanceSummary.update({
-        where: { id: monthlySummary.id },
-        data: updateData,
-      });
+// Update monthly summary
+await tx.monthlyAttendanceSummary.update({
+  where: { id: monthlySummary.id },
+  data: updateData,
+});
 
-      console.log(
-        `Updated monthly summary for employee ${employeeId} in ${month}: ${oldStatus} -> ${newStatus}`,
-      );
+console.log(
+  `Updated monthly summary for employee ${employeeId} in ${month}: ${oldStatus} -> ${newStatus}`,
+);
     } catch (error) {
-      console.error('Error updating monthly attendance summary:', error);
-      throw error;
-    }
+  console.error('Error updating monthly attendance summary:', error);
+  throw error;
+}
   }
 
   // Helper method to create late log for status change
   private async createLateLogForStatusChange(
-    tx: any,
-    employeeId: number,
-    logDate: Date,
-    reason: string,
-    reviewerId?: number,
-  ): Promise<void> {
-    try {
-      // Get employee shift times
-      const employee = await tx.employee.findUnique({
-        where: { id: employeeId },
-        select: { shiftStart: true, shiftEnd: true },
-      });
+  tx: any,
+  employeeId: number,
+  logDate: Date,
+  reason: string,
+  reviewerId ?: number,
+): Promise < void> {
+  try {
+    // Get employee shift times
+    const employee = await tx.employee.findUnique({
+      where: { id: employeeId },
+      select: { shiftStart: true, shiftEnd: true },
+    });
 
-      if (!employee) {
-        throw new BadRequestException('Employee not found');
-      }
+    if(!employee) {
+      throw new BadRequestException('Employee not found');
+    }
 
       // Calculate minutes late (simplified - you might want to enhance this)
       const scheduledTime = employee.shiftStart || '09:00';
-      const actualTime = '10:00'; // Default or calculate from checkin time
-      const minutesLate = 60; // Default or calculate
+    const actualTime = '10:00'; // Default or calculate from checkin time
+    const minutesLate = 60; // Default or calculate
 
-      await tx.lateLog.create({
-        data: {
-          empId: employeeId,
-          date: logDate,
-          scheduledTimeIn: scheduledTime,
-          actualTimeIn: actualTime,
-          minutesLate: minutesLate,
-          reason: reason,
-          actionTaken: 'Completed',
-          reviewedBy: reviewerId || null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      });
+    await tx.lateLog.create({
+      data: {
+        empId: employeeId,
+        date: logDate,
+        scheduledTimeIn: scheduledTime,
+        actualTimeIn: actualTime,
+        minutesLate: minutesLate,
+        reason: reason,
+        actionTaken: 'Completed',
+        reviewedBy: reviewerId || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
 
-      console.log(` Created late log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`);
-    } catch (error) {
-      console.error('Error creating late log:', error);
-      throw error;
-    }
+    console.log(` Created late log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`);
+  } catch(error) {
+    console.error('Error creating late log:', error);
+    throw error;
   }
+}
 
   // Helper method to create half-day log for status change
   private async createHalfDayLogForStatusChange(
-    tx: any,
-    employeeId: number,
-    logDate: Date,
-    reason: string,
-    reviewerId?: number,
-  ): Promise<void> {
-    try {
-      // Get employee shift times
-      const employee = await tx.employee.findUnique({
-        where: { id: employeeId },
-        select: { shiftStart: true, shiftEnd: true },
-      });
+  tx: any,
+  employeeId: number,
+  logDate: Date,
+  reason: string,
+  reviewerId ?: number,
+): Promise < void> {
+  try {
+    // Get employee shift times
+    const employee = await tx.employee.findUnique({
+      where: { id: employeeId },
+      select: { shiftStart: true, shiftEnd: true },
+    });
 
-      if (!employee) {
-        throw new BadRequestException('Employee not found');
-      }
+    if(!employee) {
+      throw new BadRequestException('Employee not found');
+    }
 
       // Calculate minutes late (simplified - you might want to enhance this)
       const scheduledTime = employee.shiftStart || '09:00';
-      const actualTime = '10:30'; // Default or calculate from checkin time
-      const minutesLate = 90; // Default or calculate
+    const actualTime = '10:30'; // Default or calculate from checkin time
+    const minutesLate = 90; // Default or calculate
 
-      await tx.halfDayLog.create({
-        data: {
-          empId: employeeId,
-          date: logDate,
-          scheduledTimeIn: scheduledTime,
-          actualTimeIn: actualTime,
-          minutesLate: minutesLate,
-          reason: reason,
-          actionTaken: 'Completed',
-          reviewedBy: reviewerId || null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      });
+    await tx.halfDayLog.create({
+      data: {
+        empId: employeeId,
+        date: logDate,
+        scheduledTimeIn: scheduledTime,
+        actualTimeIn: actualTime,
+        minutesLate: minutesLate,
+        reason: reason,
+        actionTaken: 'Completed',
+        reviewedBy: reviewerId || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
 
-      console.log(
-        `Created half-day log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`,
-      );
-    } catch (error) {
-      console.error('Error creating half-day log:', error);
-      throw error;
-    }
+    console.log(
+      `Created half-day log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`,
+    );
+  } catch(error) {
+    console.error('Error creating half-day log:', error);
+    throw error;
   }
+}
 }
