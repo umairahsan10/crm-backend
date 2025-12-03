@@ -51,36 +51,23 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
    * Get connection health status
    */
   async getHealthStatus(): Promise<ConnectionHealth> {
-    const config = this.configService.getConfig();
     const errors: string[] = [];
 
-    // Check runtime connection
-    const runtimeHealthy = await this.checkRuntimeConnection();
+    // Check database connection
+    const connectionHealthy = await this.checkDatabaseConnection();
 
-    // Check migration connection
-    const migrationHealthy = await this.checkMigrationConnection();
-
-    if (!runtimeHealthy) {
-      errors.push('Runtime connection (PgBouncer) is unhealthy');
+    if (!connectionHealthy) {
+      errors.push('Database connection is unhealthy');
     }
 
-    if (!migrationHealthy) {
-      errors.push('Migration connection (Direct) is unhealthy');
-    }
-
-    let status: 'healthy' | 'degraded' | 'unhealthy';
-    if (runtimeHealthy && migrationHealthy) {
-      status = 'healthy';
-    } else if (runtimeHealthy || migrationHealthy) {
-      status = 'degraded';
-    } else {
-      status = 'unhealthy';
-    }
+    const status: 'healthy' | 'degraded' | 'unhealthy' = connectionHealthy
+      ? 'healthy'
+      : 'unhealthy';
 
     const health: ConnectionHealth = {
       status,
-      runtime: runtimeHealthy,
-      migration: migrationHealthy,
+      runtime: connectionHealthy,
+      migration: connectionHealthy,
       lastCheck: new Date(),
       errors,
     };
@@ -100,29 +87,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Check runtime connection health
+   * Check database connection health
    */
-  private async checkRuntimeConnection(): Promise<boolean> {
+  private async checkDatabaseConnection(): Promise<boolean> {
     try {
-      // This would typically use PrismaService to check connection
-      // For now, we'll just validate the URL is configured
-      const url = this.configService.getRuntimeUrl();
-      return !!url && url.includes('pgbouncer=true');
+      // Validate the URL is configured
+      const url = this.configService.getDatabaseUrl();
+      return !!url;
     } catch (error) {
-      this.logger.error(`Runtime connection check failed: ${error.message}`);
-      return false;
-    }
-  }
-
-  /**
-   * Check migration connection health
-   */
-  private async checkMigrationConnection(): Promise<boolean> {
-    try {
-      const url = this.configService.getDirectUrl();
-      return !!url && (url.includes(':5432') || url.includes('direct'));
-    } catch (error) {
-      this.logger.error(`Migration connection check failed: ${error.message}`);
+      this.logger.error(`Database connection check failed: ${error.message}`);
       return false;
     }
   }

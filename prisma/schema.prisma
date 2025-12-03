@@ -166,7 +166,6 @@ model Project {
   crackedLeadId     Int?             @map("cracked_lead_id")
   salesRepId        Int?             @map("sales_rep_id")
   clientId          Int?             @map("client_id")
-  unitHeadId        Int?             @map("unit_head_id")
   status            ProjectStatus?
   difficultyLevel   DifficultyLevel? @map("difficulty_level")
   paymentStage      PaymentStage?    @map("payment_stage")
@@ -177,6 +176,7 @@ model Project {
   updatedAt         DateTime         @updatedAt @map("updated_at")
   id                Int              @id @default(autoincrement()) @map("project_id")
   teamId            Int?             @map("team_id")
+  unitHeadId        Int?             @map("unit_head_id")
   clientPayments    ClientPayment[]  @relation("ProjectPayment")
   meetingsAsProject Meeting[]        @relation("MeetingProject")
   projectChats      ProjectChat[]
@@ -185,8 +185,8 @@ model Project {
   client            Client?          @relation("ProjectClient", fields: [clientId], references: [id])
   crackedLead       CrackedLead?     @relation(fields: [crackedLeadId], references: [id])
   salesRep          Employee?        @relation("ProjectSalesRep", fields: [salesRepId], references: [id])
-  unitHead          Employee?        @relation("ProjectUnitHead", fields: [unitHeadId], references: [id])
   team              Team?            @relation("ProjectTeam", fields: [teamId], references: [id])
+  unitHead          Employee?        @relation("ProjectUnitHead", fields: [unitHeadId], references: [id])
   teams             Team[]           @relation("TeamCurrentProject")
 
   @@map("projects")
@@ -400,9 +400,9 @@ model CrackedLead {
   updatedAt       DateTime        @updatedAt @map("updated_at")
   totalPhases     Int?            @map("total_phases")
   currentPhase    Int?            @map("current_phase")
-  remainingAmount Int?            @default(0) @map("remaining_amount")
   id              Int             @id @default(autoincrement()) @map("cracked_lead_id")
   industryId      Int             @map("industry_id")
+  remainingAmount Int?            @default(0) @map("remaining_amount")
   client_payment  ClientPayment[]
   employee        Employee        @relation("CrackedLeadClosedBy", fields: [closedBy], references: [id])
   industry        Industry        @relation(fields: [industryId], references: [id])
@@ -706,7 +706,6 @@ model Admin {
 }
 
 model AdminRequest {
-  hrId        Int?                @map("hr_id")
   hrLogId     Int?                @map("hr_log_id")
   description String?
   type        RequestType?
@@ -714,6 +713,7 @@ model AdminRequest {
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   id          Int                 @id @default(autoincrement()) @map("admin_request_id")
+  hrId        Int?                @map("hr_id")
   hr          HR?                 @relation(fields: [hrId], references: [id])
   hrLog       HRLog?              @relation(fields: [hrLogId], references: [id])
 
@@ -740,7 +740,7 @@ model Attendance {
 
 model AttendanceLog {
   employeeId Int               @map("employee_id")
-  date       DateTime?         @db.Date
+  date       DateTime?
   checkin    DateTime?
   checkout   DateTime?
   mode       WorkingMode?
@@ -787,8 +787,8 @@ model HR {
   updatedAt               DateTime       @updatedAt @map("updated_at")
   id                      Int            @id @default(autoincrement()) @map("hr_id")
   monthlyRequestApprovals Boolean?       @map("monthly_request_approvals")
-  employee                Employee       @relation("HrEmployee", fields: [employeeId], references: [id])
   adminRequests           AdminRequest[]
+  employee                Employee       @relation("HrEmployee", fields: [employeeId], references: [id])
   hrLogs                  HRLog[]
 
   @@map("hr")
@@ -979,7 +979,6 @@ model Company {
   phone               String?  @db.VarChar(20)
   email               String?  @db.VarChar(255)
   website             String?  @db.VarChar(255)
-  status              String   @default("active") @db.VarChar(20)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   quarterlyLeavesDays Int      @default(0) @map("quarterly_leaves_days")
@@ -992,6 +991,7 @@ model Company {
   id                  Int      @id @default(autoincrement()) @map("company_id")
   absentTime          Int      @default(0) @map("absent_time")
   halfDeduction       Int      @default(0) @map("half_deduction")
+  status              String   @default("active") @db.VarChar(20)
 
   @@map("companies")
 }

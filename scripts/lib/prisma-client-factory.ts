@@ -155,38 +155,4 @@ export async function cleanupPrismaClient(client: PrismaClient): Promise<void> {
   }
 }
 
-/**
- * Creates a PrismaClient for direct database connections (migrations)
- * 
- * This is useful for scripts that need to connect directly to PostgreSQL
- * bypassing PgBouncer (e.g., for migrations or schema operations).
- * 
- * @param url - Direct database URL (defaults to DIRECT_DATABASE_URL env var)
- * @returns Configured PrismaClient for direct connection
- * 
- * @example
- * ```typescript
- * const client = createDirectPrismaClient();
- * try {
- *   await client.$connect();
- *   // Use client for migrations...
- * } finally {
- *   await cleanupPrismaClient(client);
- * }
- * ```
- */
-export function createDirectPrismaClient(url?: string): PrismaClient {
-  const directUrl = url || process.env.DIRECT_DATABASE_URL;
-  
-  if (!directUrl) {
-    throw new Error('DIRECT_DATABASE_URL is required. Provide it as parameter or set it as an environment variable.');
-  }
-
-  // Direct connections don't need PgBouncer parameters
-  return createPrismaClient({
-    url: directUrl,
-    usePgBouncer: false,
-    preparedStatements: true, // Direct connections can use prepared statements
-  });
-}
 

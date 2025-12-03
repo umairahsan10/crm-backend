@@ -5,15 +5,13 @@ import { ConfigService } from '@nestjs/config';
  * Database Configuration Interface
  *
  * Defines the structure for database connection configuration including:
- * - Runtime connection (PgBouncer) for application queries
- * - Direct connection for migrations
+ * - Database connection URL
  * - Connection pooling parameters
  * - SSL and logging settings
  * - Health check interval
  */
 export interface DatabaseConfig {
   url: string;
-  directUrl: string;
   poolConfig: {
     connectionLimit: number;
     poolTimeout: number;
@@ -55,17 +53,10 @@ export class DatabaseConfigService {
   }
 
   /**
-   * Get the runtime database URL (PgBouncer)
+   * Get the database URL
    */
-  getRuntimeUrl(): string {
+  getDatabaseUrl(): string {
     return this.buildRuntimeUrl();
-  }
-
-  /**
-   * Get the direct database URL (for migrations)
-   */
-  getDirectUrl(): string {
-    return this.config.directUrl;
   }
 
   /**
@@ -111,16 +102,9 @@ export class DatabaseConfigService {
 
     // Load required environment variables
     const databaseUrl = this.configService.get<string>('DATABASE_URL');
-    const directDatabaseUrl = this.configService.get<string>(
-      'DIRECT_DATABASE_URL',
-    );
 
     if (!databaseUrl) {
       throw new Error('DATABASE_URL environment variable is required');
-    }
-
-    if (!directDatabaseUrl) {
-      throw new Error('DIRECT_DATABASE_URL environment variable is required');
     }
 
     // Load optional configuration with defaults
@@ -160,7 +144,6 @@ export class DatabaseConfigService {
 
     return {
       url: databaseUrl,
-      directUrl: directDatabaseUrl,
       poolConfig: {
         connectionLimit,
         poolTimeout,
@@ -225,7 +208,6 @@ export class DatabaseConfigService {
    */
   private validateConfig(): void {
     this.validateUrl(this.config.url, 'DATABASE_URL');
-    this.validateUrl(this.config.directUrl, 'DIRECT_DATABASE_URL');
 
     // Validate pool configuration
     if (this.config.poolConfig.connectionLimit <= 0) {
@@ -264,32 +246,6 @@ export class DatabaseConfigService {
           '⚠️  Production DATABASE_URL should not point to localhost',
         );
       }
-
-      if (
-        this.config.directUrl.includes('localhost') ||
-        this.config.directUrl.includes('127.0.0.1')
-      ) {
-        this.logger.warn(
-          '⚠️  Production DIRECT_DATABASE_URL should not point to localhost',
-        );
-      }
-    }
-
-    // Validate PgBouncer configuration
-    if (
-      !this.config.url.includes('pgbouncer=true') &&
-      !this.config.url.includes(':6543')
-    ) {
-      this.logger.warn(
-        '⚠️  DATABASE_URL should point to PgBouncer (port 6543) for connection pooling',
-      );
-    }
-
-    // Validate direct connection
-    if (!this.config.directUrl.includes(':5432')) {
-      this.logger.warn(
-        '⚠️  DIRECT_DATABASE_URL should point to direct PostgreSQL (port 5432) for migrations',
-      );
     }
 
     this.logger.log('✅ Database configuration validated successfully');

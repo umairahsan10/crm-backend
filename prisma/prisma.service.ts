@@ -40,7 +40,7 @@ export class PrismaService
     // Compute database URL and log level before calling super()
     // (super() must be called before accessing 'this' in derived classes)
     const databaseUrl = configService
-      ? configService.getRuntimeUrl()
+      ? configService.getDatabaseUrl()
       : PrismaService.getDatabaseUrlFromEnvStatic();
 
     const logLevel = PrismaService.getLogLevelStatic(configService);
