@@ -9,38 +9,9 @@
  * Connection test result
  */
 export interface ConnectionTestResult {
-  runtime: {
-    connected: boolean;
-    error?: string;
-    latency?: number;
-  };
-  migration: {
-    connected: boolean;
-    error?: string;
-    latency?: number;
-  };
-}
-
-/**
- * Migration configuration
- */
-export interface MigrationConfig {
-  mode: 'dev' | 'deploy' | 'reset' | 'push';
-  name?: string;
-  force?: boolean;
-  directUrl: string;
-  skipGenerators?: boolean;
-  createOnly?: boolean;
-}
-
-/**
- * Migration result
- */
-export interface MigrationResult {
-  success: boolean;
-  message: string;
-  migrationName?: string;
+  connected: boolean;
   error?: string;
+  latency?: number;
 }
 
 /**

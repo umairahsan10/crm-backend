@@ -16,15 +16,6 @@ export const databaseValidationSchema = Joi.object({
       'any.required': 'DATABASE_URL is required',
     }),
 
-  DIRECT_DATABASE_URL: Joi.string()
-    .uri({ scheme: ['postgresql', 'postgres'] })
-    .required()
-    .messages({
-      'string.uri':
-        'DIRECT_DATABASE_URL must be a valid PostgreSQL connection string',
-      'any.required': 'DIRECT_DATABASE_URL is required',
-    }),
-
   // Optional variables with defaults
   DB_POOL_LIMIT: Joi.number().integer().positive().default(10).messages({
     'number.base': 'DB_POOL_LIMIT must be a number',

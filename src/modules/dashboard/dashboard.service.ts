@@ -2112,12 +2112,13 @@ export class DashboardService {
         value: activeToday.toString(),
         subtitle: 'Currently online',
         change: `${activeRate}% active rate`,
-        changeType:
+        changeType: (
           activeRate >= 70
             ? 'positive'
             : activeRate >= 50
               ? 'neutral'
-              : 'negative',
+              : 'negative'
+        ) as 'positive' | 'negative' | 'neutral',
         department: 'Admin',
       },
       {
