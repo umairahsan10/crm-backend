@@ -1,4 +1,10 @@
-import { IsOptional, IsInt, IsDateString, IsString, IsIn } from 'class-validator';
+import {
+  IsOptional,
+  IsInt,
+  IsDateString,
+  IsString,
+  IsIn,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -65,4 +71,3 @@ export class ExportProjectLogsDto {
   @Type(() => Boolean)
   include_developer_details?: boolean = true;
 }
-

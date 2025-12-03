@@ -2,7 +2,9 @@ import { IsOptional, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateHrPermissionDto {
-  @ApiPropertyOptional({ description: 'Update permission to manage attendance' })
+  @ApiPropertyOptional({
+    description: 'Update permission to manage attendance',
+  })
   @IsOptional()
   @IsBoolean()
   attendancePermission?: boolean;
@@ -12,7 +14,9 @@ export class UpdateHrPermissionDto {
   @IsBoolean()
   salaryPermission?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to manage commissions' })
+  @ApiPropertyOptional({
+    description: 'Update permission to manage commissions',
+  })
   @IsOptional()
   @IsBoolean()
   commissionPermission?: boolean;
@@ -22,12 +26,16 @@ export class UpdateHrPermissionDto {
   @IsBoolean()
   employeeAddPermission?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to handle terminations' })
+  @ApiPropertyOptional({
+    description: 'Update permission to handle terminations',
+  })
   @IsOptional()
   @IsBoolean()
   terminationsHandle?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to approve monthly requests' })
+  @ApiPropertyOptional({
+    description: 'Update permission to approve monthly requests',
+  })
   @IsOptional()
   @IsBoolean()
   monthlyRequestApprovals?: boolean;
@@ -42,9 +50,10 @@ export class UpdateHrPermissionDto {
   @IsBoolean()
   bonusesSet?: boolean;
 
-  @ApiPropertyOptional({ description: 'Update permission to manage shift timings' })
+  @ApiPropertyOptional({
+    description: 'Update permission to manage shift timings',
+  })
   @IsOptional()
   @IsBoolean()
   shiftTimingSet?: boolean;
 }
-

@@ -1,4 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateProjectTaskDto } from './dto/create-project-task.dto';
 import { UpdateProjectTaskDto } from './dto/update-project-task.dto';
@@ -13,27 +20,27 @@ export class ProjectTasksService {
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => AutoLogService))
-    private autoLogService: AutoLogService
+    private autoLogService: AutoLogService,
   ) {}
 
   // Helper method to normalize user object
   private normalizeUser(user: any) {
     if (!user) return null;
-    
+
     // Map role names to numeric IDs for backward compatibility
     const roleMap: { [key: string]: number } = {
-      'dep_manager': 1,
-      'unit_head': 2,
-      'team_lead': 3,
-      'senior': 4,
-      'junior': 4
+      dep_manager: 1,
+      unit_head: 2,
+      team_lead: 3,
+      senior: 4,
+      junior: 4,
     };
-    
+
     return {
       ...user,
       roleId: roleMap[user.role] || user.roleId || user.role,
       role: user.role,
-      id: user.id
+      id: user.id,
     };
   }
 
@@ -41,7 +48,7 @@ export class ProjectTasksService {
   private async validateProductionDepartment(userId: number): Promise<boolean> {
     const employee = await this.prisma.employee.findUnique({
       where: { id: userId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!employee) {
@@ -49,7 +56,9 @@ export class ProjectTasksService {
     }
 
     if (employee.department.name !== 'Production') {
-      throw new ForbiddenException('Only Production department employees can access project tasks');
+      throw new ForbiddenException(
+        'Only Production department employees can access project tasks',
+      );
     }
 
     return true;
@@ -58,9 +67,13 @@ export class ProjectTasksService {
   // Helper method to validate task creation permissions
   private async validateTaskCreationPermission(user: any): Promise<boolean> {
     const normalizedUser = this.normalizeUser(user);
-    
-    if (!['dep_manager', 'unit_head', 'team_lead'].includes(normalizedUser.role)) {
-      throw new ForbiddenException('Only team leads, unit heads, and department managers can create tasks');
+
+    if (
+      !['dep_manager', 'unit_head', 'team_lead'].includes(normalizedUser.role)
+    ) {
+      throw new ForbiddenException(
+        'Only team leads, unit heads, and department managers can create tasks',
+      );
     }
 
     await this.validateProductionDepartment(normalizedUser.id);
@@ -68,24 +81,27 @@ export class ProjectTasksService {
   }
 
   // Helper method to validate task assignment scope
-  private async validateTaskAssignmentScope(creatorId: number, assignedToId: number): Promise<boolean> {
+  private async validateTaskAssignmentScope(
+    creatorId: number,
+    assignedToId: number,
+  ): Promise<boolean> {
     const creator = await this.prisma.employee.findUnique({
       where: { id: creatorId },
-      include: { 
+      include: {
         role: true,
         department: true,
         teamLead: true,
-        managedDepartment: true
-      }
+        managedDepartment: true,
+      },
     });
 
     const assignee = await this.prisma.employee.findUnique({
       where: { id: assignedToId },
-      include: { 
+      include: {
         role: true,
         department: true,
-        teamLead: true
-      }
+        teamLead: true,
+      },
     });
 
     if (!creator || !assignee) {
@@ -94,13 +110,17 @@ export class ProjectTasksService {
 
     // Ensure assignee is in Production department
     if (assignee.department.name !== 'Production') {
-      throw new BadRequestException('Can only assign tasks to Production department employees');
+      throw new BadRequestException(
+        'Can only assign tasks to Production department employees',
+      );
     }
 
     // Team Lead can assign to team members only
     if (creator.role.name === 'team_lead') {
       if (assignee.teamLeadId !== creatorId) {
-        throw new BadRequestException('Team leads can only assign tasks to their team members');
+        throw new BadRequestException(
+          'Team leads can only assign tasks to their team members',
+        );
       }
     }
     // Unit Head can assign to employees in their unit
@@ -111,7 +131,9 @@ export class ProjectTasksService {
     // Department Manager can assign to any employee in their department
     else if (creator.role.name === 'dep_manager') {
       if (assignee.departmentId !== creator.departmentId) {
-        throw new BadRequestException('Department managers can only assign tasks to employees in their department');
+        throw new BadRequestException(
+          'Department managers can only assign tasks to employees in their department',
+        );
       }
     }
 
@@ -119,22 +141,30 @@ export class ProjectTasksService {
   }
 
   // Helper method to validate status transition
-  private validateStatusTransition(currentStatus: ProjectTaskStatus, newStatus: ProjectTaskStatus): boolean {
-    const validTransitions: { [key in ProjectTaskStatus]: ProjectTaskStatus[] } = {
-      'not_started': ['in_progress', 'review'],
-      'in_progress': ['review'],
-      'review': ['completed', 'cancelled'],
-      'completed': [],
-      'cancelled': []
+  private validateStatusTransition(
+    currentStatus: ProjectTaskStatus,
+    newStatus: ProjectTaskStatus,
+  ): boolean {
+    const validTransitions: {
+      [key in ProjectTaskStatus]: ProjectTaskStatus[];
+    } = {
+      not_started: ['in_progress', 'review'],
+      in_progress: ['review'],
+      review: ['completed', 'cancelled'],
+      completed: [],
+      cancelled: [],
     };
 
     return validTransitions[currentStatus]?.includes(newStatus) || false;
   }
 
   // Helper method to check if user can complete/cancel task
-  private async canCompleteOrCancelTask(user: any, task: any): Promise<boolean> {
+  private async canCompleteOrCancelTask(
+    user: any,
+    task: any,
+  ): Promise<boolean> {
     const normalizedUser = this.normalizeUser(user);
-    
+
     // Original creator can always complete/cancel
     if (task.assignedBy === normalizedUser.id) {
       return true;
@@ -143,7 +173,7 @@ export class ProjectTasksService {
     // Check hierarchy permissions
     const creator = await this.prisma.employee.findUnique({
       where: { id: task.assignedBy },
-      include: { role: true }
+      include: { role: true },
     });
 
     if (!creator) {
@@ -160,7 +190,10 @@ export class ProjectTasksService {
     }
     // Dept Manager created task -> Only Dept Manager can complete/cancel
     else if (creator.role.name === 'dep_manager') {
-      return normalizedUser.role === 'dep_manager' && normalizedUser.id === task.assignedBy;
+      return (
+        normalizedUser.role === 'dep_manager' &&
+        normalizedUser.id === task.assignedBy
+      );
     }
 
     return false;
@@ -176,13 +209,13 @@ export class ProjectTasksService {
   async createTask(projectId: number, dto: CreateProjectTaskDto, user: any) {
     try {
       const normalizedUser = this.normalizeUser(user);
-      
+
       // Validate creation permissions
       await this.validateTaskCreationPermission(normalizedUser);
 
       // Validate project exists and is active
       const project = await this.prisma.project.findUnique({
-        where: { id: projectId }
+        where: { id: projectId },
       });
 
       if (!project) {
@@ -190,7 +223,9 @@ export class ProjectTasksService {
       }
 
       if (project.status === 'completed' || project.status === 'onhold') {
-        throw new BadRequestException('Cannot create tasks for completed or on-hold projects');
+        throw new BadRequestException(
+          'Cannot create tasks for completed or on-hold projects',
+        );
       }
 
       // Validate due date is in the future
@@ -217,30 +252,30 @@ export class ProjectTasksService {
           startDate: null, // Will be set when status changes to in_progress
           dueDate: dueDate,
           completedOn: null,
-          comments: dto.comments
+          comments: dto.comments,
         },
         include: {
           project: {
             include: {
               client: true,
               salesRep: {
-                include: { role: true }
-              }
-            }
+                include: { role: true },
+              },
+            },
           },
           assigner: {
             include: {
               role: true,
-              department: true
-            }
+              department: true,
+            },
           },
           assignee: {
             include: {
               role: true,
-              department: true
-            }
-          }
-        }
+              department: true,
+            },
+          },
+        },
       });
 
       // No auto log needed for task creation - only track team assignments
@@ -248,10 +283,14 @@ export class ProjectTasksService {
       return {
         success: true,
         message: 'Task created successfully',
-        data: task
+        data: task,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException(`Failed to create task: ${error.message}`);
@@ -262,13 +301,13 @@ export class ProjectTasksService {
   async getProjectTasks(projectId: number, user: any, query: TaskQueryDto) {
     try {
       const normalizedUser = this.normalizeUser(user);
-      
+
       // Validate user is in Production department
       await this.validateProductionDepartment(normalizedUser.id);
 
       // Validate project exists
       const project = await this.prisma.project.findUnique({
-        where: { id: projectId }
+        where: { id: projectId },
       });
 
       if (!project) {
@@ -276,32 +315,32 @@ export class ProjectTasksService {
       }
 
       // Build where clause based on user role
-      let whereClause: any = { projectId };
+      const whereClause: any = { projectId };
 
       // Apply role-based filtering
       if (normalizedUser.role === 'dep_manager') {
         // Department manager can see all tasks in their department
         whereClause.assignee = {
           department: {
-            name: 'Production'
-          }
+            name: 'Production',
+          },
         };
       } else if (normalizedUser.role === 'unit_head') {
         // Unit head can see all tasks in their unit (for now, all Production tasks)
         whereClause.assignee = {
           department: {
-            name: 'Production'
-          }
+            name: 'Production',
+          },
         };
       } else if (normalizedUser.role === 'team_lead') {
         // Team lead can see tasks assigned to their team members
         const teamMembers = await this.prisma.employee.findMany({
           where: { teamLeadId: normalizedUser.id },
-          select: { id: true }
+          select: { id: true },
         });
-        
+
         whereClause.assignedTo = {
-          in: teamMembers.map(member => member.id)
+          in: teamMembers.map((member) => member.id),
         };
       } else {
         // Regular employees can only see tasks assigned to them
@@ -320,7 +359,7 @@ export class ProjectTasksService {
       }
 
       // Build order by clause
-      let orderBy: any = {};
+      const orderBy: any = {};
       if (query.sortBy === 'dueDate') {
         orderBy.dueDate = query.order || 'asc';
       } else if (query.sortBy === 'priority') {
@@ -338,36 +377,41 @@ export class ProjectTasksService {
             include: {
               client: true,
               salesRep: {
-                include: { role: true }
-              }
-            }
+                include: { role: true },
+              },
+            },
           },
           assigner: {
             include: {
               role: true,
-              department: true
-            }
+              department: true,
+            },
           },
           assignee: {
             include: {
               role: true,
-              department: true
-            }
-          }
+              department: true,
+            },
+          },
         },
-        orderBy: orderBy
+        orderBy: orderBy,
       });
 
       return {
         success: true,
         data: tasks,
-        count: tasks.length
+        count: tasks.length,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to fetch project tasks: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch project tasks: ${error.message}`,
+      );
     }
   }
 
@@ -375,37 +419,37 @@ export class ProjectTasksService {
   async getTaskById(projectId: number, taskId: number, user: any) {
     try {
       const normalizedUser = this.normalizeUser(user);
-      
+
       // Validate user is in Production department
       await this.validateProductionDepartment(normalizedUser.id);
 
       const task = await this.prisma.projectTask.findFirst({
         where: {
           id: taskId,
-          projectId: projectId
+          projectId: projectId,
         },
         include: {
           project: {
             include: {
               client: true,
               salesRep: {
-                include: { role: true }
-              }
-            }
+                include: { role: true },
+              },
+            },
           },
           assigner: {
             include: {
               role: true,
-              department: true
-            }
+              department: true,
+            },
           },
           assignee: {
             include: {
               role: true,
-              department: true
-            }
-          }
-        }
+              department: true,
+            },
+          },
+        },
       });
 
       if (!task) {
@@ -420,10 +464,13 @@ export class ProjectTasksService {
 
       return {
         success: true,
-        data: task
+        data: task,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       throw new BadRequestException(`Failed to fetch task: ${error.message}`);
@@ -431,18 +478,23 @@ export class ProjectTasksService {
   }
 
   // 4. Update Task
-  async updateTask(projectId: number, taskId: number, dto: UpdateProjectTaskDto, user: any) {
+  async updateTask(
+    projectId: number,
+    taskId: number,
+    dto: UpdateProjectTaskDto,
+    user: any,
+  ) {
     try {
       const normalizedUser = this.normalizeUser(user);
-      
+
       // Validate user is in Production department
       await this.validateProductionDepartment(normalizedUser.id);
 
       const task = await this.prisma.projectTask.findFirst({
         where: {
           id: taskId,
-          projectId: projectId
-        }
+          projectId: projectId,
+        },
       });
 
       if (!task) {
@@ -451,7 +503,9 @@ export class ProjectTasksService {
 
       // Only the original creator can update task details
       if (task.assignedBy !== normalizedUser.id) {
-        throw new ForbiddenException('Only the task creator can update task details');
+        throw new ForbiddenException(
+          'Only the task creator can update task details',
+        );
       }
 
       // Validate due date if provided
@@ -468,39 +522,43 @@ export class ProjectTasksService {
         data: {
           ...dto,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-          updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
+          updatedAt: TimeStorageUtil.getCurrentTimeForStorage(),
         },
         include: {
           project: {
             include: {
               client: true,
               salesRep: {
-                include: { role: true }
-              }
-            }
+                include: { role: true },
+              },
+            },
           },
           assigner: {
             include: {
               role: true,
-              department: true
-            }
+              department: true,
+            },
           },
           assignee: {
             include: {
               role: true,
-              department: true
-            }
-          }
-        }
+              department: true,
+            },
+          },
+        },
       });
 
       return {
         success: true,
         message: 'Task updated successfully',
-        data: updatedTask
+        data: updatedTask,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException(`Failed to update task: ${error.message}`);
@@ -508,18 +566,23 @@ export class ProjectTasksService {
   }
 
   // 5. Update Task Status
-  async updateTaskStatus(projectId: number, taskId: number, dto: UpdateTaskStatusDto, user: any) {
+  async updateTaskStatus(
+    projectId: number,
+    taskId: number,
+    dto: UpdateTaskStatusDto,
+    user: any,
+  ) {
     try {
       const normalizedUser = this.normalizeUser(user);
-      
+
       // Validate user is in Production department
       await this.validateProductionDepartment(normalizedUser.id);
 
       const task = await this.prisma.projectTask.findFirst({
         where: {
           id: taskId,
-          projectId: projectId
-        }
+          projectId: projectId,
+        },
       });
 
       if (!task) {
@@ -528,28 +591,44 @@ export class ProjectTasksService {
 
       // Validate status transition
       if (!this.validateStatusTransition(task.status, dto.status)) {
-        throw new BadRequestException(`Invalid status transition from ${task.status} to ${dto.status}`);
+        throw new BadRequestException(
+          `Invalid status transition from ${task.status} to ${dto.status}`,
+        );
       }
 
       // Check permissions based on status change
       if (dto.status === 'completed' || dto.status === 'cancelled') {
         // Only managers/leads can complete/cancel
-        if (!['dep_manager', 'unit_head', 'team_lead'].includes(normalizedUser.role)) {
-          throw new ForbiddenException('Only managers and leads can complete or cancel tasks');
+        if (
+          !['dep_manager', 'unit_head', 'team_lead'].includes(
+            normalizedUser.role,
+          )
+        ) {
+          throw new ForbiddenException(
+            'Only managers and leads can complete or cancel tasks',
+          );
         }
 
         // For cancellation, comment is required
         if (dto.status === 'cancelled' && !dto.comments) {
-          throw new BadRequestException('Comment is required when cancelling a task');
+          throw new BadRequestException(
+            'Comment is required when cancelling a task',
+          );
         }
       } else if (dto.status === 'in_progress' || dto.status === 'review') {
         // Managers/leads can update any task, regular employees can only update their assigned tasks
-        if (['dep_manager', 'unit_head', 'team_lead'].includes(normalizedUser.role)) {
+        if (
+          ['dep_manager', 'unit_head', 'team_lead'].includes(
+            normalizedUser.role,
+          )
+        ) {
           // Managers and leads can update any task status
         } else {
           // Regular employees can only update their own assigned tasks
           if (task.assignedTo !== normalizedUser.id) {
-            throw new ForbiddenException('You can only update status of tasks assigned to you');
+            throw new ForbiddenException(
+              'You can only update status of tasks assigned to you',
+            );
           }
         }
       }
@@ -557,7 +636,7 @@ export class ProjectTasksService {
       // Prepare update data
       const updateData: any = {
         status: dto.status,
-        updatedAt: TimeStorageUtil.getCurrentTimeForStorage()
+        updatedAt: TimeStorageUtil.getCurrentTimeForStorage(),
       };
 
       // Set start date when status changes to in_progress
@@ -574,7 +653,10 @@ export class ProjectTasksService {
       if (dto.comments) {
         if (dto.status === 'cancelled') {
           // Format cancellation comment
-          updateData.comments = this.formatCancellationComment(normalizedUser.id, dto.comments);
+          updateData.comments = this.formatCancellationComment(
+            normalizedUser.id,
+            dto.comments,
+          );
         } else {
           // Regular comment
           updateData.comments = dto.comments;
@@ -589,23 +671,23 @@ export class ProjectTasksService {
             include: {
               client: true,
               salesRep: {
-                include: { role: true }
-              }
-            }
+                include: { role: true },
+              },
+            },
           },
           assigner: {
             include: {
               role: true,
-              department: true
-            }
+              department: true,
+            },
           },
           assignee: {
             include: {
               role: true,
-              department: true
-            }
-          }
-        }
+              department: true,
+            },
+          },
+        },
       });
 
       // No auto log needed for status changes - only track employee assignments
@@ -613,13 +695,19 @@ export class ProjectTasksService {
       return {
         success: true,
         message: 'Task status updated successfully',
-        data: updatedTask
+        data: updatedTask,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to update task status: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update task status: ${error.message}`,
+      );
     }
   }
 
@@ -637,9 +725,9 @@ export class ProjectTasksService {
     else if (user.role === 'team_lead') {
       const teamMembers = await this.prisma.employee.findMany({
         where: { teamLeadId: user.id },
-        select: { id: true }
+        select: { id: true },
       });
-      return teamMembers.some(member => member.id === task.assignedTo);
+      return teamMembers.some((member) => member.id === task.assignedTo);
     }
     // Regular employees can only see tasks assigned to them
     else {

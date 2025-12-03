@@ -62,7 +62,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiOperation({ summary: 'Get profile of currently logged-in user' })
-  @ApiBearerAuth() 
+  @ApiBearerAuth()
   @ApiResponse({
     status: 200,
     description: 'Returns authenticated user profile',
@@ -135,11 +135,26 @@ export class AuthController {
   @Get('access-logs/export')
   @ApiOperation({ summary: 'Export access logs as CSV or JSON' })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'format', required: false, enum: ['csv', 'json'], example: 'csv' })
+  @ApiQuery({
+    name: 'format',
+    required: false,
+    enum: ['csv', 'json'],
+    example: 'csv',
+  })
   @ApiQuery({ name: 'employeeId', required: false, type: String })
   @ApiQuery({ name: 'success', required: false, type: String })
-  @ApiQuery({ name: 'startDate', required: false, type: String, example: '2025-01-01' })
-  @ApiQuery({ name: 'endDate', required: false, type: String, example: '2025-01-31' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    example: '2025-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    example: '2025-01-31',
+  })
   async exportAccessLogs(
     @Res() res: Response,
     @Query('format') format: string = 'csv',
@@ -159,11 +174,17 @@ export class AuthController {
 
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
       res.send(this.authService.convertToCSV(data));
     } else if (format === 'json') {
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
       res.json(data);
     } else {
       res.status(400).json({ message: 'Unsupported format. Use csv or json.' });

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateComplaintDto } from './dto/create-complaint.dto';
 import { ComplaintHrActionDto } from './dto/hr-action.dto';
@@ -7,7 +13,7 @@ import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
 @Injectable()
 export class ComplaintsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async getAllComplaints() {
     try {
@@ -64,12 +70,18 @@ export class ComplaintsService {
       return complaints;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to retrieve complaints: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to retrieve complaints: ${error.message}`,
+      );
     }
   }
 
@@ -124,7 +136,9 @@ export class ComplaintsService {
       });
 
       if (!complaint) {
-        throw new NotFoundException(`Complaint with ID ${id} not found. Please check the ID and try again.`);
+        throw new NotFoundException(
+          `Complaint with ID ${id} not found. Please check the ID and try again.`,
+        );
       }
 
       return complaint;
@@ -133,12 +147,18 @@ export class ComplaintsService {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to retrieve complaint with ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to retrieve complaint with ID ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -198,12 +218,18 @@ export class ComplaintsService {
       return complaints;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to retrieve complaints by priority ${priority}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to retrieve complaints by priority ${priority}: ${error.message}`,
+      );
     }
   }
 
@@ -263,12 +289,18 @@ export class ComplaintsService {
       return complaints;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to retrieve complaints by status ${status}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to retrieve complaints by status ${status}: ${error.message}`,
+      );
     }
   }
 
@@ -283,7 +315,9 @@ export class ComplaintsService {
       });
 
       if (!raisedByEmployee) {
-        throw new NotFoundException(`Employee with ID ${createComplaintDto.raisedBy} not found. Please check the employee ID and try again.`);
+        throw new NotFoundException(
+          `Employee with ID ${createComplaintDto.raisedBy} not found. Please check the employee ID and try again.`,
+        );
       }
 
       // Validate against employee if provided
@@ -293,7 +327,9 @@ export class ComplaintsService {
         });
 
         if (!againstEmployee) {
-          throw new NotFoundException(`Against employee with ID ${createComplaintDto.againstEmployeeId} not found. Please check the employee ID and try again.`);
+          throw new NotFoundException(
+            `Against employee with ID ${createComplaintDto.againstEmployeeId} not found. Please check the employee ID and try again.`,
+          );
         }
       }
 
@@ -304,7 +340,9 @@ export class ComplaintsService {
         });
 
         if (!department) {
-          throw new NotFoundException(`Department with ID ${createComplaintDto.departmentId} not found. Please check the department ID and try again.`);
+          throw new NotFoundException(
+            `Department with ID ${createComplaintDto.departmentId} not found. Please check the department ID and try again.`,
+          );
         }
       }
 
@@ -315,7 +353,9 @@ export class ComplaintsService {
         });
 
         if (!assignedToEmployee) {
-          throw new NotFoundException(`Assigned to employee with ID ${createComplaintDto.assignedTo} not found. Please check the employee ID and try again.`);
+          throw new NotFoundException(
+            `Assigned to employee with ID ${createComplaintDto.assignedTo} not found. Please check the employee ID and try again.`,
+          );
         }
       }
 
@@ -383,7 +423,9 @@ export class ComplaintsService {
           data: {
             hrId: raisedByEmployee.hr.id,
             actionType: 'COMPLAINT_CREATE',
-            affectedEmployeeId: createComplaintDto.againstEmployeeId || createComplaintDto.raisedBy,
+            affectedEmployeeId:
+              createComplaintDto.againstEmployeeId ||
+              createComplaintDto.raisedBy,
             description: `Created Complaint #${complaint.id} (Subject: "${complaint.subject}", Type: ${complaint.complaintType || 'Not specified'}, Priority: ${complaint.priority})`,
           },
         });
@@ -398,23 +440,35 @@ export class ComplaintsService {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to create complaint: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to create complaint: ${error.message}`,
+      );
     }
   }
 
-  private async validateAndUpdateComplaint(id: number, hrActionDto: ComplaintHrActionDto, hrEmployeeId: number) {
+  private async validateAndUpdateComplaint(
+    id: number,
+    hrActionDto: ComplaintHrActionDto,
+    hrEmployeeId: number,
+  ) {
     // Validate if complaint exists
     const existingComplaint = await this.prisma.complaint.findUnique({
       where: { id },
     });
 
     if (!existingComplaint) {
-      throw new NotFoundException(`Complaint with ID ${id} not found. Please check the ID and try again.`);
+      throw new NotFoundException(
+        `Complaint with ID ${id} not found. Please check the ID and try again.`,
+      );
     }
 
     // Validate if HR employee exists and is HR
@@ -427,11 +481,15 @@ export class ComplaintsService {
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR employee with ID ${hrEmployeeId} not found.`);
+      throw new NotFoundException(
+        `HR employee with ID ${hrEmployeeId} not found.`,
+      );
     }
 
     if (!hrEmployee.hr) {
-      throw new ForbiddenException(`Employee with ID ${hrEmployeeId} is not registered as HR personnel.`);
+      throw new ForbiddenException(
+        `Employee with ID ${hrEmployeeId} is not registered as HR personnel.`,
+      );
     }
 
     const {
@@ -443,7 +501,7 @@ export class ComplaintsService {
       subject,
       description,
       departmentId,
-      againstEmployeeId
+      againstEmployeeId,
     } = hrActionDto;
 
     // Validate assignedTo if provided
@@ -453,7 +511,9 @@ export class ComplaintsService {
       });
 
       if (!assignedEmployee) {
-        throw new NotFoundException(`Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`);
+        throw new NotFoundException(
+          `Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`,
+        );
       }
     }
 
@@ -464,7 +524,9 @@ export class ComplaintsService {
       });
 
       if (!againstEmployee) {
-        throw new NotFoundException(`Against employee with ID ${againstEmployeeId} not found. Please check the employee ID and try again.`);
+        throw new NotFoundException(
+          `Against employee with ID ${againstEmployeeId} not found. Please check the employee ID and try again.`,
+        );
       }
     }
 
@@ -475,7 +537,9 @@ export class ComplaintsService {
       });
 
       if (!department) {
-        throw new NotFoundException(`Department with ID ${departmentId} not found. Please check the department ID and try again.`);
+        throw new NotFoundException(
+          `Department with ID ${departmentId} not found. Please check the department ID and try again.`,
+        );
       }
     }
 
@@ -494,19 +558,27 @@ export class ComplaintsService {
     }
     if (resolutionNotes !== undefined) {
       updateData.resolutionNotes = resolutionNotes;
-      changes.push(`Resolution Notes: ${existingComplaint.resolutionNotes || 'None'} → ${resolutionNotes}`);
+      changes.push(
+        `Resolution Notes: ${existingComplaint.resolutionNotes || 'None'} → ${resolutionNotes}`,
+      );
     }
     if (assignedTo !== undefined) {
       updateData.assignedTo = assignedTo;
-      changes.push(`Assigned To: ${existingComplaint.assignedTo || 'None'} → ${assignedTo}`);
+      changes.push(
+        `Assigned To: ${existingComplaint.assignedTo || 'None'} → ${assignedTo}`,
+      );
     }
     if (priority !== undefined) {
       updateData.priority = priority;
-      changes.push(`Priority: ${existingComplaint.priority || 'None'} → ${priority}`);
+      changes.push(
+        `Priority: ${existingComplaint.priority || 'None'} → ${priority}`,
+      );
     }
     if (complaintType !== undefined) {
       updateData.complaintType = complaintType;
-      changes.push(`Complaint Type: ${existingComplaint.complaintType || 'None'} → ${complaintType}`);
+      changes.push(
+        `Complaint Type: ${existingComplaint.complaintType || 'None'} → ${complaintType}`,
+      );
     }
     if (subject !== undefined) {
       updateData.subject = subject;
@@ -514,21 +586,29 @@ export class ComplaintsService {
     }
     if (description !== undefined) {
       updateData.description = description;
-      changes.push(`Description: ${existingComplaint.description} → ${description}`);
+      changes.push(
+        `Description: ${existingComplaint.description} → ${description}`,
+      );
     }
     if (departmentId !== undefined) {
       updateData.departmentId = departmentId;
-      changes.push(`Department: ${existingComplaint.departmentId || 'None'} → ${departmentId}`);
+      changes.push(
+        `Department: ${existingComplaint.departmentId || 'None'} → ${departmentId}`,
+      );
     }
     if (againstEmployeeId !== undefined) {
       updateData.againstEmployeeId = againstEmployeeId;
-      changes.push(`Against Employee: ${existingComplaint.againstEmployeeId || 'None'} → ${againstEmployeeId}`);
+      changes.push(
+        `Against Employee: ${existingComplaint.againstEmployeeId || 'None'} → ${againstEmployeeId}`,
+      );
     }
 
     // Set resolutionDate if status is being updated to Resolved
     if (status === ComplaintStatus.Resolved) {
       updateData.resolutionDate = new Date();
-      changes.push(`Resolution Date: ${existingComplaint.resolutionDate || 'None'} → ${new Date().toISOString()}`);
+      changes.push(
+        `Resolution Date: ${existingComplaint.resolutionDate || 'None'} → ${new Date().toISOString()}`,
+      );
     }
 
     // Update the complaint
@@ -596,25 +676,42 @@ export class ComplaintsService {
     return updatedComplaint;
   }
 
-  async updateComplaintAction(id: number, hrActionDto: ComplaintHrActionDto, hrEmployeeId: number) {
+  async updateComplaintAction(
+    id: number,
+    hrActionDto: ComplaintHrActionDto,
+    hrEmployeeId: number,
+  ) {
     try {
-      const updatedComplaint = await this.validateAndUpdateComplaint(id, hrActionDto, hrEmployeeId);
+      const updatedComplaint = await this.validateAndUpdateComplaint(
+        id,
+        hrActionDto,
+        hrEmployeeId,
+      );
 
       return {
         message: 'Complaint action updated successfully',
         data: updatedComplaint,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to update complaint action for ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to update complaint action for ID ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -635,7 +732,9 @@ export class ComplaintsService {
       });
 
       if (!existingComplaint) {
-        throw new NotFoundException(`Complaint with ID ${id} not found. Please check the ID and try again.`);
+        throw new NotFoundException(
+          `Complaint with ID ${id} not found. Please check the ID and try again.`,
+        );
       }
 
       // Validate if employee exists
@@ -649,20 +748,27 @@ export class ComplaintsService {
       });
 
       if (!employee) {
-        throw new NotFoundException(`Employee with ID ${hrEmployeeId} not found.`);
+        throw new NotFoundException(
+          `Employee with ID ${hrEmployeeId} not found.`,
+        );
       }
 
       // Check if employee is department manager HR or admin
-      const isDeptManagerHr = employee.role.name === 'dep_manager' && employee.hr;
+      const isDeptManagerHr =
+        employee.role.name === 'dep_manager' && employee.hr;
       const isAdmin = employee.department.name === 'Admin';
 
       if (!isDeptManagerHr && !isAdmin) {
-        throw new ForbiddenException(`Employee with ID ${hrEmployeeId} is not authorized to delete complaints. Only department manager HR and admin can perform this action.`);
+        throw new ForbiddenException(
+          `Employee with ID ${hrEmployeeId} is not authorized to delete complaints. Only department manager HR and admin can perform this action.`,
+        );
       }
 
       // For HR employees, ensure they are registered in HR table
       if (isDeptManagerHr && !employee.hr) {
-        throw new ForbiddenException(`Employee with ID ${hrEmployeeId} is not registered as HR personnel.`);
+        throw new ForbiddenException(
+          `Employee with ID ${hrEmployeeId} is not registered as HR personnel.`,
+        );
       }
 
       // Log the deletion before deleting
@@ -685,16 +791,25 @@ export class ComplaintsService {
         data: { id },
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to delete complaint with ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to delete complaint with ID ${id}: ${error.message}`,
+      );
     }
   }
 }

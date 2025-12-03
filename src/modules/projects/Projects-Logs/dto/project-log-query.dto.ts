@@ -1,4 +1,10 @@
-import { IsOptional, IsNumber, IsString, IsIn, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsNumber,
+  IsString,
+  IsIn,
+  IsDateString,
+} from 'class-validator';
 
 export class ProjectLogQueryDto {
   @IsOptional()
@@ -19,7 +25,9 @@ export class ProjectLogQueryDto {
 
   @IsOptional()
   @IsString({ message: 'Sort by must be a string' })
-  @IsIn(['createdAt', 'updatedAt'], { message: 'Sort by must be createdAt or updatedAt' })
+  @IsIn(['createdAt', 'updatedAt'], {
+    message: 'Sort by must be createdAt or updatedAt',
+  })
   sortBy?: string;
 
   @IsOptional()

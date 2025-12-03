@@ -1,25 +1,32 @@
-import { IsString, IsNumber, IsPositive, IsDateString, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsPositive,
+  IsDateString,
+  IsOptional,
+  IsEnum,
+} from 'class-validator';
 import { PaymentMethod, ProcessedByRole } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateExpenseDto {
   @ApiProperty({
     description: 'Title of the expense',
-    example: 'Office Stationery Purchase'
+    example: 'Office Stationery Purchase',
   })
   @IsString()
   title: string;
 
   @ApiProperty({
     description: 'Category of the expense',
-    example: 'Office Supplies'
+    example: 'Office Supplies',
   })
   @IsString()
   category: string;
 
   @ApiProperty({
     description: 'Amount of the expense',
-    example: 2500.75
+    example: 2500.75,
   })
   @IsNumber()
   @IsPositive()
@@ -27,7 +34,7 @@ export class CreateExpenseDto {
 
   @ApiPropertyOptional({
     description: 'Date when the expense was paid (ISO 8601 format)',
-    example: '2025-10-14T10:30:00Z'
+    example: '2025-10-14T10:30:00Z',
   })
   @IsOptional()
   @IsDateString()
@@ -35,7 +42,7 @@ export class CreateExpenseDto {
 
   @ApiPropertyOptional({
     description: 'Additional notes regarding the expense',
-    example: 'Purchased stationery for HR department'
+    example: 'Purchased stationery for HR department',
   })
   @IsOptional()
   @IsString()
@@ -44,7 +51,7 @@ export class CreateExpenseDto {
   @ApiPropertyOptional({
     description: 'Payment method used for the expense',
     enum: PaymentMethod,
-    example: PaymentMethod.cash
+    example: PaymentMethod.cash,
   })
   @IsOptional()
   @IsEnum(PaymentMethod)
@@ -53,7 +60,7 @@ export class CreateExpenseDto {
   @ApiPropertyOptional({
     description: 'Role of the person who processed the expense',
     enum: ProcessedByRole,
-    example: ProcessedByRole.Admin
+    example: ProcessedByRole.Admin,
   })
   @IsOptional()
   @IsEnum(ProcessedByRole)
@@ -61,10 +68,10 @@ export class CreateExpenseDto {
 
   @ApiPropertyOptional({
     description: 'ID of the vendor associated with the expense',
-    example: 12
+    example: 12,
   })
   @IsOptional()
   @IsNumber()
   @IsPositive()
   vendorId?: number;
-} 
+}

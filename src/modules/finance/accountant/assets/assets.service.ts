@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
-import { Prisma, TransactionType, TransactionStatus, PaymentWays } from '@prisma/client';
+import {
+  Prisma,
+  TransactionType,
+  TransactionStatus,
+  PaymentWays,
+} from '@prisma/client';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import {
@@ -9,7 +14,7 @@ import {
   AssetCreateResponseDto,
   AssetUpdateResponseDto,
   AssetSingleResponseDto,
-  AssetErrorResponseDto
+  AssetErrorResponseDto,
 } from './dto/asset-response.dto';
 
 @Injectable()
@@ -22,7 +27,9 @@ export class AssetsService {
    * Helper method to get current date in PKT timezone
    */
   private getCurrentDateInPKT(): Date {
-    return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Karachi"}));
+    return new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+    );
   }
 
   // ==================== ASSET MANAGEMENT METHODS ====================
@@ -32,7 +39,7 @@ export class AssetsService {
    */
   async createAsset(
     dto: CreateAssetDto,
-    currentUserId: number
+    currentUserId: number,
   ): Promise<AssetCreateResponseDto | AssetErrorResponseDto> {
     try {
       // Validate vendor exists
@@ -43,19 +50,21 @@ export class AssetsService {
         return {
           status: 'error',
           message: 'Vendor not found',
-          error_code: 'VENDOR_NOT_FOUND'
+          error_code: 'VENDOR_NOT_FOUND',
         };
       }
 
       // Use Prisma transaction to ensure data consistency
       const result = await this.prisma.$transaction(async (prisma) => {
         const currentDate = this.getCurrentDateInPKT();
-        const purchaseDate = dto.purchaseDate ? new Date(dto.purchaseDate) : currentDate;
+        const purchaseDate = dto.purchaseDate
+          ? new Date(dto.purchaseDate)
+          : currentDate;
 
         // 1. Create transaction record first
         // Get the next available ID (largest ID + 1)
         const maxTransactionId = await prisma.transaction.aggregate({
-          _max: { id: true }
+          _max: { id: true },
         });
         const nextTransactionId = (maxTransactionId._max.id || 0) + 1;
 
@@ -76,7 +85,7 @@ export class AssetsService {
         // 2. Create asset record
         // Get the next available ID (largest ID + 1)
         const maxAssetId = await prisma.asset.aggregate({
-          _max: { id: true }
+          _max: { id: true },
         });
         const nextAssetId = (maxAssetId._max.id || 0) + 1;
 
@@ -122,11 +131,8 @@ export class AssetsService {
           transaction: this.mapTransactionToResponse(result.transaction),
         },
       };
-
     } catch (error) {
-      this.logger.error(
-        `Failed to create asset: ${error.message}`,
-      );
+      this.logger.error(`Failed to create asset: ${error.message}`);
 
       return {
         status: 'error',
@@ -150,7 +156,7 @@ export class AssetsService {
       minCurrentValue?: number;
       maxCurrentValue?: number;
     },
-    query?: any
+    query?: any,
   ): Promise<AssetListResponseDto | AssetErrorResponseDto> {
     try {
       const whereClause: any = {};
@@ -179,10 +185,14 @@ export class AssetsService {
       if (filters.minPurchaseValue || filters.maxPurchaseValue) {
         whereClause.purchaseValue = {};
         if (filters.minPurchaseValue) {
-          whereClause.purchaseValue.gte = new Prisma.Decimal(filters.minPurchaseValue);
+          whereClause.purchaseValue.gte = new Prisma.Decimal(
+            filters.minPurchaseValue,
+          );
         }
         if (filters.maxPurchaseValue) {
-          whereClause.purchaseValue.lte = new Prisma.Decimal(filters.maxPurchaseValue);
+          whereClause.purchaseValue.lte = new Prisma.Decimal(
+            filters.maxPurchaseValue,
+          );
         }
       }
 
@@ -190,10 +200,14 @@ export class AssetsService {
       if (filters.minCurrentValue || filters.maxCurrentValue) {
         whereClause.currentValue = {};
         if (filters.minCurrentValue) {
-          whereClause.currentValue.gte = new Prisma.Decimal(filters.minCurrentValue);
+          whereClause.currentValue.gte = new Prisma.Decimal(
+            filters.minCurrentValue,
+          );
         }
         if (filters.maxCurrentValue) {
-          whereClause.currentValue.lte = new Prisma.Decimal(filters.maxCurrentValue);
+          whereClause.currentValue.lte = new Prisma.Decimal(
+            filters.maxCurrentValue,
+          );
         }
       }
 
@@ -202,7 +216,11 @@ export class AssetsService {
         whereClause.OR = [
           { title: { contains: query.search, mode: 'insensitive' } },
           { category: { contains: query.search, mode: 'insensitive' } },
-          { transaction: { vendor: { name: { contains: query.search, mode: 'insensitive' } } } }
+          {
+            transaction: {
+              vendor: { name: { contains: query.search, mode: 'insensitive' } },
+            },
+          },
         ];
       }
 
@@ -232,26 +250,23 @@ export class AssetsService {
           skip,
           take: limit,
         }),
-        this.prisma.asset.count({ where: whereClause })
+        this.prisma.asset.count({ where: whereClause }),
       ]);
 
       return {
         status: 'success',
         message: 'Assets retrieved successfully',
-        data: assets.map(asset => this.mapAssetToResponse(asset)),
+        data: assets.map((asset) => this.mapAssetToResponse(asset)),
         pagination: {
           page,
           limit,
           total,
           totalPages: Math.ceil(total / limit),
-          retrieved: assets.length
-        }
+          retrieved: assets.length,
+        },
       };
-
     } catch (error) {
-      this.logger.error(
-        `Failed to get assets: ${error.message}`,
-      );
+      this.logger.error(`Failed to get assets: ${error.message}`);
 
       return {
         status: 'error',
@@ -264,7 +279,9 @@ export class AssetsService {
   /**
    * Gets a single asset by ID
    */
-  async getAssetById(id: number): Promise<AssetSingleResponseDto | AssetErrorResponseDto> {
+  async getAssetById(
+    id: number,
+  ): Promise<AssetSingleResponseDto | AssetErrorResponseDto> {
     try {
       const asset = await this.prisma.asset.findUnique({
         where: { id },
@@ -288,7 +305,7 @@ export class AssetsService {
         return {
           status: 'error',
           message: 'Asset not found',
-          error_code: 'ASSET_NOT_FOUND'
+          error_code: 'ASSET_NOT_FOUND',
         };
       }
 
@@ -297,11 +314,8 @@ export class AssetsService {
         message: 'Asset retrieved successfully',
         data: this.mapAssetToResponse(asset),
       };
-
     } catch (error) {
-      this.logger.error(
-        `Failed to get asset ${id}: ${error.message}`,
-      );
+      this.logger.error(`Failed to get asset ${id}: ${error.message}`);
 
       return {
         status: 'error',
@@ -316,19 +330,19 @@ export class AssetsService {
    */
   async updateAsset(
     dto: UpdateAssetDto,
-    currentUserId: number
+    currentUserId: number,
   ): Promise<AssetUpdateResponseDto | AssetErrorResponseDto> {
     const { asset_id, ...updateData } = dto;
-    
+
     // Validate that ID exists
     if (!asset_id) {
       return {
         status: 'error',
         message: 'Asset ID is required',
-        error_code: 'MISSING_ASSET_ID'
+        error_code: 'MISSING_ASSET_ID',
       };
     }
-    
+
     try {
       // 1. Check if asset exists
       const existingAsset = await this.prisma.asset.findUnique({
@@ -342,7 +356,7 @@ export class AssetsService {
         return {
           status: 'error',
           message: 'Asset not found',
-          error_code: 'ASSET_NOT_FOUND'
+          error_code: 'ASSET_NOT_FOUND',
         };
       }
 
@@ -355,7 +369,7 @@ export class AssetsService {
           return {
             status: 'error',
             message: 'Vendor not found',
-            error_code: 'VENDOR_NOT_FOUND'
+            error_code: 'VENDOR_NOT_FOUND',
           };
         }
       }
@@ -367,11 +381,20 @@ export class AssetsService {
         };
 
         // Update asset fields
-        if (updateData.title !== undefined) assetUpdateData.title = updateData.title;
-        if (updateData.category !== undefined) assetUpdateData.category = updateData.category;
-        if (updateData.purchaseDate !== undefined) assetUpdateData.purchaseDate = new Date(updateData.purchaseDate);
-        if (updateData.purchaseValue !== undefined) assetUpdateData.purchaseValue = new Prisma.Decimal(updateData.purchaseValue);
-        if (updateData.currentValue !== undefined) assetUpdateData.currentValue = new Prisma.Decimal(updateData.currentValue);
+        if (updateData.title !== undefined)
+          assetUpdateData.title = updateData.title;
+        if (updateData.category !== undefined)
+          assetUpdateData.category = updateData.category;
+        if (updateData.purchaseDate !== undefined)
+          assetUpdateData.purchaseDate = new Date(updateData.purchaseDate);
+        if (updateData.purchaseValue !== undefined)
+          assetUpdateData.purchaseValue = new Prisma.Decimal(
+            updateData.purchaseValue,
+          );
+        if (updateData.currentValue !== undefined)
+          assetUpdateData.currentValue = new Prisma.Decimal(
+            updateData.currentValue,
+          );
 
         // Update asset
         const updatedAsset = await prisma.asset.update({
@@ -395,7 +418,10 @@ export class AssetsService {
 
         // Update transaction if purchaseValue changed
         let updatedTransaction: any = null;
-        if (updateData.purchaseValue !== undefined && updateData.purchaseValue !== Number(existingAsset.purchaseValue)) {
+        if (
+          updateData.purchaseValue !== undefined &&
+          updateData.purchaseValue !== Number(existingAsset.purchaseValue)
+        ) {
           updatedTransaction = await prisma.transaction.update({
             where: { id: existingAsset.transactionId },
             data: {
@@ -407,7 +433,10 @@ export class AssetsService {
         }
 
         // Update transaction vendor if vendorId changed
-        if (updateData.vendorId !== undefined && updateData.vendorId !== existingAsset.transaction.vendorId) {
+        if (
+          updateData.vendorId !== undefined &&
+          updateData.vendorId !== existingAsset.transaction.vendorId
+        ) {
           updatedTransaction = await prisma.transaction.update({
             where: { id: existingAsset.transactionId },
             data: {
@@ -421,23 +450,20 @@ export class AssetsService {
         return { asset: updatedAsset, transaction: updatedTransaction };
       });
 
-      this.logger.log(
-        `Asset updated: ${asset_id} by user ${currentUserId}`,
-      );
+      this.logger.log(`Asset updated: ${asset_id} by user ${currentUserId}`);
 
       return {
         status: 'success',
         message: 'Asset updated successfully',
         data: {
           asset: this.mapAssetToResponse(result.asset),
-          transaction: result.transaction ? this.mapTransactionToResponse(result.transaction) : undefined,
+          transaction: result.transaction
+            ? this.mapTransactionToResponse(result.transaction)
+            : undefined,
         },
       };
-
     } catch (error) {
-      this.logger.error(
-        `Failed to update asset ${asset_id}: ${error.message}`,
-      );
+      this.logger.error(`Failed to update asset ${asset_id}: ${error.message}`);
 
       return {
         status: 'error',
@@ -533,7 +559,11 @@ export class AssetsService {
   async getAssetStats(): Promise<any> {
     try {
       const currentDate = this.getCurrentDateInPKT();
-      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const firstDayOfMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      );
 
       // Get all assets
       const allAssets = await this.prisma.asset.findMany({});
@@ -542,42 +572,66 @@ export class AssetsService {
       const totalAssets = allAssets.length;
 
       // Total purchase value and current value
-      const totalPurchaseValue = allAssets.reduce((sum, asset) => sum + Number(asset.purchaseValue), 0);
-      const totalCurrentValue = allAssets.reduce((sum, asset) => sum + Number(asset.currentValue), 0);
+      const totalPurchaseValue = allAssets.reduce(
+        (sum, asset) => sum + Number(asset.purchaseValue),
+        0,
+      );
+      const totalCurrentValue = allAssets.reduce(
+        (sum, asset) => sum + Number(asset.currentValue),
+        0,
+      );
 
       // Total depreciation
       const totalDepreciation = totalPurchaseValue - totalCurrentValue;
 
       // Average depreciation rate
-      const averageDepreciationRate = totalPurchaseValue > 0 
-        ? ((totalDepreciation / totalPurchaseValue) * 100) 
-        : 0;
+      const averageDepreciationRate =
+        totalPurchaseValue > 0
+          ? (totalDepreciation / totalPurchaseValue) * 100
+          : 0;
 
       // Breakdown by category
-      const categoryBreakdown: Record<string, { count: number; totalPurchaseValue: number; totalCurrentValue: number }> = {};
+      const categoryBreakdown: Record<
+        string,
+        { count: number; totalPurchaseValue: number; totalCurrentValue: number }
+      > = {};
       allAssets.forEach((asset) => {
         const category = asset.category || 'Uncategorized';
         if (!categoryBreakdown[category]) {
-          categoryBreakdown[category] = { count: 0, totalPurchaseValue: 0, totalCurrentValue: 0 };
+          categoryBreakdown[category] = {
+            count: 0,
+            totalPurchaseValue: 0,
+            totalCurrentValue: 0,
+          };
         }
         categoryBreakdown[category].count++;
-        categoryBreakdown[category].totalPurchaseValue += Number(asset.purchaseValue);
-        categoryBreakdown[category].totalCurrentValue += Number(asset.currentValue);
+        categoryBreakdown[category].totalPurchaseValue += Number(
+          asset.purchaseValue,
+        );
+        categoryBreakdown[category].totalCurrentValue += Number(
+          asset.currentValue,
+        );
       });
 
       // This month's stats
       const thisMonthAssets = allAssets.filter(
-        (asset) => asset.createdAt >= firstDayOfMonth
+        (asset) => asset.createdAt >= firstDayOfMonth,
       );
       const thisMonthCount = thisMonthAssets.length;
-      const thisMonthValue = thisMonthAssets.reduce((sum, asset) => sum + Number(asset.purchaseValue), 0);
+      const thisMonthValue = thisMonthAssets.reduce(
+        (sum, asset) => sum + Number(asset.purchaseValue),
+        0,
+      );
 
       // Assets with significant depreciation (more than 50% depreciation)
       const assetsNeedingAttention = allAssets
         .filter((asset) => {
-          const depreciationRate = Number(asset.purchaseValue) > 0 
-            ? ((Number(asset.purchaseValue) - Number(asset.currentValue)) / Number(asset.purchaseValue)) * 100
-            : 0;
+          const depreciationRate =
+            Number(asset.purchaseValue) > 0
+              ? ((Number(asset.purchaseValue) - Number(asset.currentValue)) /
+                  Number(asset.purchaseValue)) *
+                100
+              : 0;
           return depreciationRate > 50;
         })
         .map((asset) => ({
@@ -586,7 +640,13 @@ export class AssetsService {
           category: asset.category,
           purchaseValue: Number(asset.purchaseValue),
           currentValue: Number(asset.currentValue),
-          depreciationRate: Math.round(((Number(asset.purchaseValue) - Number(asset.currentValue)) / Number(asset.purchaseValue)) * 100 * 100) / 100,
+          depreciationRate:
+            Math.round(
+              ((Number(asset.purchaseValue) - Number(asset.currentValue)) /
+                Number(asset.purchaseValue)) *
+                100 *
+                100,
+            ) / 100,
         }))
         .slice(0, 5);
 
@@ -598,7 +658,8 @@ export class AssetsService {
           totalPurchaseValue: Math.round(totalPurchaseValue * 100) / 100,
           totalCurrentValue: Math.round(totalCurrentValue * 100) / 100,
           totalDepreciation: Math.round(totalDepreciation * 100) / 100,
-          averageDepreciationRate: Math.round(averageDepreciationRate * 100) / 100,
+          averageDepreciationRate:
+            Math.round(averageDepreciationRate * 100) / 100,
           byCategory: categoryBreakdown,
           thisMonth: {
             count: thisMonthCount,

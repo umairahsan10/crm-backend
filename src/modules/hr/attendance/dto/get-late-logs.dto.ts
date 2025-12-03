@@ -27,4 +27,4 @@ export class GetLateLogsDto {
   @IsOptional()
   @IsDateString()
   end_date?: string;
-} 
+}

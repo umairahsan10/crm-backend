@@ -1,5 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsDateString, IsBoolean, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsDateString,
+  IsBoolean,
+  IsEnum,
+} from 'class-validator';
 import { MeetingStatus } from '@prisma/client';
 
 export class UpdateMeetingDto {
@@ -28,7 +35,8 @@ export class UpdateMeetingDto {
   topic?: string;
 
   @ApiPropertyOptional({
-    description: 'Updated scheduled date and time for the meeting (ISO 8601 format)',
+    description:
+      'Updated scheduled date and time for the meeting (ISO 8601 format)',
     example: '2025-10-22T14:30:00Z',
   })
   @IsOptional()
@@ -45,7 +53,8 @@ export class UpdateMeetingDto {
   status?: MeetingStatus;
 
   @ApiPropertyOptional({
-    description: 'Indicates whether automatic reminders should be enabled or disabled',
+    description:
+      'Indicates whether automatic reminders should be enabled or disabled',
     example: false,
   })
   @IsOptional()

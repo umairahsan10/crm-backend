@@ -9,4 +9,4 @@ import { PrismaService } from '../../../../prisma/prisma.service';
   providers: [ProductionService],
   exports: [ProductionService],
 })
-export class ProductionModule {} 
+export class ProductionModule {}

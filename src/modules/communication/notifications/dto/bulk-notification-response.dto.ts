@@ -25,7 +25,9 @@ export class BulkNotificationResponseDto {
   @ApiProperty({ description: 'Timestamp when the notification was sent' })
   sentAt: Date;
 
-  @ApiProperty({ description: 'Number of recipients who received this notification' })
+  @ApiProperty({
+    description: 'Number of recipients who received this notification',
+  })
   recipientCount: number;
 
   @ApiProperty({ description: 'ID of the employee who sent the notification' })

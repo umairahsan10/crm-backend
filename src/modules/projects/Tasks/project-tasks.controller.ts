@@ -1,17 +1,17 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
   Patch,
-  Param, 
-  Body, 
-  Query, 
-  UseGuards, 
+  Param,
+  Body,
+  Query,
+  UseGuards,
   Request,
   ParseIntPipe,
   HttpCode,
-  HttpStatus
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectTasksService } from './project-tasks.service';
@@ -41,7 +41,7 @@ export class ProjectTasksController {
   async createTask(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Body() dto: CreateProjectTaskDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectTasksService.createTask(projectId, dto, req.user);
   }
@@ -53,7 +53,7 @@ export class ProjectTasksController {
   async getProjectTasks(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Request() req,
-    @Query() query: TaskQueryDto
+    @Query() query: TaskQueryDto,
   ) {
     return this.projectTasksService.getProjectTasks(projectId, req.user, query);
   }
@@ -65,7 +65,7 @@ export class ProjectTasksController {
   async getTaskById(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
-    @Request() req
+    @Request() req,
   ) {
     return this.projectTasksService.getTaskById(projectId, taskId, req.user);
   }
@@ -78,9 +78,14 @@ export class ProjectTasksController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
     @Body() dto: UpdateProjectTaskDto,
-    @Request() req
+    @Request() req,
   ) {
-    return this.projectTasksService.updateTask(projectId, taskId, dto, req.user);
+    return this.projectTasksService.updateTask(
+      projectId,
+      taskId,
+      dto,
+      req.user,
+    );
   }
 
   // 5. Update Task Status
@@ -91,8 +96,13 @@ export class ProjectTasksController {
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('taskId', ParseIntPipe) taskId: number,
     @Body() dto: UpdateTaskStatusDto,
-    @Request() req
+    @Request() req,
   ) {
-    return this.projectTasksService.updateTaskStatus(projectId, taskId, dto, req.user);
+    return this.projectTasksService.updateTaskStatus(
+      projectId,
+      taskId,
+      dto,
+      req.user,
+    );
   }
 }

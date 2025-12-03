@@ -13,6 +13,9 @@ export class PaginationDto {
   @ApiProperty({ example: 5, description: 'Total number of pages' })
   totalPages: number;
 
-  @ApiProperty({ example: 10, description: 'Number of records retrieved on current page' })
+  @ApiProperty({
+    example: 10,
+    description: 'Number of records retrieved on current page',
+  })
   retrieved: number;
 }

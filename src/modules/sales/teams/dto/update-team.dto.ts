@@ -1,12 +1,18 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, MinLength, MaxLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateSalesTeamDto {
   @ApiPropertyOptional({
     description: 'Updated team name',
     example: 'Enhanced Sales Team A',
     minLength: 2,
-    maxLength: 100
+    maxLength: 100,
   })
   @IsOptional()
   @IsString()
@@ -16,7 +22,7 @@ export class UpdateSalesTeamDto {
 
   @ApiPropertyOptional({
     description: 'New team lead ID',
-    example: 456
+    example: 456,
   })
   @IsOptional()
   @IsNumber()
@@ -24,7 +30,7 @@ export class UpdateSalesTeamDto {
 
   @ApiPropertyOptional({
     description: 'Sales unit ID to assign the team to',
-    example: 2
+    example: 2,
   })
   @IsOptional()
   @IsNumber()

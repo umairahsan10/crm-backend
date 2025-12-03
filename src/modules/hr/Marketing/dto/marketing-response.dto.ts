@@ -4,34 +4,58 @@ export class MarketingRecordResponseDto {
   @ApiProperty({ description: 'Marketing record ID', example: 1 })
   id: number;
 
-  @ApiProperty({ description: 'Employee ID associated with this record', example: 101 })
+  @ApiProperty({
+    description: 'Employee ID associated with this record',
+    example: 101,
+  })
   employeeId: number;
 
-  @ApiProperty({ description: 'Marketing unit ID', example: 5, required: false, nullable: true })
+  @ApiProperty({
+    description: 'Marketing unit ID',
+    example: 5,
+    required: false,
+    nullable: true,
+  })
   marketingUnitId?: number | null;
 
-  @ApiProperty({ description: 'Total campaigns run', example: 12, required: false, nullable: true })
+  @ApiProperty({
+    description: 'Total campaigns run',
+    example: 12,
+    required: false,
+    nullable: true,
+  })
   totalCampaignsRun?: number | null;
 
-  @ApiProperty({ description: 'Platform focus (e.g., Facebook, Instagram)', example: 'Facebook', required: false, nullable: true })
+  @ApiProperty({
+    description: 'Platform focus (e.g., Facebook, Instagram)',
+    example: 'Facebook',
+    required: false,
+    nullable: true,
+  })
   platformFocus?: string | null;
 
-  @ApiProperty({ description: 'Record creation timestamp', example: '2025-10-16T12:00:00.000Z' })
+  @ApiProperty({
+    description: 'Record creation timestamp',
+    example: '2025-10-16T12:00:00.000Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Record last updated timestamp', example: '2025-10-16T12:30:00.000Z' })
+  @ApiProperty({
+    description: 'Record last updated timestamp',
+    example: '2025-10-16T12:30:00.000Z',
+  })
   updatedAt: Date;
 
-  @ApiProperty({ 
+  @ApiProperty({
     type: () => Object,
-    description: 'Employee details', 
+    description: 'Employee details',
     example: {
       id: 101,
       firstName: 'John',
       lastName: 'Doe',
-      email: 'john.doe@example.com'
-    }, 
-    required: false 
+      email: 'john.doe@example.com',
+    },
+    required: false,
   })
   employee?: {
     id: number;
@@ -42,7 +66,10 @@ export class MarketingRecordResponseDto {
 }
 
 export class MarketingRecordsListResponseDto {
-  @ApiProperty({ type: [MarketingRecordResponseDto], description: 'List of marketing records' })
+  @ApiProperty({
+    type: [MarketingRecordResponseDto],
+    description: 'List of marketing records',
+  })
   marketingRecords: MarketingRecordResponseDto[];
 
   @ApiProperty({ description: 'Total number of records', example: 50 })

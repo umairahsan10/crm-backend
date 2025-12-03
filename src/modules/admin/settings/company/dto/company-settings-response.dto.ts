@@ -7,31 +7,58 @@ export class CompanySettingsResponseDto {
   @ApiProperty({ description: 'Name of the company', example: 'ABC Company' })
   name: string;
 
-  @ApiPropertyOptional({ description: 'Address of the company', example: '123 Main Street' })
+  @ApiPropertyOptional({
+    description: 'Address of the company',
+    example: '123 Main Street',
+  })
   address?: string;
 
-  @ApiPropertyOptional({ description: 'City where the company is located', example: 'New York' })
+  @ApiPropertyOptional({
+    description: 'City where the company is located',
+    example: 'New York',
+  })
   city?: string;
 
-  @ApiPropertyOptional({ description: 'State where the company is located', example: 'NY' })
+  @ApiPropertyOptional({
+    description: 'State where the company is located',
+    example: 'NY',
+  })
   state?: string;
 
-  @ApiPropertyOptional({ description: 'ZIP code of the company location', example: '10001' })
+  @ApiPropertyOptional({
+    description: 'ZIP code of the company location',
+    example: '10001',
+  })
   zip?: string;
 
-  @ApiPropertyOptional({ description: 'Country where the company is located', example: 'USA' })
+  @ApiPropertyOptional({
+    description: 'Country where the company is located',
+    example: 'USA',
+  })
   country?: string;
 
-  @ApiPropertyOptional({ description: 'Contact phone number of the company', example: '+1-555-1234' })
+  @ApiPropertyOptional({
+    description: 'Contact phone number of the company',
+    example: '+1-555-1234',
+  })
   phone?: string;
 
-  @ApiPropertyOptional({ description: 'Contact email of the company', example: 'info@example.com' })
+  @ApiPropertyOptional({
+    description: 'Contact email of the company',
+    example: 'info@example.com',
+  })
   email?: string;
 
-  @ApiPropertyOptional({ description: 'Website of the company', example: 'https://www.example.com' })
+  @ApiPropertyOptional({
+    description: 'Website of the company',
+    example: 'https://www.example.com',
+  })
   website?: string;
 
-  @ApiPropertyOptional({ description: 'Tax identification number of the company', example: 'TAX123456' })
+  @ApiPropertyOptional({
+    description: 'Tax identification number of the company',
+    example: 'TAX123456',
+  })
   taxId?: string;
 
   @ApiProperty({ description: 'Company status', example: 'active' })
@@ -41,17 +68,29 @@ export class CompanySettingsResponseDto {
   @ApiProperty({ description: 'Late time threshold in minutes', example: 30 })
   lateTime: number;
 
-  @ApiProperty({ description: 'Half-day time threshold in minutes', example: 90 })
+  @ApiProperty({
+    description: 'Half-day time threshold in minutes',
+    example: 90,
+  })
   halfTime: number;
 
-  @ApiProperty({ description: 'Absent time threshold in minutes', example: 180 })
+  @ApiProperty({
+    description: 'Absent time threshold in minutes',
+    example: 180,
+  })
   absentTime: number;
 
   // Leave Policies
-  @ApiProperty({ description: 'Number of quarterly leave days allowed', example: 20 })
+  @ApiProperty({
+    description: 'Number of quarterly leave days allowed',
+    example: 20,
+  })
   quarterlyLeavesDays: number;
 
-  @ApiProperty({ description: 'Number of monthly late days allowed', example: 3 })
+  @ApiProperty({
+    description: 'Number of monthly late days allowed',
+    example: 3,
+  })
   monthlyLatesDays: number;
 
   // Deductions
@@ -61,13 +100,21 @@ export class CompanySettingsResponseDto {
   @ApiProperty({ description: 'Deduction for each late arrival', example: 500 })
   lateDeduction: number;
 
-  @ApiProperty({ description: 'Deduction for each half-day absence', example: 750 })
+  @ApiProperty({
+    description: 'Deduction for each half-day absence',
+    example: 750,
+  })
   halfDeduction: number;
 
-  @ApiProperty({ description: 'Timestamp when the company was created', example: '2023-10-01T12:00:00Z' })
+  @ApiProperty({
+    description: 'Timestamp when the company was created',
+    example: '2023-10-01T12:00:00Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Timestamp when the company was last updated', example: '2023-10-10T15:30:00Z' })
+  @ApiProperty({
+    description: 'Timestamp when the company was last updated',
+    example: '2023-10-10T15:30:00Z',
+  })
   updatedAt: Date;
 }
-

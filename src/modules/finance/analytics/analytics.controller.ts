@@ -1,20 +1,30 @@
-import { Controller, Get, UseGuards, Query, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
-import { AnalyticsService } from './analytics.service';
-import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { DepartmentsGuard } from 'src/common/guards/departments.guard';
-import { PermissionsGuard } from 'src/common/guards/permissions.guard';
-import { Departments } from 'src/common/decorators/departments.decorator';
-import { Permissions } from 'src/common/decorators/permissions.decorator';
-import { PermissionName } from 'src/common/constants/permission.enum';
-import { 
-  FinanceAnalyticsResponseDto, 
-  ErrorResponseDto 
-} from './dto/analytics-response.dto';
 import {
-  DashboardResponseDto
-} from './dto/dashboard-response.dto';
+  Controller,
+  Get,
+  UseGuards,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { AnalyticsService } from './analytics.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { DepartmentsGuard } from '../../../common/guards/departments.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Departments } from '../../../common/decorators/departments.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionName } from '../../../common/constants/permission.enum';
+import {
+  FinanceAnalyticsResponseDto,
+  ErrorResponseDto,
+} from './dto/analytics-response.dto';
+import { DashboardResponseDto } from './dto/dashboard-response.dto';
 
 @ApiTags('Finance Analytics')
 @ApiBearerAuth()
@@ -24,18 +34,18 @@ export class AnalyticsController {
 
   /**
    * Get comprehensive finance analytics
-   * 
+   *
    * This endpoint provides a complete financial overview by aggregating statistics
    * from all finance modules (Assets, Expenses, Revenues, Liabilities) into a single
    * comprehensive analytics dashboard for accountants.
-   * 
+   *
    * The analytics include:
    * - Financial summary metrics (total income, expenses, assets, liabilities, net position)
    * - Detailed breakdowns by category, payment method, and other dimensions
    * - Monthly trends and this month's activity
    * - Top performers and areas needing attention
    * - Overdue liabilities and assets requiring maintenance
-   * 
+   *
    * @param fromDate - Optional start date for filtering (YYYY-MM-DD format)
    * @param toDate - Optional end date for filtering (YYYY-MM-DD format)
    * @param month - Optional month for filtering (1-12)
@@ -48,7 +58,7 @@ export class AnalyticsController {
    * @param minAmount - Optional minimum amount filter
    * @param maxAmount - Optional maximum amount filter
    * @returns Comprehensive finance analytics with all metrics
-   * 
+   *
    * Required Permissions: revenues_permission
    * Required Department: Accounts
    * Admin bypass: No (only accountants can view analytics)
@@ -57,79 +67,80 @@ export class AnalyticsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.revenues_permission)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get comprehensive finance analytics with advanced filtering',
-    description: 'Retrieves aggregated financial statistics from all finance modules with comprehensive filtering options for accountant dashboard'
+    description:
+      'Retrieves aggregated financial statistics from all finance modules with comprehensive filtering options for accountant dashboard',
   })
-  @ApiQuery({ 
-    name: 'fromDate', 
-    description: 'Start date for filtering (YYYY-MM-DD format)', 
-    required: false, 
-    example: '2024-01-01' 
+  @ApiQuery({
+    name: 'fromDate',
+    description: 'Start date for filtering (YYYY-MM-DD format)',
+    required: false,
+    example: '2024-01-01',
   })
-  @ApiQuery({ 
-    name: 'toDate', 
-    description: 'End date for filtering (YYYY-MM-DD format)', 
-    required: false, 
-    example: '2024-12-31' 
+  @ApiQuery({
+    name: 'toDate',
+    description: 'End date for filtering (YYYY-MM-DD format)',
+    required: false,
+    example: '2024-12-31',
   })
-  @ApiQuery({ 
-    name: 'month', 
-    description: 'Month for filtering (1-12)', 
-    required: false, 
-    example: 10 
+  @ApiQuery({
+    name: 'month',
+    description: 'Month for filtering (1-12)',
+    required: false,
+    example: 10,
   })
-  @ApiQuery({ 
-    name: 'year', 
-    description: 'Year for filtering (YYYY)', 
-    required: false, 
-    example: 2024 
+  @ApiQuery({
+    name: 'year',
+    description: 'Year for filtering (YYYY)',
+    required: false,
+    example: 2024,
   })
-  @ApiQuery({ 
-    name: 'quarter', 
-    description: 'Quarter for filtering (1-4)', 
-    required: false, 
-    example: 4 
+  @ApiQuery({
+    name: 'quarter',
+    description: 'Quarter for filtering (1-4)',
+    required: false,
+    example: 4,
   })
-  @ApiQuery({ 
-    name: 'status', 
-    description: 'Status filter (active, inactive, paid, unpaid, etc.)', 
-    required: false, 
-    example: 'active' 
+  @ApiQuery({
+    name: 'status',
+    description: 'Status filter (active, inactive, paid, unpaid, etc.)',
+    required: false,
+    example: 'active',
   })
-  @ApiQuery({ 
-    name: 'employeeId', 
-    description: 'Employee ID filter', 
-    required: false, 
-    example: 123 
+  @ApiQuery({
+    name: 'employeeId',
+    description: 'Employee ID filter',
+    required: false,
+    example: 123,
   })
-  @ApiQuery({ 
-    name: 'vendorId', 
-    description: 'Vendor ID filter', 
-    required: false, 
-    example: 456 
+  @ApiQuery({
+    name: 'vendorId',
+    description: 'Vendor ID filter',
+    required: false,
+    example: 456,
   })
-  @ApiQuery({ 
-    name: 'clientId', 
-    description: 'Client ID filter', 
-    required: false, 
-    example: 789 
+  @ApiQuery({
+    name: 'clientId',
+    description: 'Client ID filter',
+    required: false,
+    example: 789,
   })
-  @ApiQuery({ 
-    name: 'minAmount', 
-    description: 'Minimum amount filter', 
-    required: false, 
-    example: 100 
+  @ApiQuery({
+    name: 'minAmount',
+    description: 'Minimum amount filter',
+    required: false,
+    example: 100,
   })
-  @ApiQuery({ 
-    name: 'maxAmount', 
-    description: 'Maximum amount filter', 
-    required: false, 
-    example: 10000 
+  @ApiQuery({
+    name: 'maxAmount',
+    description: 'Maximum amount filter',
+    required: false,
+    example: 10000,
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Finance analytics retrieved successfully', 
+  @ApiResponse({
+    status: 200,
+    description: 'Finance analytics retrieved successfully',
     type: FinanceAnalyticsResponseDto,
     schema: {
       example: {
@@ -143,7 +154,7 @@ export class AnalyticsController {
             totalLiabilities: 50000,
             paidLiabilities: 30000,
             unpaidLiabilities: 20000,
-            netPosition: 55000
+            netPosition: 55000,
           },
           assets: {
             totalAssets: 25,
@@ -153,9 +164,13 @@ export class AnalyticsController {
             averageDepreciationRate: 11.11,
             thisMonth: { count: 3, totalValue: 25000 },
             byCategory: {
-              'Equipment': { count: 10, totalPurchaseValue: 100000, totalCurrentValue: 110000 }
+              Equipment: {
+                count: 10,
+                totalPurchaseValue: 100000,
+                totalCurrentValue: 110000,
+              },
             },
-            assetsNeedingAttention: []
+            assetsNeedingAttention: [],
           },
           expenses: {
             totalExpenses: 150,
@@ -163,15 +178,15 @@ export class AnalyticsController {
             averageExpense: 500,
             thisMonth: { count: 12, amount: 8000 },
             byCategory: {
-              'Office Supplies': { count: 20, amount: 5000 }
+              'Office Supplies': { count: 20, amount: 5000 },
             },
             topCategories: [],
             byPaymentMethod: {
-              'cash': { count: 50, amount: 25000 }
+              cash: { count: 50, amount: 25000 },
             },
             byProcessedByRole: {
-              'Employee': { count: 100, amount: 50000 }
-            }
+              Employee: { count: 100, amount: 50000 },
+            },
           },
           revenues: {
             totalRevenue: 80,
@@ -179,15 +194,15 @@ export class AnalyticsController {
             averageRevenue: 1875,
             thisMonth: { count: 8, amount: 15000 },
             byCategory: {
-              'Project Revenue': { count: 50, amount: 100000 }
+              'Project Revenue': { count: 50, amount: 100000 },
             },
             bySource: {
-              'Lead Revenue': { count: 40, amount: 80000 }
+              'Lead Revenue': { count: 40, amount: 80000 },
             },
             byPaymentMethod: {
-              'bank': { count: 60, amount: 120000 }
+              bank: { count: 60, amount: 120000 },
             },
-            topGenerators: []
+            topGenerators: [],
           },
           liabilities: {
             totalLiabilities: 30,
@@ -197,31 +212,39 @@ export class AnalyticsController {
             paidAmount: 30000,
             unpaidAmount: 20000,
             byCategory: {
-              'Vendor Payments': { count: 15, amount: 25000, paidCount: 10, unpaidCount: 5, paidAmount: 15000, unpaidAmount: 10000 }
+              'Vendor Payments': {
+                count: 15,
+                amount: 25000,
+                paidCount: 10,
+                unpaidCount: 5,
+                paidAmount: 15000,
+                unpaidAmount: 10000,
+              },
             },
-            overdueLiabilities: []
-          }
-        }
-      }
-    }
+            overdueLiabilities: [],
+          },
+        },
+      },
+    },
   })
-  @ApiResponse({ 
-    status: 400, 
-    description: 'Invalid date format or parameters', 
-    type: ErrorResponseDto 
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format or parameters',
+    type: ErrorResponseDto,
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Unauthorized - JWT token required' 
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
   })
-  @ApiResponse({ 
-    status: 403, 
-    description: 'Forbidden - Accounts department and revenues_permission required' 
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden - Accounts department and revenues_permission required',
   })
-  @ApiResponse({ 
-    status: 500, 
-    description: 'Internal server error', 
-    type: ErrorResponseDto 
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    type: ErrorResponseDto,
   })
   async getFinanceAnalytics(
     @Query('fromDate') fromDate?: string,
@@ -248,7 +271,7 @@ export class AnalyticsController {
       vendorId,
       clientId,
       minAmount,
-      maxAmount
+      maxAmount,
     });
 
     try {
@@ -289,18 +312,22 @@ export class AnalyticsController {
   }): void {
     // Validate date formats
     if (params.fromDate && !this.isValidDate(params.fromDate)) {
-      throw new BadRequestException('Invalid fromDate format. Use YYYY-MM-DD format.');
+      throw new BadRequestException(
+        'Invalid fromDate format. Use YYYY-MM-DD format.',
+      );
     }
 
     if (params.toDate && !this.isValidDate(params.toDate)) {
-      throw new BadRequestException('Invalid toDate format. Use YYYY-MM-DD format.');
+      throw new BadRequestException(
+        'Invalid toDate format. Use YYYY-MM-DD format.',
+      );
     }
 
     // Validate date range if both dates are provided
     if (params.fromDate && params.toDate) {
       const from = new Date(params.fromDate);
       const to = new Date(params.toDate);
-      
+
       if (from > to) {
         throw new BadRequestException('fromDate cannot be later than toDate.');
       }
@@ -310,7 +337,9 @@ export class AnalyticsController {
     if (params.month) {
       const monthNum = parseInt(params.month);
       if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-        throw new BadRequestException('Invalid month value. Month must be between 1 and 12.');
+        throw new BadRequestException(
+          'Invalid month value. Month must be between 1 and 12.',
+        );
       }
     }
 
@@ -319,7 +348,9 @@ export class AnalyticsController {
       const yearNum = parseInt(params.year);
       const currentYear = new Date().getFullYear();
       if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear + 10) {
-        throw new BadRequestException(`Invalid year value. Year must be between 1900 and ${currentYear + 10}.`);
+        throw new BadRequestException(
+          `Invalid year value. Year must be between 1900 and ${currentYear + 10}.`,
+        );
       }
     }
 
@@ -327,7 +358,9 @@ export class AnalyticsController {
     if (params.quarter) {
       const quarterNum = parseInt(params.quarter);
       if (isNaN(quarterNum) || quarterNum < 1 || quarterNum > 4) {
-        throw new BadRequestException('Invalid quarter value. Quarter must be between 1 and 4.');
+        throw new BadRequestException(
+          'Invalid quarter value. Quarter must be between 1 and 4.',
+        );
       }
     }
 
@@ -335,21 +368,27 @@ export class AnalyticsController {
     if (params.employeeId) {
       const id = parseInt(params.employeeId);
       if (isNaN(id) || id <= 0) {
-        throw new BadRequestException('Invalid employeeId. Must be a positive integer.');
+        throw new BadRequestException(
+          'Invalid employeeId. Must be a positive integer.',
+        );
       }
     }
 
     if (params.vendorId) {
       const id = parseInt(params.vendorId);
       if (isNaN(id) || id <= 0) {
-        throw new BadRequestException('Invalid vendorId. Must be a positive integer.');
+        throw new BadRequestException(
+          'Invalid vendorId. Must be a positive integer.',
+        );
       }
     }
 
     if (params.clientId) {
       const id = parseInt(params.clientId);
       if (isNaN(id) || id <= 0) {
-        throw new BadRequestException('Invalid clientId. Must be a positive integer.');
+        throw new BadRequestException(
+          'Invalid clientId. Must be a positive integer.',
+        );
       }
     }
 
@@ -357,14 +396,18 @@ export class AnalyticsController {
     if (params.minAmount) {
       const amount = parseFloat(params.minAmount);
       if (isNaN(amount) || amount < 0) {
-        throw new BadRequestException('Invalid minAmount. Must be a non-negative number.');
+        throw new BadRequestException(
+          'Invalid minAmount. Must be a non-negative number.',
+        );
       }
     }
 
     if (params.maxAmount) {
       const amount = parseFloat(params.maxAmount);
       if (isNaN(amount) || amount < 0) {
-        throw new BadRequestException('Invalid maxAmount. Must be a non-negative number.');
+        throw new BadRequestException(
+          'Invalid maxAmount. Must be a non-negative number.',
+        );
       }
     }
 
@@ -373,7 +416,9 @@ export class AnalyticsController {
       const minAmount = parseFloat(params.minAmount);
       const maxAmount = parseFloat(params.maxAmount);
       if (minAmount > maxAmount) {
-        throw new BadRequestException('minAmount cannot be greater than maxAmount.');
+        throw new BadRequestException(
+          'minAmount cannot be greater than maxAmount.',
+        );
       }
     }
   }
@@ -388,21 +433,25 @@ export class AnalyticsController {
     }
 
     const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString;
+    return (
+      date instanceof Date &&
+      !isNaN(date.getTime()) &&
+      date.toISOString().split('T')[0] === dateString
+    );
   }
 
   /**
    * Get comprehensive finance dashboard data for frontend widgets and graphs
-   * 
+   *
    * This endpoint provides all necessary data for building comprehensive finance dashboards:
    * - Time-based metrics (today, this week, this month, this quarter, this year)
    * - Trend analysis (daily, weekly, monthly time series)
    * - Comparison metrics (vs previous periods)
    * - Widget-ready data structures
    * - Graph-ready time series data
-   * 
+   *
    * @returns Comprehensive dashboard data with metrics, widgets, and graphs
-   * 
+   *
    * Required Permissions: revenues_permission
    * Required Department: Accounts
    */
@@ -410,29 +459,33 @@ export class AnalyticsController {
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('Accounts')
   @Permissions(PermissionName.revenues_permission)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get comprehensive finance dashboard data',
-    description: 'Retrieves all necessary data for building finance dashboards including metrics, widgets, and graph-ready time series data'
+    description:
+      'Retrieves all necessary data for building finance dashboards including metrics, widgets, and graph-ready time series data',
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Dashboard data retrieved successfully', 
-    type: DashboardResponseDto
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard data retrieved successfully',
+    type: DashboardResponseDto,
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Unauthorized - JWT token required' 
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
   })
-  @ApiResponse({ 
-    status: 403, 
-    description: 'Forbidden - Accounts department and revenues_permission required' 
+  @ApiResponse({
+    status: 403,
+    description:
+      'Forbidden - Accounts department and revenues_permission required',
   })
-  @ApiResponse({ 
-    status: 500, 
-    description: 'Internal server error', 
-    type: ErrorResponseDto 
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    type: ErrorResponseDto,
   })
-  async getFinanceDashboard(): Promise<DashboardResponseDto | ErrorResponseDto> {
+  async getFinanceDashboard(): Promise<
+    DashboardResponseDto | ErrorResponseDto
+  > {
     try {
       const result = await this.analyticsService.getFinanceDashboard();
       return result;

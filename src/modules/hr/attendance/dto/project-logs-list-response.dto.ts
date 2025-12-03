@@ -82,4 +82,3 @@ export class ProjectLogsListResponseDto {
   })
   updated_at: string;
 }
-

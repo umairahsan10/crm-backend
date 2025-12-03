@@ -13,22 +13,40 @@ export class EmployeeStatisticsDto {
   @ApiProperty({ description: 'Number of terminated employees' })
   terminated: number;
 
-  @ApiProperty({ description: 'Distribution of employees by department (e.g. HR: 10, IT: 25)' })
+  @ApiProperty({
+    description:
+      'Distribution of employees by department (e.g. HR: 10, IT: 25)',
+  })
   byDepartment: Record<string, number>;
 
-  @ApiProperty({ description: 'Distribution of employees by role (e.g. Developer: 20, Manager: 5)' })
+  @ApiProperty({
+    description:
+      'Distribution of employees by role (e.g. Developer: 20, Manager: 5)',
+  })
   byRole: Record<string, number>;
 
-  @ApiProperty({ description: 'Distribution of employees by gender (e.g. male: 15, female: 10)' })
+  @ApiProperty({
+    description:
+      'Distribution of employees by gender (e.g. male: 15, female: 10)',
+  })
   byGender: Record<string, number>;
 
-  @ApiProperty({ description: 'Distribution of employees by employment type (full-time, part-time)' })
+  @ApiProperty({
+    description:
+      'Distribution of employees by employment type (full-time, part-time)',
+  })
   byEmploymentType: Record<string, number>;
 
-  @ApiProperty({ description: 'Distribution of employees by work mode (hybrid, remote, on-site)' })
+  @ApiProperty({
+    description:
+      'Distribution of employees by work mode (hybrid, remote, on-site)',
+  })
   byModeOfWork: Record<string, number>;
 
-  @ApiProperty({ description: 'Distribution of employees by marital status (single, married)' })
+  @ApiProperty({
+    description:
+      'Distribution of employees by marital status (single, married)',
+  })
   byMaritalStatus: Record<string, number>;
 
   @ApiProperty({ description: 'Average age of employees' })

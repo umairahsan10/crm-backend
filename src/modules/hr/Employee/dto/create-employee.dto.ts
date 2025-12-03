@@ -1,4 +1,13 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsInt, IsBoolean, IsDateString, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  IsInt,
+  IsBoolean,
+  IsDateString,
+  IsNumber,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsValidRoleHierarchy } from '../../../../common/validators/role-hierarchy.validator';
 
@@ -20,7 +29,10 @@ export class CreateEmployeeDto {
   @IsString()
   phone?: string;
 
-  @ApiProperty({ enum: ['male', 'female', 'others'], description: 'Gender of the employee' })
+  @ApiProperty({
+    enum: ['male', 'female', 'others'],
+    description: 'Gender of the employee',
+  })
   @IsEnum(['male', 'female', 'others'])
   gender: 'male' | 'female' | 'others';
 
@@ -40,13 +52,19 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional({ description: 'Manager ID (if applicable)' })
   @IsOptional()
   @IsInt()
-  @IsValidRoleHierarchy({ message: 'Invalid role hierarchy: Manager assignment not allowed for this role' })
+  @IsValidRoleHierarchy({
+    message:
+      'Invalid role hierarchy: Manager assignment not allowed for this role',
+  })
   managerId?: number;
 
   @ApiPropertyOptional({ description: 'Team Lead ID (if applicable)' })
   @IsOptional()
   @IsInt()
-  @IsValidRoleHierarchy({ message: 'Invalid role hierarchy: Team Lead assignment not allowed for this role' })
+  @IsValidRoleHierarchy({
+    message:
+      'Invalid role hierarchy: Team Lead assignment not allowed for this role',
+  })
   teamLeadId?: number;
 
   @ApiPropertyOptional({ description: 'Residential address of the employee' })
@@ -54,12 +72,17 @@ export class CreateEmployeeDto {
   @IsString()
   address?: string;
 
-  @ApiPropertyOptional({ description: 'Marital status (true = married, false = single)' })
+  @ApiPropertyOptional({
+    description: 'Marital status (true = married, false = single)',
+  })
   @IsOptional()
   @IsBoolean()
   maritalStatus?: boolean;
 
-  @ApiPropertyOptional({ enum: ['active', 'terminated', 'inactive'], description: 'Employment status' })
+  @ApiPropertyOptional({
+    enum: ['active', 'terminated', 'inactive'],
+    description: 'Employment status',
+  })
   @IsOptional()
   @IsEnum(['active', 'terminated', 'inactive'])
   status?: 'active' | 'terminated' | 'inactive';
@@ -74,12 +97,17 @@ export class CreateEmployeeDto {
   @IsDateString()
   endDate?: string;
 
-  @ApiPropertyOptional({ enum: ['hybrid', 'on_site', 'remote'], description: 'Work mode type' })
+  @ApiPropertyOptional({
+    enum: ['hybrid', 'on_site', 'remote'],
+    description: 'Work mode type',
+  })
   @IsOptional()
   @IsEnum(['hybrid', 'on_site', 'remote'])
   modeOfWork?: 'hybrid' | 'on_site' | 'remote';
 
-  @ApiPropertyOptional({ description: 'Number of remote days allowed per month' })
+  @ApiPropertyOptional({
+    description: 'Number of remote days allowed per month',
+  })
   @IsOptional()
   @IsInt()
   remoteDaysAllowed?: number;
@@ -104,7 +132,10 @@ export class CreateEmployeeDto {
   @IsString()
   shiftEnd?: string;
 
-  @ApiPropertyOptional({ enum: ['full_time', 'part_time'], description: 'Type of employment' })
+  @ApiPropertyOptional({
+    enum: ['full_time', 'part_time'],
+    description: 'Type of employment',
+  })
   @IsOptional()
   @IsEnum(['full_time', 'part_time'])
   employmentType?: 'full_time' | 'part_time';
@@ -114,7 +145,10 @@ export class CreateEmployeeDto {
   @IsDateString()
   dateOfConfirmation?: string;
 
-  @ApiPropertyOptional({ enum: ['probation', 'permanent', 'notice'], description: 'Employment period type' })
+  @ApiPropertyOptional({
+    enum: ['probation', 'permanent', 'notice'],
+    description: 'Employment period type',
+  })
   @IsOptional()
   @IsEnum(['probation', 'permanent', 'notice'])
   periodType?: 'probation' | 'permanent' | 'notice';

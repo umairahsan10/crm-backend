@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsNumber, IsString, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsNumber,
+  IsString,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 import { MeetingStatus } from '@prisma/client';
 
 export class GetMeetingsDto {
@@ -61,7 +67,8 @@ export class GetMeetingsDto {
   page?: number;
 
   @ApiPropertyOptional({
-    description: 'Pagination: number of results per page (defaults to 10 if omitted)',
+    description:
+      'Pagination: number of results per page (defaults to 10 if omitted)',
     example: 10,
   })
   @IsOptional()

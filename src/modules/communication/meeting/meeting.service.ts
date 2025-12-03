@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { UpdateMeetingDto } from './dto/update-meeting.dto';
@@ -15,11 +20,14 @@ export class MeetingService {
    * All employees can schedule meetings with one another
    * Sales team, HR and admin can schedule meetings with clients
    */
-  async createMeeting(createMeetingDto: CreateMeetingDto, currentEmployeeId: number): Promise<MeetingResponseDto> {
+  async createMeeting(
+    createMeetingDto: CreateMeetingDto,
+    currentEmployeeId: number,
+  ): Promise<MeetingResponseDto> {
     // Validate that the current employee exists
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id: currentEmployeeId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!currentEmployee) {
@@ -31,12 +39,14 @@ export class MeetingService {
       // Only Sales, HR, and Admin can schedule meetings with clients
       const allowedDepartments = ['Sales', 'HR', 'Admin'];
       if (!allowedDepartments.includes(currentEmployee.department.name)) {
-        throw new ForbiddenException('Only Sales, HR, and Admin employees can schedule meetings with clients');
+        throw new ForbiddenException(
+          'Only Sales, HR, and Admin employees can schedule meetings with clients',
+        );
       }
 
       // Validate client exists
       const client = await this.prisma.client.findUnique({
-        where: { id: createMeetingDto.clientId }
+        where: { id: createMeetingDto.clientId },
       });
 
       if (!client) {
@@ -47,7 +57,7 @@ export class MeetingService {
     // If project is specified, validate it exists
     if (createMeetingDto.projectId) {
       const project = await this.prisma.project.findUnique({
-        where: { id: createMeetingDto.projectId }
+        where: { id: createMeetingDto.projectId },
       });
 
       if (!project) {
@@ -64,7 +74,7 @@ export class MeetingService {
     try {
       const meeting = await this.prisma.meeting.create({
         data: {
-          employeeId: currentEmployeeId, 
+          employeeId: currentEmployeeId,
           clientId: createMeetingDto.clientId,
           projectId: createMeetingDto.projectId,
           topic: createMeetingDto.topic,
@@ -76,12 +86,12 @@ export class MeetingService {
         include: {
           employee: {
             include: {
-              department: true
-            }
+              department: true,
+            },
           },
           client: true,
-          project: true
-        }
+          project: true,
+        },
       });
 
       // Log HR action if HR created the meeting
@@ -91,8 +101,8 @@ export class MeetingService {
             hrId: currentEmployeeId,
             actionType: 'MEETING_CREATED',
             affectedEmployeeId: currentEmployeeId,
-            description: `HR created meeting: ${createMeetingDto.topic} scheduled for ${meetingDate.toISOString()}${createMeetingDto.clientId ? ' with client' : ''}`
-          }
+            description: `HR created meeting: ${createMeetingDto.topic} scheduled for ${meetingDate.toISOString()}${createMeetingDto.clientId ? ' with client' : ''}`,
+          },
         });
       }
 
@@ -112,10 +122,13 @@ export class MeetingService {
    * Get all meetings with optional filters
    * Only Admin and HR can access all meetings
    */
-  async getAllMeetings(query: GetMeetingsDto, currentEmployeeId: number): Promise<MeetingResponseDto[]> {
+  async getAllMeetings(
+    query: GetMeetingsDto,
+    currentEmployeeId: number,
+  ): Promise<MeetingResponseDto[]> {
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id: currentEmployeeId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!currentEmployee) {
@@ -123,7 +136,10 @@ export class MeetingService {
     }
 
     // Only Admin and HR can access all meetings
-    if (currentEmployee.department.name !== 'Admin' && currentEmployee.department.name !== 'HR') {
+    if (
+      currentEmployee.department.name !== 'Admin' &&
+      currentEmployee.department.name !== 'HR'
+    ) {
       throw new ForbiddenException('Only Admin and HR can access all meetings');
     }
 
@@ -166,32 +182,37 @@ export class MeetingService {
         include: {
           employee: {
             include: {
-              department: true
-            }
+              department: true,
+            },
           },
           client: true,
-          project: true
+          project: true,
         },
         orderBy: {
-          dateTime: 'asc'
+          dateTime: 'asc',
         },
         skip,
-        take: limit
+        take: limit,
       });
 
-      return meetings.map(meeting => this.mapToResponseDto(meeting));
+      return meetings.map((meeting) => this.mapToResponseDto(meeting));
     } catch (error) {
-      throw new BadRequestException(`Failed to fetch meetings: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch meetings: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get meeting by ID
    */
-  async getMeetingById(id: number, currentEmployeeId: number): Promise<MeetingResponseDto> {
+  async getMeetingById(
+    id: number,
+    currentEmployeeId: number,
+  ): Promise<MeetingResponseDto> {
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id: currentEmployeeId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!currentEmployee) {
@@ -204,12 +225,12 @@ export class MeetingService {
         include: {
           employee: {
             include: {
-              department: true
-            }
+              department: true,
+            },
           },
           client: true,
-          project: true
-        }
+          project: true,
+        },
       });
 
       if (!meeting) {
@@ -217,28 +238,39 @@ export class MeetingService {
       }
 
       // Check access permissions
-      if (currentEmployee.department.name !== 'Admin' && 
-          meeting.employeeId !== currentEmployeeId &&
-          !meeting.clientId) {
+      if (
+        currentEmployee.department.name !== 'Admin' &&
+        meeting.employeeId !== currentEmployeeId &&
+        !meeting.clientId
+      ) {
         throw new ForbiddenException('Access denied to this meeting');
       }
 
       return this.mapToResponseDto(meeting);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
-      throw new BadRequestException(`Failed to fetch meeting: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch meeting: ${error.message}`,
+      );
     }
   }
 
   /**
    * Update meeting
    */
-  async updateMeeting(id: number, updateMeetingDto: UpdateMeetingDto, currentEmployeeId: number): Promise<MeetingResponseDto> {
+  async updateMeeting(
+    id: number,
+    updateMeetingDto: UpdateMeetingDto,
+    currentEmployeeId: number,
+  ): Promise<MeetingResponseDto> {
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id: currentEmployeeId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!currentEmployee) {
@@ -250,8 +282,8 @@ export class MeetingService {
       where: { id },
       include: {
         employee: true,
-        client: true
-      }
+        client: true,
+      },
     });
 
     if (!existingMeeting) {
@@ -259,16 +291,22 @@ export class MeetingService {
     }
 
     // Check access permissions - only meeting creator or Admin can update (not HR)
-    if (currentEmployee.department.name !== 'Admin' && 
-        existingMeeting.employeeId !== currentEmployeeId) {
-      throw new ForbiddenException('Only meeting creator or Admin can update this meeting');
+    if (
+      currentEmployee.department.name !== 'Admin' &&
+      existingMeeting.employeeId !== currentEmployeeId
+    ) {
+      throw new ForbiddenException(
+        'Only meeting creator or Admin can update this meeting',
+      );
     }
 
     // If updating to include a client, check permissions
     if (updateMeetingDto.clientId && !existingMeeting.clientId) {
       const allowedDepartments = ['Sales', 'HR', 'Admin'];
       if (!allowedDepartments.includes(currentEmployee.department.name)) {
-        throw new ForbiddenException('Only Sales, HR, and Admin employees can schedule meetings with clients');
+        throw new ForbiddenException(
+          'Only Sales, HR, and Admin employees can schedule meetings with clients',
+        );
       }
     }
 
@@ -287,12 +325,12 @@ export class MeetingService {
         include: {
           employee: {
             include: {
-              department: true
-            }
+              department: true,
+            },
           },
           client: true,
-          project: true
-        }
+          project: true,
+        },
       });
 
       // Log HR action if HR updated the meeting
@@ -302,8 +340,8 @@ export class MeetingService {
             hrId: currentEmployeeId,
             actionType: 'MEETING_UPDATED',
             affectedEmployeeId: existingMeeting.employeeId,
-            description: `HR updated meeting: "${existingMeeting.topic}" to "${updatedMeeting.topic}" scheduled for ${updatedMeeting.dateTime?.toISOString() || 'unspecified time'}${updatedMeeting.clientId ? ' with client' : ''}`
-          }
+            description: `HR updated meeting: "${existingMeeting.topic}" to "${updatedMeeting.topic}" scheduled for ${updatedMeeting.dateTime?.toISOString() || 'unspecified time'}${updatedMeeting.clientId ? ' with client' : ''}`,
+          },
         });
       }
 
@@ -315,17 +353,22 @@ export class MeetingService {
       if (error.code === 'P2003') {
         throw new BadRequestException('Foreign key constraint failed');
       }
-      throw new BadRequestException(`Failed to update meeting: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update meeting: ${error.message}`,
+      );
     }
   }
 
   /**
    * Delete meeting
    */
-  async deleteMeeting(id: number, currentEmployeeId: number): Promise<{ message: string }> {
+  async deleteMeeting(
+    id: number,
+    currentEmployeeId: number,
+  ): Promise<{ message: string }> {
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id: currentEmployeeId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!currentEmployee) {
@@ -334,7 +377,7 @@ export class MeetingService {
 
     // Check if meeting exists and current employee has access
     const existingMeeting = await this.prisma.meeting.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!existingMeeting) {
@@ -342,14 +385,18 @@ export class MeetingService {
     }
 
     // Check access permissions - only meeting creator or Admin can delete (not HR)
-    if (currentEmployee.department.name !== 'Admin' && 
-        existingMeeting.employeeId !== currentEmployeeId) {
-      throw new ForbiddenException('Only meeting creator or Admin can delete this meeting');
+    if (
+      currentEmployee.department.name !== 'Admin' &&
+      existingMeeting.employeeId !== currentEmployeeId
+    ) {
+      throw new ForbiddenException(
+        'Only meeting creator or Admin can delete this meeting',
+      );
     }
 
     try {
       await this.prisma.meeting.delete({
-        where: { id }
+        where: { id },
       });
 
       // Log HR action if HR deleted the meeting
@@ -359,23 +406,27 @@ export class MeetingService {
             hrId: currentEmployeeId,
             actionType: 'MEETING_DELETED',
             affectedEmployeeId: existingMeeting.employeeId,
-            description: `HR deleted meeting: "${existingMeeting.topic}" that was scheduled for ${existingMeeting.dateTime?.toISOString() || 'unspecified time'}${existingMeeting.clientId ? ' with client' : ''}`
-          }
+            description: `HR deleted meeting: "${existingMeeting.topic}" that was scheduled for ${existingMeeting.dateTime?.toISOString() || 'unspecified time'}${existingMeeting.clientId ? ' with client' : ''}`,
+          },
         });
       }
 
       return { message: 'Meeting deleted successfully' };
     } catch (error) {
-      throw new BadRequestException(`Failed to delete meeting: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to delete meeting: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get meetings for current employee
    */
-  async getMyMeetings(currentEmployeeId: number): Promise<MeetingResponseDto[]> {
+  async getMyMeetings(
+    currentEmployeeId: number,
+  ): Promise<MeetingResponseDto[]> {
     const currentEmployee = await this.prisma.employee.findUnique({
-      where: { id: currentEmployeeId }
+      where: { id: currentEmployeeId },
     });
 
     if (!currentEmployee) {
@@ -385,35 +436,40 @@ export class MeetingService {
     try {
       const meetings = await this.prisma.meeting.findMany({
         where: {
-          employeeId: currentEmployeeId
+          employeeId: currentEmployeeId,
         },
         include: {
           employee: {
             include: {
-              department: true
-            }
+              department: true,
+            },
           },
           client: true,
-          project: true
+          project: true,
         },
         orderBy: {
-          dateTime: 'asc'
-        }
+          dateTime: 'asc',
+        },
       });
 
-      return meetings.map(meeting => this.mapToResponseDto(meeting));
+      return meetings.map((meeting) => this.mapToResponseDto(meeting));
     } catch (error) {
-      throw new BadRequestException(`Failed to fetch meetings: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch meetings: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get upcoming meetings
    */
-  async getUpcomingMeetings(currentEmployeeId: number, days: number = 7): Promise<MeetingResponseDto[]> {
+  async getUpcomingMeetings(
+    currentEmployeeId: number,
+    days: number = 7,
+  ): Promise<MeetingResponseDto[]> {
     const currentEmployee = await this.prisma.employee.findUnique({
       where: { id: currentEmployeeId },
-      include: { department: true }
+      include: { department: true },
     });
 
     if (!currentEmployee) {
@@ -428,15 +484,15 @@ export class MeetingService {
     const where: any = {
       dateTime: {
         gte: now,
-        lte: endDate
-      }
+        lte: endDate,
+      },
     };
 
     // If not admin, only show meetings related to current employee
     if (currentEmployee.department.name !== 'Admin') {
       where.OR = [
         { employeeId: currentEmployeeId },
-        { clientId: { not: null } } // Show client meetings for Sales/HR
+        { clientId: { not: null } }, // Show client meetings for Sales/HR
       ];
     }
 
@@ -446,20 +502,22 @@ export class MeetingService {
         include: {
           employee: {
             include: {
-              department: true
-            }
+              department: true,
+            },
           },
           client: true,
-          project: true
+          project: true,
         },
         orderBy: {
-          dateTime: 'asc'
-        }
+          dateTime: 'asc',
+        },
       });
 
-      return meetings.map(meeting => this.mapToResponseDto(meeting));
+      return meetings.map((meeting) => this.mapToResponseDto(meeting));
     } catch (error) {
-      throw new BadRequestException(`Failed to fetch upcoming meetings: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch upcoming meetings: ${error.message}`,
+      );
     }
   }
 
@@ -479,28 +537,36 @@ export class MeetingService {
       meetingLink: meeting.meetingLink,
       createdAt: meeting.createdAt,
       updatedAt: meeting.updatedAt,
-      employee: meeting.employee ? {
-        id: meeting.employee.id,
-        firstName: meeting.employee.firstName,
-        lastName: meeting.employee.lastName,
-        email: meeting.employee.email,
-        department: meeting.employee.department ? {
-          id: meeting.employee.department.id,
-          name: meeting.employee.department.name
-        } : undefined
-      } : undefined,
-      client: meeting.client ? {
-        id: meeting.client.id,
-        clientName: meeting.client.clientName,
-        companyName: meeting.client.companyName,
-        email: meeting.client.email,
-        phone: meeting.client.phone
-      } : undefined,
-      project: meeting.project ? {
-        id: meeting.project.id,
-        description: meeting.project.description,
-        status: meeting.project.status
-      } : undefined
+      employee: meeting.employee
+        ? {
+            id: meeting.employee.id,
+            firstName: meeting.employee.firstName,
+            lastName: meeting.employee.lastName,
+            email: meeting.employee.email,
+            department: meeting.employee.department
+              ? {
+                  id: meeting.employee.department.id,
+                  name: meeting.employee.department.name,
+                }
+              : undefined,
+          }
+        : undefined,
+      client: meeting.client
+        ? {
+            id: meeting.client.id,
+            clientName: meeting.client.clientName,
+            companyName: meeting.client.companyName,
+            email: meeting.client.email,
+            phone: meeting.client.phone,
+          }
+        : undefined,
+      project: meeting.project
+        ? {
+            id: meeting.project.id,
+            description: meeting.project.description,
+            status: meeting.project.status,
+          }
+        : undefined,
     };
   }
 }

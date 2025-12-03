@@ -1,9 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateHrRequestDto } from './dto/create-hr-request.dto';
 import { EmployeeHrActionDto } from './dto/hr-action.dto';
 import { HrRequestsFilterDto } from './dto/hr-requests-filter.dto';
-import { PaginatedResponse, PaginationMeta } from './dto/paginated-response.dto';
+import {
+  PaginatedResponse,
+  PaginationMeta,
+} from './dto/paginated-response.dto';
 import { RequestPriority, RequestStatus } from '@prisma/client';
 import { TimeStorageUtil } from '../../../common/utils/time-storage.util';
 
@@ -66,7 +75,7 @@ export class EmployeeService {
         toDate,
         page = 1,
         limit = 10,
-        search
+        search,
       } = filterDto;
 
       // Build where clause
@@ -83,7 +92,7 @@ export class EmployeeService {
       if (requestType) {
         where.requestType = {
           contains: requestType,
-          mode: 'insensitive'
+          mode: 'insensitive',
         };
       }
 
@@ -102,15 +111,15 @@ export class EmployeeService {
           {
             subject: {
               contains: search,
-              mode: 'insensitive'
-            }
+              mode: 'insensitive',
+            },
           },
           {
             description: {
               contains: search,
-              mode: 'insensitive'
-            }
-          }
+              mode: 'insensitive',
+            },
+          },
         ];
       }
 
@@ -167,7 +176,17 @@ export class EmployeeService {
       });
 
       // If filtering/pagination is used, return paginated response
-      if (filterDto && (status || priority || requestType || fromDate || toDate || search || page !== 1 || limit !== 10)) {
+      if (
+        filterDto &&
+        (status ||
+          priority ||
+          requestType ||
+          fromDate ||
+          toDate ||
+          search ||
+          page !== 1 ||
+          limit !== 10)
+      ) {
         const totalPages = Math.ceil(total / limit);
         const meta: PaginationMeta = {
           page,
@@ -188,15 +207,20 @@ export class EmployeeService {
       return data;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch HR requests: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch HR requests: ${error.message}`,
+      );
     }
   }
-
 
   async getHrRequestById(id: number) {
     try {
@@ -242,7 +266,9 @@ export class EmployeeService {
       });
 
       if (!request) {
-        throw new NotFoundException(`HR request with ID ${id} not found. Please check the ID and try again.`);
+        throw new NotFoundException(
+          `HR request with ID ${id} not found. Please check the ID and try again.`,
+        );
       }
 
       return request;
@@ -251,12 +277,18 @@ export class EmployeeService {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch HR request with ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch HR request with ID ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -306,7 +338,9 @@ export class EmployeeService {
       });
 
       if (requests.length === 0) {
-        throw new NotFoundException(`No HR requests found with priority ${priority}.`);
+        throw new NotFoundException(
+          `No HR requests found with priority ${priority}.`,
+        );
       }
 
       return requests;
@@ -315,12 +349,18 @@ export class EmployeeService {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch HR requests by priority ${priority}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch HR requests by priority ${priority}: ${error.message}`,
+      );
     }
   }
 
@@ -370,7 +410,9 @@ export class EmployeeService {
       });
 
       if (requests.length === 0) {
-        throw new NotFoundException(`No HR requests found with status ${status}.`);
+        throw new NotFoundException(
+          `No HR requests found with status ${status}.`,
+        );
       }
 
       return requests;
@@ -379,12 +421,18 @@ export class EmployeeService {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch HR requests by status ${status}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch HR requests by status ${status}: ${error.message}`,
+      );
     }
   }
 
@@ -436,18 +484,33 @@ export class EmployeeService {
       return requests;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch HR requests for employee ${employeeId}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch HR requests for employee ${employeeId}: ${error.message}`,
+      );
     }
   }
 
   async createHrRequest(createHrRequestDto: CreateHrRequestDto) {
     try {
-      const { empId, departmentId, requestType, subject, description, priority, status, assignedTo } = createHrRequestDto;
+      const {
+        empId,
+        departmentId,
+        requestType,
+        subject,
+        description,
+        priority,
+        status,
+        assignedTo,
+      } = createHrRequestDto;
 
       // Validate if employee exists
       const employee = await this.prisma.employee.findUnique({
@@ -455,7 +518,9 @@ export class EmployeeService {
       });
 
       if (!employee) {
-        throw new NotFoundException(`Employee with ID ${empId} not found. Please check the employee ID and try again.`);
+        throw new NotFoundException(
+          `Employee with ID ${empId} not found. Please check the employee ID and try again.`,
+        );
       }
 
       // Validate department if provided
@@ -465,7 +530,9 @@ export class EmployeeService {
         });
 
         if (!department) {
-          throw new NotFoundException(`Department with ID ${departmentId} not found. Please check the department ID and try again.`);
+          throw new NotFoundException(
+            `Department with ID ${departmentId} not found. Please check the department ID and try again.`,
+          );
         }
       }
 
@@ -476,7 +543,9 @@ export class EmployeeService {
         });
 
         if (!assignedEmployee) {
-          throw new NotFoundException(`Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`);
+          throw new NotFoundException(
+            `Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`,
+          );
         }
       }
 
@@ -560,25 +629,35 @@ export class EmployeeService {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to create HR request: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to create HR request: ${error.message}`,
+      );
     }
   }
 
-
-
-  private async validateAndUpdateHrRequest(id: number, hrActionDto: EmployeeHrActionDto, hrEmployeeId: number) {
+  private async validateAndUpdateHrRequest(
+    id: number,
+    hrActionDto: EmployeeHrActionDto,
+    hrEmployeeId: number,
+  ) {
     // Validate if request exists
     const existingRequest = await this.prisma.hrRequest.findUnique({
       where: { id },
     });
 
     if (!existingRequest) {
-      throw new NotFoundException(`HR request with ID ${id} not found. Please check the ID and try again.`);
+      throw new NotFoundException(
+        `HR request with ID ${id} not found. Please check the ID and try again.`,
+      );
     }
 
     // Validate if HR employee exists and is HR
@@ -591,23 +670,26 @@ export class EmployeeService {
     });
 
     if (!hrEmployee) {
-      throw new NotFoundException(`HR employee with ID ${hrEmployeeId} not found.`);
+      throw new NotFoundException(
+        `HR employee with ID ${hrEmployeeId} not found.`,
+      );
     }
-
 
     if (!hrEmployee.hr) {
-      throw new ForbiddenException(`Employee with ID ${hrEmployeeId} is not registered as HR personnel.`);
+      throw new ForbiddenException(
+        `Employee with ID ${hrEmployeeId} is not registered as HR personnel.`,
+      );
     }
 
-    const { 
-      status, 
-      responseNotes, 
-      assignedTo, 
-      requestType, 
-      subject, 
-      description, 
-      priority, 
-      departmentId 
+    const {
+      status,
+      responseNotes,
+      assignedTo,
+      requestType,
+      subject,
+      description,
+      priority,
+      departmentId,
     } = hrActionDto;
 
     // Validate assignedTo if provided
@@ -617,7 +699,9 @@ export class EmployeeService {
       });
 
       if (!assignedEmployee) {
-        throw new NotFoundException(`Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`);
+        throw new NotFoundException(
+          `Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`,
+        );
       }
     }
 
@@ -628,7 +712,9 @@ export class EmployeeService {
       });
 
       if (!department) {
-        throw new NotFoundException(`Department with ID ${departmentId} not found. Please check the department ID and try again.`);
+        throw new NotFoundException(
+          `Department with ID ${departmentId} not found. Please check the department ID and try again.`,
+        );
       }
     }
 
@@ -647,15 +733,21 @@ export class EmployeeService {
     }
     if (responseNotes !== undefined) {
       updateData.responseNotes = responseNotes;
-      changes.push(`Response Notes: ${existingRequest.responseNotes || 'None'} → ${responseNotes}`);
+      changes.push(
+        `Response Notes: ${existingRequest.responseNotes || 'None'} → ${responseNotes}`,
+      );
     }
     if (assignedTo !== undefined) {
       updateData.assignedTo = assignedTo;
-      changes.push(`Assigned To: ${existingRequest.assignedTo || 'None'} → ${assignedTo}`);
+      changes.push(
+        `Assigned To: ${existingRequest.assignedTo || 'None'} → ${assignedTo}`,
+      );
     }
     if (requestType !== undefined) {
       updateData.requestType = requestType;
-      changes.push(`Request Type: ${existingRequest.requestType} → ${requestType}`);
+      changes.push(
+        `Request Type: ${existingRequest.requestType} → ${requestType}`,
+      );
     }
     if (subject !== undefined) {
       updateData.subject = subject;
@@ -663,7 +755,9 @@ export class EmployeeService {
     }
     if (description !== undefined) {
       updateData.description = description;
-      changes.push(`Description: ${existingRequest.description} → ${description}`);
+      changes.push(
+        `Description: ${existingRequest.description} → ${description}`,
+      );
     }
     if (priority !== undefined) {
       updateData.priority = priority;
@@ -671,13 +765,17 @@ export class EmployeeService {
     }
     if (departmentId !== undefined) {
       updateData.departmentId = departmentId;
-      changes.push(`Department: ${existingRequest.departmentId || 'None'} → ${departmentId}`);
+      changes.push(
+        `Department: ${existingRequest.departmentId || 'None'} → ${departmentId}`,
+      );
     }
 
     // Set resolvedOn if status is being updated to Resolved
     if (status === RequestStatus.Resolved) {
       updateData.resolvedOn = new Date();
-      changes.push(`Resolved On: ${existingRequest.resolvedOn || 'None'} → ${new Date().toISOString()}`);
+      changes.push(
+        `Resolved On: ${existingRequest.resolvedOn || 'None'} → ${new Date().toISOString()}`,
+      );
     }
 
     // Update the request
@@ -737,49 +835,81 @@ export class EmployeeService {
     return updatedRequest;
   }
 
-  async takeHrAction(id: number, hrActionDto: EmployeeHrActionDto, hrEmployeeId: number) {
+  async takeHrAction(
+    id: number,
+    hrActionDto: EmployeeHrActionDto,
+    hrEmployeeId: number,
+  ) {
     try {
-      const updatedRequest = await this.validateAndUpdateHrRequest(id, hrActionDto, hrEmployeeId);
+      const updatedRequest = await this.validateAndUpdateHrRequest(
+        id,
+        hrActionDto,
+        hrEmployeeId,
+      );
 
       return {
         message: 'HR action taken successfully',
         data: updatedRequest,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to take HR action on request ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to take HR action on request ${id}: ${error.message}`,
+      );
     }
   }
 
-
-
-  async updateHrRequestAction(id: number, hrActionDto: EmployeeHrActionDto, hrEmployeeId: number) {
+  async updateHrRequestAction(
+    id: number,
+    hrActionDto: EmployeeHrActionDto,
+    hrEmployeeId: number,
+  ) {
     try {
-      const updatedRequest = await this.validateAndUpdateHrRequest(id, hrActionDto, hrEmployeeId);
+      const updatedRequest = await this.validateAndUpdateHrRequest(
+        id,
+        hrActionDto,
+        hrEmployeeId,
+      );
 
       return {
         message: 'HR request action updated successfully',
         data: updatedRequest,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to update HR request action for ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to update HR request action for ID ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -800,7 +930,9 @@ export class EmployeeService {
       });
 
       if (!existingRequest) {
-        throw new NotFoundException(`HR request with ID ${id} not found. Please check the ID and try again.`);
+        throw new NotFoundException(
+          `HR request with ID ${id} not found. Please check the ID and try again.`,
+        );
       }
 
       // Validate if HR employee exists and is HR
@@ -813,16 +945,25 @@ export class EmployeeService {
       });
 
       if (!hrEmployee) {
-        throw new NotFoundException(`HR employee with ID ${hrEmployeeId} not found.`);
+        throw new NotFoundException(
+          `HR employee with ID ${hrEmployeeId} not found.`,
+        );
       }
 
       // Check if employee is HR (you might need to adjust this based on your role system)
-      if (hrEmployee.role.name !== 'dep_manager' && hrEmployee.role.name !== 'unit_head') {
-        throw new ForbiddenException(`Employee with ID ${hrEmployeeId} is not authorized to delete HR requests. Only HR personnel can perform this action.`);
+      if (
+        hrEmployee.role.name !== 'dep_manager' &&
+        hrEmployee.role.name !== 'unit_head'
+      ) {
+        throw new ForbiddenException(
+          `Employee with ID ${hrEmployeeId} is not authorized to delete HR requests. Only HR personnel can perform this action.`,
+        );
       }
 
       if (!hrEmployee.hr) {
-        throw new ForbiddenException(`Employee with ID ${hrEmployeeId} is not registered as HR personnel.`);
+        throw new ForbiddenException(
+          `Employee with ID ${hrEmployeeId} is not registered as HR personnel.`,
+        );
       }
 
       // Log the deletion before deleting
@@ -845,16 +986,25 @@ export class EmployeeService {
         data: { id },
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to delete HR request with ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to delete HR request with ID ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -862,14 +1012,20 @@ export class EmployeeService {
    * Admin-specific method to validate and update HR request
    * Bypasses HR employee validation since admins don't have HR records
    */
-  private async validateAndUpdateHrRequestAsAdmin(id: number, hrActionDto: EmployeeHrActionDto, adminId: number) {
+  private async validateAndUpdateHrRequestAsAdmin(
+    id: number,
+    hrActionDto: EmployeeHrActionDto,
+    adminId: number,
+  ) {
     // Validate if request exists
     const existingRequest = await this.prisma.hrRequest.findUnique({
       where: { id },
     });
 
     if (!existingRequest) {
-      throw new NotFoundException(`HR request with ID ${id} not found. Please check the ID and try again.`);
+      throw new NotFoundException(
+        `HR request with ID ${id} not found. Please check the ID and try again.`,
+      );
     }
 
     // Validate if admin exists
@@ -881,15 +1037,15 @@ export class EmployeeService {
       throw new NotFoundException(`Admin with ID ${adminId} not found.`);
     }
 
-    const { 
-      status, 
-      responseNotes, 
-      assignedTo, 
-      requestType, 
-      subject, 
-      description, 
-      priority, 
-      departmentId 
+    const {
+      status,
+      responseNotes,
+      assignedTo,
+      requestType,
+      subject,
+      description,
+      priority,
+      departmentId,
     } = hrActionDto;
 
     // Validate assignedTo if provided
@@ -899,7 +1055,9 @@ export class EmployeeService {
       });
 
       if (!assignedEmployee) {
-        throw new NotFoundException(`Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`);
+        throw new NotFoundException(
+          `Assigned employee with ID ${assignedTo} not found. Please check the assigned employee ID and try again.`,
+        );
       }
     }
 
@@ -910,7 +1068,9 @@ export class EmployeeService {
       });
 
       if (!department) {
-        throw new NotFoundException(`Department with ID ${departmentId} not found. Please check the department ID and try again.`);
+        throw new NotFoundException(
+          `Department with ID ${departmentId} not found. Please check the department ID and try again.`,
+        );
       }
     }
 
@@ -929,15 +1089,21 @@ export class EmployeeService {
     }
     if (responseNotes !== undefined) {
       updateData.responseNotes = responseNotes;
-      changes.push(`Response Notes: ${existingRequest.responseNotes || 'None'} → ${responseNotes}`);
+      changes.push(
+        `Response Notes: ${existingRequest.responseNotes || 'None'} → ${responseNotes}`,
+      );
     }
     if (assignedTo !== undefined) {
       updateData.assignedTo = assignedTo;
-      changes.push(`Assigned To: ${existingRequest.assignedTo || 'None'} → ${assignedTo}`);
+      changes.push(
+        `Assigned To: ${existingRequest.assignedTo || 'None'} → ${assignedTo}`,
+      );
     }
     if (requestType !== undefined) {
       updateData.requestType = requestType;
-      changes.push(`Request Type: ${existingRequest.requestType} → ${requestType}`);
+      changes.push(
+        `Request Type: ${existingRequest.requestType} → ${requestType}`,
+      );
     }
     if (subject !== undefined) {
       updateData.subject = subject;
@@ -945,7 +1111,9 @@ export class EmployeeService {
     }
     if (description !== undefined) {
       updateData.description = description;
-      changes.push(`Description: ${existingRequest.description} → ${description}`);
+      changes.push(
+        `Description: ${existingRequest.description} → ${description}`,
+      );
     }
     if (priority !== undefined) {
       updateData.priority = priority;
@@ -953,13 +1121,17 @@ export class EmployeeService {
     }
     if (departmentId !== undefined) {
       updateData.departmentId = departmentId;
-      changes.push(`Department: ${existingRequest.departmentId || 'None'} → ${departmentId}`);
+      changes.push(
+        `Department: ${existingRequest.departmentId || 'None'} → ${departmentId}`,
+      );
     }
 
     // Set resolvedOn if status is being updated to Resolved
     if (status === RequestStatus.Resolved) {
       updateData.resolvedOn = new Date();
-      changes.push(`Resolved On: ${existingRequest.resolvedOn || 'None'} → ${new Date().toISOString()}`);
+      changes.push(
+        `Resolved On: ${existingRequest.resolvedOn || 'None'} → ${new Date().toISOString()}`,
+      );
     }
 
     // Update the request
@@ -1007,10 +1179,12 @@ export class EmployeeService {
     // TODO: Log admin actions to admin_logs table when it's added to schema
     // For now, we skip logging for admin actions
     // Future implementation should create admin_logs table and log:
-    // - adminId, action: 'HR_REQUEST_UPDATE', targetType: 'HR_REQUEST', 
+    // - adminId, action: 'HR_REQUEST_UPDATE', targetType: 'HR_REQUEST',
     // - targetId: id, description, metadata (hrRequestId, affectedEmployeeId, changes)
     if (changes.length > 0) {
-      console.log(`Admin ${adminId} updated HR Request #${id}: ${changes.join(', ')}`);
+      console.log(
+        `Admin ${adminId} updated HR Request #${id}: ${changes.join(', ')}`,
+      );
     }
 
     return updatedRequest;
@@ -1019,50 +1193,84 @@ export class EmployeeService {
   /**
    * Admin takes action on HR request (creates initial action)
    */
-  async takeAdminAction(id: number, hrActionDto: EmployeeHrActionDto, adminId: number) {
+  async takeAdminAction(
+    id: number,
+    hrActionDto: EmployeeHrActionDto,
+    adminId: number,
+  ) {
     try {
-      const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(id, hrActionDto, adminId);
+      const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(
+        id,
+        hrActionDto,
+        adminId,
+      );
 
       return {
         message: 'Admin action taken successfully',
         data: updatedRequest,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to take admin action on request ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to take admin action on request ${id}: ${error.message}`,
+      );
     }
   }
 
   /**
    * Admin updates existing action on HR request
    */
-  async updateAdminAction(id: number, hrActionDto: EmployeeHrActionDto, adminId: number) {
+  async updateAdminAction(
+    id: number,
+    hrActionDto: EmployeeHrActionDto,
+    adminId: number,
+  ) {
     try {
-      const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(id, hrActionDto, adminId);
+      const updatedRequest = await this.validateAndUpdateHrRequestAsAdmin(
+        id,
+        hrActionDto,
+        adminId,
+      );
 
       return {
         message: 'Admin request action updated successfully',
         data: updatedRequest,
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to update admin action for request ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to update admin action for request ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -1086,7 +1294,9 @@ export class EmployeeService {
       });
 
       if (!existingRequest) {
-        throw new NotFoundException(`HR request with ID ${id} not found. Please check the ID and try again.`);
+        throw new NotFoundException(
+          `HR request with ID ${id} not found. Please check the ID and try again.`,
+        );
       }
 
       // Validate if admin exists
@@ -1100,7 +1310,9 @@ export class EmployeeService {
 
       // TODO: Log admin deletion to admin_logs table when it's added to schema
       // For now, we log to console
-      console.log(`Admin ${adminId} deleted HR Request #${id} (Subject: "${existingRequest.subject}", Employee: ${existingRequest.employee.firstName} ${existingRequest.employee.lastName})`);
+      console.log(
+        `Admin ${adminId} deleted HR Request #${id} (Subject: "${existingRequest.subject}", Employee: ${existingRequest.employee.firstName} ${existingRequest.employee.lastName})`,
+      );
 
       // Delete the request
       await this.prisma.hrRequest.delete({
@@ -1112,16 +1324,25 @@ export class EmployeeService {
         data: { id },
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to delete HR request with ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to delete HR request with ID ${id}: ${error.message}`,
+      );
     }
   }
 }

@@ -30,7 +30,11 @@ export class ChangeDto {
   @ApiProperty({ description: 'Rate change', example: 2.3 })
   rate: number;
 
-  @ApiProperty({ description: 'Trend direction', example: 'up', enum: ['up', 'down', 'neutral'] })
+  @ApiProperty({
+    description: 'Trend direction',
+    example: 'up',
+    enum: ['up', 'down', 'neutral'],
+  })
   trend: 'up' | 'down' | 'neutral';
 
   @ApiProperty({ description: 'Percentage change', example: 2.55 })
@@ -38,10 +42,16 @@ export class ChangeDto {
 }
 
 export class AttendanceSummaryDto {
-  @ApiProperty({ description: 'Current period summary', type: PeriodSummaryDto })
+  @ApiProperty({
+    description: 'Current period summary',
+    type: PeriodSummaryDto,
+  })
   currentPeriod: PeriodSummaryDto;
 
-  @ApiProperty({ description: 'Previous period summary', type: PeriodSummaryDto })
+  @ApiProperty({
+    description: 'Previous period summary',
+    type: PeriodSummaryDto,
+  })
   previousPeriod: PeriodSummaryDto;
 
   @ApiProperty({ description: 'Change comparison', type: ChangeDto })
@@ -63,13 +73,20 @@ export class DepartmentAttendanceDto {
 }
 
 export class AttendanceDataPointDto {
-  @ApiProperty({ description: 'Date in ISO format (YYYY-MM-DD for daily, YYYY-MM for monthly)', example: '2025-01-15' })
+  @ApiProperty({
+    description:
+      'Date in ISO format (YYYY-MM-DD for daily, YYYY-MM for monthly)',
+    example: '2025-01-15',
+  })
   date: string;
 
   @ApiProperty({ description: 'Short label for chart', example: 'Mon' })
   label: string;
 
-  @ApiProperty({ description: 'Full label for display', example: 'Mon, Jan 15' })
+  @ApiProperty({
+    description: 'Full label for display',
+    example: 'Mon, Jan 15',
+  })
   fullLabel: string;
 
   @ApiProperty({ description: 'Attendance rate percentage', example: 95 })
@@ -87,7 +104,11 @@ export class AttendanceDataPointDto {
   @ApiProperty({ description: 'On leave count', required: false, example: 3 })
   onLeave?: number;
 
-  @ApiProperty({ description: 'Remote work count', required: false, example: 8 })
+  @ApiProperty({
+    description: 'Remote work count',
+    required: false,
+    example: 8,
+  })
   remote?: number;
 
   @ApiProperty({ description: 'Late count', required: false, example: 2 })
@@ -102,16 +123,32 @@ export class AttendanceDataPointDto {
   @ApiProperty({ description: 'Is holiday', required: false, example: false })
   isHoliday?: boolean;
 
-  @ApiProperty({ description: 'Month number (for monthly view)', required: false, example: 1 })
+  @ApiProperty({
+    description: 'Month number (for monthly view)',
+    required: false,
+    example: 1,
+  })
   monthNumber?: number;
 
-  @ApiProperty({ description: 'Year (for monthly view)', required: false, example: 2025 })
+  @ApiProperty({
+    description: 'Year (for monthly view)',
+    required: false,
+    example: 2025,
+  })
   year?: number;
 
-  @ApiProperty({ description: 'Working days in month (for monthly view)', required: false, example: 22 })
+  @ApiProperty({
+    description: 'Working days in month (for monthly view)',
+    required: false,
+    example: 22,
+  })
   workingDays?: number;
 
-  @ApiProperty({ description: 'Department breakdown (Admin only)', required: false, type: Object })
+  @ApiProperty({
+    description: 'Department breakdown (Admin only)',
+    required: false,
+    type: Object,
+  })
   byDepartment?: Record<string, DepartmentAttendanceDto>;
 }
 
@@ -133,13 +170,24 @@ export class AttendanceMetadataDto {
   @ApiProperty({ description: 'Total months', example: 12 })
   totalMonths?: number;
 
-  @ApiProperty({ description: 'Working days count', required: false, example: 5 })
+  @ApiProperty({
+    description: 'Working days count',
+    required: false,
+    example: 5,
+  })
   workingDays?: number;
 
-  @ApiProperty({ description: 'Weekend days count', required: false, example: 2 })
+  @ApiProperty({
+    description: 'Weekend days count',
+    required: false,
+    example: 2,
+  })
   weekendDays?: number;
 
-  @ApiProperty({ description: 'Generation timestamp', example: '2025-01-21T10:30:00Z' })
+  @ApiProperty({
+    description: 'Generation timestamp',
+    example: '2025-01-21T10:30:00Z',
+  })
   generatedAt: string;
 }
 
@@ -158,16 +206,28 @@ export class AttendanceTrendsResponseDto {
   @ApiProperty({ description: 'User role', example: 'dep_manager' })
   role: string;
 
-  @ApiProperty({ description: 'Period type', example: 'daily', enum: ['daily', 'monthly'] })
+  @ApiProperty({
+    description: 'Period type',
+    example: 'daily',
+    enum: ['daily', 'monthly'],
+  })
   period: 'daily' | 'monthly';
 
-  @ApiProperty({ description: 'Summary statistics', type: AttendanceSummaryDto })
+  @ApiProperty({
+    description: 'Summary statistics',
+    type: AttendanceSummaryDto,
+  })
   summary: AttendanceSummaryDto | AdminDepartmentSummaryDto;
 
-  @ApiProperty({ description: 'Trend data points', type: [AttendanceDataPointDto] })
+  @ApiProperty({
+    description: 'Trend data points',
+    type: [AttendanceDataPointDto],
+  })
   data: AttendanceDataPointDto[];
 
-  @ApiProperty({ description: 'Response metadata', type: AttendanceMetadataDto })
+  @ApiProperty({
+    description: 'Response metadata',
+    type: AttendanceMetadataDto,
+  })
   metadata: AttendanceMetadataDto;
 }
-

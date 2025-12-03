@@ -1,12 +1,12 @@
-import { 
-  IsString, 
-  IsDateString, 
-  IsEnum, 
-  IsNumber, 
-  IsOptional, 
-  IsPositive, 
-  MinLength, 
-  MaxLength 
+import {
+  IsString,
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  MinLength,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CampaignStatus } from '@prisma/client';
@@ -82,7 +82,8 @@ export class CreateCampaignDto {
   unitId: number;
 
   @ApiPropertyOptional({
-    example: 'This campaign focuses on promoting new product launches across social media.',
+    example:
+      'This campaign focuses on promoting new product launches across social media.',
     description: 'Optional description of the campaign',
     maxLength: 1000,
   })
@@ -93,7 +94,8 @@ export class CreateCampaignDto {
 
   @ApiPropertyOptional({
     example: 7,
-    description: 'Optional ID of the production unit associated with the campaign',
+    description:
+      'Optional ID of the production unit associated with the campaign',
   })
   @IsOptional()
   @IsNumber({}, { message: 'Production unit ID must be a number' })

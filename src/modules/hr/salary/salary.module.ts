@@ -9,4 +9,4 @@ import { FinanceModule } from '../../finance/finance.module';
   providers: [SalaryService],
   exports: [SalaryService],
 })
-export class SalaryModule {} 
+export class SalaryModule {}

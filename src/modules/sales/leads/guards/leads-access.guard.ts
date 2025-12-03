@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 
 @Injectable()
@@ -9,7 +14,7 @@ export class LeadsAccessGuard implements CanActivate {
     console.log('🔍 LeadsAccessGuard - canActivate called');
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    
+
     console.log('🔍 LeadsAccessGuard - user:', user);
     console.log('🔍 LeadsAccessGuard - user type:', typeof user);
 
@@ -28,9 +33,9 @@ export class LeadsAccessGuard implements CanActivate {
       where: { id: user.id },
       include: {
         department: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     });
 
     if (!employee) {
@@ -45,6 +50,8 @@ export class LeadsAccessGuard implements CanActivate {
       return true;
     }
 
-    throw new ForbiddenException('Access denied. Only sales, HR, admin, and marketing users can access leads.');
+    throw new ForbiddenException(
+      'Access denied. Only sales, HR, admin, and marketing users can access leads.',
+    );
   }
 }

@@ -40,7 +40,11 @@ export class AutoCheckoutTrigger {
    *  - Actual late check-in does not affect the computed checkout time.
    */
   @Cron('0 5 * * *', { timeZone: 'Asia/Karachi' })
-  async autoCheckout(): Promise<{ processed: number; updated: number; skipped: number }> {
+  async autoCheckout(): Promise<{
+    processed: number;
+    updated: number;
+    skipped: number;
+  }> {
     const isOk = await this.ensureDb();
     if (!isOk) {
       return { processed: 0, updated: 0, skipped: 0 };
@@ -49,7 +53,9 @@ export class AutoCheckoutTrigger {
     try {
       // Current PKT date/time
       const now = new Date();
-      const nowPkt = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+      const nowPkt = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+      );
 
       // Target date is yesterday in PKT (business date)
       const targetDate = new Date(nowPkt);
@@ -64,8 +70,8 @@ export class AutoCheckoutTrigger {
           checkout: null,
           NOT: { status: 'absent' },
           employee: {
-            status: 'active'
-          }
+            status: 'active',
+          },
         },
         select: {
           id: true,
@@ -73,9 +79,9 @@ export class AutoCheckoutTrigger {
           checkin: true,
           status: true,
           employee: {
-            select: { shiftStart: true, shiftEnd: true, status: true }
-          }
-        }
+            select: { shiftStart: true, shiftEnd: true, status: true },
+          },
+        },
       });
 
       if (logs.length === 0) {
@@ -89,33 +95,45 @@ export class AutoCheckoutTrigger {
       for (const log of logs) {
         try {
           // Compute candidate checkout in PKT for the business date
-          const candidateCheckout = this.computeCandidateCheckout(targetDate, log.employee?.shiftStart || null, log.employee?.shiftEnd || null);
+          const candidateCheckout = this.computeCandidateCheckout(
+            targetDate,
+            log.employee?.shiftStart || null,
+            log.employee?.shiftEnd || null,
+          );
 
           // Cap at 05:00 AM PKT next day (cron run time)
           const capTime = new Date(targetDate);
           capTime.setDate(capTime.getDate() + 1);
           capTime.setHours(5, 0, 0, 0);
 
-          const finalCheckout = candidateCheckout > capTime ? capTime : candidateCheckout;
+          const finalCheckout =
+            candidateCheckout > capTime ? capTime : candidateCheckout;
 
           // Persist checkout as a PKT-local timestamp (Date object stored as UTC by DB)
           await this.prisma.attendanceLog.update({
             where: { id: log.id },
             data: {
-              checkout: finalCheckout
-            }
+              checkout: finalCheckout,
+            },
           });
           updated++;
         } catch (e) {
-          this.logger.error(`Failed auto-checkout for log ${log.id}: ${e.message}`);
+          this.logger.error(
+            `Failed auto-checkout for log ${log.id}: ${e.message}`,
+          );
           skipped++;
         }
       }
 
-      this.logger.log(`Auto-checkout complete. Processed=${logs.length}, Updated=${updated}, Skipped=${skipped}`);
+      this.logger.log(
+        `Auto-checkout complete. Processed=${logs.length}, Updated=${updated}, Skipped=${skipped}`,
+      );
       return { processed: logs.length, updated, skipped };
     } catch (error) {
-      if (error.message?.includes("Can't reach database server") || (error as any).code === 'P1001') {
+      if (
+        error.message?.includes("Can't reach database server") ||
+        error.code === 'P1001'
+      ) {
         this.logger.warn(`DB issue during auto-checkout: ${error.message}`);
         return { processed: 0, updated: 0, skipped: 0 };
       }
@@ -124,7 +142,11 @@ export class AutoCheckoutTrigger {
     }
   }
 
-  private computeCandidateCheckout(businessDatePkt: Date, shiftStart: string | null, shiftEnd: string | null): Date {
+  private computeCandidateCheckout(
+    businessDatePkt: Date,
+    shiftStart: string | null,
+    shiftEnd: string | null,
+  ): Date {
     // If shiftEnd exists, place it on the correct day relative to shiftStart
     if (shiftEnd) {
       const end = new Date(businessDatePkt);
@@ -188,5 +210,3 @@ export class AutoCheckoutTrigger {
     return Math.floor(m);
   }
 }
-
-

@@ -4,7 +4,10 @@ export class DeleteTeamSuccessResponseDto {
   @ApiProperty({ description: 'Success status', example: true })
   success: boolean;
 
-  @ApiProperty({ description: 'Success message', example: 'Team deleted successfully' })
+  @ApiProperty({
+    description: 'Success message',
+    example: 'Team deleted successfully',
+  })
   message: string;
 }
 
@@ -12,7 +15,10 @@ export class DeleteTeamErrorResponseDto {
   @ApiProperty({ description: 'Success status', example: false })
   success: boolean;
 
-  @ApiProperty({ description: 'Error message', example: 'Cannot delete team. Team has dependencies.' })
+  @ApiProperty({
+    description: 'Error message',
+    example: 'Cannot delete team. Team has dependencies.',
+  })
   message: string;
 
   @ApiProperty({ description: 'Team information' })
@@ -50,6 +56,9 @@ export class DeleteTeamErrorResponseDto {
     };
   };
 
-  @ApiProperty({ description: 'Instructions to resolve dependencies', type: [String] })
+  @ApiProperty({
+    description: 'Instructions to resolve dependencies',
+    type: [String],
+  })
   instructions: string[];
 }

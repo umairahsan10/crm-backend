@@ -4,6 +4,6 @@ import { TeamsModule } from './teams/teams.module';
 
 @Module({
   imports: [UnitsModule, TeamsModule],
-  exports: [UnitsModule, TeamsModule]
+  exports: [UnitsModule, TeamsModule],
 })
-export class ProductionModule {} 
+export class ProductionModule {}

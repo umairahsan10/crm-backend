@@ -11,8 +11,8 @@ export class MetricGridResponseDto {
   @ApiProperty({ description: 'Dashboard metric cards', type: [MetricCardDto] })
   cards?: MetricCardDto[];
 
-  @ApiProperty({ 
-    description: 'Cards grouped by department (only for Admin users)', 
+  @ApiProperty({
+    description: 'Cards grouped by department (only for Admin users)',
     type: Object,
     isArray: false,
     required: false,
@@ -21,8 +21,8 @@ export class MetricGridResponseDto {
       Sales: [],
       HR: [],
       Production: [],
-      Accounts: []
-    }
+      Accounts: [],
+    },
   })
   cardsByDepartment?: {
     Admin?: MetricCardDto[];
@@ -32,4 +32,3 @@ export class MetricGridResponseDto {
     Accounts?: MetricCardDto[];
   };
 }
-

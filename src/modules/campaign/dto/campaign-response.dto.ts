@@ -5,40 +5,73 @@ export class CampaignResponseDto {
   @ApiProperty({ example: 1, description: 'Unique ID of the campaign' })
   id: number;
 
-  @ApiProperty({ example: 'Summer Marketing Blitz', description: 'Name of the campaign' })
+  @ApiProperty({
+    example: 'Summer Marketing Blitz',
+    description: 'Name of the campaign',
+  })
   campaignName: string;
 
-  @ApiProperty({ example: 'digital', description: 'Type of campaign (e.g., digital, print)' })
+  @ApiProperty({
+    example: 'digital',
+    description: 'Type of campaign (e.g., digital, print)',
+  })
   campaignType: string;
 
-  @ApiProperty({ example: '2025-06-01', description: 'Start date of the campaign (ISO format)' })
+  @ApiProperty({
+    example: '2025-06-01',
+    description: 'Start date of the campaign (ISO format)',
+  })
   startDate: Date;
 
-  @ApiProperty({ example: '2025-09-30', description: 'End date of the campaign (ISO format)' })
+  @ApiProperty({
+    example: '2025-09-30',
+    description: 'End date of the campaign (ISO format)',
+  })
   endDate: Date;
 
-  @ApiProperty({ enum: CampaignStatus, description: 'Current status of the campaign' })
+  @ApiProperty({
+    enum: CampaignStatus,
+    description: 'Current status of the campaign',
+  })
   status: CampaignStatus;
 
   @ApiProperty({ example: 25000, description: 'Planned campaign budget' })
   budget: number;
 
-  @ApiPropertyOptional({ example: 22000, description: 'Actual cost incurred during the campaign' })
+  @ApiPropertyOptional({
+    example: 22000,
+    description: 'Actual cost incurred during the campaign',
+  })
   actualCost?: number;
 
-  @ApiProperty({ example: 3, description: 'ID of the marketing unit associated with the campaign' })
+  @ApiProperty({
+    example: 3,
+    description: 'ID of the marketing unit associated with the campaign',
+  })
   unitId: number;
 
-  @ApiPropertyOptional({ example: 'Campaign focusing on brand awareness', description: 'Brief description of the campaign' })
+  @ApiPropertyOptional({
+    example: 'Campaign focusing on brand awareness',
+    description: 'Brief description of the campaign',
+  })
   description?: string;
 
-  @ApiProperty({ example: '2025-05-01T10:00:00Z', description: 'Timestamp when the campaign record was created' })
+  @ApiProperty({
+    example: '2025-05-01T10:00:00Z',
+    description: 'Timestamp when the campaign record was created',
+  })
   createdAt: Date;
 
-  @ApiProperty({ example: '2025-05-15T18:30:00Z', description: 'Timestamp when the campaign record was last updated' })
+  @ApiProperty({
+    example: '2025-05-15T18:30:00Z',
+    description: 'Timestamp when the campaign record was last updated',
+  })
   updatedAt: Date;
 
-  @ApiPropertyOptional({ example: 7, description: 'ID of the production unit (if any)' })
+  @ApiPropertyOptional({
+    example: 7,
+    description: 'ID of the production unit (if any)',
+  })
   productionUnitId?: number;
 
   @ApiPropertyOptional({
@@ -63,7 +96,10 @@ export class CampaignResponseDto {
 }
 
 export class CampaignListResponseDto {
-  @ApiProperty({ type: [CampaignResponseDto], description: 'List of campaigns in the current page' })
+  @ApiProperty({
+    type: [CampaignResponseDto],
+    description: 'List of campaigns in the current page',
+  })
   campaigns: CampaignResponseDto[];
 
   @ApiProperty({ example: 120, description: 'Total number of campaigns found' })

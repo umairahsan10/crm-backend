@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
 import { CompanySettingsResponseDto } from './dto/company-settings-response.dto';
@@ -20,7 +25,9 @@ export class CompanySettingsService {
       });
 
       if (!company) {
-        throw new NotFoundException('Company settings not found. Please create a company first.');
+        throw new NotFoundException(
+          'Company settings not found. Please create a company first.',
+        );
       }
 
       return this.mapToResponseDto(company);
@@ -29,7 +36,9 @@ export class CompanySettingsService {
         throw error;
       }
       this.logger.error(`Failed to get company settings: ${error.message}`);
-      throw new BadRequestException(`Failed to get company settings: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to get company settings: ${error.message}`,
+      );
     }
   }
 
@@ -37,14 +46,18 @@ export class CompanySettingsService {
    * Update company settings (single company with ID = 1)
    * Supports partial updates - can update single field or multiple fields
    */
-  async updateCompanySettings(dto: UpdateCompanySettingsDto): Promise<CompanySettingsResponseDto> {
+  async updateCompanySettings(
+    dto: UpdateCompanySettingsDto,
+  ): Promise<CompanySettingsResponseDto> {
     // Check if company exists
     const existingCompany = await this.prisma.company.findUnique({
       where: { id: this.COMPANY_ID },
     });
 
     if (!existingCompany) {
-      throw new NotFoundException('Company settings not found. Please create a company first.');
+      throw new NotFoundException(
+        'Company settings not found. Please create a company first.',
+      );
     }
 
     try {
@@ -70,13 +83,18 @@ export class CompanySettingsService {
       if (dto.absentTime !== undefined) updateData.absentTime = dto.absentTime;
 
       // Leave Policies
-      if (dto.quarterlyLeavesDays !== undefined) updateData.quarterlyLeavesDays = dto.quarterlyLeavesDays;
-      if (dto.monthlyLatesDays !== undefined) updateData.monthlyLatesDays = dto.monthlyLatesDays;
+      if (dto.quarterlyLeavesDays !== undefined)
+        updateData.quarterlyLeavesDays = dto.quarterlyLeavesDays;
+      if (dto.monthlyLatesDays !== undefined)
+        updateData.monthlyLatesDays = dto.monthlyLatesDays;
 
       // Deductions
-      if (dto.absentDeduction !== undefined) updateData.absentDeduction = dto.absentDeduction;
-      if (dto.lateDeduction !== undefined) updateData.lateDeduction = dto.lateDeduction;
-      if (dto.halfDeduction !== undefined) updateData.halfDeduction = dto.halfDeduction;
+      if (dto.absentDeduction !== undefined)
+        updateData.absentDeduction = dto.absentDeduction;
+      if (dto.lateDeduction !== undefined)
+        updateData.lateDeduction = dto.lateDeduction;
+      if (dto.halfDeduction !== undefined)
+        updateData.halfDeduction = dto.halfDeduction;
 
       // Update company
       const updatedCompany = await this.prisma.company.update({
@@ -91,7 +109,9 @@ export class CompanySettingsService {
         throw error;
       }
       this.logger.error(`Failed to update company settings: ${error.message}`);
-      throw new BadRequestException(`Failed to update company settings: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to update company settings: ${error.message}`,
+      );
     }
   }
 
@@ -125,4 +145,3 @@ export class CompanySettingsService {
     };
   }
 }
-

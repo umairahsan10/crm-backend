@@ -2,10 +2,14 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
+import { JwtConfigService } from '../../../../config/jwt.config';
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private jwtConfig: JwtConfigService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
@@ -17,7 +21,7 @@ export class WsJwtGuard implements CanActivate {
       }
 
       const payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-for-crm-backend-2024',
+        secret: this.jwtConfig.getSecret(),
       });
 
       // Attach user to socket for later use
@@ -57,4 +61,3 @@ export class WsJwtGuard implements CanActivate {
     return null;
   }
 }
-

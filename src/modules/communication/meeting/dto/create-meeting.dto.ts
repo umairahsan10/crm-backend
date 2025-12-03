@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsDateString, IsBoolean, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsDateString,
+  IsBoolean,
+  IsEnum,
+} from 'class-validator';
 import { MeetingStatus } from '@prisma/client';
 
 export class CreateMeetingDto {
@@ -43,7 +50,8 @@ export class CreateMeetingDto {
   status?: MeetingStatus;
 
   @ApiPropertyOptional({
-    description: 'Whether an automatic reminder should be sent before the meeting',
+    description:
+      'Whether an automatic reminder should be sent before the meeting',
     example: true,
   })
   @IsOptional()

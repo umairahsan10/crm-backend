@@ -10,10 +10,16 @@ export class TeamLeadResponseDto {
   @ApiProperty({ description: 'Team lead last name', example: 'Doe' })
   lastName: string;
 
-  @ApiPropertyOptional({ description: 'Team lead email', example: 'john.doe@company.com' })
+  @ApiPropertyOptional({
+    description: 'Team lead email',
+    example: 'john.doe@company.com',
+  })
   email?: string;
 
-  @ApiPropertyOptional({ description: 'Team lead phone', example: '+1234567890' })
+  @ApiPropertyOptional({
+    description: 'Team lead phone',
+    example: '+1234567890',
+  })
   phone?: string;
 
   @ApiPropertyOptional({ description: 'Team lead role information' })
@@ -27,7 +33,10 @@ export class ProductionUnitResponseDto {
   @ApiProperty({ description: 'Production unit ID', example: 1 })
   id: number;
 
-  @ApiProperty({ description: 'Production unit name', example: 'Frontend Development Unit' })
+  @ApiProperty({
+    description: 'Production unit name',
+    example: 'Frontend Development Unit',
+  })
   name: string;
 
   @ApiPropertyOptional({ description: 'Production unit head information' })
@@ -48,10 +57,16 @@ export class TeamMemberResponseDto {
   @ApiProperty({ description: 'Employee last name', example: 'Smith' })
   lastName: string;
 
-  @ApiPropertyOptional({ description: 'Employee email', example: 'jane.smith@company.com' })
+  @ApiPropertyOptional({
+    description: 'Employee email',
+    example: 'jane.smith@company.com',
+  })
   email?: string;
 
-  @ApiPropertyOptional({ description: 'Employee phone', example: '+1234567891' })
+  @ApiPropertyOptional({
+    description: 'Employee phone',
+    example: '+1234567891',
+  })
   phone?: string;
 
   @ApiPropertyOptional({ description: 'Employee role information' })
@@ -65,16 +80,28 @@ export class ProjectResponseDto {
   @ApiProperty({ description: 'Project ID', example: 789 })
   id: number;
 
-  @ApiPropertyOptional({ description: 'Project description', example: 'E-commerce website development' })
+  @ApiPropertyOptional({
+    description: 'Project description',
+    example: 'E-commerce website development',
+  })
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Project status', example: 'in_progress' })
+  @ApiPropertyOptional({
+    description: 'Project status',
+    example: 'in_progress',
+  })
   status?: string;
 
-  @ApiPropertyOptional({ description: 'Project progress percentage', example: 65.50 })
+  @ApiPropertyOptional({
+    description: 'Project progress percentage',
+    example: 65.5,
+  })
   liveProgress?: number;
 
-  @ApiPropertyOptional({ description: 'Project deadline', example: '2024-03-15T00:00:00.000Z' })
+  @ApiPropertyOptional({
+    description: 'Project deadline',
+    example: '2024-03-15T00:00:00.000Z',
+  })
   deadline?: Date;
 
   @ApiPropertyOptional({ description: 'Client information' })
@@ -114,10 +141,16 @@ export class TeamListResponseDto {
   @ApiPropertyOptional({ description: 'Production unit ID', example: 1 })
   productionUnitId?: number;
 
-  @ApiProperty({ description: 'Team creation date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Team creation date',
+    example: '2024-01-15T10:30:00Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Team last update date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Team last update date',
+    example: '2024-01-15T10:30:00Z',
+  })
   updatedAt: Date;
 
   @ApiPropertyOptional({ description: 'Team lead information' })
@@ -152,10 +185,16 @@ export class TeamDetailResponseDto {
   @ApiPropertyOptional({ description: 'Production unit ID', example: 1 })
   productionUnitId?: number;
 
-  @ApiProperty({ description: 'Team creation date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Team creation date',
+    example: '2024-01-15T10:30:00Z',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Team last update date', example: '2024-01-15T10:30:00Z' })
+  @ApiProperty({
+    description: 'Team last update date',
+    example: '2024-01-15T10:30:00Z',
+  })
   updatedAt: Date;
 
   @ApiPropertyOptional({ description: 'Team lead information' })
@@ -170,9 +209,15 @@ export class TeamDetailResponseDto {
   @ApiProperty({ description: 'Number of team projects', example: 3 })
   projectsCount: number;
 
-  @ApiProperty({ description: 'Team members list', type: [TeamMemberResponseDto] })
+  @ApiProperty({
+    description: 'Team members list',
+    type: [TeamMemberResponseDto],
+  })
   members: TeamMemberResponseDto[];
 
-  @ApiProperty({ description: 'Team projects list', type: [ProjectResponseDto] })
+  @ApiProperty({
+    description: 'Team projects list',
+    type: [ProjectResponseDto],
+  })
   projects: ProjectResponseDto[];
 }

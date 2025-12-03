@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { GetAttendanceLogsDto } from './dto/get-attendance-logs.dto';
 import { AttendanceLogResponseDto } from './dto/attendance-log-response.dto';
@@ -25,21 +30,46 @@ import { LeaveLogResponseDto } from './dto/leave-log-response.dto';
 import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
 import { BulkCheckoutDto } from './dto/bulk-checkout.dto';
 import { ExportLeaveLogsDto } from './dto/export-leave-logs.dto';
-import { LeaveLogsStatsDto, LeaveLogsStatsResponseDto, PeriodStatsDto, EmployeeLeaveStatsDto, LeaveTypeStatsDto, StatsPeriod } from './dto/leave-logs-stats.dto';
+import {
+  LeaveLogsStatsDto,
+  LeaveLogsStatsResponseDto,
+  PeriodStatsDto,
+  EmployeeLeaveStatsDto,
+  LeaveTypeStatsDto,
+  StatsPeriod,
+} from './dto/leave-logs-stats.dto';
 import { ExportLateLogsDto } from './dto/export-late-logs.dto';
-import { LateLogsStatsDto, LateLogsStatsResponseDto, EmployeeLateStatsDto, ReasonStatsDto, PeriodStatsDto as LatePeriodStatsDto } from './dto/late-logs-stats.dto';
+import {
+  LateLogsStatsDto,
+  LateLogsStatsResponseDto,
+  EmployeeLateStatsDto,
+  ReasonStatsDto,
+  PeriodStatsDto as LatePeriodStatsDto,
+} from './dto/late-logs-stats.dto';
 import { ExportHalfDayLogsDto } from './dto/export-half-day-logs.dto';
-import { HalfDayLogsStatsDto, HalfDayLogsStatsResponseDto, EmployeeHalfDayStatsDto, ReasonStatsDto as HalfDayReasonStatsDto, PeriodStatsDto as HalfDayPeriodStatsDto } from './dto/half-day-logs-stats.dto';
+import {
+  HalfDayLogsStatsDto,
+  HalfDayLogsStatsResponseDto,
+  EmployeeHalfDayStatsDto,
+  ReasonStatsDto as HalfDayReasonStatsDto,
+  PeriodStatsDto as HalfDayPeriodStatsDto,
+} from './dto/half-day-logs-stats.dto';
 import { GetProjectLogsDto } from './dto/get-project-logs.dto';
 import { ProjectLogsListResponseDto } from './dto/project-logs-list-response.dto';
 import { ExportProjectLogsDto } from '../../projects/Projects-Logs/dto/export-project-logs.dto';
-import { ProjectLogsStatsDto, ProjectLogsStatsResponseDto, StatsPeriod as ProjectLogsStatsPeriod } from '../../projects/Projects-Logs/dto/project-logs-stats.dto';
+import {
+  ProjectLogsStatsDto,
+  ProjectLogsStatsResponseDto,
+  StatsPeriod as ProjectLogsStatsPeriod,
+} from '../../projects/Projects-Logs/dto/project-logs-stats.dto';
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  async getAttendanceLogs(query: GetAttendanceLogsDto): Promise<AttendanceLogResponseDto[]> {
+  async getAttendanceLogs(
+    query: GetAttendanceLogsDto,
+  ): Promise<AttendanceLogResponseDto[]> {
     try {
       const { employee_id, start_date, end_date } = query;
 
@@ -51,16 +81,22 @@ export class AttendanceService {
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
       if (start_date && new Date(start_date) < threeMonthsAgo) {
-        throw new BadRequestException('Start date cannot be more than 3 months ago');
+        throw new BadRequestException(
+          'Start date cannot be more than 3 months ago',
+        );
       }
 
       if (end_date && new Date(end_date) < threeMonthsAgo) {
-        throw new BadRequestException('End date cannot be more than 3 months ago');
+        throw new BadRequestException(
+          'End date cannot be more than 3 months ago',
+        );
       }
 
       // Validate that start_date is not less than end_date
       if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
-        throw new BadRequestException('Start date cannot be greater than end date');
+        throw new BadRequestException(
+          'Start date cannot be greater than end date',
+        );
       }
 
       // Build where clause
@@ -83,27 +119,27 @@ export class AttendanceService {
       // If no date filters provided, default to last 3 months
       if (!start_date && !end_date) {
         where.date = {
-          gte: threeMonthsAgo
+          gte: threeMonthsAgo,
         };
       }
 
       const attendanceLogs = await this.prisma.attendanceLog.findMany({
         where,
         orderBy: {
-          date: 'desc'
+          date: 'desc',
         },
         include: {
           employee: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
-      return attendanceLogs.map(log => ({
+      return attendanceLogs.map((log) => ({
         id: log.id,
         employee_id: log.employeeId,
         employee_first_name: log.employee.firstName,
@@ -114,21 +150,24 @@ export class AttendanceService {
         mode: log.mode,
         status: log.status,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getAttendanceLogs:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to fetch attendance logs: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch attendance logs: ${error.message}`,
+      );
     }
   }
 
   async checkin(checkinData: CheckinDto): Promise<CheckinResponseDto> {
     try {
       var night_shift = false;
-      const { employee_id, checkin, mode, timezone, offset_minutes } = checkinData;
+      const { employee_id, checkin, mode, timezone, offset_minutes } =
+        checkinData;
 
       const employeeId = Number(employee_id);
       if (!employeeId || isNaN(employeeId) || employeeId <= 0) {
@@ -148,26 +187,39 @@ export class AttendanceService {
         : 300; // default PKT UTC+5
 
       const checkinLocal = new Date(
-        new Date(checkin).toLocaleString("en-US", { timeZone: timezone || "Asia/Karachi" })
-      );  
+        new Date(checkin).toLocaleString('en-US', {
+          timeZone: timezone || 'Asia/Karachi',
+        }),
+      );
 
       // Normalize local date to midnight for business date calculations
       const checkinDatePKT = new Date(checkinLocal);
       checkinDatePKT.setHours(5, 0, 0, 0);
 
       // Parse shift start/end from varchar 24-hour format
-      const [shiftStartHour, shiftStartMinute = 0] = (employee.shiftStart || '09:00').split(':').map(Number);
-      const [shiftEndHour, shiftEndMinute = 0] = (employee.shiftEnd || '17:00').split(':').map(Number);
+      const [shiftStartHour, shiftStartMinute = 0] = (
+        employee.shiftStart || '09:00'
+      )
+        .split(':')
+        .map(Number);
+      const [shiftEndHour, shiftEndMinute = 0] = (employee.shiftEnd || '17:00')
+        .split(':')
+        .map(Number);
 
       const currentHour = checkinLocal.getHours();
       const currentMinute = checkinLocal.getMinutes();
 
       // Adjust business date for night shifts
       if (shiftEndHour < shiftStartHour) {
-        if (currentHour < shiftEndHour || (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)) {
+        if (
+          currentHour < shiftEndHour ||
+          (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)
+        ) {
           checkinDatePKT.setDate(checkinDatePKT.getDate() - 1);
           var night_shift = true;
-          console.log(`Night shift: using previous day for employee ${employeeId}`);
+          console.log(
+            `Night shift: using previous day for employee ${employeeId}`,
+          );
         }
       }
 
@@ -180,11 +232,15 @@ export class AttendanceService {
       expectedShiftStart.setHours(shiftStartHour, shiftStartMinute, 0, 0);
       const expectedShiftEnd = new Date(checkinDatePKT);
       expectedShiftEnd.setHours(shiftEndHour, shiftEndMinute, 0, 0);
-      if (shiftEndHour < shiftStartHour) expectedShiftEnd.setDate(expectedShiftEnd.getDate() + 1); // night shift
+      if (shiftEndHour < shiftStartHour)
+        expectedShiftEnd.setDate(expectedShiftEnd.getDate() + 1); // night shift
 
       // Compute minutes late
-      let minutesLate = Math.floor((checkinLocal.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
-      if (shiftEndHour < shiftStartHour && minutesLate < 0) minutesLate += 24 * 60; // night shift adjustment
+      let minutesLate = Math.floor(
+        (checkinLocal.getTime() - expectedShiftStart.getTime()) / (1000 * 60),
+      );
+      if (shiftEndHour < shiftStartHour && minutesLate < 0)
+        minutesLate += 24 * 60; // night shift adjustment
       if (minutesLate < 0) minutesLate = 0;
 
       // Fetch company policy
@@ -202,30 +258,51 @@ export class AttendanceService {
 
       // Determine status based on minutes late
       let status: 'present' | 'late' | 'half_day' | 'absent' = 'present';
-      let lateDetails: { minutes_late: number; requires_reason: boolean } | null = null;
+      let lateDetails: {
+        minutes_late: number;
+        requires_reason: boolean;
+      } | null = null;
 
       if (minutesLate > 0) {
         if (minutesLate <= lateTime) status = 'present';
-        else if (minutesLate <= halfTime) { status = 'late'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
-        else if (minutesLate <= absentTime) { status = 'half_day'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
-        else { status = 'absent'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
+        else if (minutesLate <= halfTime) {
+          status = 'late';
+          lateDetails = { minutes_late: minutesLate, requires_reason: true };
+        } else if (minutesLate <= absentTime) {
+          status = 'half_day';
+          lateDetails = { minutes_late: minutesLate, requires_reason: true };
+        } else {
+          status = 'absent';
+          lateDetails = { minutes_late: minutesLate, requires_reason: true };
+        }
       }
 
       // Check if already checked in for this business date or night shift adjacent dates
       if (!night_shift) {
-        const prevDate = new Date(checkinDatePKT); prevDate.setDate(prevDate.getDate() - 1);
-        const nextDate = new Date(checkinDatePKT); nextDate.setDate(nextDate.getDate() + 1);
+        const prevDate = new Date(checkinDatePKT);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const nextDate = new Date(checkinDatePKT);
+        nextDate.setDate(nextDate.getDate() + 1);
         var existingCheckin = await this.prisma.attendanceLog.findFirst({
-          where: { employeeId, OR: [{ date: checkinDatePKT }, { date: prevDate }, { date: nextDate }] }
+          where: {
+            employeeId,
+            OR: [
+              { date: checkinDatePKT },
+              { date: prevDate },
+              { date: nextDate },
+            ],
+          },
         });
-      }
-      else {
+      } else {
         var existingCheckin = await this.prisma.attendanceLog.findFirst({
-          where: { employeeId, date: checkinDatePKT  }
+          where: { employeeId, date: checkinDatePKT },
         });
       }
 
-      if (existingCheckin && existingCheckin.checkin) throw new BadRequestException('Employee already checked in for this date');
+      if (existingCheckin && existingCheckin.checkin)
+        throw new BadRequestException(
+          'Employee already checked in for this date',
+        );
 
       // Create fresh attendance log
       const attendanceLog = await this.prisma.attendanceLog.create({
@@ -236,11 +313,15 @@ export class AttendanceService {
           mode: mode || 'onsite',
           status,
           createdAt: new Date(),
-        }
+        },
       });
 
       // Update monthly summary & base attendance (methods remain unchanged)
-      await this.updateMonthlyAttendanceSummary(employeeId, checkinDatePKT, status);
+      await this.updateMonthlyAttendanceSummary(
+        employeeId,
+        checkinDatePKT,
+        status,
+      );
       await this.updateBaseAttendance(employeeId, status);
 
       // Create late log if needed
@@ -255,8 +336,8 @@ export class AttendanceService {
             reason: null,
             actionTaken: 'Created',
             lateType: null,
-            justified: null
-          }
+            justified: null,
+          },
         });
       }
 
@@ -272,8 +353,8 @@ export class AttendanceService {
             reason: null,
             actionTaken: 'Created',
             halfDayType: null,
-            justified: null
-          }
+            justified: null,
+          },
         });
       }
 
@@ -284,31 +365,39 @@ export class AttendanceService {
         checkin: attendanceLog.checkin?.toISOString() || null,
         checkin_local: checkinLocal?.toISOString() || null,
         mode: attendanceLog.mode,
-        status: attendanceLog.status as 'present' | 'late' | 'half_day' | 'absent' | null,
+        status: attendanceLog.status as
+          | 'present'
+          | 'late'
+          | 'half_day'
+          | 'absent'
+          | null,
         late_details: lateDetails,
         timezone: timezone || 'Asia/Karachi',
         offset_minutes: effectiveOffsetMinutes,
         local_date: checkinDatePKT.toISOString().split('T')[0],
         created_at: attendanceLog.createdAt.toISOString(),
-        updated_at: attendanceLog.updatedAt.toISOString()
+        updated_at: attendanceLog.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in checkin:', error);
       if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException(`Failed to record check-in: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to record check-in: ${error.message}`,
+      );
     }
   }
 
   async checkout(checkoutData: CheckoutDto): Promise<CheckoutResponseDto> {
     try {
-      const { employee_id, date, checkout, timezone, offset_minutes } = checkoutData;
+      const { employee_id, date, checkout, timezone, offset_minutes } =
+        checkoutData;
 
       // Ensure employee_id is a number
       const employeeId = Number(employee_id);
 
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: employeeId }
+        where: { id: employeeId },
       });
 
       if (!employee) {
@@ -325,7 +414,9 @@ export class AttendanceService {
         ? Number(offset_minutes)
         : 300;
 
-      const checkoutLocal = new Date(checkoutUtc.getTime() + effectiveOffsetMinutes * 60 * 1000);
+      const checkoutLocal = new Date(
+        checkoutUtc.getTime() + effectiveOffsetMinutes * 60 * 1000,
+      );
 
       // Determine business date: use provided date if available, otherwise calculate from checkout time
       let businessDateLocal: Date;
@@ -333,7 +424,9 @@ export class AttendanceService {
         // Use provided date
         const inputDate = new Date(date + 'T00:00:00');
         if (isNaN(inputDate.getTime())) {
-          throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
+          throw new BadRequestException(
+            'Invalid date format. Expected YYYY-MM-DD',
+          );
         }
         businessDateLocal = new Date(inputDate);
         businessDateLocal.setHours(0, 0, 0, 0);
@@ -351,8 +444,8 @@ export class AttendanceService {
           employeeId,
           date: businessDateLocal,
           checkin: { not: null },
-          checkout: null
-        }
+          checkout: null,
+        },
       });
 
       // If not found, try previous day (for night shifts that cross midnight)
@@ -364,8 +457,8 @@ export class AttendanceService {
             employeeId,
             date: prevDate,
             checkin: { not: null },
-            checkout: null
-          }
+            checkout: null,
+          },
         });
       }
 
@@ -378,8 +471,8 @@ export class AttendanceService {
             employeeId,
             date: nextDate,
             checkin: { not: null },
-            checkout: null
-          }
+            checkout: null,
+          },
         });
       }
 
@@ -390,20 +483,24 @@ export class AttendanceService {
           where: {
             employeeId,
             checkin: { not: null },
-            checkout: null
+            checkout: null,
           },
           orderBy: {
-            createdAt: 'desc'
-          }
+            createdAt: 'desc',
+          },
         });
       }
 
       if (!existingAttendance || !existingAttendance.checkin) {
-        throw new BadRequestException('Employee must check in before checking out');
+        throw new BadRequestException(
+          'Employee must check in before checking out',
+        );
       }
 
       if (existingAttendance.checkout) {
-        throw new BadRequestException('Employee already checked out for this date');
+        throw new BadRequestException(
+          'Employee already checked out for this date',
+        );
       }
 
       // Use local time for storage
@@ -411,8 +508,10 @@ export class AttendanceService {
 
       // Calculate total hours worked using the stored times
       const checkinTime = existingAttendance.checkin;
-      const totalMilliseconds = checkoutTimeForStorage.getTime() - checkinTime.getTime();
-      const totalHoursWorked = Math.round((totalMilliseconds / (1000 * 60 * 60)) * 100) / 100; // Round to 2 decimal places
+      const totalMilliseconds =
+        checkoutTimeForStorage.getTime() - checkinTime.getTime();
+      const totalHoursWorked =
+        Math.round((totalMilliseconds / (1000 * 60 * 60)) * 100) / 100; // Round to 2 decimal places
 
       // Get local date string for response
       const localDateStr = `${checkoutLocal.getUTCFullYear()}-${String(checkoutLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(checkoutLocal.getUTCDate()).padStart(2, '0')}`;
@@ -422,8 +521,8 @@ export class AttendanceService {
         where: { id: existingAttendance.id },
         data: {
           checkout: checkoutTimeForStorage,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       return {
@@ -434,27 +533,34 @@ export class AttendanceService {
         checkout: updatedAttendance.checkout?.toISOString() || null,
         checkout_local: checkoutLocal.toISOString(),
         mode: updatedAttendance.mode,
-        status: updatedAttendance.status as 'present' | 'late' | 'half_day' | 'absent' | null,
+        status: updatedAttendance.status as
+          | 'present'
+          | 'late'
+          | 'half_day'
+          | 'absent'
+          | null,
         total_hours_worked: totalHoursWorked,
         timezone: timezone || 'Asia/Karachi',
         offset_minutes: effectiveOffsetMinutes,
         local_date: localDateStr,
         created_at: updatedAttendance.createdAt.toISOString(),
-        updated_at: updatedAttendance.updatedAt.toISOString()
+        updated_at: updatedAttendance.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in checkout:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to record check-out: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to record check-out: ${error.message}`,
+      );
     }
   }
 
   private async updateMonthlyAttendanceSummary(
     employeeId: number,
     checkinDate: Date,
-    status: 'present' | 'late' | 'half_day' | 'absent'
+    status: 'present' | 'late' | 'half_day' | 'absent',
   ): Promise<void> {
     try {
       // Get month in YYYY-MM format
@@ -464,8 +570,8 @@ export class AttendanceService {
       let summary = await this.prisma.monthlyAttendanceSummary.findFirst({
         where: {
           empId: employeeId,
-          month: month
-        }
+          month: month,
+        },
       });
 
       if (!summary) {
@@ -479,8 +585,8 @@ export class AttendanceService {
             totalLeaveDays: 0,
             totalLateDays: 0,
             totalHalfDays: 0,
-            totalRemoteDays: 0
-          }
+            totalRemoteDays: 0,
+          },
         });
       }
 
@@ -507,9 +613,8 @@ export class AttendanceService {
       // Update the summary
       await this.prisma.monthlyAttendanceSummary.update({
         where: { id: summary.id },
-        data: updateData
+        data: updateData,
       });
-
     } catch (error) {
       console.error('Error updating monthly attendance summary:', error);
       // Don't throw error here to avoid failing the check-in
@@ -518,14 +623,14 @@ export class AttendanceService {
 
   private async updateBaseAttendance(
     employeeId: number,
-    status: 'present' | 'late' | 'half_day' | 'absent'
+    status: 'present' | 'late' | 'half_day' | 'absent',
   ): Promise<void> {
     try {
       // Find existing attendance record or create new one
       let attendance = await this.prisma.attendance.findFirst({
         where: {
-          employeeId: employeeId
-        }
+          employeeId: employeeId,
+        },
       });
 
       if (!attendance) {
@@ -540,12 +645,13 @@ export class AttendanceService {
             remoteDays: 0,
             quarterlyLeaves: 0,
             monthlyLates: 0,
-            halfDays: 0
-          }
+            halfDays: 0,
+          },
         });
       } else {
         // Fix NULL values by setting them to 0 if they're null
-        const needsUpdate = attendance.presentDays === null ||
+        const needsUpdate =
+          attendance.presentDays === null ||
           attendance.absentDays === null ||
           attendance.lateDays === null ||
           attendance.halfDays === null;
@@ -561,8 +667,8 @@ export class AttendanceService {
               remoteDays: attendance.remoteDays ?? 0,
               quarterlyLeaves: attendance.quarterlyLeaves ?? 0,
               monthlyLates: attendance.monthlyLates ?? 0,
-              halfDays: attendance.halfDays ?? 0
-            }
+              halfDays: attendance.halfDays ?? 0,
+            },
           });
         }
       }
@@ -593,9 +699,8 @@ export class AttendanceService {
       // Update the attendance record
       await this.prisma.attendance.update({
         where: { id: attendance.id },
-        data: updateData
+        data: updateData,
       });
-
     } catch (error) {
       console.error('Error updating base attendance:', error);
       // Don't throw error here to avoid failing the check-in
@@ -610,16 +715,16 @@ export class AttendanceService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          createdAt: 'desc'
-        }
+          createdAt: 'desc',
+        },
       });
 
-      return attendanceRecords.map(record => ({
+      return attendanceRecords.map((record) => ({
         id: record.id,
         employee_id: record.employeeId,
         present_days: record.presentDays,
@@ -631,29 +736,33 @@ export class AttendanceService {
         monthly_lates: record.monthlyLates,
         half_days: record.halfDays,
         created_at: record.createdAt.toISOString(),
-        updated_at: record.updatedAt.toISOString()
+        updated_at: record.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getAttendanceList:', error);
-      throw new InternalServerErrorException(`Failed to fetch attendance records: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch attendance records: ${error.message}`,
+      );
     }
   }
 
-  async getAttendanceById(employeeId: number): Promise<AttendanceListResponseDto | null> {
+  async getAttendanceById(
+    employeeId: number,
+  ): Promise<AttendanceListResponseDto | null> {
     try {
       const attendanceRecord = await this.prisma.attendance.findFirst({
         where: {
-          employeeId: employeeId
+          employeeId: employeeId,
         },
         include: {
           employee: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       if (!attendanceRecord) {
@@ -672,43 +781,50 @@ export class AttendanceService {
         monthly_lates: attendanceRecord.monthlyLates,
         half_days: attendanceRecord.halfDays,
         created_at: attendanceRecord.createdAt.toISOString(),
-        updated_at: attendanceRecord.updatedAt.toISOString()
+        updated_at: attendanceRecord.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in getAttendanceById:', error);
-      throw new InternalServerErrorException(`Failed to fetch attendance record: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch attendance record: ${error.message}`,
+      );
     }
   }
 
-  async getMonthlyAttendanceList(month?: string): Promise<MonthlyAttendanceResponseDto[]> {
+  async getMonthlyAttendanceList(
+    month?: string,
+  ): Promise<MonthlyAttendanceResponseDto[]> {
     try {
       // If no month provided, use current month
       const targetMonth = month || new Date().toISOString().slice(0, 7);
 
       // Validate month format (YYYY-MM)
       if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
-        throw new BadRequestException('Invalid month format. Use YYYY-MM format (e.g., 2025-01)');
+        throw new BadRequestException(
+          'Invalid month format. Use YYYY-MM format (e.g., 2025-01)',
+        );
       }
 
-      const monthlyRecords = await this.prisma.monthlyAttendanceSummary.findMany({
-        where: {
-          month: targetMonth
-        },
-        include: {
-          employee: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      const monthlyRecords =
+        await this.prisma.monthlyAttendanceSummary.findMany({
+          where: {
+            month: targetMonth,
+          },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        });
 
-      return monthlyRecords.map(record => ({
+      return monthlyRecords.map((record) => ({
         id: record.id,
         employee_id: record.empId,
         employee_first_name: record.employee.firstName,
@@ -722,42 +838,50 @@ export class AttendanceService {
         total_remote_days: record.totalRemoteDays,
         generated_on: record.generatedOn.toISOString(),
         created_at: record.createdAt.toISOString(),
-        updated_at: record.updatedAt.toISOString()
+        updated_at: record.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getMonthlyAttendanceList:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to fetch monthly attendance records: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch monthly attendance records: ${error.message}`,
+      );
     }
   }
 
-  async getMonthlyAttendanceByEmployee(employeeId: number, month?: string): Promise<MonthlyAttendanceResponseDto | null> {
+  async getMonthlyAttendanceByEmployee(
+    employeeId: number,
+    month?: string,
+  ): Promise<MonthlyAttendanceResponseDto | null> {
     try {
       // If no month provided, use current month
       const targetMonth = month || new Date().toISOString().slice(0, 7);
 
       // Validate month format (YYYY-MM)
       if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
-        throw new BadRequestException('Invalid month format. Use YYYY-MM format (e.g., 2025-01)');
+        throw new BadRequestException(
+          'Invalid month format. Use YYYY-MM format (e.g., 2025-01)',
+        );
       }
 
-      const monthlyRecord = await this.prisma.monthlyAttendanceSummary.findFirst({
-        where: {
-          empId: employeeId,
-          month: targetMonth
-        },
-        include: {
-          employee: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true
-            }
-          }
-        }
-      });
+      const monthlyRecord =
+        await this.prisma.monthlyAttendanceSummary.findFirst({
+          where: {
+            empId: employeeId,
+            month: targetMonth,
+          },
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
 
       if (!monthlyRecord) {
         return null;
@@ -777,24 +901,28 @@ export class AttendanceService {
         total_remote_days: monthlyRecord.totalRemoteDays,
         generated_on: monthlyRecord.generatedOn.toISOString(),
         created_at: monthlyRecord.createdAt.toISOString(),
-        updated_at: monthlyRecord.updatedAt.toISOString()
+        updated_at: monthlyRecord.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in getMonthlyAttendanceByEmployee:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to fetch monthly attendance record: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch monthly attendance record: ${error.message}`,
+      );
     }
   }
 
-  async updateAttendance(updateData: UpdateAttendanceDto): Promise<AttendanceListResponseDto> {
+  async updateAttendance(
+    updateData: UpdateAttendanceDto,
+  ): Promise<AttendanceListResponseDto> {
     try {
       const { employee_id, ...updateFields } = updateData;
 
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: employee_id }
+        where: { id: employee_id },
       });
 
       if (!employee) {
@@ -804,25 +932,35 @@ export class AttendanceService {
       // Find existing attendance record
       const attendance = await this.prisma.attendance.findFirst({
         where: {
-          employeeId: employee_id
-        }
+          employeeId: employee_id,
+        },
       });
 
       if (!attendance) {
-        throw new BadRequestException('Attendance record not found for this employee');
+        throw new BadRequestException(
+          'Attendance record not found for this employee',
+        );
       }
 
       // Prepare update data (only include fields that are provided)
       const dataToUpdate: any = {};
 
-      if (updateFields.present_days !== undefined) dataToUpdate.presentDays = updateFields.present_days;
-      if (updateFields.absent_days !== undefined) dataToUpdate.absentDays = updateFields.absent_days;
-      if (updateFields.late_days !== undefined) dataToUpdate.lateDays = updateFields.late_days;
-      if (updateFields.leave_days !== undefined) dataToUpdate.leaveDays = updateFields.leave_days;
-      if (updateFields.remote_days !== undefined) dataToUpdate.remoteDays = updateFields.remote_days;
-      if (updateFields.quarterly_leaves !== undefined) dataToUpdate.quarterlyLeaves = updateFields.quarterly_leaves;
-      if (updateFields.monthly_lates !== undefined) dataToUpdate.monthlyLates = updateFields.monthly_lates;
-      if (updateFields.half_days !== undefined) dataToUpdate.halfDays = updateFields.half_days;
+      if (updateFields.present_days !== undefined)
+        dataToUpdate.presentDays = updateFields.present_days;
+      if (updateFields.absent_days !== undefined)
+        dataToUpdate.absentDays = updateFields.absent_days;
+      if (updateFields.late_days !== undefined)
+        dataToUpdate.lateDays = updateFields.late_days;
+      if (updateFields.leave_days !== undefined)
+        dataToUpdate.leaveDays = updateFields.leave_days;
+      if (updateFields.remote_days !== undefined)
+        dataToUpdate.remoteDays = updateFields.remote_days;
+      if (updateFields.quarterly_leaves !== undefined)
+        dataToUpdate.quarterlyLeaves = updateFields.quarterly_leaves;
+      if (updateFields.monthly_lates !== undefined)
+        dataToUpdate.monthlyLates = updateFields.monthly_lates;
+      if (updateFields.half_days !== undefined)
+        dataToUpdate.halfDays = updateFields.half_days;
 
       // Update the attendance record
       const updatedAttendance = await this.prisma.attendance.update({
@@ -833,10 +971,10 @@ export class AttendanceService {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       return {
@@ -851,24 +989,28 @@ export class AttendanceService {
         monthly_lates: updatedAttendance.monthlyLates,
         half_days: updatedAttendance.halfDays,
         created_at: updatedAttendance.createdAt.toISOString(),
-        updated_at: updatedAttendance.updatedAt.toISOString()
+        updated_at: updatedAttendance.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in updateAttendance:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to update attendance record: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to update attendance record: ${error.message}`,
+      );
     }
   }
 
-  async updateMonthlyAttendance(updateData: UpdateMonthlyAttendanceDto): Promise<MonthlyAttendanceResponseDto> {
+  async updateMonthlyAttendance(
+    updateData: UpdateMonthlyAttendanceDto,
+  ): Promise<MonthlyAttendanceResponseDto> {
     try {
       const { employee_id, month, ...updateFields } = updateData;
 
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: employee_id }
+        where: { id: employee_id },
       });
 
       if (!employee) {
@@ -876,41 +1018,51 @@ export class AttendanceService {
       }
 
       // Find existing monthly attendance record
-      const monthlyAttendance = await this.prisma.monthlyAttendanceSummary.findFirst({
-        where: {
-          empId: employee_id,
-          month: month
-        }
-      });
+      const monthlyAttendance =
+        await this.prisma.monthlyAttendanceSummary.findFirst({
+          where: {
+            empId: employee_id,
+            month: month,
+          },
+        });
 
       if (!monthlyAttendance) {
-        throw new BadRequestException(`Monthly attendance record not found for employee ${employee_id} in month ${month}`);
+        throw new BadRequestException(
+          `Monthly attendance record not found for employee ${employee_id} in month ${month}`,
+        );
       }
 
       // Prepare update data (only include fields that are provided)
       const dataToUpdate: any = {};
 
-      if (updateFields.total_present !== undefined) dataToUpdate.totalPresent = updateFields.total_present;
-      if (updateFields.total_absent !== undefined) dataToUpdate.totalAbsent = updateFields.total_absent;
-      if (updateFields.total_leave_days !== undefined) dataToUpdate.totalLeaveDays = updateFields.total_leave_days;
-      if (updateFields.total_late_days !== undefined) dataToUpdate.totalLateDays = updateFields.total_late_days;
-      if (updateFields.total_half_days !== undefined) dataToUpdate.totalHalfDays = updateFields.total_half_days;
-      if (updateFields.total_remote_days !== undefined) dataToUpdate.totalRemoteDays = updateFields.total_remote_days;
+      if (updateFields.total_present !== undefined)
+        dataToUpdate.totalPresent = updateFields.total_present;
+      if (updateFields.total_absent !== undefined)
+        dataToUpdate.totalAbsent = updateFields.total_absent;
+      if (updateFields.total_leave_days !== undefined)
+        dataToUpdate.totalLeaveDays = updateFields.total_leave_days;
+      if (updateFields.total_late_days !== undefined)
+        dataToUpdate.totalLateDays = updateFields.total_late_days;
+      if (updateFields.total_half_days !== undefined)
+        dataToUpdate.totalHalfDays = updateFields.total_half_days;
+      if (updateFields.total_remote_days !== undefined)
+        dataToUpdate.totalRemoteDays = updateFields.total_remote_days;
 
       // Update the monthly attendance record
-      const updatedMonthlyAttendance = await this.prisma.monthlyAttendanceSummary.update({
-        where: { id: monthlyAttendance.id },
-        data: dataToUpdate,
-        include: {
-          employee: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true
-            }
-          }
-        }
-      });
+      const updatedMonthlyAttendance =
+        await this.prisma.monthlyAttendanceSummary.update({
+          where: { id: monthlyAttendance.id },
+          data: dataToUpdate,
+          include: {
+            employee: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
 
       return {
         id: updatedMonthlyAttendance.id,
@@ -926,14 +1078,16 @@ export class AttendanceService {
         total_remote_days: updatedMonthlyAttendance.totalRemoteDays,
         generated_on: updatedMonthlyAttendance.generatedOn.toISOString(),
         created_at: updatedMonthlyAttendance.createdAt.toISOString(),
-        updated_at: updatedMonthlyAttendance.updatedAt.toISOString()
+        updated_at: updatedMonthlyAttendance.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in updateMonthlyAttendance:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to update monthly attendance record: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to update monthly attendance record: ${error.message}`,
+      );
     }
   }
 
@@ -943,7 +1097,7 @@ export class AttendanceService {
     reason?: string,
     reviewerId?: number,
     checkin?: string,
-    checkout?: string
+    checkout?: string,
   ): Promise<AttendanceLogResponseDto> {
     try {
       // Use transaction to ensure all updates succeed or fail together
@@ -958,10 +1112,10 @@ export class AttendanceService {
                 firstName: true,
                 lastName: true,
                 shiftStart: true,
-                shiftEnd: true
-              }
-            }
-          }
+                shiftEnd: true,
+              },
+            },
+          },
         });
 
         if (!currentLog) {
@@ -970,17 +1124,21 @@ export class AttendanceService {
 
         const oldStatus = currentLog.status;
         const employeeId = currentLog.employeeId;
-        const logDate = currentLog.date ? new Date(currentLog.date) : new Date();
+        const logDate = currentLog.date
+          ? new Date(currentLog.date)
+          : new Date();
 
         // 2. Validate status change is allowed
         if (oldStatus === newStatus) {
-          throw new BadRequestException('Status is already set to the requested value');
+          throw new BadRequestException(
+            'Status is already set to the requested value',
+          );
         }
 
         // 3. Update the attendance log
         const updateData: any = {
           status: newStatus,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
 
         if (checkin) {
@@ -998,10 +1156,10 @@ export class AttendanceService {
               select: {
                 id: true,
                 firstName: true,
-                lastName: true
-              }
-            }
-          }
+                lastName: true,
+              },
+            },
+          },
         });
 
         // 4. Update attendance counters
@@ -1009,7 +1167,7 @@ export class AttendanceService {
           tx,
           employeeId,
           oldStatus || 'absent',
-          newStatus
+          newStatus,
         );
 
         // 5. Update monthly attendance summary
@@ -1018,7 +1176,7 @@ export class AttendanceService {
           employeeId,
           logDate,
           oldStatus || 'absent',
-          newStatus
+          newStatus,
         );
 
         // 6. Create specific logs if needed
@@ -1028,7 +1186,7 @@ export class AttendanceService {
             employeeId,
             logDate,
             reason || 'Status changed to late',
-            reviewerId
+            reviewerId,
           );
         }
 
@@ -1038,7 +1196,7 @@ export class AttendanceService {
             employeeId,
             logDate,
             reason || 'Status changed to half day',
-            reviewerId
+            reviewerId,
           );
         }
 
@@ -1055,7 +1213,7 @@ export class AttendanceService {
           mode: updatedLog.mode || 'onsite',
           late_details: null, // Will be populated separately if needed
           created_at: updatedLog.createdAt.toISOString(),
-          updated_at: updatedLog.updatedAt.toISOString()
+          updated_at: updatedLog.updatedAt.toISOString(),
         };
       });
     } catch (error) {
@@ -1063,17 +1221,28 @@ export class AttendanceService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to update attendance log status: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to update attendance log status: ${error.message}`,
+      );
     }
   }
 
-  async submitLateReason(lateData: SubmitLateReasonDto): Promise<LateLogResponseDto> {
+  async submitLateReason(
+    lateData: SubmitLateReasonDto,
+  ): Promise<LateLogResponseDto> {
     try {
-      const { emp_id, date, scheduled_time_in, actual_time_in, minutes_late, reason } = lateData;
+      const {
+        emp_id,
+        date,
+        scheduled_time_in,
+        actual_time_in,
+        minutes_late,
+        reason,
+      } = lateData;
 
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: emp_id }
+        where: { id: emp_id },
       });
 
       if (!employee) {
@@ -1085,15 +1254,17 @@ export class AttendanceService {
         where: {
           empId: emp_id,
           date: new Date(date),
-          actionTaken: 'Created' // Only update logs created by check-in
+          actionTaken: 'Created', // Only update logs created by check-in
         },
         orderBy: {
-          createdAt: 'desc' // Get the most recent one
-        }
+          createdAt: 'desc', // Get the most recent one
+        },
       });
 
       if (!existingLateLog) {
-        throw new BadRequestException('No late log found for this employee and date. Please check-in first.');
+        throw new BadRequestException(
+          'No late log found for this employee and date. Please check-in first.',
+        );
       }
 
       // Update the existing late log with reason and change status to Pending
@@ -1104,8 +1275,8 @@ export class AttendanceService {
           actionTaken: 'Pending', // Status when employee submits reason
           lateType: null, // Keep null, will be set by HR
           justified: null, // Keep null, will be set by HR
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       return {
@@ -1121,22 +1292,29 @@ export class AttendanceService {
         action_taken: lateLog.actionTaken,
         reviewed_by: lateLog.reviewedBy,
         created_at: lateLog.createdAt.toISOString(),
-        updated_at: lateLog.updatedAt.toISOString()
+        updated_at: lateLog.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in submitLateReason:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to submit late reason: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to submit late reason: ${error.message}`,
+      );
     }
   }
 
-  async processLateAction(lateLogId: number, action: 'Pending' | 'Completed', reviewerId: number, lateType?: 'paid' | 'unpaid'): Promise<LateLogResponseDto> {
+  async processLateAction(
+    lateLogId: number,
+    action: 'Pending' | 'Completed',
+    reviewerId: number,
+    lateType?: 'paid' | 'unpaid',
+  ): Promise<LateLogResponseDto> {
     try {
       // Find the late log
       const lateLog = await this.prisma.lateLog.findUnique({
-        where: { id: lateLogId }
+        where: { id: lateLogId },
       });
 
       if (!lateLog) {
@@ -1149,19 +1327,21 @@ export class AttendanceService {
         data: {
           actionTaken: action,
           lateType: lateType || null, // Let HR set this
-          justified: action === 'Completed' ? (lateType === 'paid') : null, // Let HR set this
+          justified: action === 'Completed' ? lateType === 'paid' : null, // Let HR set this
           reviewedBy: reviewerId,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
-      let attendanceUpdates: { late_days: number; monthly_lates: number; } | undefined = undefined;
+      let attendanceUpdates:
+        | { late_days: number; monthly_lates: number }
+        | undefined = undefined;
 
       // If completed and marked as paid, update attendance records
       if (action === 'Completed' && lateType === 'paid') {
         // Find the attendance record for this employee
         const attendance = await this.prisma.attendance.findFirst({
-          where: { employeeId: lateLog.empId }
+          where: { employeeId: lateLog.empId },
         });
 
         if (attendance) {
@@ -1175,9 +1355,9 @@ export class AttendanceService {
             data: {
               lateDays: newLateDays,
               monthlyLates: {
-                increment: 1
-              }
-            }
+                increment: 1,
+              },
+            },
           });
 
           // Update monthly attendance summary to reflect the change
@@ -1185,19 +1365,19 @@ export class AttendanceService {
           await this.prisma.monthlyAttendanceSummary.updateMany({
             where: {
               empId: lateLog.empId,
-              month: currentMonth
+              month: currentMonth,
             },
             data: {
               totalLateDays: {
-                decrement: 1
-              }
-            }
+                decrement: 1,
+              },
+            },
           });
 
           // Include the updated attendance values in response
           attendanceUpdates = {
             late_days: updatedAttendance.lateDays || 0,
-            monthly_lates: updatedAttendance.monthlyLates || 0
+            monthly_lates: updatedAttendance.monthlyLates || 0,
           };
         }
       }
@@ -1216,14 +1396,16 @@ export class AttendanceService {
         reviewed_by: updatedLateLog.reviewedBy,
         created_at: updatedLateLog.createdAt.toISOString(),
         updated_at: updatedLateLog.updatedAt.toISOString(),
-        attendance_updates: attendanceUpdates
+        attendance_updates: attendanceUpdates,
       };
     } catch (error) {
       console.error('Error in processLateAction:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to process late action: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to process late action: ${error.message}`,
+      );
     }
   }
 
@@ -1239,16 +1421,22 @@ export class AttendanceService {
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
       if (start_date && new Date(start_date) < sixMonthsAgo) {
-        throw new BadRequestException('Start date cannot be more than 6 months ago');
+        throw new BadRequestException(
+          'Start date cannot be more than 6 months ago',
+        );
       }
 
       if (end_date && new Date(end_date) < sixMonthsAgo) {
-        throw new BadRequestException('End date cannot be more than 6 months ago');
+        throw new BadRequestException(
+          'End date cannot be more than 6 months ago',
+        );
       }
 
       // Validate that start_date is not greater than end_date
       if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
-        throw new BadRequestException('Start date cannot be greater than end date');
+        throw new BadRequestException(
+          'Start date cannot be greater than end date',
+        );
       }
 
       // Build where clause
@@ -1275,23 +1463,23 @@ export class AttendanceService {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          date: 'desc'
-        }
+          date: 'desc',
+        },
       });
 
       // Transform the data to match the response DTO
-      return lateLogs.map(log => ({
+      return lateLogs.map((log) => ({
         late_log_id: log.id,
         emp_id: log.empId,
         employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
@@ -1304,20 +1492,26 @@ export class AttendanceService {
         late_type: log.lateType,
         action_taken: log.actionTaken,
         reviewed_by: log.reviewedBy,
-        reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+        reviewer_name: log.reviewer
+          ? `${log.reviewer.firstName} ${log.reviewer.lastName}`
+          : null,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getLateLogs:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to fetch late logs: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch late logs: ${error.message}`,
+      );
     }
   }
 
-  async getLateLogsByEmployee(employeeId: number): Promise<LateLogsListResponseDto[]> {
+  async getLateLogsByEmployee(
+    employeeId: number,
+  ): Promise<LateLogsListResponseDto[]> {
     try {
       // Validate employee_id
       if (isNaN(employeeId) || employeeId <= 0) {
@@ -1326,7 +1520,7 @@ export class AttendanceService {
 
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: employeeId }
+        where: { id: employeeId },
       });
 
       if (!employee) {
@@ -1336,29 +1530,29 @@ export class AttendanceService {
       // Fetch late logs for the specific employee
       const lateLogs = await this.prisma.lateLog.findMany({
         where: {
-          empId: employeeId
+          empId: employeeId,
         },
         include: {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          date: 'desc'
-        }
+          date: 'desc',
+        },
       });
 
       // Transform the data to match the response DTO
-      return lateLogs.map(log => ({
+      return lateLogs.map((log) => ({
         late_log_id: log.id,
         emp_id: log.empId,
         employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
@@ -1371,26 +1565,26 @@ export class AttendanceService {
         late_type: log.lateType,
         action_taken: log.actionTaken,
         reviewed_by: log.reviewedBy,
-        reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+        reviewer_name: log.reviewer
+          ? `${log.reviewer.firstName} ${log.reviewer.lastName}`
+          : null,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getLateLogsByEmployee:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to fetch late logs for employee: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch late logs for employee: ${error.message}`,
+      );
     }
   }
 
   // Get Late Logs for Export (similar to HR logs pattern)
   async getLateLogsForExport(query: any) {
-    const {
-      employee_id,
-      start_date,
-      end_date
-    } = query;
+    const { employee_id, start_date, end_date } = query;
 
     // Build where clause (same logic as getLateLogs but without pagination)
     const where: any = {};
@@ -1417,20 +1611,20 @@ export class AttendanceService {
             firstName: true,
             lastName: true,
             email: true,
-            id: true
-          }
+            id: true,
+          },
         },
         reviewer: {
           select: {
             firstName: true,
             lastName: true,
-            email: true
-          }
-        }
+            email: true,
+          },
+        },
       },
       orderBy: {
-        date: 'desc'
-      }
+        date: 'desc',
+      },
     });
   }
 
@@ -1447,7 +1641,7 @@ export class AttendanceService {
       'Minutes Late',
       'Reason',
       'Justified',
-      'Action Taken'
+      'Action Taken',
     ];
 
     if (query.include_late_type) {
@@ -1455,14 +1649,19 @@ export class AttendanceService {
     }
 
     if (query.include_reviewer_details) {
-      headers.push('Reviewed By', 'Reviewer Name', 'Reviewer Email', 'Reviewed On');
+      headers.push(
+        'Reviewed By',
+        'Reviewer Name',
+        'Reviewer Email',
+        'Reviewed On',
+      );
     }
 
     headers.push('Created At', 'Updated At');
 
     const csvRows = [headers.join(',')];
 
-    lateLogs.forEach(log => {
+    lateLogs.forEach((log) => {
       const row = [
         log.id,
         log.empId,
@@ -1474,7 +1673,7 @@ export class AttendanceService {
         log.minutesLate,
         `"${log.reason || ''}"`,
         log.justified !== null ? log.justified : '',
-        log.actionTaken
+        log.actionTaken,
       ];
 
       if (query.include_late_type) {
@@ -1484,16 +1683,15 @@ export class AttendanceService {
       if (query.include_reviewer_details) {
         row.push(
           log.reviewedBy || '',
-          log.reviewer ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"` : '',
+          log.reviewer
+            ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"`
+            : '',
           log.reviewer ? log.reviewer.email : '',
-          log.reviewedOn ? log.reviewedOn.toISOString() : ''
+          log.reviewedOn ? log.reviewedOn.toISOString() : '',
         );
       }
 
-      row.push(
-        log.createdAt.toISOString(),
-        log.updatedAt.toISOString()
-      );
+      row.push(log.createdAt.toISOString(), log.updatedAt.toISOString());
 
       csvRows.push(row.join(','));
     });
@@ -1502,7 +1700,9 @@ export class AttendanceService {
   }
 
   // Get Late Logs Statistics
-  async getLateLogsStats(query: LateLogsStatsDto): Promise<LateLogsStatsResponseDto> {
+  async getLateLogsStats(
+    query: LateLogsStatsDto,
+  ): Promise<LateLogsStatsResponseDto> {
     try {
       // Build where clause
       const where: any = {};
@@ -1514,15 +1714,15 @@ export class AttendanceService {
       if (query.start_date && query.end_date) {
         where.date = {
           gte: new Date(query.start_date),
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       } else if (query.start_date) {
         where.date = {
-          gte: new Date(query.start_date)
+          gte: new Date(query.start_date),
         };
       } else if (query.end_date) {
         where.date = {
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       }
 
@@ -1533,40 +1733,59 @@ export class AttendanceService {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       // Calculate basic statistics
       const totalLateLogs = lateLogs.length;
-      const pendingLateLogs = lateLogs.filter(log => log.actionTaken === 'Pending').length;
-      const completedLateLogs = lateLogs.filter(log => log.actionTaken === 'Completed').length;
+      const pendingLateLogs = lateLogs.filter(
+        (log) => log.actionTaken === 'Pending',
+      ).length;
+      const completedLateLogs = lateLogs.filter(
+        (log) => log.actionTaken === 'Completed',
+      ).length;
 
       // Calculate total minutes late
-      const totalMinutesLate = lateLogs.reduce((sum, log) => sum + log.minutesLate, 0);
-      const averageMinutesLate = totalLateLogs > 0 ? totalMinutesLate / totalLateLogs : 0;
+      const totalMinutesLate = lateLogs.reduce(
+        (sum, log) => sum + log.minutesLate,
+        0,
+      );
+      const averageMinutesLate =
+        totalLateLogs > 0 ? totalMinutesLate / totalLateLogs : 0;
 
       // Count paid vs unpaid
-      const paidLateCount = lateLogs.filter(log => log.lateType === 'paid').length;
-      const unpaidLateCount = lateLogs.filter(log => log.lateType === 'unpaid').length;
+      const paidLateCount = lateLogs.filter(
+        (log) => log.lateType === 'paid',
+      ).length;
+      const unpaidLateCount = lateLogs.filter(
+        (log) => log.lateType === 'unpaid',
+      ).length;
 
       // Find most common reason
-      const reasonCounts = lateLogs.reduce((acc, log) => {
-        const reason = log.reason || 'No reason provided';
-        acc[reason] = (acc[reason] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const reasonCounts = lateLogs.reduce(
+        (acc, log) => {
+          const reason = log.reason || 'No reason provided';
+          acc[reason] = (acc[reason] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
-      const mostCommonReason = Object.keys(reasonCounts).length > 0
-        ? Object.keys(reasonCounts).reduce((a, b) =>
-          reasonCounts[a] > reasonCounts[b] ? a : b
-        )
-        : 'N/A';
+      const mostCommonReason =
+        Object.keys(reasonCounts).length > 0
+          ? Object.keys(reasonCounts).reduce((a, b) =>
+              reasonCounts[a] > reasonCounts[b] ? a : b,
+            )
+          : 'N/A';
 
       // Generate period statistics
-      const periodStats = this.generateLateLogsPeriodStats(lateLogs, query.period || StatsPeriod.MONTHLY);
+      const periodStats = this.generateLateLogsPeriodStats(
+        lateLogs,
+        query.period || StatsPeriod.MONTHLY,
+      );
 
       const response: LateLogsStatsResponseDto = {
         total_late_logs: totalLateLogs,
@@ -1577,32 +1796,43 @@ export class AttendanceService {
         most_common_reason: mostCommonReason,
         paid_late_count: paidLateCount,
         unpaid_late_count: unpaidLateCount,
-        period_stats: periodStats
+        period_stats: periodStats,
       };
 
       // Add breakdowns if requested
       if (query.include_breakdown) {
-        response.employee_breakdown = this.generateLateLogsEmployeeBreakdown(lateLogs);
-        response.reason_breakdown = this.generateLateLogsReasonBreakdown(lateLogs);
+        response.employee_breakdown =
+          this.generateLateLogsEmployeeBreakdown(lateLogs);
+        response.reason_breakdown =
+          this.generateLateLogsReasonBreakdown(lateLogs);
       }
 
       return response;
     } catch (error) {
       console.error('Error in getLateLogsStats:', error);
-      throw new InternalServerErrorException(`Failed to get late logs statistics: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to get late logs statistics: ${error.message}`,
+      );
     }
   }
 
   // Generate period statistics for late logs
-  private generateLateLogsPeriodStats(lateLogs: any[], period: StatsPeriod): LatePeriodStatsDto[] {
+  private generateLateLogsPeriodStats(
+    lateLogs: any[],
+    period: StatsPeriod,
+  ): LatePeriodStatsDto[] {
     const stats: LatePeriodStatsDto[] = [];
     const groupedLogs = this.groupLateLogsByPeriod(lateLogs, period);
 
-    Object.keys(groupedLogs).forEach(periodKey => {
+    Object.keys(groupedLogs).forEach((periodKey) => {
       const logs = groupedLogs[periodKey];
       const totalLateLogs = logs.length;
-      const pendingLateLogs = logs.filter(log => log.actionTaken === 'Pending').length;
-      const completedLateLogs = logs.filter(log => log.actionTaken === 'Completed').length;
+      const pendingLateLogs = logs.filter(
+        (log) => log.actionTaken === 'Pending',
+      ).length;
+      const completedLateLogs = logs.filter(
+        (log) => log.actionTaken === 'Completed',
+      ).length;
       const totalMinutes = logs.reduce((sum, log) => sum + log.minutesLate, 0);
 
       stats.push({
@@ -1610,7 +1840,7 @@ export class AttendanceService {
         total_late_logs: totalLateLogs,
         completed_late_logs: completedLateLogs,
         pending_late_logs: pendingLateLogs,
-        total_minutes: totalMinutes
+        total_minutes: totalMinutes,
       });
     });
 
@@ -1618,10 +1848,13 @@ export class AttendanceService {
   }
 
   // Group late logs by period
-  private groupLateLogsByPeriod(lateLogs: any[], period: StatsPeriod): Record<string, any[]> {
+  private groupLateLogsByPeriod(
+    lateLogs: any[],
+    period: StatsPeriod,
+  ): Record<string, any[]> {
     const grouped: Record<string, any[]> = {};
 
-    lateLogs.forEach(log => {
+    lateLogs.forEach((log) => {
       let periodKey: string;
       const date = new Date(log.date);
 
@@ -1654,10 +1887,12 @@ export class AttendanceService {
   }
 
   // Generate employee breakdown for late logs
-  private generateLateLogsEmployeeBreakdown(lateLogs: any[]): EmployeeLateStatsDto[] {
+  private generateLateLogsEmployeeBreakdown(
+    lateLogs: any[],
+  ): EmployeeLateStatsDto[] {
     const employeeStats: Record<number, any> = {};
 
-    lateLogs.forEach(log => {
+    lateLogs.forEach((log) => {
       if (!employeeStats[log.empId]) {
         employeeStats[log.empId] = {
           employee_id: log.empId,
@@ -1665,7 +1900,7 @@ export class AttendanceService {
           total_late_logs: 0,
           total_minutes: 0,
           completed_late_logs: 0,
-          pending_late_logs: 0
+          pending_late_logs: 0,
         };
       }
 
@@ -1677,24 +1912,30 @@ export class AttendanceService {
       else if (log.actionTaken === 'Pending') stats.pending_late_logs++;
     });
 
-    return Object.values(employeeStats).map(stats => ({
-      ...stats,
-      average_minutes_late: stats.total_late_logs > 0 ? Math.round((stats.total_minutes / stats.total_late_logs) * 100) / 100 : 0
-    })).sort((a, b) => b.total_late_logs - a.total_late_logs);
+    return Object.values(employeeStats)
+      .map((stats) => ({
+        ...stats,
+        average_minutes_late:
+          stats.total_late_logs > 0
+            ? Math.round((stats.total_minutes / stats.total_late_logs) * 100) /
+              100
+            : 0,
+      }))
+      .sort((a, b) => b.total_late_logs - a.total_late_logs);
   }
 
   // Generate reason breakdown for late logs
   private generateLateLogsReasonBreakdown(lateLogs: any[]): ReasonStatsDto[] {
     const reasonStats: Record<string, any> = {};
 
-    lateLogs.forEach(log => {
+    lateLogs.forEach((log) => {
       const reason = log.reason || 'No reason provided';
       if (!reasonStats[reason]) {
         reasonStats[reason] = {
           reason: reason,
           count: 0,
           total_minutes: 0,
-          completed_count: 0
+          completed_count: 0,
         };
       }
 
@@ -1704,15 +1945,22 @@ export class AttendanceService {
       if (log.actionTaken === 'Completed') stats.completed_count++;
     });
 
-    return Object.values(reasonStats).map(stats => ({
-      reason: stats.reason,
-      count: stats.count,
-      total_minutes: stats.total_minutes,
-      completion_rate: stats.count > 0 ? Math.round((stats.completed_count / stats.count) * 100) : 0
-    })).sort((a, b) => b.count - a.count);
+    return Object.values(reasonStats)
+      .map((stats) => ({
+        reason: stats.reason,
+        count: stats.count,
+        total_minutes: stats.total_minutes,
+        completion_rate:
+          stats.count > 0
+            ? Math.round((stats.completed_count / stats.count) * 100)
+            : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
-  async getHalfDayLogs(query: GetHalfDayLogsDto): Promise<HalfDayLogsListResponseDto[]> {
+  async getHalfDayLogs(
+    query: GetHalfDayLogsDto,
+  ): Promise<HalfDayLogsListResponseDto[]> {
     try {
       const { employee_id, start_date, end_date } = query;
 
@@ -1724,16 +1972,22 @@ export class AttendanceService {
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
       if (start_date && new Date(start_date) < sixMonthsAgo) {
-        throw new BadRequestException('Start date cannot be more than 6 months ago');
+        throw new BadRequestException(
+          'Start date cannot be more than 6 months ago',
+        );
       }
 
       if (end_date && new Date(end_date) < sixMonthsAgo) {
-        throw new BadRequestException('End date cannot be more than 6 months ago');
+        throw new BadRequestException(
+          'End date cannot be more than 6 months ago',
+        );
       }
 
       // Validate that start_date is not greater than end_date
       if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
-        throw new BadRequestException('Start date cannot be greater than end date');
+        throw new BadRequestException(
+          'Start date cannot be greater than end date',
+        );
       }
 
       // Build where clause
@@ -1760,23 +2014,23 @@ export class AttendanceService {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          date: 'desc'
-        }
+          date: 'desc',
+        },
       });
 
       // Transform the data to match the response DTO
-      return halfDayLogs.map(log => ({
+      return halfDayLogs.map((log) => ({
         half_day_log_id: log.id,
         emp_id: log.empId,
         employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
@@ -1789,20 +2043,26 @@ export class AttendanceService {
         half_day_type: log.halfDayType,
         action_taken: log.actionTaken,
         reviewed_by: log.reviewedBy,
-        reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+        reviewer_name: log.reviewer
+          ? `${log.reviewer.firstName} ${log.reviewer.lastName}`
+          : null,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getHalfDayLogs:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to fetch half-day logs: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch half-day logs: ${error.message}`,
+      );
     }
   }
 
-  async getHalfDayLogsByEmployee(employeeId: number): Promise<HalfDayLogsListResponseDto[]> {
+  async getHalfDayLogsByEmployee(
+    employeeId: number,
+  ): Promise<HalfDayLogsListResponseDto[]> {
     try {
       // Validate employee_id
       if (isNaN(employeeId) || employeeId <= 0) {
@@ -1811,7 +2071,7 @@ export class AttendanceService {
 
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: employeeId }
+        where: { id: employeeId },
       });
 
       if (!employee) {
@@ -1821,29 +2081,29 @@ export class AttendanceService {
       // Fetch half-day logs for the specific employee
       const halfDayLogs = await this.prisma.halfDayLog.findMany({
         where: {
-          empId: employeeId
+          empId: employeeId,
         },
         include: {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          date: 'desc'
-        }
+          date: 'desc',
+        },
       });
 
       // Transform the data to match the response DTO
-      return halfDayLogs.map(log => ({
+      return halfDayLogs.map((log) => ({
         half_day_log_id: log.id,
         emp_id: log.empId,
         employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
@@ -1856,26 +2116,26 @@ export class AttendanceService {
         half_day_type: log.halfDayType,
         action_taken: log.actionTaken,
         reviewed_by: log.reviewedBy,
-        reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+        reviewer_name: log.reviewer
+          ? `${log.reviewer.firstName} ${log.reviewer.lastName}`
+          : null,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getHalfDayLogsByEmployee:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to fetch half-day logs for employee: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch half-day logs for employee: ${error.message}`,
+      );
     }
   }
 
   // Get Half Day Logs for Export (similar to HR logs pattern)
   async getHalfDayLogsForExport(query: any) {
-    const {
-      employee_id,
-      start_date,
-      end_date
-    } = query;
+    const { employee_id, start_date, end_date } = query;
 
     // Build where clause (same logic as getHalfDayLogs but without pagination)
     const where: any = {};
@@ -1902,25 +2162,28 @@ export class AttendanceService {
             firstName: true,
             lastName: true,
             email: true,
-            id: true
-          }
+            id: true,
+          },
         },
         reviewer: {
           select: {
             firstName: true,
             lastName: true,
-            email: true
-          }
-        }
+            email: true,
+          },
+        },
       },
       orderBy: {
-        date: 'desc'
-      }
+        date: 'desc',
+      },
     });
   }
 
   // Convert Half Day Logs to CSV (similar to HR logs pattern)
-  convertHalfDayLogsToCSV(halfDayLogs: any[], query: ExportHalfDayLogsDto): string {
+  convertHalfDayLogsToCSV(
+    halfDayLogs: any[],
+    query: ExportHalfDayLogsDto,
+  ): string {
     const headers = [
       'Half Day Log ID',
       'Employee ID',
@@ -1932,7 +2195,7 @@ export class AttendanceService {
       'Minutes Late',
       'Reason',
       'Justified',
-      'Action Taken'
+      'Action Taken',
     ];
 
     if (query.include_half_day_type) {
@@ -1940,14 +2203,19 @@ export class AttendanceService {
     }
 
     if (query.include_reviewer_details) {
-      headers.push('Reviewed By', 'Reviewer Name', 'Reviewer Email', 'Reviewed On');
+      headers.push(
+        'Reviewed By',
+        'Reviewer Name',
+        'Reviewer Email',
+        'Reviewed On',
+      );
     }
 
     headers.push('Created At', 'Updated At');
 
     const csvRows = [headers.join(',')];
 
-    halfDayLogs.forEach(log => {
+    halfDayLogs.forEach((log) => {
       const row = [
         log.id,
         log.empId,
@@ -1959,7 +2227,7 @@ export class AttendanceService {
         log.minutesLate,
         `"${log.reason || ''}"`,
         log.justified !== null ? log.justified : '',
-        log.actionTaken
+        log.actionTaken,
       ];
 
       if (query.include_half_day_type) {
@@ -1969,16 +2237,15 @@ export class AttendanceService {
       if (query.include_reviewer_details) {
         row.push(
           log.reviewedBy || '',
-          log.reviewer ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"` : '',
+          log.reviewer
+            ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"`
+            : '',
           log.reviewer ? log.reviewer.email : '',
-          log.reviewedOn ? log.reviewedOn.toISOString() : ''
+          log.reviewedOn ? log.reviewedOn.toISOString() : '',
         );
       }
 
-      row.push(
-        log.createdAt.toISOString(),
-        log.updatedAt.toISOString()
-      );
+      row.push(log.createdAt.toISOString(), log.updatedAt.toISOString());
 
       csvRows.push(row.join(','));
     });
@@ -1987,7 +2254,9 @@ export class AttendanceService {
   }
 
   // Get Half Day Logs Statistics
-  async getHalfDayLogsStats(query: HalfDayLogsStatsDto): Promise<HalfDayLogsStatsResponseDto> {
+  async getHalfDayLogsStats(
+    query: HalfDayLogsStatsDto,
+  ): Promise<HalfDayLogsStatsResponseDto> {
     try {
       // Build where clause
       const where: any = {};
@@ -1999,15 +2268,15 @@ export class AttendanceService {
       if (query.start_date && query.end_date) {
         where.date = {
           gte: new Date(query.start_date),
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       } else if (query.start_date) {
         where.date = {
-          gte: new Date(query.start_date)
+          gte: new Date(query.start_date),
         };
       } else if (query.end_date) {
         where.date = {
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       }
 
@@ -2018,40 +2287,59 @@ export class AttendanceService {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       // Calculate basic statistics
       const totalHalfDayLogs = halfDayLogs.length;
-      const pendingHalfDayLogs = halfDayLogs.filter(log => log.actionTaken === 'Pending').length;
-      const completedHalfDayLogs = halfDayLogs.filter(log => log.actionTaken === 'Completed').length;
+      const pendingHalfDayLogs = halfDayLogs.filter(
+        (log) => log.actionTaken === 'Pending',
+      ).length;
+      const completedHalfDayLogs = halfDayLogs.filter(
+        (log) => log.actionTaken === 'Completed',
+      ).length;
 
       // Calculate total minutes late
-      const totalMinutesLate = halfDayLogs.reduce((sum, log) => sum + log.minutesLate, 0);
-      const averageMinutesLate = totalHalfDayLogs > 0 ? totalMinutesLate / totalHalfDayLogs : 0;
+      const totalMinutesLate = halfDayLogs.reduce(
+        (sum, log) => sum + log.minutesLate,
+        0,
+      );
+      const averageMinutesLate =
+        totalHalfDayLogs > 0 ? totalMinutesLate / totalHalfDayLogs : 0;
 
       // Count paid vs unpaid
-      const paidHalfDayCount = halfDayLogs.filter(log => log.halfDayType === 'paid').length;
-      const unpaidHalfDayCount = halfDayLogs.filter(log => log.halfDayType === 'unpaid').length;
+      const paidHalfDayCount = halfDayLogs.filter(
+        (log) => log.halfDayType === 'paid',
+      ).length;
+      const unpaidHalfDayCount = halfDayLogs.filter(
+        (log) => log.halfDayType === 'unpaid',
+      ).length;
 
       // Find most common reason
-      const reasonCounts = halfDayLogs.reduce((acc, log) => {
-        const reason = log.reason || 'No reason provided';
-        acc[reason] = (acc[reason] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const reasonCounts = halfDayLogs.reduce(
+        (acc, log) => {
+          const reason = log.reason || 'No reason provided';
+          acc[reason] = (acc[reason] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
-      const mostCommonReason = Object.keys(reasonCounts).length > 0
-        ? Object.keys(reasonCounts).reduce((a, b) =>
-          reasonCounts[a] > reasonCounts[b] ? a : b
-        )
-        : 'N/A';
+      const mostCommonReason =
+        Object.keys(reasonCounts).length > 0
+          ? Object.keys(reasonCounts).reduce((a, b) =>
+              reasonCounts[a] > reasonCounts[b] ? a : b,
+            )
+          : 'N/A';
 
       // Generate period statistics
-      const periodStats = this.generateHalfDayLogsPeriodStats(halfDayLogs, query.period || StatsPeriod.MONTHLY);
+      const periodStats = this.generateHalfDayLogsPeriodStats(
+        halfDayLogs,
+        query.period || StatsPeriod.MONTHLY,
+      );
 
       const response: HalfDayLogsStatsResponseDto = {
         total_half_day_logs: totalHalfDayLogs,
@@ -2062,32 +2350,43 @@ export class AttendanceService {
         most_common_reason: mostCommonReason,
         paid_half_day_count: paidHalfDayCount,
         unpaid_half_day_count: unpaidHalfDayCount,
-        period_stats: periodStats
+        period_stats: periodStats,
       };
 
       // Add breakdowns if requested
       if (query.include_breakdown) {
-        response.employee_breakdown = this.generateHalfDayLogsEmployeeBreakdown(halfDayLogs);
-        response.reason_breakdown = this.generateHalfDayLogsReasonBreakdown(halfDayLogs);
+        response.employee_breakdown =
+          this.generateHalfDayLogsEmployeeBreakdown(halfDayLogs);
+        response.reason_breakdown =
+          this.generateHalfDayLogsReasonBreakdown(halfDayLogs);
       }
 
       return response;
     } catch (error) {
       console.error('Error in getHalfDayLogsStats:', error);
-      throw new InternalServerErrorException(`Failed to get half day logs statistics: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to get half day logs statistics: ${error.message}`,
+      );
     }
   }
 
   // Generate period statistics for half day logs
-  private generateHalfDayLogsPeriodStats(halfDayLogs: any[], period: StatsPeriod): HalfDayPeriodStatsDto[] {
+  private generateHalfDayLogsPeriodStats(
+    halfDayLogs: any[],
+    period: StatsPeriod,
+  ): HalfDayPeriodStatsDto[] {
     const stats: HalfDayPeriodStatsDto[] = [];
     const groupedLogs = this.groupHalfDayLogsByPeriod(halfDayLogs, period);
 
-    Object.keys(groupedLogs).forEach(periodKey => {
+    Object.keys(groupedLogs).forEach((periodKey) => {
       const logs = groupedLogs[periodKey];
       const totalHalfDayLogs = logs.length;
-      const pendingHalfDayLogs = logs.filter(log => log.actionTaken === 'Pending').length;
-      const completedHalfDayLogs = logs.filter(log => log.actionTaken === 'Completed').length;
+      const pendingHalfDayLogs = logs.filter(
+        (log) => log.actionTaken === 'Pending',
+      ).length;
+      const completedHalfDayLogs = logs.filter(
+        (log) => log.actionTaken === 'Completed',
+      ).length;
       const totalMinutes = logs.reduce((sum, log) => sum + log.minutesLate, 0);
 
       stats.push({
@@ -2095,7 +2394,7 @@ export class AttendanceService {
         total_half_day_logs: totalHalfDayLogs,
         completed_half_day_logs: completedHalfDayLogs,
         pending_half_day_logs: pendingHalfDayLogs,
-        total_minutes: totalMinutes
+        total_minutes: totalMinutes,
       });
     });
 
@@ -2103,10 +2402,13 @@ export class AttendanceService {
   }
 
   // Group half day logs by period
-  private groupHalfDayLogsByPeriod(halfDayLogs: any[], period: StatsPeriod): Record<string, any[]> {
+  private groupHalfDayLogsByPeriod(
+    halfDayLogs: any[],
+    period: StatsPeriod,
+  ): Record<string, any[]> {
     const grouped: Record<string, any[]> = {};
 
-    halfDayLogs.forEach(log => {
+    halfDayLogs.forEach((log) => {
       let periodKey: string;
       const date = new Date(log.date);
 
@@ -2139,10 +2441,12 @@ export class AttendanceService {
   }
 
   // Generate employee breakdown for half day logs
-  private generateHalfDayLogsEmployeeBreakdown(halfDayLogs: any[]): EmployeeHalfDayStatsDto[] {
+  private generateHalfDayLogsEmployeeBreakdown(
+    halfDayLogs: any[],
+  ): EmployeeHalfDayStatsDto[] {
     const employeeStats: Record<number, any> = {};
 
-    halfDayLogs.forEach(log => {
+    halfDayLogs.forEach((log) => {
       if (!employeeStats[log.empId]) {
         employeeStats[log.empId] = {
           employee_id: log.empId,
@@ -2150,7 +2454,7 @@ export class AttendanceService {
           total_half_day_logs: 0,
           total_minutes: 0,
           completed_half_day_logs: 0,
-          pending_half_day_logs: 0
+          pending_half_day_logs: 0,
         };
       }
 
@@ -2162,24 +2466,33 @@ export class AttendanceService {
       else if (log.actionTaken === 'Pending') stats.pending_half_day_logs++;
     });
 
-    return Object.values(employeeStats).map(stats => ({
-      ...stats,
-      average_minutes_late: stats.total_half_day_logs > 0 ? Math.round((stats.total_minutes / stats.total_half_day_logs) * 100) / 100 : 0
-    })).sort((a, b) => b.total_half_day_logs - a.total_half_day_logs);
+    return Object.values(employeeStats)
+      .map((stats) => ({
+        ...stats,
+        average_minutes_late:
+          stats.total_half_day_logs > 0
+            ? Math.round(
+                (stats.total_minutes / stats.total_half_day_logs) * 100,
+              ) / 100
+            : 0,
+      }))
+      .sort((a, b) => b.total_half_day_logs - a.total_half_day_logs);
   }
 
   // Generate reason breakdown for half day logs
-  private generateHalfDayLogsReasonBreakdown(halfDayLogs: any[]): HalfDayReasonStatsDto[] {
+  private generateHalfDayLogsReasonBreakdown(
+    halfDayLogs: any[],
+  ): HalfDayReasonStatsDto[] {
     const reasonStats: Record<string, any> = {};
 
-    halfDayLogs.forEach(log => {
+    halfDayLogs.forEach((log) => {
       const reason = log.reason || 'No reason provided';
       if (!reasonStats[reason]) {
         reasonStats[reason] = {
           reason: reason,
           count: 0,
           total_minutes: 0,
-          completed_count: 0
+          completed_count: 0,
         };
       }
 
@@ -2189,21 +2502,35 @@ export class AttendanceService {
       if (log.actionTaken === 'Completed') stats.completed_count++;
     });
 
-    return Object.values(reasonStats).map(stats => ({
-      reason: stats.reason,
-      count: stats.count,
-      total_minutes: stats.total_minutes,
-      completion_rate: stats.count > 0 ? Math.round((stats.completed_count / stats.count) * 100) : 0
-    })).sort((a, b) => b.count - a.count);
+    return Object.values(reasonStats)
+      .map((stats) => ({
+        reason: stats.reason,
+        count: stats.count,
+        total_minutes: stats.total_minutes,
+        completion_rate:
+          stats.count > 0
+            ? Math.round((stats.completed_count / stats.count) * 100)
+            : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
-  async submitHalfDayReason(halfDayData: SubmitHalfDayReasonDto): Promise<HalfDayLogResponseDto> {
+  async submitHalfDayReason(
+    halfDayData: SubmitHalfDayReasonDto,
+  ): Promise<HalfDayLogResponseDto> {
     try {
-      const { emp_id, date, scheduled_time_in, actual_time_in, minutes_late, reason } = halfDayData;
+      const {
+        emp_id,
+        date,
+        scheduled_time_in,
+        actual_time_in,
+        minutes_late,
+        reason,
+      } = halfDayData;
 
       // Check if employee exists
       const employee = await this.prisma.employee.findUnique({
-        where: { id: emp_id }
+        where: { id: emp_id },
       });
 
       if (!employee) {
@@ -2215,15 +2542,17 @@ export class AttendanceService {
         where: {
           empId: emp_id,
           date: new Date(date),
-          actionTaken: 'Created' // Only update logs created by check-in
+          actionTaken: 'Created', // Only update logs created by check-in
         },
         orderBy: {
-          createdAt: 'desc' // Get the most recent one
-        }
+          createdAt: 'desc', // Get the most recent one
+        },
       });
 
       if (!existingHalfDayLog) {
-        throw new BadRequestException('No half-day log found for this employee and date. Please check-in first.');
+        throw new BadRequestException(
+          'No half-day log found for this employee and date. Please check-in first.',
+        );
       }
 
       // Update the existing half-day log with reason and change status to Pending
@@ -2234,8 +2563,8 @@ export class AttendanceService {
           actionTaken: 'Pending', // Status when employee submits reason
           halfDayType: null, // Keep null, will be set by HR
           justified: null, // Keep null, will be set by HR
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       return {
@@ -2251,22 +2580,29 @@ export class AttendanceService {
         action_taken: halfDayLog.actionTaken,
         reviewed_by: halfDayLog.reviewedBy,
         created_at: halfDayLog.createdAt.toISOString(),
-        updated_at: halfDayLog.updatedAt.toISOString()
+        updated_at: halfDayLog.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in submitHalfDayReason:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to submit half-day reason: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to submit half-day reason: ${error.message}`,
+      );
     }
   }
 
-  async processHalfDayAction(halfDayLogId: number, action: 'Pending' | 'Completed', reviewerId: number, halfDayType?: 'paid' | 'unpaid'): Promise<HalfDayLogResponseDto> {
+  async processHalfDayAction(
+    halfDayLogId: number,
+    action: 'Pending' | 'Completed',
+    reviewerId: number,
+    halfDayType?: 'paid' | 'unpaid',
+  ): Promise<HalfDayLogResponseDto> {
     try {
       // Find the half-day log
       const halfDayLog = await this.prisma.halfDayLog.findUnique({
-        where: { id: halfDayLogId }
+        where: { id: halfDayLogId },
       });
 
       if (!halfDayLog) {
@@ -2279,19 +2615,21 @@ export class AttendanceService {
         data: {
           actionTaken: action,
           halfDayType: halfDayType || null, // Let HR set this
-          justified: action === 'Completed' ? (halfDayType === 'paid') : null, // Let HR set this
+          justified: action === 'Completed' ? halfDayType === 'paid' : null, // Let HR set this
           reviewedBy: reviewerId,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
-      let attendanceUpdates: { half_days: number; monthly_half_days: number; } | undefined = undefined;
+      let attendanceUpdates:
+        | { half_days: number; monthly_half_days: number }
+        | undefined = undefined;
 
       // If completed and marked as paid, update attendance records
       if (action === 'Completed' && halfDayType === 'paid') {
         // Find the attendance record for this employee
         const attendance = await this.prisma.attendance.findFirst({
-          where: { employeeId: halfDayLog.empId }
+          where: { employeeId: halfDayLog.empId },
         });
 
         if (attendance) {
@@ -2303,8 +2641,8 @@ export class AttendanceService {
           const updatedAttendance = await this.prisma.attendance.update({
             where: { id: attendance.id },
             data: {
-              halfDays: newHalfDays
-            }
+              halfDays: newHalfDays,
+            },
           });
 
           // Update monthly attendance summary to reflect the change
@@ -2313,27 +2651,28 @@ export class AttendanceService {
           await this.prisma.monthlyAttendanceSummary.updateMany({
             where: {
               empId: halfDayLog.empId,
-              month: halfDayMonth
+              month: halfDayMonth,
             },
             data: {
               totalHalfDays: {
-                decrement: 1
-              }
-            }
+                decrement: 1,
+              },
+            },
           });
 
           // Get the updated monthly attendance summary to include in response
-          const updatedMonthlySummary = await this.prisma.monthlyAttendanceSummary.findFirst({
-            where: {
-              empId: halfDayLog.empId,
-              month: halfDayMonth
-            }
-          });
+          const updatedMonthlySummary =
+            await this.prisma.monthlyAttendanceSummary.findFirst({
+              where: {
+                empId: halfDayLog.empId,
+                month: halfDayMonth,
+              },
+            });
 
           // Include the updated attendance values in response
           attendanceUpdates = {
             half_days: updatedAttendance.halfDays || 0,
-            monthly_half_days: updatedMonthlySummary?.totalHalfDays || 0
+            monthly_half_days: updatedMonthlySummary?.totalHalfDays || 0,
           };
         }
       }
@@ -2352,18 +2691,22 @@ export class AttendanceService {
         reviewed_by: updatedHalfDayLog.reviewedBy,
         created_at: updatedHalfDayLog.createdAt.toISOString(),
         updated_at: updatedHalfDayLog.updatedAt.toISOString(),
-        attendance_updates: attendanceUpdates
+        attendance_updates: attendanceUpdates,
       };
     } catch (error) {
       console.error('Error in processHalfDayAction:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to process half-day action: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to process half-day action: ${error.message}`,
+      );
     }
   }
 
-  async getLeaveLogs(query: GetLeaveLogsDto): Promise<LeaveLogsListResponseDto[]> {
+  async getLeaveLogs(
+    query: GetLeaveLogsDto,
+  ): Promise<LeaveLogsListResponseDto[]> {
     try {
       const { employee_id, start_date, end_date } = query;
 
@@ -2375,16 +2718,22 @@ export class AttendanceService {
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
       if (start_date && new Date(start_date) < threeMonthsAgo) {
-        throw new BadRequestException('Start date cannot be more than 3 months ago');
+        throw new BadRequestException(
+          'Start date cannot be more than 3 months ago',
+        );
       }
 
       if (end_date && new Date(end_date) < threeMonthsAgo) {
-        throw new BadRequestException('End date cannot be more than 3 months ago');
+        throw new BadRequestException(
+          'End date cannot be more than 3 months ago',
+        );
       }
 
       // Validate that start_date is not less than end_date
       if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
-        throw new BadRequestException('Start date cannot be greater than end date');
+        throw new BadRequestException(
+          'Start date cannot be greater than end date',
+        );
       }
 
       // Build where clause
@@ -2402,16 +2751,16 @@ export class AttendanceService {
           where.OR.push({
             AND: [
               { startDate: { lte: new Date(end_date) } },
-              { endDate: { gte: new Date(start_date) } }
-            ]
+              { endDate: { gte: new Date(start_date) } },
+            ],
           });
         } else if (start_date) {
           where.OR.push({
-            endDate: { gte: new Date(start_date) }
+            endDate: { gte: new Date(start_date) },
           });
         } else if (end_date) {
           where.OR.push({
-            startDate: { lte: new Date(end_date) }
+            startDate: { lte: new Date(end_date) },
           });
         }
       }
@@ -2422,22 +2771,22 @@ export class AttendanceService {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          appliedOn: 'desc'
-        }
+          appliedOn: 'desc',
+        },
       });
 
-      return leaveLogs.map(log => ({
+      return leaveLogs.map((log) => ({
         leave_log_id: log.id,
         emp_id: log.empId,
         employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
@@ -2448,22 +2797,28 @@ export class AttendanceService {
         status: log.status || 'Pending',
         applied_on: log.appliedOn.toISOString(),
         reviewed_by: log.reviewedBy,
-        reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+        reviewer_name: log.reviewer
+          ? `${log.reviewer.firstName} ${log.reviewer.lastName}`
+          : null,
         reviewed_on: log.reviewedOn ? log.reviewedOn.toISOString() : null,
         confirmation_reason: log.confirmationReason,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getLeaveLogs:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to get leave logs: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to get leave logs: ${error.message}`,
+      );
     }
   }
 
-  async getLeaveLogsByEmployee(employeeId: number): Promise<LeaveLogsListResponseDto[]> {
+  async getLeaveLogsByEmployee(
+    employeeId: number,
+  ): Promise<LeaveLogsListResponseDto[]> {
     try {
       if (!employeeId || isNaN(employeeId)) {
         throw new BadRequestException('Invalid employee ID');
@@ -2471,28 +2826,28 @@ export class AttendanceService {
 
       const leaveLogs = await this.prisma.leaveLog.findMany({
         where: {
-          empId: employeeId
+          empId: employeeId,
         },
         include: {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
+              lastName: true,
+            },
+          },
         },
         orderBy: {
-          appliedOn: 'desc'
-        }
+          appliedOn: 'desc',
+        },
       });
 
-      return leaveLogs.map(log => ({
+      return leaveLogs.map((log) => ({
         leave_log_id: log.id,
         emp_id: log.empId,
         employee_name: `${log.employee.firstName} ${log.employee.lastName}`,
@@ -2503,28 +2858,28 @@ export class AttendanceService {
         status: log.status || 'Pending',
         applied_on: log.appliedOn.toISOString(),
         reviewed_by: log.reviewedBy,
-        reviewer_name: log.reviewer ? `${log.reviewer.firstName} ${log.reviewer.lastName}` : null,
+        reviewer_name: log.reviewer
+          ? `${log.reviewer.firstName} ${log.reviewer.lastName}`
+          : null,
         reviewed_on: log.reviewedOn ? log.reviewedOn.toISOString() : null,
         confirmation_reason: log.confirmationReason,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getLeaveLogsByEmployee:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to get leave logs by employee: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to get leave logs by employee: ${error.message}`,
+      );
     }
   }
 
   // Get Leave Logs for Export (similar to HR logs pattern)
   async getLeaveLogsForExport(query: any) {
-    const {
-      employee_id,
-      start_date,
-      end_date
-    } = query;
+    const { employee_id, start_date, end_date } = query;
 
     // Build where clause (same logic as getLeaveLogs but without pagination)
     const where: any = {};
@@ -2536,15 +2891,15 @@ export class AttendanceService {
     if (start_date && end_date) {
       where.appliedOn = {
         gte: new Date(start_date),
-        lte: new Date(end_date)
+        lte: new Date(end_date),
       };
     } else if (start_date) {
       where.appliedOn = {
-        gte: new Date(start_date)
+        gte: new Date(start_date),
       };
     } else if (end_date) {
       where.appliedOn = {
-        lte: new Date(end_date)
+        lte: new Date(end_date),
       };
     }
 
@@ -2556,20 +2911,20 @@ export class AttendanceService {
             firstName: true,
             lastName: true,
             email: true,
-            id: true
-          }
+            id: true,
+          },
         },
         reviewer: {
           select: {
             firstName: true,
             lastName: true,
-            email: true
-          }
-        }
+            email: true,
+          },
+        },
       },
       orderBy: {
-        appliedOn: 'desc'
-      }
+        appliedOn: 'desc',
+      },
     });
   }
 
@@ -2586,11 +2941,16 @@ export class AttendanceService {
       'Reason',
       'Status',
       'Applied On',
-      'Total Days'
+      'Total Days',
     ];
 
     if (query.include_reviewer_details) {
-      headers.push('Reviewed By', 'Reviewer Name', 'Reviewer Email', 'Reviewed On');
+      headers.push(
+        'Reviewed By',
+        'Reviewer Name',
+        'Reviewer Email',
+        'Reviewed On',
+      );
     }
 
     if (query.include_confirmation_reason) {
@@ -2601,7 +2961,7 @@ export class AttendanceService {
 
     const csvRows = [headers.join(',')];
 
-    leaveLogs.forEach(log => {
+    leaveLogs.forEach((log) => {
       const row = [
         log.id,
         log.empId,
@@ -2613,15 +2973,17 @@ export class AttendanceService {
         `"${log.reason || ''}"`,
         log.status || 'Pending',
         log.appliedOn.toISOString(),
-        this.calculateLeaveDays(log.startDate, log.endDate)
+        this.calculateLeaveDays(log.startDate, log.endDate),
       ];
 
       if (query.include_reviewer_details) {
         row.push(
           log.reviewedBy || '',
-          log.reviewer ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"` : '',
+          log.reviewer
+            ? `"${log.reviewer.firstName} ${log.reviewer.lastName}"`
+            : '',
           log.reviewer ? log.reviewer.email : '',
-          log.reviewedOn ? log.reviewedOn.toISOString() : ''
+          log.reviewedOn ? log.reviewedOn.toISOString() : '',
         );
       }
 
@@ -2629,10 +2991,7 @@ export class AttendanceService {
         row.push(`"${log.confirmationReason || ''}"`);
       }
 
-      row.push(
-        log.createdAt.toISOString(),
-        log.updatedAt.toISOString()
-      );
+      row.push(log.createdAt.toISOString(), log.updatedAt.toISOString());
 
       csvRows.push(row.join(','));
     });
@@ -2640,12 +2999,14 @@ export class AttendanceService {
     return csvRows.join('\n');
   }
 
-  async createLeaveLog(leaveData: CreateLeaveLogDto): Promise<LeaveLogResponseDto> {
+  async createLeaveLog(
+    leaveData: CreateLeaveLogDto,
+  ): Promise<LeaveLogResponseDto> {
     try {
       // Validate employee exists
       const employee = await this.prisma.employee.findUnique({
         where: { id: leaveData.emp_id },
-        select: { id: true, firstName: true, lastName: true }
+        select: { id: true, firstName: true, lastName: true },
       });
 
       if (!employee) {
@@ -2657,7 +3018,9 @@ export class AttendanceService {
       const endDate = new Date(leaveData.end_date);
 
       if (startDate > endDate) {
-        throw new BadRequestException('Start date cannot be greater than end date');
+        throw new BadRequestException(
+          'Start date cannot be greater than end date',
+        );
       }
 
       // Check for existing leave requests for the same date range
@@ -2669,30 +3032,32 @@ export class AttendanceService {
             {
               AND: [
                 { startDate: { lte: startDate } },
-                { endDate: { gte: startDate } }
-              ]
+                { endDate: { gte: startDate } },
+              ],
             },
             {
               AND: [
                 { startDate: { lte: endDate } },
-                { endDate: { gte: endDate } }
-              ]
+                { endDate: { gte: endDate } },
+              ],
             },
             {
               AND: [
                 { startDate: { gte: startDate } },
-                { endDate: { lte: endDate } }
-              ]
-            }
+                { endDate: { lte: endDate } },
+              ],
+            },
           ],
           status: {
-            in: ['Pending', 'Approved']
-          }
-        }
+            in: ['Pending', 'Approved'],
+          },
+        },
       });
 
       if (existingLeave) {
-        throw new BadRequestException('Leave request already exists for the specified date range. Please check your existing leave requests.');
+        throw new BadRequestException(
+          'Leave request already exists for the specified date range. Please check your existing leave requests.',
+        );
       }
 
       // Create the leave log with status automatically set to 'Pending'
@@ -2704,22 +3069,22 @@ export class AttendanceService {
           endDate: endDate,
           reason: leaveData.reason,
           status: 'Pending', // Automatically set to pending
-          appliedOn: new Date()
+          appliedOn: new Date(),
         },
         include: {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       return {
@@ -2733,22 +3098,33 @@ export class AttendanceService {
         status: leaveLog.status || 'Pending',
         applied_on: leaveLog.appliedOn.toISOString(),
         reviewed_by: leaveLog.reviewedBy,
-        reviewer_name: leaveLog.reviewer ? `${leaveLog.reviewer.firstName} ${leaveLog.reviewer.lastName}` : null,
-        reviewed_on: leaveLog.reviewedOn ? leaveLog.reviewedOn.toISOString() : null,
+        reviewer_name: leaveLog.reviewer
+          ? `${leaveLog.reviewer.firstName} ${leaveLog.reviewer.lastName}`
+          : null,
+        reviewed_on: leaveLog.reviewedOn
+          ? leaveLog.reviewedOn.toISOString()
+          : null,
         confirmation_reason: leaveLog.confirmationReason,
         created_at: leaveLog.createdAt.toISOString(),
-        updated_at: leaveLog.updatedAt.toISOString()
+        updated_at: leaveLog.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in createLeaveLog:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to create leave log: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to create leave log: ${error.message}`,
+      );
     }
   }
 
-  async processLeaveAction(leaveLogId: number, action: 'Approved' | 'Rejected', reviewerId: number, confirmationReason?: string): Promise<LeaveLogResponseDto> {
+  async processLeaveAction(
+    leaveLogId: number,
+    action: 'Approved' | 'Rejected',
+    reviewerId: number,
+    confirmationReason?: string,
+  ): Promise<LeaveLogResponseDto> {
     try {
       // Find the leave log
       const leaveLog = await this.prisma.leaveLog.findUnique({
@@ -2757,16 +3133,16 @@ export class AttendanceService {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       if (!leaveLog) {
@@ -2781,22 +3157,22 @@ export class AttendanceService {
           reviewedBy: reviewerId,
           reviewedOn: new Date(),
           confirmationReason: confirmationReason || null,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
         include: {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
+              lastName: true,
+            },
           },
           reviewer: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       // Process attendance updates based on the logic you specified
@@ -2808,15 +3184,19 @@ export class AttendanceService {
         // Calculate the TOTAL number of days for this leave using proper day counting
         const totalLeaveDays = this.calculateLeaveDays(startDate, endDate);
 
-        console.log(`Leave approved: Total days: ${totalLeaveDays}, Start: ${startDate.toISOString().split('T')[0]}, End: ${endDate.toISOString().split('T')[0]}`);
+        console.log(
+          `Leave approved: Total days: ${totalLeaveDays}, Start: ${startDate.toISOString().split('T')[0]}, End: ${endDate.toISOString().split('T')[0]}`,
+        );
 
         // Condition 1: If endDate is less than current date (past leave)
         if (endDate < currentDate) {
-          console.log(`Processing past leave - endDate ${endDate.toISOString().split('T')[0]} is before current date ${currentDate.toISOString().split('T')[0]}`);
+          console.log(
+            `Processing past leave - endDate ${endDate.toISOString().split('T')[0]} is before current date ${currentDate.toISOString().split('T')[0]}`,
+          );
 
           // Find the attendance record for this employee
           const attendance = await this.prisma.attendance.findFirst({
-            where: { employeeId: leaveLog.empId }
+            where: { employeeId: leaveLog.empId },
           });
 
           if (attendance) {
@@ -2830,14 +3210,25 @@ export class AttendanceService {
               data: {
                 absentDays: Math.max(0, currentAbsentDays - totalLeaveDays),
                 leaveDays: currentLeaveDays + totalLeaveDays,
-                quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - totalLeaveDays)
-              }
+                quarterlyLeaves: Math.max(
+                  0,
+                  currentQuarterlyLeaves - totalLeaveDays,
+                ),
+              },
             });
 
-            console.log(`Updated attendance: -${totalLeaveDays} absent, +${totalLeaveDays} leave, -${totalLeaveDays} quarterly`);
+            console.log(
+              `Updated attendance: -${totalLeaveDays} absent, +${totalLeaveDays} leave, -${totalLeaveDays} quarterly`,
+            );
 
             // 2. Update monthly attendance summary table
-            await this.updateMonthlyAttendanceForLeave(leaveLog.empId, startDate, endDate, totalLeaveDays, totalLeaveDays);
+            await this.updateMonthlyAttendanceForLeave(
+              leaveLog.empId,
+              startDate,
+              endDate,
+              totalLeaveDays,
+              totalLeaveDays,
+            );
 
             // 3. Update attendance logs table - change status from absent to leave
             const currentDateForLogs = new Date(startDate);
@@ -2848,8 +3239,8 @@ export class AttendanceService {
               const existingLog = await this.prisma.attendanceLog.findFirst({
                 where: {
                   employeeId: leaveLog.empId,
-                  date: new Date(logDate)
-                }
+                  date: new Date(logDate),
+                },
               });
 
               if (existingLog) {
@@ -2859,10 +3250,12 @@ export class AttendanceService {
                   data: {
                     status: 'leave',
                     checkin: null,
-                    checkout: null
-                  }
+                    checkout: null,
+                  },
                 });
-                console.log(`Updated existing log for ${logDate} to leave status`);
+                console.log(
+                  `Updated existing log for ${logDate} to leave status`,
+                );
               } else {
                 // Create new attendance log with leave status
                 await this.prisma.attendanceLog.create({
@@ -2872,8 +3265,8 @@ export class AttendanceService {
                     checkin: null,
                     checkout: null,
                     mode: 'onsite',
-                    status: 'leave'
-                  }
+                    status: 'leave',
+                  },
                 });
                 console.log(`Created new leave log for ${logDate}`);
               }
@@ -2885,7 +3278,9 @@ export class AttendanceService {
         }
         // Condition 2: If startDate >= current date (future leave) - DO NOTHING
         else {
-          console.log(`Future leave - startDate ${startDate.toISOString().split('T')[0]} is >= current date ${currentDate.toISOString().split('T')[0]}, doing nothing`);
+          console.log(
+            `Future leave - startDate ${startDate.toISOString().split('T')[0]} is >= current date ${currentDate.toISOString().split('T')[0]}, doing nothing`,
+          );
         }
       }
       // If action is 'Rejected', no action needed as per your requirement
@@ -2901,18 +3296,24 @@ export class AttendanceService {
         status: updatedLeaveLog.status || 'Pending',
         applied_on: updatedLeaveLog.appliedOn.toISOString(),
         reviewed_by: updatedLeaveLog.reviewedBy,
-        reviewer_name: updatedLeaveLog.reviewer ? `${updatedLeaveLog.reviewer.firstName} ${updatedLeaveLog.reviewer.lastName}` : null,
-        reviewed_on: updatedLeaveLog.reviewedOn ? updatedLeaveLog.reviewedOn.toISOString() : null,
+        reviewer_name: updatedLeaveLog.reviewer
+          ? `${updatedLeaveLog.reviewer.firstName} ${updatedLeaveLog.reviewer.lastName}`
+          : null,
+        reviewed_on: updatedLeaveLog.reviewedOn
+          ? updatedLeaveLog.reviewedOn.toISOString()
+          : null,
         confirmation_reason: updatedLeaveLog.confirmationReason,
         created_at: updatedLeaveLog.createdAt.toISOString(),
-        updated_at: updatedLeaveLog.updatedAt.toISOString()
+        updated_at: updatedLeaveLog.updatedAt.toISOString(),
       };
     } catch (error) {
       console.error('Error in processLeaveAction:', error);
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new InternalServerErrorException(`Failed to process leave action: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to process leave action: ${error.message}`,
+      );
     }
   }
 
@@ -2931,7 +3332,13 @@ export class AttendanceService {
   }
 
   // Helper function to update monthly attendance for cross-month leaves
-  private async updateMonthlyAttendanceForLeave(empId: number, startDate: Date, endDate: Date, totalLeaveDays: number, allowedDaysForMonthly: number): Promise<void> {
+  private async updateMonthlyAttendanceForLeave(
+    empId: number,
+    startDate: Date,
+    endDate: Date,
+    totalLeaveDays: number,
+    allowedDaysForMonthly: number,
+  ): Promise<void> {
     const monthlyDays = new Map<string, number>();
 
     // Count the actual days per month
@@ -2950,31 +3357,41 @@ export class AttendanceService {
       await this.prisma.monthlyAttendanceSummary.updateMany({
         where: {
           empId: empId,
-          month: month
+          month: month,
         },
         data: {
           totalAbsent: {
-            decrement: daysInMonth
+            decrement: daysInMonth,
           },
           totalLeaveDays: {
-            increment: daysInMonth
-          }
-        }
+            increment: daysInMonth,
+          },
+        },
       });
 
-      console.log(`Updated month ${month}: -${daysInMonth} absent, +${daysInMonth} leave days`);
+      console.log(
+        `Updated month ${month}: -${daysInMonth} absent, +${daysInMonth} leave days`,
+      );
     }
   }
 
-  async autoMarkAbsent(targetDate?: string): Promise<{ message: string; absent_marked: number; leave_applied: number }> {
+  async autoMarkAbsent(targetDate?: string): Promise<{
+    message: string;
+    absent_marked: number;
+    leave_applied: number;
+  }> {
     try {
       // Get current time in PKT (following checkin pattern)
       const now = new Date();
-      const nowPkt = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+      const nowPkt = new Date(
+        now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+      );
 
       // Compute local time using PKT offset (+300 minutes = UTC+5)
       const effectiveOffsetMinutes = 300; // PKT UTC+5
-      const currentTimeLocal = new Date(now.getTime() + effectiveOffsetMinutes * 60 * 1000);
+      const currentTimeLocal = new Date(
+        now.getTime() + effectiveOffsetMinutes * 60 * 1000,
+      );
 
       // Determine target business date: use provided date or calculate based on current time
       let todayPKT: Date;
@@ -2984,7 +3401,9 @@ export class AttendanceService {
         // Use provided date
         const inputDate = new Date(targetDate + 'T00:00:00');
         if (isNaN(inputDate.getTime())) {
-          throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
+          throw new BadRequestException(
+            'Invalid date format. Expected YYYY-MM-DD',
+          );
         }
         todayPKT = new Date(inputDate);
         todayPKT.setHours(0, 0, 0, 0);
@@ -3004,7 +3423,9 @@ export class AttendanceService {
       // Convert current time to minutes since midnight for comparison
       const currentTimeMinutes = currentHour * 60 + currentMinute;
 
-      console.log(`Auto-marking absent for date: ${localDateStr}, current time (PKT): ${currentTime}`);
+      console.log(
+        `Auto-marking absent for date: ${localDateStr}, current time (PKT): ${currentTime}`,
+      );
 
       // Get company settings to retrieve absentTime configuration
       const company = await this.prisma.company.findFirst();
@@ -3018,15 +3439,15 @@ export class AttendanceService {
       // Get all employees with their shift start times
       const employees = await this.prisma.employee.findMany({
         where: {
-          status: 'active'
+          status: 'active',
         },
         select: {
           id: true,
           firstName: true,
           lastName: true,
           shiftStart: true,
-          shiftEnd: true
-        }
+          shiftEnd: true,
+        },
       });
 
       let absentMarked = 0;
@@ -3034,7 +3455,7 @@ export class AttendanceService {
 
       // OPTIMIZATION: Pre-process all employees to determine who should be marked absent
       interface EmployeeAbsentData {
-        employee: typeof employees[0];
+        employee: (typeof employees)[0];
         businessDate: Date;
         shouldMarkAbsent: boolean;
       }
@@ -3044,7 +3465,9 @@ export class AttendanceService {
 
       for (const employee of employees) {
         if (!employee.shiftStart) {
-          console.log(`Employee ${employee.id} has no shift start time, skipping`);
+          console.log(
+            `Employee ${employee.id} has no shift start time, skipping`,
+          );
           continue;
         }
 
@@ -3052,11 +3475,15 @@ export class AttendanceService {
         const shiftStartTime = employee.shiftStart;
         const shiftStartParts = shiftStartTime.split(':');
         const shiftHours = parseInt(shiftStartParts[0], 10);
-        let shiftMins = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
+        let shiftMins = shiftStartParts[1]
+          ? parseInt(shiftStartParts[1], 10)
+          : 0;
 
         // Validate parsed values
         if (isNaN(shiftHours) || shiftHours < 0 || shiftHours > 23) {
-          console.log(`Employee ${employee.id} has invalid shift start time: ${shiftStartTime}, skipping`);
+          console.log(
+            `Employee ${employee.id} has invalid shift start time: ${shiftStartTime}, skipping`,
+          );
           continue;
         }
         if (isNaN(shiftMins) || shiftMins < 0 || shiftMins > 59) {
@@ -3072,7 +3499,7 @@ export class AttendanceService {
           timeSinceShiftStart = currentTimeMinutes - shiftStartMinutes;
         } else {
           // Shift started yesterday (night shift)
-          timeSinceShiftStart = (1440 - shiftStartMinutes) + currentTimeMinutes;
+          timeSinceShiftStart = 1440 - shiftStartMinutes + currentTimeMinutes;
         }
 
         // Determine the business date for this employee
@@ -3083,7 +3510,9 @@ export class AttendanceService {
           const shiftEnd = employee.shiftEnd || '17:00';
           const shiftEndParts = shiftEnd.split(':');
           const shiftEndHour = parseInt(shiftEndParts[0], 10);
-          const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
+          const shiftEndMinute = shiftEndParts[1]
+            ? parseInt(shiftEndParts[1], 10)
+            : 0;
 
           // If it's a night shift (crosses midnight)
           if (shiftEndHour < shiftHours) {
@@ -3105,7 +3534,7 @@ export class AttendanceService {
           employeesToProcess.push({
             employee,
             businessDate,
-            shouldMarkAbsent: true
+            shouldMarkAbsent: true,
           });
           employeeIds.push(employee.id);
         }
@@ -3116,14 +3545,18 @@ export class AttendanceService {
         return {
           message: 'Auto-mark absent process completed successfully',
           absent_marked: 0,
-          leave_applied: 0
+          leave_applied: 0,
         };
       }
 
       // OPTIMIZATION: Pre-fetch all existing logs in ONE query
-      const allBusinessDates = employeesToProcess.map(e => e.businessDate);
-      const minDate = new Date(Math.min(...allBusinessDates.map(d => d.getTime())));
-      const maxDate = new Date(Math.max(...allBusinessDates.map(d => d.getTime())));
+      const allBusinessDates = employeesToProcess.map((e) => e.businessDate);
+      const minDate = new Date(
+        Math.min(...allBusinessDates.map((d) => d.getTime())),
+      );
+      const maxDate = new Date(
+        Math.max(...allBusinessDates.map((d) => d.getTime())),
+      );
       minDate.setHours(0, 0, 0, 0);
       maxDate.setHours(23, 59, 59, 999);
 
@@ -3132,13 +3565,13 @@ export class AttendanceService {
           employeeId: { in: employeeIds },
           date: {
             gte: minDate,
-            lte: maxDate
-          }
-        }
+            lte: maxDate,
+          },
+        },
       });
 
       // Create map for quick lookup
-      const existingLogsMap = new Map<string, typeof existingLogs[0]>();
+      const existingLogsMap = new Map<string, (typeof existingLogs)[0]>();
       for (const log of existingLogs) {
         if (log.date) {
           const key = `${log.employeeId}_${log.date.getTime()}`;
@@ -3147,17 +3580,23 @@ export class AttendanceService {
       }
 
       // OPTIMIZATION: Pre-fetch all approved leaves in ONE query
-      const allBusinessDatesForLeave = Array.from(new Set(allBusinessDates.map(d => d.getTime()))).map(t => new Date(t));
-      const minLeaveDate = new Date(Math.min(...allBusinessDatesForLeave.map(d => d.getTime())));
-      const maxLeaveDate = new Date(Math.max(...allBusinessDatesForLeave.map(d => d.getTime())));
+      const allBusinessDatesForLeave = Array.from(
+        new Set(allBusinessDates.map((d) => d.getTime())),
+      ).map((t) => new Date(t));
+      const minLeaveDate = new Date(
+        Math.min(...allBusinessDatesForLeave.map((d) => d.getTime())),
+      );
+      const maxLeaveDate = new Date(
+        Math.max(...allBusinessDatesForLeave.map((d) => d.getTime())),
+      );
 
       const approvedLeaves = await this.prisma.leaveLog.findMany({
         where: {
           empId: { in: employeeIds },
           status: 'Approved',
           startDate: { lte: maxLeaveDate },
-          endDate: { gte: minLeaveDate }
-        }
+          endDate: { gte: minLeaveDate },
+        },
       });
 
       // Create map for quick lookup (check if date falls within leave range)
@@ -3172,11 +3611,11 @@ export class AttendanceService {
       // OPTIMIZATION: Pre-fetch all attendance records for leave updates
       const attendanceRecords = await this.prisma.attendance.findMany({
         where: {
-          employeeId: { in: employeeIds }
-        }
+          employeeId: { in: employeeIds },
+        },
       });
 
-      const attendanceMap = new Map<number, typeof attendanceRecords[0]>();
+      const attendanceMap = new Map<number, (typeof attendanceRecords)[0]>();
       for (const att of attendanceRecords) {
         attendanceMap.set(att.employeeId, att);
       }
@@ -3224,13 +3663,15 @@ export class AttendanceService {
         const existingLog = existingLogsMap.get(logKey);
 
         if (existingLog) {
-          console.log(`Employee ${employee.id} already has attendance log for ${businessDate.toISOString().split('T')[0]}, skipping`);
+          console.log(
+            `Employee ${employee.id} already has attendance log for ${businessDate.toISOString().split('T')[0]}, skipping`,
+          );
           continue;
         }
 
         // Check if employee has approved leave for this date
         const employeeLeaves = employeeLeavesMap.get(employee.id) || [];
-        const hasApprovedLeave = employeeLeaves.some(leave => {
+        const hasApprovedLeave = employeeLeaves.some((leave) => {
           const leaveStart = new Date(leave.startDate);
           const leaveEnd = new Date(leave.endDate);
           leaveStart.setHours(0, 0, 0, 0);
@@ -3239,14 +3680,16 @@ export class AttendanceService {
         });
 
         if (hasApprovedLeave) {
-          console.log(`Employee ${employee.id} has approved leave for ${businessDate.toISOString().split('T')[0]}, applying leave instead of absent`);
+          console.log(
+            `Employee ${employee.id} has approved leave for ${businessDate.toISOString().split('T')[0]}, applying leave instead of absent`,
+          );
 
           // Check if there's an existing log to update (shouldn't happen, but just in case)
           const existingLogForLeave = existingLogsMap.get(logKey);
           if (existingLogForLeave) {
             leaveLogsToUpdate.push({
               id: existingLogForLeave.id,
-              status: 'leave'
+              status: 'leave',
             });
           } else {
             leaveLogsToCreate.push({
@@ -3255,14 +3698,16 @@ export class AttendanceService {
               checkin: null,
               checkout: null,
               mode: 'onsite',
-              status: 'leave'
+              status: 'leave',
             });
           }
 
           leaveUpdates.push({ employeeId: employee.id, businessDate });
           leaveApplied++;
         } else {
-          console.log(`Employee ${employee.id} has no approved leave, marking as absent for ${businessDate.toISOString().split('T')[0]}`);
+          console.log(
+            `Employee ${employee.id} has no approved leave, marking as absent for ${businessDate.toISOString().split('T')[0]}`,
+          );
 
           absentLogsToCreate.push({
             employeeId: employee.id,
@@ -3270,7 +3715,7 @@ export class AttendanceService {
             checkin: null,
             checkout: null,
             mode: 'onsite',
-            status: 'absent'
+            status: 'absent',
           });
 
           absentUpdates.push({ employeeId: employee.id, businessDate });
@@ -3279,161 +3724,179 @@ export class AttendanceService {
       }
 
       // OPTIMIZATION: Execute all bulk operations in a single transaction
-      await this.prisma.$transaction(async (tx) => {
-        // Bulk create absent logs
-        if (absentLogsToCreate.length > 0) {
-          await tx.attendanceLog.createMany({
-            data: absentLogsToCreate,
-            skipDuplicates: true
-          });
-        }
-
-        // Bulk create leave logs
-        if (leaveLogsToCreate.length > 0) {
-          await tx.attendanceLog.createMany({
-            data: leaveLogsToCreate,
-            skipDuplicates: true
-          });
-        }
-
-        // Bulk update leave logs (if any existing logs need to be updated)
-        if (leaveLogsToUpdate.length > 0) {
-          await Promise.all(
-            leaveLogsToUpdate.map(log =>
-              tx.attendanceLog.update({
-                where: { id: log.id },
-                data: {
-                  status: 'leave',
-                  checkin: null,
-                  checkout: null
-                }
-              })
-            )
-          );
-        }
-
-        // Update attendance counters for leaves (batch parallel execution)
-        if (leaveUpdates.length > 0) {
-          await Promise.all(
-            leaveUpdates.map(async (update) => {
-              const attendance = attendanceMap.get(update.employeeId);
-              if (attendance) {
-                const currentLeaveDays = attendance.leaveDays || 0;
-                const currentQuarterlyLeaves = attendance.quarterlyLeaves || 0;
-
-                await tx.attendance.update({
-                  where: { id: attendance.id },
-                  data: {
-                    leaveDays: currentLeaveDays + 1,
-                    quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - 1)
-                  }
-                });
-
-                // Update monthly attendance summary
-                const monthKey = update.businessDate.toISOString().split('T')[0].substring(0, 7);
-                await tx.monthlyAttendanceSummary.updateMany({
-                  where: {
-                    empId: update.employeeId,
-                    month: monthKey
-                  },
-                  data: {
-                    totalLeaveDays: { increment: 1 }
-                  }
-                });
-              }
-            })
-          );
-        }
-
-        // Update attendance counters for absent (batch parallel execution)
-        // Pre-fetch monthly summaries to avoid individual queries
-        const uniqueMonths = Array.from(new Set(absentUpdates.map(u => u.businessDate.toISOString().slice(0, 7))));
-        const absentEmployeeIds = absentUpdates.map(u => u.employeeId);
-        const monthlySummariesForAbsent = await tx.monthlyAttendanceSummary.findMany({
-          where: {
-            empId: { in: absentEmployeeIds },
-            month: { in: uniqueMonths }
+      await this.prisma.$transaction(
+        async (tx) => {
+          // Bulk create absent logs
+          if (absentLogsToCreate.length > 0) {
+            await tx.attendanceLog.createMany({
+              data: absentLogsToCreate,
+              skipDuplicates: true,
+            });
           }
-        });
-        const monthlySummaryMapForAbsent = new Map<string, typeof monthlySummariesForAbsent[0]>();
-        for (const summary of monthlySummariesForAbsent) {
-          const key = `${summary.empId}_${summary.month}`;
-          monthlySummaryMapForAbsent.set(key, summary);
-        }
 
-        if (absentUpdates.length > 0) {
-          await Promise.all(
-            absentUpdates.map(async (update) => {
-              // Update base attendance
-              const attendance = attendanceMap.get(update.employeeId);
-              if (!attendance) {
-                // Create new attendance record if it doesn't exist
-                await tx.attendance.create({
-                  data: {
-                    employeeId: update.employeeId,
-                    presentDays: 0,
-                    absentDays: 1,
-                    lateDays: 0,
-                    leaveDays: 0,
-                    remoteDays: 0,
-                    quarterlyLeaves: 0,
-                    monthlyLates: 0,
-                    halfDays: 0
-                  }
-                });
-              } else {
-                await tx.attendance.update({
-                  where: { id: attendance.id },
-                  data: {
-                    absentDays: { increment: 1 }
-                  }
-                });
-              }
+          // Bulk create leave logs
+          if (leaveLogsToCreate.length > 0) {
+            await tx.attendanceLog.createMany({
+              data: leaveLogsToCreate,
+              skipDuplicates: true,
+            });
+          }
 
-              // Update monthly attendance summary using pre-fetched data
-              const month = update.businessDate.toISOString().slice(0, 7);
-              const summaryKey = `${update.employeeId}_${month}`;
-              let summary = monthlySummaryMapForAbsent.get(summaryKey);
+          // Bulk update leave logs (if any existing logs need to be updated)
+          if (leaveLogsToUpdate.length > 0) {
+            await Promise.all(
+              leaveLogsToUpdate.map((log) =>
+                tx.attendanceLog.update({
+                  where: { id: log.id },
+                  data: {
+                    status: 'leave',
+                    checkin: null,
+                    checkout: null,
+                  },
+                }),
+              ),
+            );
+          }
 
-              if (!summary) {
-                summary = await tx.monthlyAttendanceSummary.create({
-                  data: {
-                    empId: update.employeeId,
-                    month: month,
-                    totalPresent: 0,
-                    totalAbsent: 1,
-                    totalLeaveDays: 0,
-                    totalLateDays: 0,
-                    totalHalfDays: 0,
-                    totalRemoteDays: 0
-                  }
-                });
-                monthlySummaryMapForAbsent.set(summaryKey, summary);
-              } else {
-                await tx.monthlyAttendanceSummary.update({
-                  where: { id: summary.id },
-                  data: {
-                    totalAbsent: { increment: 1 }
-                  }
-                });
-              }
-            })
+          // Update attendance counters for leaves (batch parallel execution)
+          if (leaveUpdates.length > 0) {
+            await Promise.all(
+              leaveUpdates.map(async (update) => {
+                const attendance = attendanceMap.get(update.employeeId);
+                if (attendance) {
+                  const currentLeaveDays = attendance.leaveDays || 0;
+                  const currentQuarterlyLeaves =
+                    attendance.quarterlyLeaves || 0;
+
+                  await tx.attendance.update({
+                    where: { id: attendance.id },
+                    data: {
+                      leaveDays: currentLeaveDays + 1,
+                      quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - 1),
+                    },
+                  });
+
+                  // Update monthly attendance summary
+                  const monthKey = update.businessDate
+                    .toISOString()
+                    .split('T')[0]
+                    .substring(0, 7);
+                  await tx.monthlyAttendanceSummary.updateMany({
+                    where: {
+                      empId: update.employeeId,
+                      month: monthKey,
+                    },
+                    data: {
+                      totalLeaveDays: { increment: 1 },
+                    },
+                  });
+                }
+              }),
+            );
+          }
+
+          // Update attendance counters for absent (batch parallel execution)
+          // Pre-fetch monthly summaries to avoid individual queries
+          const uniqueMonths = Array.from(
+            new Set(
+              absentUpdates.map((u) =>
+                u.businessDate.toISOString().slice(0, 7),
+              ),
+            ),
           );
-        }
-      }, {
-        timeout: 60000,
-        maxWait: 15000
-      });
+          const absentEmployeeIds = absentUpdates.map((u) => u.employeeId);
+          const monthlySummariesForAbsent =
+            await tx.monthlyAttendanceSummary.findMany({
+              where: {
+                empId: { in: absentEmployeeIds },
+                month: { in: uniqueMonths },
+              },
+            });
+          const monthlySummaryMapForAbsent = new Map<
+            string,
+            (typeof monthlySummariesForAbsent)[0]
+          >();
+          for (const summary of monthlySummariesForAbsent) {
+            const key = `${summary.empId}_${summary.month}`;
+            monthlySummaryMapForAbsent.set(key, summary);
+          }
+
+          if (absentUpdates.length > 0) {
+            await Promise.all(
+              absentUpdates.map(async (update) => {
+                // Update base attendance
+                const attendance = attendanceMap.get(update.employeeId);
+                if (!attendance) {
+                  // Create new attendance record if it doesn't exist
+                  await tx.attendance.create({
+                    data: {
+                      employeeId: update.employeeId,
+                      presentDays: 0,
+                      absentDays: 1,
+                      lateDays: 0,
+                      leaveDays: 0,
+                      remoteDays: 0,
+                      quarterlyLeaves: 0,
+                      monthlyLates: 0,
+                      halfDays: 0,
+                    },
+                  });
+                } else {
+                  await tx.attendance.update({
+                    where: { id: attendance.id },
+                    data: {
+                      absentDays: { increment: 1 },
+                    },
+                  });
+                }
+
+                // Update monthly attendance summary using pre-fetched data
+                const month = update.businessDate.toISOString().slice(0, 7);
+                const summaryKey = `${update.employeeId}_${month}`;
+                let summary = monthlySummaryMapForAbsent.get(summaryKey);
+
+                if (!summary) {
+                  summary = await tx.monthlyAttendanceSummary.create({
+                    data: {
+                      empId: update.employeeId,
+                      month: month,
+                      totalPresent: 0,
+                      totalAbsent: 1,
+                      totalLeaveDays: 0,
+                      totalLateDays: 0,
+                      totalHalfDays: 0,
+                      totalRemoteDays: 0,
+                    },
+                  });
+                  monthlySummaryMapForAbsent.set(summaryKey, summary);
+                } else {
+                  await tx.monthlyAttendanceSummary.update({
+                    where: { id: summary.id },
+                    data: {
+                      totalAbsent: { increment: 1 },
+                    },
+                  });
+                }
+              }),
+            );
+          }
+        },
+        {
+          timeout: 60000,
+          maxWait: 15000,
+        },
+      );
 
       return {
         message: 'Auto-mark absent process completed successfully',
         absent_marked: absentMarked,
-        leave_applied: leaveApplied
+        leave_applied: leaveApplied,
       };
-
     } catch (error) {
       console.error('Error in autoMarkAbsent:', error);
-      throw new InternalServerErrorException(`Failed to auto-mark absent: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to auto-mark absent: ${error.message}`,
+      );
     }
   }
 
@@ -3443,16 +3906,25 @@ export class AttendanceService {
    * Creates late/half-day logs as needed, supports cross-day scenarios
    * Updates attendance_logs, attendance, monthly_attendance_summary, and hr_logs tables
    */
-  async bulkMarkAllEmployeesPresent(bulkMarkData: BulkMarkPresentDto): Promise<{ message: string; marked_present: number; errors: number; skipped: number }> {
+  async bulkMarkAllEmployeesPresent(bulkMarkData: BulkMarkPresentDto): Promise<{
+    message: string;
+    marked_present: number;
+    errors: number;
+    skipped: number;
+  }> {
     const { date, employee_ids, reason } = bulkMarkData;
 
     // Get current time in PKT (following checkin pattern)
     const now = new Date();
-    const nowPkt = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+    const nowPkt = new Date(
+      now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
+    );
 
     // Compute local time using PKT offset (+300 minutes = UTC+5)
     const effectiveOffsetMinutes = 300; // PKT UTC+5
-    const currentTimeLocal = new Date(now.getTime() + effectiveOffsetMinutes * 60 * 1000);
+    const currentTimeLocal = new Date(
+      now.getTime() + effectiveOffsetMinutes * 60 * 1000,
+    );
 
     // Derive local business date (YYYY-MM-DD) from local time (following checkin pattern)
     const localDateStr = `${currentTimeLocal.getUTCFullYear()}-${String(currentTimeLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(currentTimeLocal.getUTCDate()).padStart(2, '0')}`;
@@ -3465,20 +3937,29 @@ export class AttendanceService {
       // Split the date string to avoid timezone interpretation issues
       const dateParts = date.split('-');
       if (dateParts.length !== 3) {
-        throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
+        throw new BadRequestException(
+          'Invalid date format. Expected YYYY-MM-DD',
+        );
       }
 
       // Create date in UTC to avoid timezone conversion issues
       // This ensures "2025-11-14" stays as "2025-11-14" regardless of server timezone
-      targetBusinessDate = new Date(Date.UTC(
-        parseInt(dateParts[0], 10),
-        parseInt(dateParts[1], 10) - 1, // Month is 0-indexed
-        parseInt(dateParts[2], 10),
-        0, 0, 0, 0
-      ));
+      targetBusinessDate = new Date(
+        Date.UTC(
+          parseInt(dateParts[0], 10),
+          parseInt(dateParts[1], 10) - 1, // Month is 0-indexed
+          parseInt(dateParts[2], 10),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
 
       if (isNaN(targetBusinessDate.getTime())) {
-        throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
+        throw new BadRequestException(
+          'Invalid date format. Expected YYYY-MM-DD',
+        );
       }
 
       // Get today in PKT for validation
@@ -3487,11 +3968,21 @@ export class AttendanceService {
 
       // Allow present and past dates, but not future dates (based on PKT)
       // Compare dates by their date components only (ignore time)
-      const targetDateOnly = new Date(targetBusinessDate.getUTCFullYear(), targetBusinessDate.getUTCMonth(), targetBusinessDate.getUTCDate());
-      const todayDateOnly = new Date(todayPKT.getFullYear(), todayPKT.getMonth(), todayPKT.getDate());
+      const targetDateOnly = new Date(
+        targetBusinessDate.getUTCFullYear(),
+        targetBusinessDate.getUTCMonth(),
+        targetBusinessDate.getUTCDate(),
+      );
+      const todayDateOnly = new Date(
+        todayPKT.getFullYear(),
+        todayPKT.getMonth(),
+        todayPKT.getDate(),
+      );
 
       if (targetDateOnly.getTime() > todayDateOnly.getTime()) {
-        throw new BadRequestException('Bulk mark present is not allowed for future dates.');
+        throw new BadRequestException(
+          'Bulk mark present is not allowed for future dates.',
+        );
       }
     } else {
       // Use current PKT business date as default
@@ -3511,14 +4002,18 @@ export class AttendanceService {
 
     // Build employee query: filter by employee_ids if provided, otherwise get all active
     const employeeWhere: any = {
-      status: 'active'
+      status: 'active',
     };
 
     if (employee_ids && employee_ids.length > 0) {
       // Validate employee IDs are positive integers
-      const invalidIds = employee_ids.filter(id => !Number.isInteger(id) || id <= 0);
+      const invalidIds = employee_ids.filter(
+        (id) => !Number.isInteger(id) || id <= 0,
+      );
       if (invalidIds.length > 0) {
-        throw new BadRequestException(`Invalid employee IDs: ${invalidIds.join(', ')}. All IDs must be positive integers.`);
+        throw new BadRequestException(
+          `Invalid employee IDs: ${invalidIds.join(', ')}. All IDs must be positive integers.`,
+        );
       }
       employeeWhere.id = { in: employee_ids };
     }
@@ -3531,23 +4026,26 @@ export class AttendanceService {
         firstName: true,
         lastName: true,
         shiftStart: true,
-        shiftEnd: true
-      }
+        shiftEnd: true,
+      },
     });
 
     if (employees.length === 0) {
-      const message = employee_ids && employee_ids.length > 0
-        ? `No active employees found with the provided employee IDs: ${employee_ids.join(', ')}`
-        : 'No active employees found.';
+      const message =
+        employee_ids && employee_ids.length > 0
+          ? `No active employees found with the provided employee IDs: ${employee_ids.join(', ')}`
+          : 'No active employees found.';
       throw new NotFoundException(message);
     }
 
     // Validate that all requested employee IDs exist (if provided)
     if (employee_ids && employee_ids.length > 0) {
-      const foundIds = employees.map(emp => emp.id);
-      const missingIds = employee_ids.filter(id => !foundIds.includes(id));
+      const foundIds = employees.map((emp) => emp.id);
+      const missingIds = employee_ids.filter((id) => !foundIds.includes(id));
       if (missingIds.length > 0) {
-        throw new NotFoundException(`Employees not found or not active: ${missingIds.join(', ')}`);
+        throw new NotFoundException(
+          `Employees not found or not active: ${missingIds.join(', ')}`,
+        );
       }
     }
 
@@ -3555,7 +4053,9 @@ export class AttendanceService {
     const logDateStr = date
       ? date // Use the original input date string
       : `${targetBusinessDate.getUTCFullYear()}-${String(targetBusinessDate.getUTCMonth() + 1).padStart(2, '0')}-${String(targetBusinessDate.getUTCDate()).padStart(2, '0')}`;
-    console.log(`Bulk mark present: Using PKT date ${logDateStr} for ${employees.length} employee(s)`);
+    console.log(
+      `Bulk mark present: Using PKT date ${logDateStr} for ${employees.length} employee(s)`,
+    );
 
     let markedPresent = 0;
     let errors = 0;
@@ -3571,16 +4071,18 @@ export class AttendanceService {
     // Note: For past dates, this represents when the bulk mark operation is performed, not the actual checkin time
     const checkinTimeForStorage = currentTimeLocal;
 
-    console.log(`Starting bulk checkin operation for ${employees.length} employee(s) on ${dateStr} at ${checkinTimeForStorage.toISOString()}`);
+    console.log(
+      `Starting bulk checkin operation for ${employees.length} employee(s) on ${dateStr} at ${checkinTimeForStorage.toISOString()}`,
+    );
 
     // OPTIMIZATION: Pre-process all employees to calculate their data upfront
     const currentHour = checkinTimeForStorage.getUTCHours();
     const currentMinute = checkinTimeForStorage.getUTCMinutes();
-    const employeeIds = employees.map(emp => emp.id);
+    const employeeIds = employees.map((emp) => emp.id);
 
     // Pre-calculate all employee data (status, dates, minutes late)
     interface EmployeeProcessData {
-      employee: typeof employees[0];
+      employee: (typeof employees)[0];
       businessDate: Date;
       status: 'present' | 'late' | 'half_day' | 'absent';
       minutesLate: number;
@@ -3599,9 +4101,13 @@ export class AttendanceService {
         const shiftStartParts = shiftStart.split(':');
         const shiftEndParts = shiftEnd.split(':');
         const shiftStartHour = parseInt(shiftStartParts[0], 10);
-        const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
+        const shiftStartMinute = shiftStartParts[1]
+          ? parseInt(shiftStartParts[1], 10)
+          : 0;
         const shiftEndHour = parseInt(shiftEndParts[0], 10);
-        const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
+        const shiftEndMinute = shiftEndParts[1]
+          ? parseInt(shiftEndParts[1], 10)
+          : 0;
 
         // Determine the correct business date for this employee
         let employeeBusinessDate = new Date(targetBusinessDate);
@@ -3612,12 +4118,17 @@ export class AttendanceService {
         } else {
           // No explicit date provided - apply night shift logic
           if (shiftEndHour < shiftStartHour) {
-            if (currentHour < shiftEndHour || (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)) {
-              employeeBusinessDate = new Date(Date.UTC(
-                targetBusinessDate.getUTCFullYear(),
-                targetBusinessDate.getUTCMonth(),
-                targetBusinessDate.getUTCDate() - 1
-              ));
+            if (
+              currentHour < shiftEndHour ||
+              (currentHour === shiftEndHour && currentMinute <= shiftEndMinute)
+            ) {
+              employeeBusinessDate = new Date(
+                Date.UTC(
+                  targetBusinessDate.getUTCFullYear(),
+                  targetBusinessDate.getUTCMonth(),
+                  targetBusinessDate.getUTCDate() - 1,
+                ),
+              );
             }
           }
         }
@@ -3627,11 +4138,14 @@ export class AttendanceService {
         expectedShiftStart.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
 
         // Calculate minutes late from shift start
-        let minutesLate = Math.floor((checkinTimeForStorage.getTime() - expectedShiftStart.getTime()) / (1000 * 60));
+        let minutesLate = Math.floor(
+          (checkinTimeForStorage.getTime() - expectedShiftStart.getTime()) /
+            (1000 * 60),
+        );
 
         // Handle night shifts that cross midnight
         if (shiftEndHour < shiftStartHour && minutesLate < 0) {
-          minutesLate = minutesLate + (24 * 60);
+          minutesLate = minutesLate + 24 * 60;
         }
 
         // Normalize negative minutes
@@ -3663,7 +4177,7 @@ export class AttendanceService {
           status,
           minutesLate,
           shiftStart,
-          actualTimeIn
+          actualTimeIn,
         });
       } catch (error) {
         console.error(`Error pre-processing employee ${employee.id}:`, error);
@@ -3673,9 +4187,15 @@ export class AttendanceService {
 
     // OPTIMIZATION: Pre-fetch all existing logs in ONE query instead of per-employee
     // Get all unique business dates to query (use date range to handle all dates)
-    const allBusinessDates = Array.from(employeeDataMap.values()).map(d => d.businessDate);
-    const minDate = new Date(Math.min(...allBusinessDates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...allBusinessDates.map(d => d.getTime())));
+    const allBusinessDates = Array.from(employeeDataMap.values()).map(
+      (d) => d.businessDate,
+    );
+    const minDate = new Date(
+      Math.min(...allBusinessDates.map((d) => d.getTime())),
+    );
+    const maxDate = new Date(
+      Math.max(...allBusinessDates.map((d) => d.getTime())),
+    );
     // Set to start and end of day to capture all dates
     minDate.setHours(0, 0, 0, 0);
     maxDate.setHours(23, 59, 59, 999);
@@ -3685,13 +4205,13 @@ export class AttendanceService {
         employeeId: { in: employeeIds },
         date: {
           gte: minDate,
-          lte: maxDate
-        }
-      }
+          lte: maxDate,
+        },
+      },
     });
 
     // Create a map of existing logs by employeeId and date for quick lookup
-    const existingLogsMap = new Map<string, typeof existingLogs[0]>();
+    const existingLogsMap = new Map<string, (typeof existingLogs)[0]>();
     for (const log of existingLogs) {
       if (log.date) {
         const key = `${log.employeeId}_${log.date.getTime()}`;
@@ -3700,13 +4220,17 @@ export class AttendanceService {
     }
 
     // OPTIMIZATION: Pre-fetch monthly summaries in batch (for wasAbsent check only)
-    const monthlySummariesForCheck = await this.prisma.monthlyAttendanceSummary.findMany({
-      where: {
-        empId: { in: employeeIds }
-      }
-    });
+    const monthlySummariesForCheck =
+      await this.prisma.monthlyAttendanceSummary.findMany({
+        where: {
+          empId: { in: employeeIds },
+        },
+      });
 
-    const monthlySummaryMapForCheck = new Map<string, typeof monthlySummariesForCheck[0]>();
+    const monthlySummaryMapForCheck = new Map<
+      string,
+      (typeof monthlySummariesForCheck)[0]
+    >();
     for (const summary of monthlySummariesForCheck) {
       const key = `${summary.empId}_${summary.month}`;
       monthlySummaryMapForCheck.set(key, summary);
@@ -3778,7 +4302,7 @@ export class AttendanceService {
           logsToUpdate.push({
             id: existingLog.id,
             checkin: checkinTimeForStorage,
-            status: empData.status
+            status: empData.status,
           });
 
           const wasAbsent = existingLog.status === 'absent';
@@ -3786,7 +4310,7 @@ export class AttendanceService {
             employeeId,
             businessDate: empData.businessDate,
             wasAbsent,
-            status: empData.status
+            status: empData.status,
           });
         } else {
           // Check if this date was manually counted as absent
@@ -3797,12 +4321,23 @@ export class AttendanceService {
           let wasAbsent = false;
           if (monthlySummary && monthlySummary.totalAbsent > 0) {
             // Check actual absent records for this month
-            const actualAbsentRecords = existingLogs.filter(log =>
-              log.employeeId === employeeId &&
-              log.status === 'absent' &&
-              log.date &&
-              log.date >= new Date(empData.businessDate.getFullYear(), empData.businessDate.getMonth(), 1) &&
-              log.date < new Date(empData.businessDate.getFullYear(), empData.businessDate.getMonth() + 1, 1)
+            const actualAbsentRecords = existingLogs.filter(
+              (log) =>
+                log.employeeId === employeeId &&
+                log.status === 'absent' &&
+                log.date &&
+                log.date >=
+                  new Date(
+                    empData.businessDate.getFullYear(),
+                    empData.businessDate.getMonth(),
+                    1,
+                  ) &&
+                log.date <
+                  new Date(
+                    empData.businessDate.getFullYear(),
+                    empData.businessDate.getMonth() + 1,
+                    1,
+                  ),
             ).length;
 
             if (monthlySummary.totalAbsent > actualAbsentRecords) {
@@ -3817,14 +4352,14 @@ export class AttendanceService {
             checkin: checkinTimeForStorage,
             checkout: null,
             mode: 'onsite',
-            status: empData.status
+            status: empData.status,
           });
 
           counterUpdates.push({
             employeeId,
             businessDate: empData.businessDate,
             wasAbsent,
-            status: empData.status
+            status: empData.status,
           });
         }
 
@@ -3839,7 +4374,7 @@ export class AttendanceService {
             reason: null,
             actionTaken: 'Created',
             lateType: null,
-            justified: null
+            justified: null,
           });
           markedLate++;
         } else if (empData.status === 'half_day') {
@@ -3852,7 +4387,7 @@ export class AttendanceService {
             reason: null,
             actionTaken: 'Created',
             halfDayType: null,
-            justified: null
+            justified: null,
           });
           markedHalfDay++;
         }
@@ -3865,27 +4400,34 @@ export class AttendanceService {
     }
 
     // OPTIMIZATION: Pre-fetch all attendance records and monthly summaries to avoid per-employee queries
-    const allEmployeeIdsForUpdates = counterUpdates.map(u => u.employeeId);
+    const allEmployeeIdsForUpdates = counterUpdates.map((u) => u.employeeId);
     const uniqueEmployeeIds = Array.from(new Set(allEmployeeIdsForUpdates));
 
     const attendanceRecords = await this.prisma.attendance.findMany({
-      where: { employeeId: { in: uniqueEmployeeIds } }
+      where: { employeeId: { in: uniqueEmployeeIds } },
     });
-    const attendanceMap = new Map(attendanceRecords.map(att => [att.employeeId, att]));
+    const attendanceMap = new Map(
+      attendanceRecords.map((att) => [att.employeeId, att]),
+    );
 
     // Get all unique month keys
-    const uniqueMonthKeys = Array.from(new Set(counterUpdates.map(u => {
-      const date = u.businessDate;
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    })));
+    const uniqueMonthKeys = Array.from(
+      new Set(
+        counterUpdates.map((u) => {
+          const date = u.businessDate;
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        }),
+      ),
+    );
 
-    const monthlySummaries = await this.prisma.monthlyAttendanceSummary.findMany({
-      where: {
-        empId: { in: uniqueEmployeeIds },
-        month: { in: uniqueMonthKeys }
-      }
-    });
-    const monthlySummaryMap = new Map<string, typeof monthlySummaries[0]>();
+    const monthlySummaries =
+      await this.prisma.monthlyAttendanceSummary.findMany({
+        where: {
+          empId: { in: uniqueEmployeeIds },
+          month: { in: uniqueMonthKeys },
+        },
+      });
+    const monthlySummaryMap = new Map<string, (typeof monthlySummaries)[0]>();
     for (const summary of monthlySummaries) {
       const key = `${summary.empId}_${summary.month}`;
       monthlySummaryMap.set(key, summary);
@@ -3896,17 +4438,21 @@ export class AttendanceService {
     const batchSize = 15; // Process 15 employees per batch to avoid timeout
     const totalBatches = Math.ceil(counterUpdates.length / batchSize);
 
-    console.log(`Processing ${counterUpdates.length} employees in ${totalBatches} batches of ${batchSize}`);
+    console.log(
+      `Processing ${counterUpdates.length} employees in ${totalBatches} batches of ${batchSize}`,
+    );
 
     for (let i = 0; i < counterUpdates.length; i += batchSize) {
       const batch = counterUpdates.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
 
       // Get employee IDs in this batch
-      const batchEmployeeIds = batch.map(update => update.employeeId);
+      const batchEmployeeIds = batch.map((update) => update.employeeId);
 
       // Filter logs and updates for this batch
-      const batchLogsToCreate = logsToCreate.filter(log => batchEmployeeIds.includes(log.employeeId));
+      const batchLogsToCreate = logsToCreate.filter((log) =>
+        batchEmployeeIds.includes(log.employeeId),
+      );
 
       // Get the actual log IDs for this batch from existingLogs
       const batchLogIds = new Set<number>();
@@ -3917,96 +4463,112 @@ export class AttendanceService {
           batchLogIds.add(existingLog.id);
         }
       }
-      const batchLogsToUpdateFiltered = logsToUpdate.filter(log => batchLogIds.has(log.id));
+      const batchLogsToUpdateFiltered = logsToUpdate.filter((log) =>
+        batchLogIds.has(log.id),
+      );
 
-      const batchLateLogsToCreate = lateLogsToCreate.filter(log => batchEmployeeIds.includes(log.empId));
-      const batchHalfDayLogsToCreate = halfDayLogsToCreate.filter(log => batchEmployeeIds.includes(log.empId));
+      const batchLateLogsToCreate = lateLogsToCreate.filter((log) =>
+        batchEmployeeIds.includes(log.empId),
+      );
+      const batchHalfDayLogsToCreate = halfDayLogsToCreate.filter((log) =>
+        batchEmployeeIds.includes(log.empId),
+      );
 
       try {
-        await this.prisma.$transaction(async (tx) => {
-          // Bulk create new attendance logs for this batch
-          if (batchLogsToCreate.length > 0) {
-            await tx.attendanceLog.createMany({
-              data: batchLogsToCreate,
-              skipDuplicates: true
-            });
-          }
+        await this.prisma.$transaction(
+          async (tx) => {
+            // Bulk create new attendance logs for this batch
+            if (batchLogsToCreate.length > 0) {
+              await tx.attendanceLog.createMany({
+                data: batchLogsToCreate,
+                skipDuplicates: true,
+              });
+            }
 
-          // Bulk update existing attendance logs for this batch
-          if (batchLogsToUpdateFiltered.length > 0) {
-            await Promise.all(
-              batchLogsToUpdateFiltered.map(log =>
-                tx.attendanceLog.update({
-                  where: { id: log.id },
-                  data: {
-                    checkin: log.checkin,
-                    status: log.status,
-                    mode: 'onsite',
-                    updatedAt: new Date()
-                  }
-                })
-              )
-            );
-          }
-
-          // Bulk create late logs for this batch
-          if (batchLateLogsToCreate.length > 0) {
-            await tx.lateLog.createMany({
-              data: batchLateLogsToCreate,
-              skipDuplicates: true
-            });
-          }
-
-          // Bulk create half-day logs for this batch
-          if (batchHalfDayLogsToCreate.length > 0) {
-            await tx.halfDayLog.createMany({
-              data: batchHalfDayLogsToCreate,
-              skipDuplicates: true
-            });
-          }
-
-          // Update attendance counters for this batch (parallel execution)
-          // Use pre-fetched data to avoid individual queries
-          await Promise.all(
-            batch.map(update =>
-              Promise.all([
-                this.updateMonthlyAttendanceForBulkMarkPresentOptimized(
-                  tx,
-                  update.employeeId,
-                  update.businessDate,
-                  update.wasAbsent,
-                  update.status,
-                  monthlySummaryMap
+            // Bulk update existing attendance logs for this batch
+            if (batchLogsToUpdateFiltered.length > 0) {
+              await Promise.all(
+                batchLogsToUpdateFiltered.map((log) =>
+                  tx.attendanceLog.update({
+                    where: { id: log.id },
+                    data: {
+                      checkin: log.checkin,
+                      status: log.status,
+                      mode: 'onsite',
+                      updatedAt: new Date(),
+                    },
+                  }),
                 ),
-                this.updateAttendanceForBulkMarkPresentOptimized(
-                  tx,
-                  update.employeeId,
-                  update.businessDate,
-                  update.wasAbsent,
-                  update.status,
-                  attendanceMap
-                )
-              ])
-            )
-          );
-        }, {
-          timeout: 45000, // 45 seconds per batch
-          maxWait: 10000
-        });
+              );
+            }
 
-        console.log(`Batch ${batchNumber}/${totalBatches} completed successfully`);
+            // Bulk create late logs for this batch
+            if (batchLateLogsToCreate.length > 0) {
+              await tx.lateLog.createMany({
+                data: batchLateLogsToCreate,
+                skipDuplicates: true,
+              });
+            }
+
+            // Bulk create half-day logs for this batch
+            if (batchHalfDayLogsToCreate.length > 0) {
+              await tx.halfDayLog.createMany({
+                data: batchHalfDayLogsToCreate,
+                skipDuplicates: true,
+              });
+            }
+
+            // Update attendance counters for this batch (parallel execution)
+            // Use pre-fetched data to avoid individual queries
+            await Promise.all(
+              batch.map((update) =>
+                Promise.all([
+                  this.updateMonthlyAttendanceForBulkMarkPresentOptimized(
+                    tx,
+                    update.employeeId,
+                    update.businessDate,
+                    update.wasAbsent,
+                    update.status,
+                    monthlySummaryMap,
+                  ),
+                  this.updateAttendanceForBulkMarkPresentOptimized(
+                    tx,
+                    update.employeeId,
+                    update.businessDate,
+                    update.wasAbsent,
+                    update.status,
+                    attendanceMap,
+                  ),
+                ]),
+              ),
+            );
+          },
+          {
+            timeout: 45000, // 45 seconds per batch
+            maxWait: 10000,
+          },
+        );
+
+        console.log(
+          `Batch ${batchNumber}/${totalBatches} completed successfully`,
+        );
       } catch (batchError) {
-        console.error(`Error in batch ${batchNumber}/${totalBatches}:`, batchError);
+        console.error(
+          `Error in batch ${batchNumber}/${totalBatches}:`,
+          batchError,
+        );
         errors += batch.length;
       }
 
       // Small delay between batches to prevent connection pool exhaustion
       if (i + batchSize < counterUpdates.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
 
-    console.log(`Bulk checkin operation completed. Marked: ${markedPresent} (${markedLate} late, ${markedHalfDay} half-day), Errors: ${errors}, Skipped: ${skipped}`);
+    console.log(
+      `Bulk checkin operation completed. Marked: ${markedPresent} (${markedLate} late, ${markedHalfDay} half-day), Errors: ${errors}, Skipped: ${skipped}`,
+    );
 
     // Create a single HR log entry for the entire bulk operation
     // Format: "{count} employees - {reason}" or just "{count} employees" if no reason
@@ -4019,12 +4581,17 @@ export class AttendanceService {
         hrId: 1, // TODO: Get from authenticated user
         actionType: 'bulk_mark_present',
         affectedEmployeeId: null,
-        description
-      }
+        description,
+      },
     });
 
-    const employeeInfo = employee_ids ? ` for ${employee_ids.length} specified employee(s)` : '';
-    const statusInfo = markedLate > 0 || markedHalfDay > 0 ? ` (${markedPresent - markedLate - markedHalfDay} present, ${markedLate} late, ${markedHalfDay} half-day)` : '';
+    const employeeInfo = employee_ids
+      ? ` for ${employee_ids.length} specified employee(s)`
+      : '';
+    const statusInfo =
+      markedLate > 0 || markedHalfDay > 0
+        ? ` (${markedPresent - markedLate - markedHalfDay} present, ${markedLate} late, ${markedHalfDay} half-day)`
+        : '';
     const message = `Bulk checkin completed${employeeInfo} for ${dateStr}${statusInfo}${reason ? ` - Reason: ${reason}` : ''}`;
     return { message, marked_present: markedPresent, errors, skipped };
   }
@@ -4036,8 +4603,14 @@ export class AttendanceService {
    * Otherwise, if worked_hours >= shift_time/2, marks as "half_day"
    * Returns worked hours in hh:mm:ss format
    */
-  async bulkCheckoutEmployees(bulkCheckoutData: BulkCheckoutDto): Promise<{ message: string; checked_out: number; errors: number; skipped: number }> {
-    const { date, employee_ids, reason, timezone, offset_minutes } = bulkCheckoutData;
+  async bulkCheckoutEmployees(bulkCheckoutData: BulkCheckoutDto): Promise<{
+    message: string;
+    checked_out: number;
+    errors: number;
+    skipped: number;
+  }> {
+    const { date, employee_ids, reason, timezone, offset_minutes } =
+      bulkCheckoutData;
 
     // Get current time in PKT (following checkout pattern)
     const now = new Date();
@@ -4045,7 +4618,9 @@ export class AttendanceService {
       ? Number(offset_minutes)
       : 300; // Default to PKT UTC+5
 
-    const checkoutTimeLocal = new Date(now.getTime() + effectiveOffsetMinutes * 60 * 1000);
+    const checkoutTimeLocal = new Date(
+      now.getTime() + effectiveOffsetMinutes * 60 * 1000,
+    );
 
     // Derive local business date (YYYY-MM-DD) from local time
     const localDateStr = `${checkoutTimeLocal.getUTCFullYear()}-${String(checkoutTimeLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(checkoutTimeLocal.getUTCDate()).padStart(2, '0')}`;
@@ -4058,10 +4633,16 @@ export class AttendanceService {
       // This ensures we match dates stored in the database correctly
       const dateParts = date.split('-');
       if (dateParts.length !== 3) {
-        throw new BadRequestException('Invalid date format. Expected YYYY-MM-DD');
+        throw new BadRequestException(
+          'Invalid date format. Expected YYYY-MM-DD',
+        );
       }
       // Create date in local timezone (PKT) to match database storage
-      targetBusinessDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+      targetBusinessDate = new Date(
+        parseInt(dateParts[0]),
+        parseInt(dateParts[1]) - 1,
+        parseInt(dateParts[2]),
+      );
       targetBusinessDate.setHours(0, 0, 0, 0);
     } else {
       targetBusinessDate = new Date(businessDateLocal);
@@ -4079,14 +4660,18 @@ export class AttendanceService {
       checkout: null,
       date: {
         gte: dateStart,
-        lte: dateEnd
-      }
+        lte: dateEnd,
+      },
     };
 
     if (employee_ids && employee_ids.length > 0) {
-      const invalidIds = employee_ids.filter(id => !Number.isInteger(id) || id <= 0);
+      const invalidIds = employee_ids.filter(
+        (id) => !Number.isInteger(id) || id <= 0,
+      );
       if (invalidIds.length > 0) {
-        throw new BadRequestException(`Invalid employee IDs: ${invalidIds.join(', ')}. All IDs must be positive integers.`);
+        throw new BadRequestException(
+          `Invalid employee IDs: ${invalidIds.join(', ')}. All IDs must be positive integers.`,
+        );
       }
       attendanceWhere.employeeId = { in: employee_ids };
     }
@@ -4101,48 +4686,58 @@ export class AttendanceService {
             firstName: true,
             lastName: true,
             shiftStart: true,
-            shiftEnd: true
-          }
-        }
-      }
+            shiftEnd: true,
+          },
+        },
+      },
     });
 
     if (attendanceLogs.length === 0) {
-      const message = employee_ids && employee_ids.length > 0
-        ? `No employees found with active check-ins for the provided employee IDs: ${employee_ids.join(', ')} on ${targetBusinessDate.toISOString().split('T')[0]}`
-        : `No employees found with active check-ins on ${targetBusinessDate.toISOString().split('T')[0]}`;
+      const message =
+        employee_ids && employee_ids.length > 0
+          ? `No employees found with active check-ins for the provided employee IDs: ${employee_ids.join(', ')} on ${targetBusinessDate.toISOString().split('T')[0]}`
+          : `No employees found with active check-ins on ${targetBusinessDate.toISOString().split('T')[0]}`;
       throw new NotFoundException(message);
     }
 
-    console.log(`Bulk checkout: Processing ${attendanceLogs.length} employee(s) for date ${targetBusinessDate.toISOString().split('T')[0]}`);
+    console.log(
+      `Bulk checkout: Processing ${attendanceLogs.length} employee(s) for date ${targetBusinessDate.toISOString().split('T')[0]}`,
+    );
 
     let checkedOut = 0;
     let errors = 0;
-    let skipped = 0;
+    const skipped = 0;
     let statusUpdated = 0;
 
     // OPTIMIZATION: Pre-fetch all attendance records and monthly summaries to avoid per-employee queries
-    const allEmployeeIds = attendanceLogs.map(log => log.employeeId);
+    const allEmployeeIds = attendanceLogs.map((log) => log.employeeId);
     const uniqueEmployeeIds = Array.from(new Set(allEmployeeIds));
 
     const attendanceRecords = await this.prisma.attendance.findMany({
-      where: { employeeId: { in: uniqueEmployeeIds } }
+      where: { employeeId: { in: uniqueEmployeeIds } },
     });
-    const attendanceMap = new Map(attendanceRecords.map(att => [att.employeeId, att]));
+    const attendanceMap = new Map(
+      attendanceRecords.map((att) => [att.employeeId, att]),
+    );
 
     // Get all unique month keys
-    const uniqueMonthKeys = Array.from(new Set(attendanceLogs.map(log => {
-      const date = log.date || targetBusinessDate;
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    })));
+    const uniqueMonthKeys = Array.from(
+      new Set(
+        attendanceLogs.map((log) => {
+          const date = log.date || targetBusinessDate;
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        }),
+      ),
+    );
 
-    const monthlySummaries = await this.prisma.monthlyAttendanceSummary.findMany({
-      where: {
-        empId: { in: uniqueEmployeeIds },
-        month: { in: uniqueMonthKeys }
-      }
-    });
-    const monthlySummaryMap = new Map<string, typeof monthlySummaries[0]>();
+    const monthlySummaries =
+      await this.prisma.monthlyAttendanceSummary.findMany({
+        where: {
+          empId: { in: uniqueEmployeeIds },
+          month: { in: uniqueMonthKeys },
+        },
+      });
+    const monthlySummaryMap = new Map<string, (typeof monthlySummaries)[0]>();
     for (const summary of monthlySummaries) {
       const key = `${summary.empId}_${summary.month}`;
       monthlySummaryMap.set(key, summary);
@@ -4152,214 +4747,252 @@ export class AttendanceService {
     // Smaller batches = more batches = better reliability
     const batchSize = 10; // Reduced from 20 to 10 for better reliability
     const dateStr = targetBusinessDate.toISOString().split('T')[0];
-    console.log(`Processing ${attendanceLogs.length} employees in batches of ${batchSize} (${Math.ceil(attendanceLogs.length / batchSize)} total batches)`);
+    console.log(
+      `Processing ${attendanceLogs.length} employees in batches of ${batchSize} (${Math.ceil(attendanceLogs.length / batchSize)} total batches)`,
+    );
 
     for (let i = 0; i < attendanceLogs.length; i += batchSize) {
       const batch = attendanceLogs.slice(i, i + batchSize);
       const batchNumber = Math.floor(i / batchSize) + 1;
       const totalBatches = Math.ceil(attendanceLogs.length / batchSize);
-      console.log(`Processing batch ${batchNumber}/${totalBatches} with ${batch.length} employees`);
+      console.log(
+        `Processing batch ${batchNumber}/${totalBatches} with ${batch.length} employees`,
+      );
 
       try {
-        await this.prisma.$transaction(async (tx) => {
-          for (const log of batch) {
-            try {
-              const employee = log.employee;
-              const initialStatus = log.status as 'present' | 'late' | 'half_day' | 'absent' | null;
-              const wasAbsent = initialStatus === 'absent';
+        await this.prisma.$transaction(
+          async (tx) => {
+            for (const log of batch) {
+              try {
+                const employee = log.employee;
+                const initialStatus = log.status as
+                  | 'present'
+                  | 'late'
+                  | 'half_day'
+                  | 'absent'
+                  | null;
+                const wasAbsent = initialStatus === 'absent';
 
-              // Get employee's shift times
-              const shiftStart = employee.shiftStart || '09:00';
-              const shiftEnd = employee.shiftEnd || '17:00';
+                // Get employee's shift times
+                const shiftStart = employee.shiftStart || '09:00';
+                const shiftEnd = employee.shiftEnd || '17:00';
 
-              // Parse shift times
-              const shiftStartParts = shiftStart.split(':');
-              const shiftEndParts = shiftEnd.split(':');
-              const shiftStartHour = parseInt(shiftStartParts[0], 10);
-              const shiftStartMinute = shiftStartParts[1] ? parseInt(shiftStartParts[1], 10) : 0;
-              const shiftEndHour = parseInt(shiftEndParts[0], 10);
-              const shiftEndMinute = shiftEndParts[1] ? parseInt(shiftEndParts[1], 10) : 0;
+                // Parse shift times
+                const shiftStartParts = shiftStart.split(':');
+                const shiftEndParts = shiftEnd.split(':');
+                const shiftStartHour = parseInt(shiftStartParts[0], 10);
+                const shiftStartMinute = shiftStartParts[1]
+                  ? parseInt(shiftStartParts[1], 10)
+                  : 0;
+                const shiftEndHour = parseInt(shiftEndParts[0], 10);
+                const shiftEndMinute = shiftEndParts[1]
+                  ? parseInt(shiftEndParts[1], 10)
+                  : 0;
 
-              // Calculate shift duration in hours
-              // Create shift start and end dates for calculation
-              const shiftStartDate = new Date(targetBusinessDate);
-              shiftStartDate.setUTCHours(shiftStartHour, shiftStartMinute, 0, 0);
+                // Calculate shift duration in hours
+                // Create shift start and end dates for calculation
+                const shiftStartDate = new Date(targetBusinessDate);
+                shiftStartDate.setUTCHours(
+                  shiftStartHour,
+                  shiftStartMinute,
+                  0,
+                  0,
+                );
 
-              const shiftEndDate = new Date(targetBusinessDate);
-              shiftEndDate.setUTCHours(shiftEndHour, shiftEndMinute, 0, 0);
+                const shiftEndDate = new Date(targetBusinessDate);
+                shiftEndDate.setUTCHours(shiftEndHour, shiftEndMinute, 0, 0);
 
-              // Handle night shifts (crossing midnight)
-              if (shiftEndHour < shiftStartHour || (shiftEndHour === shiftStartHour && shiftEndMinute < shiftStartMinute)) {
-                shiftEndDate.setDate(shiftEndDate.getDate() + 1);
-              }
+                // Handle night shifts (crossing midnight)
+                if (
+                  shiftEndHour < shiftStartHour ||
+                  (shiftEndHour === shiftStartHour &&
+                    shiftEndMinute < shiftStartMinute)
+                ) {
+                  shiftEndDate.setDate(shiftEndDate.getDate() + 1);
+                }
 
-              const shiftDurationMs = shiftEndDate.getTime() - shiftStartDate.getTime();
-              const shiftDurationHours = shiftDurationMs / (1000 * 60 * 60);
+                const shiftDurationMs =
+                  shiftEndDate.getTime() - shiftStartDate.getTime();
+                const shiftDurationHours = shiftDurationMs / (1000 * 60 * 60);
 
-              // Calculate worked hours from checkin to checkout
-              const checkinTime = log.checkin!;
-              const checkoutTimeForStorage = checkoutTimeLocal;
-              const workedMs = checkoutTimeForStorage.getTime() - checkinTime.getTime();
-              const workedHours = workedMs / (1000 * 60 * 60);
+                // Calculate worked hours from checkin to checkout
+                const checkinTime = log.checkin!;
+                const checkoutTimeForStorage = checkoutTimeLocal;
+                const workedMs =
+                  checkoutTimeForStorage.getTime() - checkinTime.getTime();
+                const workedHours = workedMs / (1000 * 60 * 60);
 
-              // Format worked hours as hh:mm:ss
-              const totalSeconds = Math.floor(workedMs / 1000);
-              const hours = Math.floor(totalSeconds / 3600);
-              const minutes = Math.floor((totalSeconds % 3600) / 60);
-              const seconds = totalSeconds % 60;
-              const workedHoursFormatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                // Format worked hours as hh:mm:ss
+                const totalSeconds = Math.floor(workedMs / 1000);
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                const workedHoursFormatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-              // Determine new status
-              let newStatus: 'present' | 'late' | 'half_day' | 'absent' = initialStatus || 'present';
+                // Determine new status
+                let newStatus: 'present' | 'late' | 'half_day' | 'absent' =
+                  initialStatus || 'present';
 
-              if (wasAbsent) {
-                // If initially absent, remain absent regardless of worked hours
-                newStatus = 'absent';
-              } else {
-                // If worked_hours >= shift_time/2, mark as half_day
-                if (workedHours >= shiftDurationHours / 2) {
-                  newStatus = 'half_day';
-                  if (initialStatus !== 'half_day') {
-                    statusUpdated++;
-                  }
+                if (wasAbsent) {
+                  // If initially absent, remain absent regardless of worked hours
+                  newStatus = 'absent';
                 } else {
-                  // If worked_hours < shift_time/2
-                  if (initialStatus === 'present' || initialStatus === null) {
-                    // If initial status was "present", mark as absent
-                    newStatus = 'absent';
-                    statusUpdated++;
+                  // If worked_hours >= shift_time/2, mark as half_day
+                  if (workedHours >= shiftDurationHours / 2) {
+                    newStatus = 'half_day';
+                    if (initialStatus !== 'half_day') {
+                      statusUpdated++;
+                    }
                   } else {
-                    // If initial status was "late" or "half_day", keep current status
-                    newStatus = initialStatus;
-                  }
-                }
-              }
-
-              // Update attendance log
-              await tx.attendanceLog.update({
-                where: { id: log.id },
-                data: {
-                  checkout: checkoutTimeForStorage,
-                  status: newStatus,
-                  updatedAt: new Date()
-                }
-              });
-
-              // Update attendance counters if status changed
-              if (newStatus !== initialStatus && !wasAbsent) {
-                // Status changed - need to update counters
-                const logDate = log.date || targetBusinessDate;
-                const monthKey = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}`;
-                const summaryKey = `${employee.id}_${monthKey}`;
-
-                // Update attendance record using pre-fetched data
-                let attendance = attendanceMap.get(employee.id);
-                if (!attendance) {
-                  attendance = await tx.attendance.create({
-                    data: {
-                      employeeId: employee.id,
-                      presentDays: 0,
-                      absentDays: 0,
-                      lateDays: 0,
-                      leaveDays: 0,
-                      remoteDays: 0,
-                      quarterlyLeaves: 0,
-                      monthlyLates: 0,
-                      halfDays: 0
+                    // If worked_hours < shift_time/2
+                    if (initialStatus === 'present' || initialStatus === null) {
+                      // If initial status was "present", mark as absent
+                      newStatus = 'absent';
+                      statusUpdated++;
+                    } else {
+                      // If initial status was "late" or "half_day", keep current status
+                      newStatus = initialStatus;
                     }
-                  });
-                  attendanceMap.set(employee.id, attendance);
-                }
-
-                // Calculate counter changes
-                const updateData: any = {};
-
-                if (newStatus === 'half_day') {
-                  // Changed to half_day: increment halfDays, decrement presentDays if was present
-                  if (initialStatus === 'present') {
-                    updateData.presentDays = { decrement: 1 };
                   }
-                  updateData.halfDays = { increment: 1 };
-                } else if (newStatus === 'absent') {
-                  // Changed to absent: decrement presentDays, increment absentDays
-                  if (initialStatus === 'present') {
-                    updateData.presentDays = { decrement: 1 };
+                }
+
+                // Update attendance log
+                await tx.attendanceLog.update({
+                  where: { id: log.id },
+                  data: {
+                    checkout: checkoutTimeForStorage,
+                    status: newStatus,
+                    updatedAt: new Date(),
+                  },
+                });
+
+                // Update attendance counters if status changed
+                if (newStatus !== initialStatus && !wasAbsent) {
+                  // Status changed - need to update counters
+                  const logDate = log.date || targetBusinessDate;
+                  const monthKey = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}`;
+                  const summaryKey = `${employee.id}_${monthKey}`;
+
+                  // Update attendance record using pre-fetched data
+                  let attendance = attendanceMap.get(employee.id);
+                  if (!attendance) {
+                    attendance = await tx.attendance.create({
+                      data: {
+                        employeeId: employee.id,
+                        presentDays: 0,
+                        absentDays: 0,
+                        lateDays: 0,
+                        leaveDays: 0,
+                        remoteDays: 0,
+                        quarterlyLeaves: 0,
+                        monthlyLates: 0,
+                        halfDays: 0,
+                      },
+                    });
+                    attendanceMap.set(employee.id, attendance);
                   }
-                  updateData.absentDays = { increment: 1 };
-                }
 
-                if (Object.keys(updateData).length > 0) {
-                  await tx.attendance.update({
-                    where: { id: attendance.id },
-                    data: updateData
-                  });
-                }
+                  // Calculate counter changes
+                  const updateData: any = {};
 
-                // Update monthly summary using pre-fetched data
-                let monthlySummary = monthlySummaryMap.get(summaryKey);
-                if (!monthlySummary) {
-                  monthlySummary = await tx.monthlyAttendanceSummary.create({
-                    data: {
-                      empId: employee.id,
-                      month: monthKey,
-                      totalPresent: 0,
-                      totalAbsent: 0,
-                      totalLeaveDays: 0,
-                      totalLateDays: 0,
-                      totalHalfDays: 0,
-                      totalRemoteDays: 0
+                  if (newStatus === 'half_day') {
+                    // Changed to half_day: increment halfDays, decrement presentDays if was present
+                    if (initialStatus === 'present') {
+                      updateData.presentDays = { decrement: 1 };
                     }
-                  });
-                  monthlySummaryMap.set(summaryKey, monthlySummary);
-                }
-
-                const monthlyUpdateData: any = {};
-
-                if (newStatus === 'half_day') {
-                  if (initialStatus === 'present') {
-                    monthlyUpdateData.totalPresent = { decrement: 1 };
+                    updateData.halfDays = { increment: 1 };
+                  } else if (newStatus === 'absent') {
+                    // Changed to absent: decrement presentDays, increment absentDays
+                    if (initialStatus === 'present') {
+                      updateData.presentDays = { decrement: 1 };
+                    }
+                    updateData.absentDays = { increment: 1 };
                   }
-                  monthlyUpdateData.totalHalfDays = { increment: 1 };
-                } else if (newStatus === 'absent') {
-                  if (initialStatus === 'present') {
-                    monthlyUpdateData.totalPresent = { decrement: 1 };
+
+                  if (Object.keys(updateData).length > 0) {
+                    await tx.attendance.update({
+                      where: { id: attendance.id },
+                      data: updateData,
+                    });
                   }
-                  monthlyUpdateData.totalAbsent = { increment: 1 };
+
+                  // Update monthly summary using pre-fetched data
+                  let monthlySummary = monthlySummaryMap.get(summaryKey);
+                  if (!monthlySummary) {
+                    monthlySummary = await tx.monthlyAttendanceSummary.create({
+                      data: {
+                        empId: employee.id,
+                        month: monthKey,
+                        totalPresent: 0,
+                        totalAbsent: 0,
+                        totalLeaveDays: 0,
+                        totalLateDays: 0,
+                        totalHalfDays: 0,
+                        totalRemoteDays: 0,
+                      },
+                    });
+                    monthlySummaryMap.set(summaryKey, monthlySummary);
+                  }
+
+                  const monthlyUpdateData: any = {};
+
+                  if (newStatus === 'half_day') {
+                    if (initialStatus === 'present') {
+                      monthlyUpdateData.totalPresent = { decrement: 1 };
+                    }
+                    monthlyUpdateData.totalHalfDays = { increment: 1 };
+                  } else if (newStatus === 'absent') {
+                    if (initialStatus === 'present') {
+                      monthlyUpdateData.totalPresent = { decrement: 1 };
+                    }
+                    monthlyUpdateData.totalAbsent = { increment: 1 };
+                  }
+
+                  if (Object.keys(monthlyUpdateData).length > 0) {
+                    await tx.monthlyAttendanceSummary.update({
+                      where: { id: monthlySummary.id },
+                      data: monthlyUpdateData,
+                    });
+                  }
+
+                  console.log(
+                    `Employee ${employee.id}: Status updated from ${initialStatus} to ${newStatus} based on worked hours (${workedHoursFormatted})`,
+                  );
                 }
 
-                if (Object.keys(monthlyUpdateData).length > 0) {
-                  await tx.monthlyAttendanceSummary.update({
-                    where: { id: monthlySummary.id },
-                    data: monthlyUpdateData
-                  });
-                }
-
-                console.log(`Employee ${employee.id}: Status updated from ${initialStatus} to ${newStatus} based on worked hours (${workedHoursFormatted})`);
+                checkedOut++;
+              } catch (error) {
+                console.error(
+                  `Error processing checkout for employee ${log.employeeId} (${log.employee.firstName} ${log.employee.lastName}):`,
+                  error,
+                );
+                errors++;
               }
-
-              checkedOut++;
-            } catch (error) {
-              console.error(`Error processing checkout for employee ${log.employeeId} (${log.employee.firstName} ${log.employee.lastName}):`, error);
-              errors++;
             }
-          }
-        }, {
-          timeout: 30000, // 30 seconds timeout per batch
-          maxWait: 8000 // 8 seconds max wait (reduced from 10s)
-        });
+          },
+          {
+            timeout: 30000, // 30 seconds timeout per batch
+            maxWait: 8000, // 8 seconds max wait (reduced from 10s)
+          },
+        );
       } catch (batchError) {
-        console.error(`Error processing batch ${batchNumber}/${totalBatches}:`, batchError);
+        console.error(
+          `Error processing batch ${batchNumber}/${totalBatches}:`,
+          batchError,
+        );
         // Continue with next batch even if this one fails
         errors += batch.length; // Count all employees in failed batch as errors
       }
 
       // Add delay between batches to reduce database load and prevent connection pool exhaustion
       if (i + batchSize < attendanceLogs.length) {
-        await new Promise(resolve => setTimeout(resolve, 200)); // Increased from 100ms to 200ms
+        await new Promise((resolve) => setTimeout(resolve, 200)); // Increased from 100ms to 200ms
       }
     }
 
-    console.log(`Bulk checkout operation completed. Checked out: ${checkedOut}, Status updated: ${statusUpdated}, Errors: ${errors}, Skipped: ${skipped}`);
+    console.log(
+      `Bulk checkout operation completed. Checked out: ${checkedOut}, Status updated: ${statusUpdated}, Errors: ${errors}, Skipped: ${skipped}`,
+    );
 
     // Create HR log entry
     const description = reason
@@ -4371,15 +5004,16 @@ export class AttendanceService {
         hrId: 1, // TODO: Get from authenticated user
         actionType: 'bulk_checkout',
         affectedEmployeeId: null,
-        description
-      }
+        description,
+      },
     });
 
-    const employeeInfo = employee_ids ? ` for ${employee_ids.length} specified employee(s)` : '';
+    const employeeInfo = employee_ids
+      ? ` for ${employee_ids.length} specified employee(s)`
+      : '';
     const message = `Bulk checkout completed${employeeInfo} for ${dateStr}${reason ? ` - Reason: ${reason}` : ''}`;
     return { message, checked_out: checkedOut, errors, skipped };
   }
-
 
   /**
    * Optimized version that uses pre-fetched attendance records
@@ -4390,7 +5024,7 @@ export class AttendanceService {
     date: Date,
     wasAbsent: boolean = false,
     status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
-    attendanceMap: Map<number, any>
+    attendanceMap: Map<number, any>,
   ): Promise<void> {
     // Use pre-fetched attendance record
     let attendance = attendanceMap.get(employeeId);
@@ -4407,8 +5041,8 @@ export class AttendanceService {
           remoteDays: 0,
           quarterlyLeaves: 0,
           monthlyLates: 0,
-          halfDays: 0
-        }
+          halfDays: 0,
+        },
       });
       // Update map for future use in same transaction
       attendanceMap.set(employeeId, attendance);
@@ -4426,7 +5060,10 @@ export class AttendanceService {
       if (status === 'late') {
         updateData.lateDays = (attendance.lateDays || 0) + 1;
         if ((attendance.monthlyLates ?? 0) > 0) {
-          updateData.monthlyLates = Math.max(0, (attendance.monthlyLates ?? 0) - 1);
+          updateData.monthlyLates = Math.max(
+            0,
+            (attendance.monthlyLates ?? 0) - 1,
+          );
         }
       } else if (status === 'half_day') {
         updateData.halfDays = (attendance.halfDays || 0) + 1;
@@ -4439,7 +5076,7 @@ export class AttendanceService {
 
     await tx.attendance.update({
       where: { id: attendance.id },
-      data: updateData
+      data: updateData,
     });
   }
 
@@ -4452,7 +5089,7 @@ export class AttendanceService {
     date: Date,
     wasAbsent: boolean = false,
     status: 'present' | 'late' | 'half_day' | 'absent' = 'present',
-    monthlySummaryMap: Map<string, any>
+    monthlySummaryMap: Map<string, any>,
   ): Promise<void> {
     const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const summaryKey = `${employeeId}_${monthYear}`;
@@ -4471,8 +5108,8 @@ export class AttendanceService {
           totalLeaveDays: 0,
           totalLateDays: 0,
           totalHalfDays: 0,
-          totalRemoteDays: 0
-        }
+          totalRemoteDays: 0,
+        },
       });
       // Update map for future use in same transaction
       monthlySummaryMap.set(summaryKey, monthlySummary);
@@ -4492,29 +5129,32 @@ export class AttendanceService {
         updateData.totalHalfDays = (monthlySummary.totalHalfDays || 0) + 1;
       }
 
-      if (wasAbsent && monthlySummary.totalAbsent && monthlySummary.totalAbsent > 0) {
+      if (
+        wasAbsent &&
+        monthlySummary.totalAbsent &&
+        monthlySummary.totalAbsent > 0
+      ) {
         updateData.totalAbsent = Math.max(0, monthlySummary.totalAbsent - 1);
       }
     }
 
     await tx.monthlyAttendanceSummary.update({
       where: { id: monthlySummary.id },
-      data: updateData
+      data: updateData,
     });
   }
-
 
   // Helper method to update attendance counters for status changes
   private async updateAttendanceCountersForStatusChange(
     tx: any,
     employeeId: number,
     oldStatus: string,
-    newStatus: string
+    newStatus: string,
   ): Promise<void> {
     try {
       // Find existing attendance record
       const attendance = await tx.attendance.findFirst({
-        where: { employeeId: employeeId }
+        where: { employeeId: employeeId },
       });
 
       if (!attendance) {
@@ -4563,10 +5203,12 @@ export class AttendanceService {
       // Update attendance record
       await tx.attendance.update({
         where: { id: attendance.id },
-        data: updateData
+        data: updateData,
       });
 
-      console.log(`Updated attendance counters for employee ${employeeId}: ${oldStatus} -> ${newStatus}`);
+      console.log(
+        `Updated attendance counters for employee ${employeeId}: ${oldStatus} -> ${newStatus}`,
+      );
     } catch (error) {
       console.error('Error updating attendance counters:', error);
       throw error;
@@ -4579,7 +5221,7 @@ export class AttendanceService {
     employeeId: number,
     logDate: Date,
     oldStatus: string,
-    newStatus: string
+    newStatus: string,
   ): Promise<void> {
     try {
       const month = logDate.toISOString().slice(0, 7); // YYYY-MM format
@@ -4588,8 +5230,8 @@ export class AttendanceService {
       let monthlySummary = await tx.monthlyAttendanceSummary.findFirst({
         where: {
           empId: employeeId,
-          month: month
-        }
+          month: month,
+        },
       });
 
       if (!monthlySummary) {
@@ -4604,8 +5246,8 @@ export class AttendanceService {
             totalLateDays: 0,
             totalHalfDays: 0,
             totalRemoteDays: 0,
-            generatedOn: new Date()
-          }
+            generatedOn: new Date(),
+          },
         });
       }
 
@@ -4648,10 +5290,12 @@ export class AttendanceService {
       // Update monthly summary
       await tx.monthlyAttendanceSummary.update({
         where: { id: monthlySummary.id },
-        data: updateData
+        data: updateData,
       });
 
-      console.log(`Updated monthly summary for employee ${employeeId} in ${month}: ${oldStatus} -> ${newStatus}`);
+      console.log(
+        `Updated monthly summary for employee ${employeeId} in ${month}: ${oldStatus} -> ${newStatus}`,
+      );
     } catch (error) {
       console.error('Error updating monthly attendance summary:', error);
       throw error;
@@ -4664,13 +5308,13 @@ export class AttendanceService {
     employeeId: number,
     logDate: Date,
     reason: string,
-    reviewerId?: number
+    reviewerId?: number,
   ): Promise<void> {
     try {
       // Get employee shift times
       const employee = await tx.employee.findUnique({
         where: { id: employeeId },
-        select: { shiftStart: true, shiftEnd: true }
+        select: { shiftStart: true, shiftEnd: true },
       });
 
       if (!employee) {
@@ -4693,11 +5337,13 @@ export class AttendanceService {
           actionTaken: 'Completed',
           reviewedBy: reviewerId || null,
           createdAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
-      console.log(`Created late log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`);
+      console.log(
+        `Created late log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`,
+      );
     } catch (error) {
       console.error('Error creating late log:', error);
       throw error;
@@ -4710,13 +5356,13 @@ export class AttendanceService {
     employeeId: number,
     logDate: Date,
     reason: string,
-    reviewerId?: number
+    reviewerId?: number,
   ): Promise<void> {
     try {
       // Get employee shift times
       const employee = await tx.employee.findUnique({
         where: { id: employeeId },
-        select: { shiftStart: true, shiftEnd: true }
+        select: { shiftStart: true, shiftEnd: true },
       });
 
       if (!employee) {
@@ -4739,21 +5385,23 @@ export class AttendanceService {
           actionTaken: 'Completed',
           reviewedBy: reviewerId || null,
           createdAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
-      console.log(`Created half-day log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`);
+      console.log(
+        `Created half-day log for employee ${employeeId} on ${logDate.toISOString().split('T')[0]}`,
+      );
     } catch (error) {
       console.error('Error creating half-day log:', error);
       throw error;
     }
   }
 
-
-
   // Get Leave Logs Statistics
-  async getLeaveLogsStats(query: LeaveLogsStatsDto): Promise<LeaveLogsStatsResponseDto> {
+  async getLeaveLogsStats(
+    query: LeaveLogsStatsDto,
+  ): Promise<LeaveLogsStatsResponseDto> {
     try {
       // Build where clause
       const where: any = {};
@@ -4765,15 +5413,15 @@ export class AttendanceService {
       if (query.start_date && query.end_date) {
         where.appliedOn = {
           gte: new Date(query.start_date),
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       } else if (query.start_date) {
         where.appliedOn = {
-          gte: new Date(query.start_date)
+          gte: new Date(query.start_date),
         };
       } else if (query.end_date) {
         where.appliedOn = {
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       }
 
@@ -4784,40 +5432,54 @@ export class AttendanceService {
           employee: {
             select: {
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       // Calculate basic statistics
       const totalLeaves = leaveLogs.length;
-      const pendingLeaves = leaveLogs.filter(log => log.status === 'Pending').length;
-      const approvedLeaves = leaveLogs.filter(log => log.status === 'Approved').length;
-      const rejectedLeaves = leaveLogs.filter(log => log.status === 'Rejected').length;
+      const pendingLeaves = leaveLogs.filter(
+        (log) => log.status === 'Pending',
+      ).length;
+      const approvedLeaves = leaveLogs.filter(
+        (log) => log.status === 'Approved',
+      ).length;
+      const rejectedLeaves = leaveLogs.filter(
+        (log) => log.status === 'Rejected',
+      ).length;
 
       // Calculate total leave days
       const totalLeaveDays = leaveLogs.reduce((sum, log) => {
         return sum + this.calculateLeaveDays(log.startDate, log.endDate);
       }, 0);
 
-      const averageLeaveDuration = totalLeaves > 0 ? totalLeaveDays / totalLeaves : 0;
+      const averageLeaveDuration =
+        totalLeaves > 0 ? totalLeaveDays / totalLeaves : 0;
 
       // Find most common leave type
-      const leaveTypeCounts = leaveLogs.reduce((acc, log) => {
-        const leaveType = log.leaveType || 'Unknown';
-        acc[leaveType] = (acc[leaveType] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const leaveTypeCounts = leaveLogs.reduce(
+        (acc, log) => {
+          const leaveType = log.leaveType || 'Unknown';
+          acc[leaveType] = (acc[leaveType] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
-      const mostCommonLeaveType = Object.keys(leaveTypeCounts).length > 0
-        ? Object.keys(leaveTypeCounts).reduce((a, b) =>
-          leaveTypeCounts[a] > leaveTypeCounts[b] ? a : b
-        )
-        : 'N/A';
+      const mostCommonLeaveType =
+        Object.keys(leaveTypeCounts).length > 0
+          ? Object.keys(leaveTypeCounts).reduce((a, b) =>
+              leaveTypeCounts[a] > leaveTypeCounts[b] ? a : b,
+            )
+          : 'N/A';
 
       // Generate period statistics
-      const periodStats = this.generatePeriodStats(leaveLogs, query.period || StatsPeriod.MONTHLY);
+      const periodStats = this.generatePeriodStats(
+        leaveLogs,
+        query.period || StatsPeriod.MONTHLY,
+      );
 
       const response: LeaveLogsStatsResponseDto = {
         total_leaves: totalLeaves,
@@ -4827,34 +5489,49 @@ export class AttendanceService {
         total_leave_days: totalLeaveDays,
         average_leave_duration: Math.round(averageLeaveDuration * 100) / 100,
         most_common_leave_type: mostCommonLeaveType,
-        period_stats: periodStats
+        period_stats: periodStats,
       };
 
       // Add breakdowns if requested
       if (query.include_breakdown) {
         response.employee_breakdown = this.generateEmployeeBreakdown(leaveLogs);
-        response.leave_type_breakdown = this.generateLeaveTypeBreakdown(leaveLogs);
+        response.leave_type_breakdown =
+          this.generateLeaveTypeBreakdown(leaveLogs);
       }
 
       return response;
     } catch (error) {
       console.error('Error in getLeaveLogsStats:', error);
-      throw new InternalServerErrorException(`Failed to get leave logs statistics: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to get leave logs statistics: ${error.message}`,
+      );
     }
   }
 
   // Generate period statistics
-  private generatePeriodStats(leaveLogs: any[], period: StatsPeriod): PeriodStatsDto[] {
+  private generatePeriodStats(
+    leaveLogs: any[],
+    period: StatsPeriod,
+  ): PeriodStatsDto[] {
     const stats: PeriodStatsDto[] = [];
     const groupedLogs = this.groupLogsByPeriod(leaveLogs, period);
 
-    Object.keys(groupedLogs).forEach(periodKey => {
+    Object.keys(groupedLogs).forEach((periodKey) => {
       const logs = groupedLogs[periodKey];
       const totalLeaves = logs.length;
-      const pendingLeaves = logs.filter(log => log.status === 'Pending').length;
-      const approvedLeaves = logs.filter(log => log.status === 'Approved').length;
-      const rejectedLeaves = logs.filter(log => log.status === 'Rejected').length;
-      const totalDays = logs.reduce((sum, log) => sum + this.calculateLeaveDays(log.startDate, log.endDate), 0);
+      const pendingLeaves = logs.filter(
+        (log) => log.status === 'Pending',
+      ).length;
+      const approvedLeaves = logs.filter(
+        (log) => log.status === 'Approved',
+      ).length;
+      const rejectedLeaves = logs.filter(
+        (log) => log.status === 'Rejected',
+      ).length;
+      const totalDays = logs.reduce(
+        (sum, log) => sum + this.calculateLeaveDays(log.startDate, log.endDate),
+        0,
+      );
 
       stats.push({
         period: periodKey,
@@ -4862,7 +5539,7 @@ export class AttendanceService {
         approved_leaves: approvedLeaves,
         rejected_leaves: rejectedLeaves,
         pending_leaves: pendingLeaves,
-        total_days: totalDays
+        total_days: totalDays,
       });
     });
 
@@ -4870,10 +5547,13 @@ export class AttendanceService {
   }
 
   // Group logs by period
-  private groupLogsByPeriod(leaveLogs: any[], period: StatsPeriod): Record<string, any[]> {
+  private groupLogsByPeriod(
+    leaveLogs: any[],
+    period: StatsPeriod,
+  ): Record<string, any[]> {
     const grouped: Record<string, any[]> = {};
 
-    leaveLogs.forEach(log => {
+    leaveLogs.forEach((log) => {
       let periodKey: string;
       const date = new Date(log.appliedOn);
 
@@ -4909,7 +5589,7 @@ export class AttendanceService {
   private generateEmployeeBreakdown(leaveLogs: any[]): EmployeeLeaveStatsDto[] {
     const employeeStats: Record<number, any> = {};
 
-    leaveLogs.forEach(log => {
+    leaveLogs.forEach((log) => {
       if (!employeeStats[log.empId]) {
         employeeStats[log.empId] = {
           employee_id: log.empId,
@@ -4918,7 +5598,7 @@ export class AttendanceService {
           total_days: 0,
           approved_leaves: 0,
           rejected_leaves: 0,
-          pending_leaves: 0
+          pending_leaves: 0,
         };
       }
 
@@ -4931,21 +5611,23 @@ export class AttendanceService {
       else stats.pending_leaves++;
     });
 
-    return Object.values(employeeStats).sort((a, b) => b.total_leaves - a.total_leaves);
+    return Object.values(employeeStats).sort(
+      (a, b) => b.total_leaves - a.total_leaves,
+    );
   }
 
   // Generate leave type breakdown
   private generateLeaveTypeBreakdown(leaveLogs: any[]): LeaveTypeStatsDto[] {
     const typeStats: Record<string, any> = {};
 
-    leaveLogs.forEach(log => {
+    leaveLogs.forEach((log) => {
       const leaveType = log.leaveType || 'Unknown';
       if (!typeStats[leaveType]) {
         typeStats[leaveType] = {
           leave_type: leaveType,
           count: 0,
           total_days: 0,
-          approved_count: 0
+          approved_count: 0,
         };
       }
 
@@ -4955,16 +5637,23 @@ export class AttendanceService {
       if (log.status === 'Approved') stats.approved_count++;
     });
 
-    return Object.values(typeStats).map(stats => ({
-      leave_type: stats.leave_type,
-      count: stats.count,
-      total_days: stats.total_days,
-      approval_rate: stats.count > 0 ? Math.round((stats.approved_count / stats.count) * 100) : 0
-    })).sort((a, b) => b.count - a.count);
+    return Object.values(typeStats)
+      .map((stats) => ({
+        leave_type: stats.leave_type,
+        count: stats.count,
+        total_days: stats.total_days,
+        approval_rate:
+          stats.count > 0
+            ? Math.round((stats.approved_count / stats.count) * 100)
+            : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
   // Get All Project Logs (for HR attendance)
-  async getProjectLogs(query: GetProjectLogsDto): Promise<ProjectLogsListResponseDto[]> {
+  async getProjectLogs(
+    query: GetProjectLogsDto,
+  ): Promise<ProjectLogsListResponseDto[]> {
     try {
       const { project_id, developer_id, start_date, end_date } = query;
 
@@ -4998,25 +5687,25 @@ export class AttendanceService {
               id: true,
               firstName: true,
               lastName: true,
-              email: true
-            }
+              email: true,
+            },
           },
           project: {
             select: {
               id: true,
               description: true,
               deadline: true,
-              status: true
-            }
-          }
+              status: true,
+            },
+          },
         },
         orderBy: {
-          createdAt: 'desc'
-        }
+          createdAt: 'desc',
+        },
       });
 
       // Transform the data to match the response DTO
-      return projectLogs.map(log => ({
+      return projectLogs.map((log) => ({
         project_log_id: log.id,
         project_id: log.projectId,
         developer_id: log.developerId,
@@ -5026,26 +5715,25 @@ export class AttendanceService {
         developer_email: log.developer.email,
         project_name: `Project ${log.projectId}`,
         project_description: log.project.description,
-        project_deadline: log.project.deadline ? log.project.deadline.toISOString().split('T')[0] : null,
+        project_deadline: log.project.deadline
+          ? log.project.deadline.toISOString().split('T')[0]
+          : null,
         project_status: log.project.status,
         created_at: log.createdAt.toISOString(),
-        updated_at: log.updatedAt.toISOString()
+        updated_at: log.updatedAt.toISOString(),
       }));
     } catch (error) {
       console.error('Error in getProjectLogs:', error);
-      throw new InternalServerErrorException(`Failed to fetch project logs: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch project logs: ${error.message}`,
+      );
     }
   }
 
   // Get Project Logs for Export (for HR attendance - all projects)
   async getProjectLogsForExportHR(query: ExportProjectLogsDto) {
     try {
-      const { 
-        project_id, 
-        developer_id, 
-        start_date, 
-        end_date 
-      } = query;
+      const { project_id, developer_id, start_date, end_date } = query;
 
       // Build where clause
       const where: any = {};
@@ -5078,38 +5766,43 @@ export class AttendanceService {
                   id: true,
                   companyName: true,
                   clientName: true,
-                  email: true
-                }
-              }
-            }
+                  email: true,
+                },
+              },
+            },
           },
           developer: {
             include: {
               role: {
                 select: {
-                  name: true
-                }
+                  name: true,
+                },
               },
               department: {
                 select: {
-                  name: true
-                }
-              }
-            }
-          }
+                  name: true,
+                },
+              },
+            },
+          },
         },
         orderBy: {
-          createdAt: 'desc'
-        }
+          createdAt: 'desc',
+        },
       });
     } catch (error) {
       console.error('Error in getProjectLogsForExportHR:', error);
-      throw new InternalServerErrorException(`Failed to get project logs for export: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to get project logs for export: ${error.message}`,
+      );
     }
   }
 
   // Convert Project Logs to CSV (for HR attendance)
-  convertProjectLogsToCSVHR(projectLogs: any[], query: ExportProjectLogsDto): string {
+  convertProjectLogsToCSVHR(
+    projectLogs: any[],
+    query: ExportProjectLogsDto,
+  ): string {
     const headers = [
       'Project Log ID',
       'Project ID',
@@ -5117,7 +5810,7 @@ export class AttendanceService {
       'Developer Name',
       'Developer Email',
       'Created At',
-      'Updated At'
+      'Updated At',
     ];
 
     if (query.include_project_details) {
@@ -5130,7 +5823,7 @@ export class AttendanceService {
 
     const csvRows = [headers.join(',')];
 
-    projectLogs.forEach(log => {
+    projectLogs.forEach((log) => {
       const row = [
         log.id,
         log.projectId,
@@ -5138,22 +5831,25 @@ export class AttendanceService {
         `"${log.developer.firstName} ${log.developer.lastName}"`,
         log.developer.email,
         log.createdAt.toISOString(),
-        log.updatedAt.toISOString()
+        log.updatedAt.toISOString(),
       ];
 
       if (query.include_project_details) {
-        const clientName = log.project?.client?.companyName || log.project?.client?.clientName || 'N/A';
+        const clientName =
+          log.project?.client?.companyName ||
+          log.project?.client?.clientName ||
+          'N/A';
         row.push(
           `Project ${log.projectId}`,
           `"${clientName}"`,
-          log.project?.client?.email || 'N/A'
+          log.project?.client?.email || 'N/A',
         );
       }
 
       if (query.include_developer_details) {
         row.push(
           log.developer.role?.name || 'N/A',
-          log.developer.department?.name || 'N/A'
+          log.developer.department?.name || 'N/A',
         );
       }
 
@@ -5164,11 +5860,13 @@ export class AttendanceService {
   }
 
   // Get Project Logs Statistics (for HR attendance - all projects)
-  async getProjectLogsStatsHR(query: ProjectLogsStatsDto): Promise<ProjectLogsStatsResponseDto> {
+  async getProjectLogsStatsHR(
+    query: ProjectLogsStatsDto,
+  ): Promise<ProjectLogsStatsResponseDto> {
     try {
       // Build where clause
       const where: any = {};
-      
+
       if (query.project_id) {
         where.projectId = query.project_id;
       }
@@ -5180,15 +5878,15 @@ export class AttendanceService {
       if (query.start_date && query.end_date) {
         where.createdAt = {
           gte: new Date(query.start_date),
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       } else if (query.start_date) {
         where.createdAt = {
-          gte: new Date(query.start_date)
+          gte: new Date(query.start_date),
         };
       } else if (query.end_date) {
         where.createdAt = {
-          lte: new Date(query.end_date)
+          lte: new Date(query.end_date),
         };
       }
 
@@ -5198,67 +5896,83 @@ export class AttendanceService {
         include: {
           project: {
             select: {
-              id: true
-            }
+              id: true,
+            },
           },
           developer: {
             select: {
               id: true,
               firstName: true,
-              lastName: true
-            }
-          }
-        }
+              lastName: true,
+            },
+          },
+        },
       });
 
       // Calculate basic statistics
       const totalProjectLogs = projectLogs.length;
-      const uniqueProjects = new Set(projectLogs.map(log => log.projectId)).size;
-      const uniqueDevelopers = new Set(projectLogs.map(log => log.developerId)).size;
-      const averageLogsPerProject = uniqueProjects > 0 ? totalProjectLogs / uniqueProjects : 0;
-      const averageLogsPerDeveloper = uniqueDevelopers > 0 ? totalProjectLogs / uniqueDevelopers : 0;
+      const uniqueProjects = new Set(projectLogs.map((log) => log.projectId))
+        .size;
+      const uniqueDevelopers = new Set(
+        projectLogs.map((log) => log.developerId),
+      ).size;
+      const averageLogsPerProject =
+        uniqueProjects > 0 ? totalProjectLogs / uniqueProjects : 0;
+      const averageLogsPerDeveloper =
+        uniqueDevelopers > 0 ? totalProjectLogs / uniqueDevelopers : 0;
 
       // Generate period statistics
-      const periodStats = this.generateProjectLogsPeriodStatsHR(projectLogs, query.period || ProjectLogsStatsPeriod.MONTHLY);
+      const periodStats = this.generateProjectLogsPeriodStatsHR(
+        projectLogs,
+        query.period || ProjectLogsStatsPeriod.MONTHLY,
+      );
 
       const response: ProjectLogsStatsResponseDto = {
         total_project_logs: totalProjectLogs,
         unique_projects: uniqueProjects,
         unique_developers: uniqueDevelopers,
         average_logs_per_project: Math.round(averageLogsPerProject * 100) / 100,
-        average_logs_per_developer: Math.round(averageLogsPerDeveloper * 100) / 100,
-        period_stats: periodStats
+        average_logs_per_developer:
+          Math.round(averageLogsPerDeveloper * 100) / 100,
+        period_stats: periodStats,
       };
 
       // Add breakdowns if requested
       if (query.include_breakdown) {
-        response.developer_breakdown = this.generateProjectLogsDeveloperBreakdownHR(projectLogs);
-        response.project_breakdown = this.generateProjectLogsProjectBreakdownHR(projectLogs);
+        response.developer_breakdown =
+          this.generateProjectLogsDeveloperBreakdownHR(projectLogs);
+        response.project_breakdown =
+          this.generateProjectLogsProjectBreakdownHR(projectLogs);
       }
 
       return response;
     } catch (error) {
       console.error('Error in getProjectLogsStatsHR:', error);
-      throw new InternalServerErrorException(`Failed to get project logs statistics: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to get project logs statistics: ${error.message}`,
+      );
     }
   }
 
   // Generate period statistics for project logs
-  private generateProjectLogsPeriodStatsHR(projectLogs: any[], period: ProjectLogsStatsPeriod): any[] {
+  private generateProjectLogsPeriodStatsHR(
+    projectLogs: any[],
+    period: ProjectLogsStatsPeriod,
+  ): any[] {
     const stats: any[] = [];
     const groupedLogs = this.groupProjectLogsByPeriodHR(projectLogs, period);
 
-    Object.keys(groupedLogs).forEach(periodKey => {
+    Object.keys(groupedLogs).forEach((periodKey) => {
       const logs = groupedLogs[periodKey];
       const totalProjectLogs = logs.length;
-      const uniqueProjects = new Set(logs.map(log => log.projectId)).size;
-      const uniqueDevelopers = new Set(logs.map(log => log.developerId)).size;
+      const uniqueProjects = new Set(logs.map((log) => log.projectId)).size;
+      const uniqueDevelopers = new Set(logs.map((log) => log.developerId)).size;
 
       stats.push({
         period: periodKey,
         total_project_logs: totalProjectLogs,
         unique_projects: uniqueProjects,
-        unique_developers: uniqueDevelopers
+        unique_developers: uniqueDevelopers,
       });
     });
 
@@ -5266,10 +5980,13 @@ export class AttendanceService {
   }
 
   // Group project logs by period
-  private groupProjectLogsByPeriodHR(projectLogs: any[], period: ProjectLogsStatsPeriod): Record<string, any[]> {
+  private groupProjectLogsByPeriodHR(
+    projectLogs: any[],
+    period: ProjectLogsStatsPeriod,
+  ): Record<string, any[]> {
     const grouped: Record<string, any[]> = {};
 
-    projectLogs.forEach(log => {
+    projectLogs.forEach((log) => {
       let periodKey: string;
       const date = new Date(log.createdAt);
 
@@ -5283,13 +6000,19 @@ export class AttendanceService {
           periodKey = `Week of ${weekStart.toISOString().split('T')[0]}`;
           break;
         case ProjectLogsStatsPeriod.MONTHLY:
-          periodKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+          periodKey = date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+          });
           break;
         case ProjectLogsStatsPeriod.YEARLY:
           periodKey = date.getFullYear().toString();
           break;
         default:
-          periodKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+          periodKey = date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+          });
       }
 
       if (!grouped[periodKey]) {
@@ -5303,58 +6026,69 @@ export class AttendanceService {
 
   // Generate developer breakdown
   private generateProjectLogsDeveloperBreakdownHR(projectLogs: any[]): any[] {
-    const developerMap = new Map<number, { logs: any[], developer: any }>();
+    const developerMap = new Map<number, { logs: any[]; developer: any }>();
 
-    projectLogs.forEach(log => {
+    projectLogs.forEach((log) => {
       if (!developerMap.has(log.developerId)) {
         developerMap.set(log.developerId, {
           logs: [],
-          developer: log.developer
+          developer: log.developer,
         });
       }
       developerMap.get(log.developerId)!.logs.push(log);
     });
 
-    return Array.from(developerMap.entries()).map(([developerId, data]) => {
-      const uniqueProjects = new Set(data.logs.map(log => log.projectId)).size;
-      const totalProjectLogs = data.logs.length;
-      const averageLogsPerProject = uniqueProjects > 0 ? totalProjectLogs / uniqueProjects : 0;
+    return Array.from(developerMap.entries())
+      .map(([developerId, data]) => {
+        const uniqueProjects = new Set(data.logs.map((log) => log.projectId))
+          .size;
+        const totalProjectLogs = data.logs.length;
+        const averageLogsPerProject =
+          uniqueProjects > 0 ? totalProjectLogs / uniqueProjects : 0;
 
-      return {
-        developer_id: developerId,
-        developer_name: `${data.developer.firstName} ${data.developer.lastName}`,
-        total_project_logs: totalProjectLogs,
-        unique_projects: uniqueProjects,
-        average_logs_per_project: Math.round(averageLogsPerProject * 100) / 100
-      };
-    }).sort((a, b) => b.total_project_logs - a.total_project_logs);
+        return {
+          developer_id: developerId,
+          developer_name: `${data.developer.firstName} ${data.developer.lastName}`,
+          total_project_logs: totalProjectLogs,
+          unique_projects: uniqueProjects,
+          average_logs_per_project:
+            Math.round(averageLogsPerProject * 100) / 100,
+        };
+      })
+      .sort((a, b) => b.total_project_logs - a.total_project_logs);
   }
 
   // Generate project breakdown
   private generateProjectLogsProjectBreakdownHR(projectLogs: any[]): any[] {
     const projectMap = new Map<number, { logs: any[] }>();
 
-    projectLogs.forEach(log => {
+    projectLogs.forEach((log) => {
       if (!projectMap.has(log.projectId)) {
         projectMap.set(log.projectId, {
-          logs: []
+          logs: [],
         });
       }
       projectMap.get(log.projectId)!.logs.push(log);
     });
 
-    return Array.from(projectMap.entries()).map(([projectId, data]) => {
-      const uniqueDevelopers = new Set(data.logs.map(log => log.developerId)).size;
-      const totalProjectLogs = data.logs.length;
-      const averageLogsPerDeveloper = uniqueDevelopers > 0 ? totalProjectLogs / uniqueDevelopers : 0;
+    return Array.from(projectMap.entries())
+      .map(([projectId, data]) => {
+        const uniqueDevelopers = new Set(
+          data.logs.map((log) => log.developerId),
+        ).size;
+        const totalProjectLogs = data.logs.length;
+        const averageLogsPerDeveloper =
+          uniqueDevelopers > 0 ? totalProjectLogs / uniqueDevelopers : 0;
 
-      return {
-        project_id: projectId,
-        project_name: `Project ${projectId}`,
-        total_project_logs: totalProjectLogs,
-        unique_developers: uniqueDevelopers,
-        average_logs_per_developer: Math.round(averageLogsPerDeveloper * 100) / 100
-      };
-    }).sort((a, b) => b.total_project_logs - a.total_project_logs);
+        return {
+          project_id: projectId,
+          project_name: `Project ${projectId}`,
+          total_project_logs: totalProjectLogs,
+          unique_developers: uniqueDevelopers,
+          average_logs_per_developer:
+            Math.round(averageLogsPerDeveloper * 100) / 100,
+        };
+      })
+      .sort((a, b) => b.total_project_logs - a.total_project_logs);
   }
 }

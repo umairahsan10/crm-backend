@@ -1,7 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ProjectTasksService } from './project-tasks.service';
 import { ProjectTasksController } from './project-tasks.controller';
-import { PrismaService } from '../../../../prisma/prisma.service';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { DepartmentsGuard } from '../../../common/guards/departments.guard';
 import { AutoLogService } from '../Projects-Logs/auto-log.service';
@@ -11,10 +10,9 @@ import { AutoLogService } from '../Projects-Logs/auto-log.service';
   providers: [
     ProjectTasksService,
     AutoLogService,
-    PrismaService,
     RolesGuard,
-    DepartmentsGuard
+    DepartmentsGuard,
   ],
-  exports: [ProjectTasksService]
+  exports: [ProjectTasksService],
 })
 export class ProjectTasksModule {}

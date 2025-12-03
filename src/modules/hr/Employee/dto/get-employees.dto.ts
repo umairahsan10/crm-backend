@@ -59,13 +59,19 @@ export class GetEmployeesDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Page number for pagination', example: 1 })
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
+    example: 1,
+  })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsInt()
   page?: number = 1;
 
-  @ApiPropertyOptional({ description: 'Number of records per page', example: 10 })
+  @ApiPropertyOptional({
+    description: 'Number of records per page',
+    example: 10,
+  })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
   @IsInt()

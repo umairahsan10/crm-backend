@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateProjectChatDto } from './dto/create-project-chat.dto';
 
@@ -6,36 +12,47 @@ import { CreateProjectChatDto } from './dto/create-project-chat.dto';
 export class ProjectChatsService {
   constructor(private prisma: PrismaService) {}
 
-  async getAllProjectChats(requesterId: number, filters?: {
-    projectId?: number;
-    participants?: number;
-    transferredFrom?: number;
-    transferredTo?: number;
-  }) {
+  async getAllProjectChats(
+    requesterId: number,
+    filters?: {
+      projectId?: number;
+      participants?: number;
+      transferredFrom?: number;
+      transferredTo?: number;
+    },
+  ) {
     try {
       console.log('🔍 getAllProjectChats - Requester ID:', requesterId);
-      
+
       // First, get all chats where the requester is a participant
       const userParticipations = await this.prisma.chatParticipant.findMany({
         where: { employeeId: requesterId },
-        select: { chatId: true }
+        select: { chatId: true },
       });
 
-      console.log('🔍 getAllProjectChats - User participations found:', userParticipations.length);
-      console.log('🔍 getAllProjectChats - Chat IDs:', userParticipations.map(p => p.chatId));
+      console.log(
+        '🔍 getAllProjectChats - User participations found:',
+        userParticipations.length,
+      );
+      console.log(
+        '🔍 getAllProjectChats - Chat IDs:',
+        userParticipations.map((p) => p.chatId),
+      );
 
-      const accessibleChatIds = userParticipations.map(p => p.chatId);
+      const accessibleChatIds = userParticipations.map((p) => p.chatId);
 
       if (accessibleChatIds.length === 0) {
         // User is not a participant in any chat
-        console.log('⚠️ getAllProjectChats - User is not a participant in any chat');
+        console.log(
+          '⚠️ getAllProjectChats - User is not a participant in any chat',
+        );
         return [];
       }
 
       const whereClause: any = {
-        id: { in: accessibleChatIds } // Only return chats where user is a participant
+        id: { in: accessibleChatIds }, // Only return chats where user is a participant
       };
-      
+
       if (filters?.projectId) {
         whereClause.projectId = filters.projectId;
       }
@@ -49,8 +66,11 @@ export class ProjectChatsService {
         whereClause.transferredTo = filters.transferredTo;
       }
 
-      console.log('🔍 getAllProjectChats - Where clause:', JSON.stringify(whereClause, null, 2));
-      
+      console.log(
+        '🔍 getAllProjectChats - Where clause:',
+        JSON.stringify(whereClause, null, 2),
+      );
+
       const chats = await this.prisma.projectChat.findMany({
         where: whereClause,
         include: {
@@ -100,20 +120,26 @@ export class ProjectChatsService {
             take: 1, // Get only the latest message
           },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
-      
+
       console.log('✅ getAllProjectChats - Chats found:', chats.length);
-      
+
       return chats;
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch project chats: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch project chats: ${error.message}`,
+      );
     }
   }
 
@@ -128,7 +154,9 @@ export class ProjectChatsService {
       });
 
       if (!requesterParticipant) {
-        throw new ForbiddenException(`Access denied. Only chat participants can view this chat.`);
+        throw new ForbiddenException(
+          `Access denied. Only chat participants can view this chat.`,
+        );
       }
 
       const chat = await this.prisma.projectChat.findUnique({
@@ -182,21 +210,32 @@ export class ProjectChatsService {
       });
 
       if (!chat) {
-        throw new NotFoundException(`Project chat with ID ${id} not found. Please check the ID and try again.`);
+        throw new NotFoundException(
+          `Project chat with ID ${id} not found. Please check the ID and try again.`,
+        );
       }
 
       return chat;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch project chat with ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch project chat with ID ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -253,7 +292,9 @@ export class ProjectChatsService {
       });
 
       if (!chat) {
-        throw new NotFoundException(`Project chat for project ID ${projectId} not found. Please check the project ID and try again.`);
+        throw new NotFoundException(
+          `Project chat for project ID ${projectId} not found. Please check the project ID and try again.`,
+        );
       }
 
       // Check if requester is a participant in this chat
@@ -265,24 +306,34 @@ export class ProjectChatsService {
       });
 
       if (!requesterParticipant) {
-        throw new ForbiddenException(`Access denied. Only chat participants can view this chat.`);
+        throw new ForbiddenException(
+          `Access denied. Only chat participants can view this chat.`,
+        );
       }
 
       return chat;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('Duplicate entry found. Please check your data.');
+        throw new BadRequestException(
+          'Duplicate entry found. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to fetch project chat for project ID ${projectId}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to fetch project chat for project ID ${projectId}: ${error.message}`,
+      );
     }
   }
-
 
   async createProjectChat(createProjectChatDto: CreateProjectChatDto) {
     try {
@@ -292,7 +343,9 @@ export class ProjectChatsService {
           where: { id: createProjectChatDto.projectId },
         });
         if (!project) {
-          throw new BadRequestException(`Project with ID ${createProjectChatDto.projectId} not found. Please provide a valid project ID.`);
+          throw new BadRequestException(
+            `Project with ID ${createProjectChatDto.projectId} not found. Please provide a valid project ID.`,
+          );
         }
       }
 
@@ -301,7 +354,9 @@ export class ProjectChatsService {
           where: { id: createProjectChatDto.transferredFrom },
         });
         if (!employee) {
-          throw new BadRequestException(`Employee with ID ${createProjectChatDto.transferredFrom} not found. Please provide a valid employee ID.`);
+          throw new BadRequestException(
+            `Employee with ID ${createProjectChatDto.transferredFrom} not found. Please provide a valid employee ID.`,
+          );
         }
       }
 
@@ -310,7 +365,9 @@ export class ProjectChatsService {
           where: { id: createProjectChatDto.transferredTo },
         });
         if (!employee) {
-          throw new BadRequestException(`Employee with ID ${createProjectChatDto.transferredTo} not found. Please provide a valid employee ID.`);
+          throw new BadRequestException(
+            `Employee with ID ${createProjectChatDto.transferredTo} not found. Please provide a valid employee ID.`,
+          );
         }
       }
 
@@ -358,15 +415,20 @@ export class ProjectChatsService {
         throw error;
       }
       if (error.code === 'P2002') {
-        throw new BadRequestException('A project chat with these details already exists. Please check your data.');
+        throw new BadRequestException(
+          'A project chat with these details already exists. Please check your data.',
+        );
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Foreign key constraint failed. Please check if all referenced records exist.');
+        throw new BadRequestException(
+          'Foreign key constraint failed. Please check if all referenced records exist.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to create project chat: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to create project chat: ${error.message}`,
+      );
     }
   }
-
 
   async deleteProjectChat(id: number) {
     try {
@@ -376,7 +438,9 @@ export class ProjectChatsService {
       });
 
       if (!existingChat) {
-        throw new NotFoundException(`Project chat with ID ${id} not found. Please check the ID and try again.`);
+        throw new NotFoundException(
+          `Project chat with ID ${id} not found. Please check the ID and try again.`,
+        );
       }
 
       // Step 1: Delete all chat participants first
@@ -400,18 +464,22 @@ export class ProjectChatsService {
         where: { id },
       });
 
-      return { 
+      return {
         message: `Project chat with ID ${id} has been deleted successfully`,
-        deletedChat: existingChat
+        deletedChat: existingChat,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
       if (error.code === 'P2003') {
-        throw new BadRequestException('Cannot delete project chat due to existing references. Please remove related records first.');
+        throw new BadRequestException(
+          'Cannot delete project chat due to existing references. Please remove related records first.',
+        );
       }
-      throw new InternalServerErrorException(`Failed to delete project chat with ID ${id}: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Failed to delete project chat with ID ${id}: ${error.message}`,
+      );
     }
   }
 
@@ -425,7 +493,7 @@ export class ProjectChatsService {
           firstName: true,
           lastName: true,
           email: true,
-        }
+        },
       });
 
       // Get all chat participations for this user
@@ -439,18 +507,18 @@ export class ProjectChatsService {
                   id: true,
                   description: true,
                   status: true,
-                }
-              }
-            }
+                },
+              },
+            },
           },
           employee: {
             select: {
               id: true,
               firstName: true,
               lastName: true,
-            }
-          }
-        }
+            },
+          },
+        },
       });
 
       // Get total counts
@@ -466,19 +534,21 @@ export class ProjectChatsService {
           totalParticipantsInSystem: totalParticipants,
           totalMessagesInSystem: totalMessages,
           userParticipations: participations.length,
-          participations: participations.map(p => ({
+          participations: participations.map((p) => ({
             participantId: p.id,
             chatId: p.chatId,
             memberType: p.memberType,
             projectId: p.chat.projectId,
-            projectDescription: p.chat.project?.description || 'No project linked',
+            projectDescription:
+              p.chat.project?.description || 'No project linked',
             projectStatus: p.chat.project?.status || null,
             createdAt: p.createdAt,
           })),
         },
-        message: participations.length === 0 
-          ? `User ${userId} is not a participant in any chat. Please add them to a chat using POST /chat-participants` 
-          : `User ${userId} is a participant in ${participations.length} chat(s)`
+        message:
+          participations.length === 0
+            ? `User ${userId} is not a participant in any chat. Please add them to a chat using POST /chat-participants`
+            : `User ${userId} is a participant in ${participations.length} chat(s)`,
       };
     } catch (error) {
       throw new InternalServerErrorException(`Debug failed: ${error.message}`);

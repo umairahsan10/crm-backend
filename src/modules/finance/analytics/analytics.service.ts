@@ -12,7 +12,7 @@ import {
   ExpenseStatsDto,
   RevenueStatsDto,
   LiabilityStatsDto,
-  ErrorResponseDto
+  ErrorResponseDto,
 } from './dto/analytics-response.dto';
 import {
   DashboardResponseDto,
@@ -27,7 +27,7 @@ import {
   DashboardWidgetsDto,
   WidgetMetricDto,
   CategoryBreakdownDto,
-  TrendDataDto
+  TrendDataDto,
 } from './dto/dashboard-response.dto';
 import { TransactionType, TransactionStatus } from '@prisma/client';
 
@@ -59,52 +59,60 @@ export class AnalyticsService {
 
   /**
    * Get comprehensive finance analytics
-   * 
+   *
    * This method aggregates statistics from all finance modules (Assets, Expenses, Revenues, Liabilities)
    * and provides a complete financial overview for the accountant dashboard.
-   * 
+   *
    * @param fromDate - Optional start date for filtering (ISO string)
    * @param toDate - Optional end date for filtering (ISO string)
    * @returns Comprehensive finance analytics with all metrics
    */
   async getFinanceAnalytics(
-    filters: AnalyticsFilters = {}
+    filters: AnalyticsFilters = {},
   ): Promise<FinanceAnalyticsResponseDto | ErrorResponseDto> {
     try {
       this.logger.log('Retrieving comprehensive finance analytics');
 
       // Get statistics from all finance services with filtering
-      const [
-        assetsResult,
-        expensesResult,
-        revenuesResult,
-        liabilitiesResult
-      ] = await Promise.all([
-        this.getFilteredAssetStats(filters),
-        this.getFilteredExpenseStats(filters),
-        this.getFilteredRevenueStats(filters),
-        this.getFilteredLiabilityStats(filters)
-      ]);
+      const [assetsResult, expensesResult, revenuesResult, liabilitiesResult] =
+        await Promise.all([
+          this.getFilteredAssetStats(filters),
+          this.getFilteredExpenseStats(filters),
+          this.getFilteredRevenueStats(filters),
+          this.getFilteredLiabilityStats(filters),
+        ]);
 
       // Check if any service returned an error
       if (assetsResult.status === 'error') {
         this.logger.error('Failed to retrieve asset statistics');
-        return this.createErrorResponse('Failed to retrieve asset statistics', 'ASSETS_ERROR');
+        return this.createErrorResponse(
+          'Failed to retrieve asset statistics',
+          'ASSETS_ERROR',
+        );
       }
 
       if (expensesResult.status === 'error') {
         this.logger.error('Failed to retrieve expense statistics');
-        return this.createErrorResponse('Failed to retrieve expense statistics', 'EXPENSES_ERROR');
+        return this.createErrorResponse(
+          'Failed to retrieve expense statistics',
+          'EXPENSES_ERROR',
+        );
       }
 
       if (revenuesResult.status === 'error') {
         this.logger.error('Failed to retrieve revenue statistics');
-        return this.createErrorResponse('Failed to retrieve revenue statistics', 'REVENUES_ERROR');
+        return this.createErrorResponse(
+          'Failed to retrieve revenue statistics',
+          'REVENUES_ERROR',
+        );
       }
 
       if (liabilitiesResult.status === 'error') {
         this.logger.error('Failed to retrieve liability statistics');
-        return this.createErrorResponse('Failed to retrieve liability statistics', 'LIABILITIES_ERROR');
+        return this.createErrorResponse(
+          'Failed to retrieve liability statistics',
+          'LIABILITIES_ERROR',
+        );
       }
 
       // Extract data from service responses
@@ -118,7 +126,7 @@ export class AnalyticsService {
         assetsData,
         expensesData,
         revenuesData,
-        liabilitiesData
+        liabilitiesData,
       );
 
       // Map individual module statistics
@@ -133,7 +141,7 @@ export class AnalyticsService {
         assets,
         expenses,
         revenues,
-        liabilities
+        liabilities,
       };
 
       this.logger.log('Finance analytics retrieved successfully');
@@ -141,14 +149,13 @@ export class AnalyticsService {
       return {
         status: 'success',
         message: 'Finance analytics retrieved successfully',
-        data: analyticsData
+        data: analyticsData,
       };
-
     } catch (error) {
       this.logger.error(`Error retrieving finance analytics: ${error.message}`);
       return this.createErrorResponse(
         'An error occurred while retrieving finance analytics',
-        'ANALYTICS_ERROR'
+        'ANALYTICS_ERROR',
       );
     }
   }
@@ -160,7 +167,7 @@ export class AnalyticsService {
     assetsData: any,
     expensesData: any,
     revenuesData: any,
-    liabilitiesData: any
+    liabilitiesData: any,
   ): SummaryStatsDto {
     const totalIncome = revenuesData.totalAmount || 0;
     const totalExpenses = expensesData.totalAmount || 0;
@@ -168,7 +175,7 @@ export class AnalyticsService {
     const totalLiabilities = liabilitiesData.totalAmount || 0;
     const paidLiabilities = liabilitiesData.paidAmount || 0;
     const unpaidLiabilities = liabilitiesData.unpaidAmount || 0;
-    
+
     // Net position = Income - Expenses - Unpaid Liabilities
     const netPosition = totalIncome - totalExpenses - unpaidLiabilities;
 
@@ -179,7 +186,7 @@ export class AnalyticsService {
       totalLiabilities: Math.round(totalLiabilities * 100) / 100,
       paidLiabilities: Math.round(paidLiabilities * 100) / 100,
       unpaidLiabilities: Math.round(unpaidLiabilities * 100) / 100,
-      netPosition: Math.round(netPosition * 100) / 100
+      netPosition: Math.round(netPosition * 100) / 100,
     };
   }
 
@@ -189,16 +196,21 @@ export class AnalyticsService {
   private mapAssetStats(assetsData: any): AssetStatsDto {
     return {
       totalAssets: assetsData.totalAssets || 0,
-      totalPurchaseValue: Math.round((assetsData.totalPurchaseValue || 0) * 100) / 100,
-      totalCurrentValue: Math.round((assetsData.totalCurrentValue || 0) * 100) / 100,
-      totalDepreciation: Math.round((assetsData.totalDepreciation || 0) * 100) / 100,
-      averageDepreciationRate: Math.round((assetsData.averageDepreciationRate || 0) * 100) / 100,
+      totalPurchaseValue:
+        Math.round((assetsData.totalPurchaseValue || 0) * 100) / 100,
+      totalCurrentValue:
+        Math.round((assetsData.totalCurrentValue || 0) * 100) / 100,
+      totalDepreciation:
+        Math.round((assetsData.totalDepreciation || 0) * 100) / 100,
+      averageDepreciationRate:
+        Math.round((assetsData.averageDepreciationRate || 0) * 100) / 100,
       thisMonth: {
         count: assetsData.thisMonth?.count || 0,
-        totalValue: Math.round((assetsData.thisMonth?.totalValue || 0) * 100) / 100
+        totalValue:
+          Math.round((assetsData.thisMonth?.totalValue || 0) * 100) / 100,
       },
       byCategory: assetsData.byCategory || {},
-      assetsNeedingAttention: assetsData.assetsNeedingAttention || []
+      assetsNeedingAttention: assetsData.assetsNeedingAttention || [],
     };
   }
 
@@ -209,15 +221,16 @@ export class AnalyticsService {
     return {
       totalExpenses: expensesData.totalExpenses || 0,
       totalAmount: Math.round((expensesData.totalAmount || 0) * 100) / 100,
-      averageExpense: Math.round((expensesData.averageExpense || 0) * 100) / 100,
+      averageExpense:
+        Math.round((expensesData.averageExpense || 0) * 100) / 100,
       thisMonth: {
         count: expensesData.thisMonth?.count || 0,
-        amount: Math.round((expensesData.thisMonth?.amount || 0) * 100) / 100
+        amount: Math.round((expensesData.thisMonth?.amount || 0) * 100) / 100,
       },
       byCategory: expensesData.byCategory || {},
       topCategories: expensesData.topCategories || [],
       byPaymentMethod: expensesData.byPaymentMethod || {},
-      byProcessedByRole: expensesData.byProcessedByRole || {}
+      byProcessedByRole: expensesData.byProcessedByRole || {},
     };
   }
 
@@ -228,15 +241,16 @@ export class AnalyticsService {
     return {
       totalRevenue: revenuesData.totalRevenue || 0,
       totalAmount: Math.round((revenuesData.totalAmount || 0) * 100) / 100,
-      averageRevenue: Math.round((revenuesData.averageRevenue || 0) * 100) / 100,
+      averageRevenue:
+        Math.round((revenuesData.averageRevenue || 0) * 100) / 100,
       thisMonth: {
         count: revenuesData.thisMonth?.count || 0,
-        amount: Math.round((revenuesData.thisMonth?.amount || 0) * 100) / 100
+        amount: Math.round((revenuesData.thisMonth?.amount || 0) * 100) / 100,
       },
       byCategory: revenuesData.byCategory || {},
       bySource: revenuesData.bySource || {},
       byPaymentMethod: revenuesData.byPaymentMethod || {},
-      topGenerators: revenuesData.topGenerators || []
+      topGenerators: revenuesData.topGenerators || [],
     };
   }
 
@@ -252,18 +266,21 @@ export class AnalyticsService {
       paidAmount: Math.round((liabilitiesData.paidAmount || 0) * 100) / 100,
       unpaidAmount: Math.round((liabilitiesData.unpaidAmount || 0) * 100) / 100,
       byCategory: liabilitiesData.byCategory || {},
-      overdueLiabilities: liabilitiesData.overdueLiabilities || []
+      overdueLiabilities: liabilitiesData.overdueLiabilities || [],
     };
   }
 
   /**
    * Create error response
    */
-  private createErrorResponse(message: string, errorCode: string): ErrorResponseDto {
+  private createErrorResponse(
+    message: string,
+    errorCode: string,
+  ): ErrorResponseDto {
     return {
       status: 'error',
       message,
-      error_code: errorCode
+      error_code: errorCode,
     };
   }
 
@@ -275,29 +292,32 @@ export class AnalyticsService {
       // For now, return the basic stats and apply filtering in the response
       // In a full implementation, you would modify the Prisma queries in AssetsService
       const result = await this.assetsService.getAssetStats();
-      
+
       if (result.status === 'success' && result.data) {
         // Apply filters to the data
-        let filteredData = { ...result.data };
-        
+        const filteredData = { ...result.data };
+
         // Apply amount filters
-        if (filters.minAmount !== undefined || filters.maxAmount !== undefined) {
+        if (
+          filters.minAmount !== undefined ||
+          filters.maxAmount !== undefined
+        ) {
           // This would require modifying the underlying service queries
           // For now, we'll return the unfiltered data
         }
-        
+
         return {
           status: 'success',
-          data: filteredData
+          data: filteredData,
         };
       }
-      
+
       return result;
     } catch (error) {
       this.logger.error('Error getting filtered asset stats:', error);
       return {
         status: 'error',
-        message: 'Failed to retrieve filtered asset statistics'
+        message: 'Failed to retrieve filtered asset statistics',
       };
     }
   }
@@ -305,30 +325,35 @@ export class AnalyticsService {
   /**
    * Get filtered expense statistics
    */
-  private async getFilteredExpenseStats(filters: AnalyticsFilters): Promise<any> {
+  private async getFilteredExpenseStats(
+    filters: AnalyticsFilters,
+  ): Promise<any> {
     try {
       const result = await this.expenseService.getExpenseStats();
-      
+
       if (result.status === 'success' && result.data) {
-        let filteredData = { ...result.data };
-        
+        const filteredData = { ...result.data };
+
         // Apply filters to the data
-        if (filters.minAmount !== undefined || filters.maxAmount !== undefined) {
+        if (
+          filters.minAmount !== undefined ||
+          filters.maxAmount !== undefined
+        ) {
           // This would require modifying the underlying service queries
         }
-        
+
         return {
           status: 'success',
-          data: filteredData
+          data: filteredData,
         };
       }
-      
+
       return result;
     } catch (error) {
       this.logger.error('Error getting filtered expense stats:', error);
       return {
         status: 'error',
-        message: 'Failed to retrieve filtered expense statistics'
+        message: 'Failed to retrieve filtered expense statistics',
       };
     }
   }
@@ -336,30 +361,35 @@ export class AnalyticsService {
   /**
    * Get filtered revenue statistics
    */
-  private async getFilteredRevenueStats(filters: AnalyticsFilters): Promise<any> {
+  private async getFilteredRevenueStats(
+    filters: AnalyticsFilters,
+  ): Promise<any> {
     try {
       const result = await this.revenueService.getRevenueStats();
-      
+
       if (result.status === 'success' && result.data) {
-        let filteredData = { ...result.data };
-        
+        const filteredData = { ...result.data };
+
         // Apply filters to the data
-        if (filters.minAmount !== undefined || filters.maxAmount !== undefined) {
+        if (
+          filters.minAmount !== undefined ||
+          filters.maxAmount !== undefined
+        ) {
           // This would require modifying the underlying service queries
         }
-        
+
         return {
           status: 'success',
-          data: filteredData
+          data: filteredData,
         };
       }
-      
+
       return result;
     } catch (error) {
       this.logger.error('Error getting filtered revenue stats:', error);
       return {
         status: 'error',
-        message: 'Failed to retrieve filtered revenue statistics'
+        message: 'Failed to retrieve filtered revenue statistics',
       };
     }
   }
@@ -367,37 +397,42 @@ export class AnalyticsService {
   /**
    * Get filtered liability statistics
    */
-  private async getFilteredLiabilityStats(filters: AnalyticsFilters): Promise<any> {
+  private async getFilteredLiabilityStats(
+    filters: AnalyticsFilters,
+  ): Promise<any> {
     try {
       const result = await this.liabilitiesService.getLiabilityStats();
-      
+
       if (result.status === 'success' && result.data) {
-        let filteredData = { ...result.data };
-        
+        const filteredData = { ...result.data };
+
         // Apply filters to the data
-        if (filters.minAmount !== undefined || filters.maxAmount !== undefined) {
+        if (
+          filters.minAmount !== undefined ||
+          filters.maxAmount !== undefined
+        ) {
           // This would require modifying the underlying service queries
         }
-        
+
         return {
           status: 'success',
-          data: filteredData
+          data: filteredData,
         };
       }
-      
+
       return result;
     } catch (error) {
       this.logger.error('Error getting filtered liability stats:', error);
       return {
         status: 'error',
-        message: 'Failed to retrieve filtered liability statistics'
+        message: 'Failed to retrieve filtered liability statistics',
       };
     }
   }
 
   /**
    * Get comprehensive finance dashboard data for frontend widgets and graphs
-   * 
+   *
    * This method provides all necessary data for building comprehensive finance dashboards:
    * - Time-based metrics (today, this week, this month, this quarter, this year)
    * - Trend analysis (daily, weekly, monthly time series)
@@ -405,32 +440,65 @@ export class AnalyticsService {
    * - Widget-ready data structures
    * - Graph-ready time series data
    */
-  async getFinanceDashboard(): Promise<DashboardResponseDto | ErrorResponseDto> {
+  async getFinanceDashboard(): Promise<
+    DashboardResponseDto | ErrorResponseDto
+  > {
     try {
       this.logger.log('Retrieving comprehensive finance dashboard data');
 
       // Get current date in PKT
       const currentDate = this.getCurrentDateInPKT();
-      
+
       // Calculate all date ranges
       const dateRanges = this.calculateDateRanges(currentDate);
 
       // Fetch all transactions in parallel
-      const [revenueTransactions, expenseTransactions, liabilityTransactions, assetsData, liabilitiesData] = await Promise.all([
+      const [
+        revenueTransactions,
+        expenseTransactions,
+        liabilityTransactions,
+        assetsData,
+        liabilitiesData,
+      ] = await Promise.all([
         this.getRevenueTransactions(),
         this.getExpenseTransactions(),
         this.getLiabilityTransactions(),
         this.getFilteredAssetStats({}),
-        this.getFilteredLiabilityStats({})
+        this.getFilteredLiabilityStats({}),
       ]);
 
       // Calculate metrics
-      const revenues = this.calculateRevenueMetrics(revenueTransactions, dateRanges);
-      const expenses = this.calculateExpenseMetrics(expenseTransactions, dateRanges);
-      const liabilities = this.calculateLiabilityMetrics(liabilityTransactions, dateRanges);
-      const summary = this.calculateFinancialSummary(revenueTransactions, expenseTransactions, assetsData, liabilitiesData, dateRanges);
-      const trends = this.calculateTrends(revenueTransactions, expenseTransactions, liabilityTransactions);
-      const widgets = this.calculateWidgets(revenueTransactions, expenseTransactions, revenues, expenses, summary);
+      const revenues = this.calculateRevenueMetrics(
+        revenueTransactions,
+        dateRanges,
+      );
+      const expenses = this.calculateExpenseMetrics(
+        expenseTransactions,
+        dateRanges,
+      );
+      const liabilities = this.calculateLiabilityMetrics(
+        liabilityTransactions,
+        dateRanges,
+      );
+      const summary = this.calculateFinancialSummary(
+        revenueTransactions,
+        expenseTransactions,
+        assetsData,
+        liabilitiesData,
+        dateRanges,
+      );
+      const trends = this.calculateTrends(
+        revenueTransactions,
+        expenseTransactions,
+        liabilityTransactions,
+      );
+      const widgets = this.calculateWidgets(
+        revenueTransactions,
+        expenseTransactions,
+        revenues,
+        expenses,
+        summary,
+      );
 
       const dashboardData: DashboardDataDto = {
         summary,
@@ -442,8 +510,8 @@ export class AnalyticsService {
         periodInfo: {
           currentPeriod: `${dateRanges.thisMonth.start.getFullYear()}-${String(dateRanges.thisMonth.start.getMonth() + 1).padStart(2, '0')}`,
           previousPeriod: `${dateRanges.lastMonth.start.getFullYear()}-${String(dateRanges.lastMonth.start.getMonth() + 1).padStart(2, '0')}`,
-          generatedAt: currentDate.toISOString()
-        }
+          generatedAt: currentDate.toISOString(),
+        },
       };
 
       this.logger.log('Dashboard data retrieved successfully');
@@ -451,13 +519,13 @@ export class AnalyticsService {
       return {
         status: 'success',
         message: 'Dashboard data retrieved successfully',
-        data: dashboardData
+        data: dashboardData,
       };
     } catch (error) {
       this.logger.error(`Error retrieving dashboard data: ${error.message}`);
       return this.createErrorResponse(
         'An error occurred while retrieving dashboard data',
-        'DASHBOARD_ERROR'
+        'DASHBOARD_ERROR',
       );
     }
   }
@@ -467,7 +535,7 @@ export class AnalyticsService {
    */
   private getCurrentDateInPKT(): Date {
     const now = new Date();
-    return new Date(now.getTime() + (5 * 60 * 60 * 1000)); // PKT is UTC+5
+    return new Date(now.getTime() + 5 * 60 * 60 * 1000); // PKT is UTC+5
   }
 
   /**
@@ -486,7 +554,14 @@ export class AnalyticsService {
     const dayOfWeek = currentDate.getDay();
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const thisWeekStart = new Date(year, month, day + mondayOffset, 0, 0, 0, 0);
-    const thisWeekEnd = new Date(thisWeekStart.getTime() + (6 * 24 * 60 * 60 * 1000) + (23 * 60 * 60 * 1000) + (59 * 60 * 1000) + (59 * 1000) + 999);
+    const thisWeekEnd = new Date(
+      thisWeekStart.getTime() +
+        6 * 24 * 60 * 60 * 1000 +
+        23 * 60 * 60 * 1000 +
+        59 * 60 * 1000 +
+        59 * 1000 +
+        999,
+    );
 
     // This month
     const thisMonthStart = new Date(year, month, 1, 0, 0, 0, 0);
@@ -499,13 +574,37 @@ export class AnalyticsService {
     // This quarter
     const quarter = Math.floor(month / 3);
     const thisQuarterStart = new Date(year, quarter * 3, 1, 0, 0, 0, 0);
-    const thisQuarterEnd = new Date(year, (quarter + 1) * 3, 0, 23, 59, 59, 999);
+    const thisQuarterEnd = new Date(
+      year,
+      (quarter + 1) * 3,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     // Last quarter
     const lastQuarter = quarter === 0 ? 3 : quarter - 1;
     const lastQuarterYear = quarter === 0 ? year - 1 : year;
-    const lastQuarterStart = new Date(lastQuarterYear, lastQuarter * 3, 1, 0, 0, 0, 0);
-    const lastQuarterEnd = new Date(lastQuarterYear, (lastQuarter + 1) * 3, 0, 23, 59, 59, 999);
+    const lastQuarterStart = new Date(
+      lastQuarterYear,
+      lastQuarter * 3,
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
+    const lastQuarterEnd = new Date(
+      lastQuarterYear,
+      (lastQuarter + 1) * 3,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
 
     // This year
     const thisYearStart = new Date(year, 0, 1, 0, 0, 0, 0);
@@ -523,7 +622,7 @@ export class AnalyticsService {
       thisQuarter: { start: thisQuarterStart, end: thisQuarterEnd },
       lastQuarter: { start: lastQuarterStart, end: lastQuarterEnd },
       thisYear: { start: thisYearStart, end: thisYearEnd },
-      lastYear: { start: lastYearStart, end: lastYearEnd }
+      lastYear: { start: lastYearStart, end: lastYearEnd },
     };
   }
 
@@ -534,7 +633,7 @@ export class AnalyticsService {
     return await this.prisma.transaction.findMany({
       where: {
         transactionType: TransactionType.payment,
-        status: TransactionStatus.completed
+        status: TransactionStatus.completed,
       },
       include: {
         Revenue: {
@@ -542,15 +641,15 @@ export class AnalyticsService {
             lead: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
-        }
+                name: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
-        transactionDate: 'asc'
-      }
+        transactionDate: 'asc',
+      },
     });
   }
 
@@ -561,14 +660,14 @@ export class AnalyticsService {
     return await this.prisma.transaction.findMany({
       where: {
         transactionType: TransactionType.expense,
-        status: TransactionStatus.completed
+        status: TransactionStatus.completed,
       },
       include: {
-        Expense: true
+        Expense: true,
       },
       orderBy: {
-        transactionDate: 'asc'
-      }
+        transactionDate: 'asc',
+      },
     });
   }
 
@@ -578,25 +677,29 @@ export class AnalyticsService {
   private async getLiabilityTransactions() {
     const liabilities = await this.prisma.liability.findMany({
       include: {
-        transaction: true
+        transaction: true,
       },
       orderBy: {
-        createdAt: 'asc'
-      }
+        createdAt: 'asc',
+      },
     });
-    
+
     // Map to transaction-like structure for consistency with other methods
-    return liabilities.map(liability => ({
+    return liabilities.map((liability) => ({
       ...liability.transaction,
-      Liability: [liability]
+      Liability: [liability],
     }));
   }
 
   /**
    * Filter transactions by date range
    */
-  private filterTransactionsByDate(transactions: any[], startDate: Date, endDate: Date) {
-    return transactions.filter(t => {
+  private filterTransactionsByDate(
+    transactions: any[],
+    startDate: Date,
+    endDate: Date,
+  ) {
+    return transactions.filter((t) => {
       const txDate = new Date(t.transactionDate);
       return txDate >= startDate && txDate <= endDate;
     });
@@ -605,8 +708,15 @@ export class AnalyticsService {
   /**
    * Calculate time period metrics
    */
-  private calculateTimePeriodMetrics(transactions: any[], dateRange: { start: Date; end: Date }): TimePeriodMetricsDto {
-    const filtered = this.filterTransactionsByDate(transactions, dateRange.start, dateRange.end);
+  private calculateTimePeriodMetrics(
+    transactions: any[],
+    dateRange: { start: Date; end: Date },
+  ): TimePeriodMetricsDto {
+    const filtered = this.filterTransactionsByDate(
+      transactions,
+      dateRange.start,
+      dateRange.end,
+    );
     const count = filtered.length;
     const amount = filtered.reduce((sum, t) => sum + Number(t.amount), 0);
     const average = count > 0 ? amount / count : 0;
@@ -615,7 +725,7 @@ export class AnalyticsService {
       count,
       amount: Math.round(amount * 100) / 100,
       average: Math.round(average * 100) / 100,
-      changePercent: 0 // Will be calculated in comparison
+      changePercent: 0, // Will be calculated in comparison
     };
   }
 
@@ -626,16 +736,25 @@ export class AnalyticsService {
     currentTransactions: any[],
     previousTransactions: any[],
     currentRange: { start: Date; end: Date },
-    previousRange: { start: Date; end: Date }
+    previousRange: { start: Date; end: Date },
   ): PeriodComparisonDto {
-    const current = this.calculateTimePeriodMetrics(currentTransactions, currentRange);
-    const previous = this.calculateTimePeriodMetrics(previousTransactions, previousRange);
-    
+    const current = this.calculateTimePeriodMetrics(
+      currentTransactions,
+      currentRange,
+    );
+    const previous = this.calculateTimePeriodMetrics(
+      previousTransactions,
+      previousRange,
+    );
+
     const difference = current.amount - previous.amount;
-    const changePercent = previous.amount > 0 
-      ? Math.round((difference / previous.amount) * 100 * 100) / 100 
-      : (current.amount > 0 ? 100 : 0);
-    
+    const changePercent =
+      previous.amount > 0
+        ? Math.round((difference / previous.amount) * 100 * 100) / 100
+        : current.amount > 0
+          ? 100
+          : 0;
+
     let trend: 'up' | 'down' | 'neutral' = 'neutral';
     if (changePercent > 0.1) trend = 'up';
     else if (changePercent < -0.1) trend = 'down';
@@ -645,37 +764,59 @@ export class AnalyticsService {
       previous: { ...previous, changePercent: 0 },
       difference: Math.round(difference * 100) / 100,
       changePercent,
-      trend
+      trend,
     };
   }
 
   /**
    * Calculate revenue metrics
    */
-  private calculateRevenueMetrics(transactions: any[], dateRanges: any): RevenueMetricsDto {
-    const today = this.calculateTimePeriodMetrics(transactions, dateRanges.today);
-    const thisWeek = this.calculateTimePeriodMetrics(transactions, dateRanges.thisWeek);
-    const thisMonth = this.calculateTimePeriodMetrics(transactions, dateRanges.thisMonth);
-    const thisQuarter = this.calculateTimePeriodMetrics(transactions, dateRanges.thisQuarter);
-    const thisYear = this.calculateTimePeriodMetrics(transactions, dateRanges.thisYear);
+  private calculateRevenueMetrics(
+    transactions: any[],
+    dateRanges: any,
+  ): RevenueMetricsDto {
+    const today = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.today,
+    );
+    const thisWeek = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisWeek,
+    );
+    const thisMonth = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisMonth,
+    );
+    const thisQuarter = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisQuarter,
+    );
+    const thisYear = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisYear,
+    );
 
     const monthOverMonth = this.calculatePeriodComparison(
       transactions,
       transactions,
       dateRanges.thisMonth,
-      dateRanges.lastMonth
+      dateRanges.lastMonth,
     );
 
     const yearOverYear = this.calculatePeriodComparison(
       transactions,
       transactions,
       dateRanges.thisYear,
-      dateRanges.lastYear
+      dateRanges.lastYear,
     );
 
     // Calculate top categories - use thisYear for better data coverage
     const categoryMap = new Map<string, { amount: number; count: number }>();
-    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+    this.filterTransactionsByDate(
+      transactions,
+      dateRanges.thisYear.start,
+      dateRanges.thisYear.end,
+    ).forEach((t) => {
       const revenue = Array.isArray(t.Revenue) ? t.Revenue[0] : t.Revenue;
       if (revenue) {
         const category = revenue.category || 'Uncategorized';
@@ -686,20 +827,32 @@ export class AnalyticsService {
       }
     });
 
-    const totalAmount = Array.from(categoryMap.values()).reduce((sum, v) => sum + v.amount, 0);
-    const topCategories: CategoryBreakdownDto[] = Array.from(categoryMap.entries())
+    const totalAmount = Array.from(categoryMap.values()).reduce(
+      (sum, v) => sum + v.amount,
+      0,
+    );
+    const topCategories: CategoryBreakdownDto[] = Array.from(
+      categoryMap.entries(),
+    )
       .map(([name, data]) => ({
         name,
         amount: Math.round(data.amount * 100) / 100,
         count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+        percentage:
+          totalAmount > 0
+            ? Math.round((data.amount / totalAmount) * 100 * 100) / 100
+            : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
 
     // Calculate top sources - use thisYear for better data coverage
     const sourceMap = new Map<string, { amount: number; count: number }>();
-    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+    this.filterTransactionsByDate(
+      transactions,
+      dateRanges.thisYear.start,
+      dateRanges.thisYear.end,
+    ).forEach((t) => {
       const revenue = Array.isArray(t.Revenue) ? t.Revenue[0] : t.Revenue;
       if (revenue) {
         const source = revenue.source || 'Unknown';
@@ -715,7 +868,10 @@ export class AnalyticsService {
         name,
         amount: Math.round(data.amount * 100) / 100,
         count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+        percentage:
+          totalAmount > 0
+            ? Math.round((data.amount / totalAmount) * 100 * 100) / 100
+            : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
@@ -729,37 +885,59 @@ export class AnalyticsService {
       monthOverMonth,
       yearOverYear,
       topCategories,
-      topSources
+      topSources,
     };
   }
 
   /**
    * Calculate expense metrics
    */
-  private calculateExpenseMetrics(transactions: any[], dateRanges: any): ExpenseMetricsDto {
-    const today = this.calculateTimePeriodMetrics(transactions, dateRanges.today);
-    const thisWeek = this.calculateTimePeriodMetrics(transactions, dateRanges.thisWeek);
-    const thisMonth = this.calculateTimePeriodMetrics(transactions, dateRanges.thisMonth);
-    const thisQuarter = this.calculateTimePeriodMetrics(transactions, dateRanges.thisQuarter);
-    const thisYear = this.calculateTimePeriodMetrics(transactions, dateRanges.thisYear);
+  private calculateExpenseMetrics(
+    transactions: any[],
+    dateRanges: any,
+  ): ExpenseMetricsDto {
+    const today = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.today,
+    );
+    const thisWeek = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisWeek,
+    );
+    const thisMonth = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisMonth,
+    );
+    const thisQuarter = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisQuarter,
+    );
+    const thisYear = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisYear,
+    );
 
     const monthOverMonth = this.calculatePeriodComparison(
       transactions,
       transactions,
       dateRanges.thisMonth,
-      dateRanges.lastMonth
+      dateRanges.lastMonth,
     );
 
     const yearOverYear = this.calculatePeriodComparison(
       transactions,
       transactions,
       dateRanges.thisYear,
-      dateRanges.lastYear
+      dateRanges.lastYear,
     );
 
     // Calculate top categories - use thisYear for better data coverage
     const categoryMap = new Map<string, { amount: number; count: number }>();
-    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+    this.filterTransactionsByDate(
+      transactions,
+      dateRanges.thisYear.start,
+      dateRanges.thisYear.end,
+    ).forEach((t) => {
       const expense = Array.isArray(t.Expense) ? t.Expense[0] : t.Expense;
       if (expense) {
         const category = expense.category || 'Uncategorized';
@@ -770,20 +948,35 @@ export class AnalyticsService {
       }
     });
 
-    const totalAmount = Array.from(categoryMap.values()).reduce((sum, v) => sum + v.amount, 0);
-    const topCategories: CategoryBreakdownDto[] = Array.from(categoryMap.entries())
+    const totalAmount = Array.from(categoryMap.values()).reduce(
+      (sum, v) => sum + v.amount,
+      0,
+    );
+    const topCategories: CategoryBreakdownDto[] = Array.from(
+      categoryMap.entries(),
+    )
       .map(([name, data]) => ({
         name,
         amount: Math.round(data.amount * 100) / 100,
         count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+        percentage:
+          totalAmount > 0
+            ? Math.round((data.amount / totalAmount) * 100 * 100) / 100
+            : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
 
     // Calculate top payment methods - use thisYear for better data coverage
-    const paymentMethodMap = new Map<string, { amount: number; count: number }>();
-    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
+    const paymentMethodMap = new Map<
+      string,
+      { amount: number; count: number }
+    >();
+    this.filterTransactionsByDate(
+      transactions,
+      dateRanges.thisYear.start,
+      dateRanges.thisYear.end,
+    ).forEach((t) => {
       const method = t.paymentMethod || 'unknown';
       const existing = paymentMethodMap.get(method) || { amount: 0, count: 0 };
       existing.amount += Number(t.amount);
@@ -791,12 +984,17 @@ export class AnalyticsService {
       paymentMethodMap.set(method, existing);
     });
 
-    const topPaymentMethods: CategoryBreakdownDto[] = Array.from(paymentMethodMap.entries())
+    const topPaymentMethods: CategoryBreakdownDto[] = Array.from(
+      paymentMethodMap.entries(),
+    )
       .map(([name, data]) => ({
         name,
         amount: Math.round(data.amount * 100) / 100,
         count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+        percentage:
+          totalAmount > 0
+            ? Math.round((data.amount / totalAmount) * 100 * 100) / 100
+            : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
@@ -810,38 +1008,62 @@ export class AnalyticsService {
       monthOverMonth,
       yearOverYear,
       topCategories,
-      topPaymentMethods
+      topPaymentMethods,
     };
   }
 
   /**
    * Calculate liability metrics
    */
-  private calculateLiabilityMetrics(transactions: any[], dateRanges: any): LiabilityMetricsDto {
-    const today = this.calculateTimePeriodMetrics(transactions, dateRanges.today);
-    const thisWeek = this.calculateTimePeriodMetrics(transactions, dateRanges.thisWeek);
-    const thisMonth = this.calculateTimePeriodMetrics(transactions, dateRanges.thisMonth);
-    const thisQuarter = this.calculateTimePeriodMetrics(transactions, dateRanges.thisQuarter);
-    const thisYear = this.calculateTimePeriodMetrics(transactions, dateRanges.thisYear);
+  private calculateLiabilityMetrics(
+    transactions: any[],
+    dateRanges: any,
+  ): LiabilityMetricsDto {
+    const today = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.today,
+    );
+    const thisWeek = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisWeek,
+    );
+    const thisMonth = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisMonth,
+    );
+    const thisQuarter = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisQuarter,
+    );
+    const thisYear = this.calculateTimePeriodMetrics(
+      transactions,
+      dateRanges.thisYear,
+    );
 
     const monthOverMonth = this.calculatePeriodComparison(
       transactions,
       transactions,
       dateRanges.thisMonth,
-      dateRanges.lastMonth
+      dateRanges.lastMonth,
     );
 
     const yearOverYear = this.calculatePeriodComparison(
       transactions,
       transactions,
       dateRanges.thisYear,
-      dateRanges.lastYear
+      dateRanges.lastYear,
     );
 
     // Calculate top categories - use thisYear for better data coverage
     const categoryMap = new Map<string, { amount: number; count: number }>();
-    this.filterTransactionsByDate(transactions, dateRanges.thisYear.start, dateRanges.thisYear.end).forEach(t => {
-      const liability = Array.isArray(t.Liability) ? t.Liability[0] : t.Liability;
+    this.filterTransactionsByDate(
+      transactions,
+      dateRanges.thisYear.start,
+      dateRanges.thisYear.end,
+    ).forEach((t) => {
+      const liability = Array.isArray(t.Liability)
+        ? t.Liability[0]
+        : t.Liability;
       if (liability) {
         const category = liability.category || 'Uncategorized';
         const existing = categoryMap.get(category) || { amount: 0, count: 0 };
@@ -851,13 +1073,21 @@ export class AnalyticsService {
       }
     });
 
-    const totalAmount = Array.from(categoryMap.values()).reduce((sum, v) => sum + v.amount, 0);
-    const topCategories: CategoryBreakdownDto[] = Array.from(categoryMap.entries())
+    const totalAmount = Array.from(categoryMap.values()).reduce(
+      (sum, v) => sum + v.amount,
+      0,
+    );
+    const topCategories: CategoryBreakdownDto[] = Array.from(
+      categoryMap.entries(),
+    )
       .map(([name, data]) => ({
         name,
         amount: Math.round(data.amount * 100) / 100,
         count: data.count,
-        percentage: totalAmount > 0 ? Math.round((data.amount / totalAmount) * 100 * 100) / 100 : 0
+        percentage:
+          totalAmount > 0
+            ? Math.round((data.amount / totalAmount) * 100 * 100) / 100
+            : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 10);
@@ -870,7 +1100,7 @@ export class AnalyticsService {
       thisYear,
       monthOverMonth,
       yearOverYear,
-      topCategories
+      topCategories,
     };
   }
 
@@ -882,28 +1112,42 @@ export class AnalyticsService {
     expenseTransactions: any[],
     assetsData: any,
     liabilitiesData: any,
-    dateRanges: any
+    dateRanges: any,
   ): FinancialSummaryDto {
-    const totalRevenue = revenueTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const totalRevenue = revenueTransactions.reduce(
+      (sum, t) => sum + Number(t.amount),
+      0,
+    );
+    const totalExpenses = expenseTransactions.reduce(
+      (sum, t) => sum + Number(t.amount),
+      0,
+    );
     const netProfit = totalRevenue - totalExpenses;
-    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const profitMargin =
+      totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
     // Calculate monthly metrics
     const monthlyRevenueTransactions = this.filterTransactionsByDate(
       revenueTransactions,
       dateRanges.thisMonth.start,
-      dateRanges.thisMonth.end
+      dateRanges.thisMonth.end,
     );
     const monthlyExpenseTransactions = this.filterTransactionsByDate(
       expenseTransactions,
       dateRanges.thisMonth.start,
-      dateRanges.thisMonth.end
+      dateRanges.thisMonth.end,
     );
-    const monthlyRevenue = monthlyRevenueTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const monthlyExpenses = monthlyExpenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const monthlyRevenue = monthlyRevenueTransactions.reduce(
+      (sum, t) => sum + Number(t.amount),
+      0,
+    );
+    const monthlyExpenses = monthlyExpenseTransactions.reduce(
+      (sum, t) => sum + Number(t.amount),
+      0,
+    );
     const monthlyNetProfit = monthlyRevenue - monthlyExpenses;
-    const monthlyProfitMargin = monthlyRevenue > 0 ? (monthlyNetProfit / monthlyRevenue) * 100 : 0;
+    const monthlyProfitMargin =
+      monthlyRevenue > 0 ? (monthlyNetProfit / monthlyRevenue) * 100 : 0;
 
     const totalAssets = assetsData.data?.totalCurrentValue || 0;
     const totalLiabilities = liabilitiesData.data?.totalAmount || 0;
@@ -922,30 +1166,65 @@ export class AnalyticsService {
       unpaidLiabilities: Math.round(unpaidLiabilities * 100) / 100,
       availableCash: Math.round(availableCash * 100) / 100,
       monthlyNetProfit: Math.round(monthlyNetProfit * 100) / 100,
-      monthlyProfitMargin: Math.round(monthlyProfitMargin * 100) / 100
+      monthlyProfitMargin: Math.round(monthlyProfitMargin * 100) / 100,
     };
   }
 
   /**
    * Calculate trend data for graphs
    */
-  private calculateTrends(revenueTransactions: any[], expenseTransactions: any[], liabilityTransactions: any[]): TrendDataDto {
+  private calculateTrends(
+    revenueTransactions: any[],
+    expenseTransactions: any[],
+    liabilityTransactions: any[],
+  ): TrendDataDto {
     // Daily trend (last 30 days)
     const daily: TimeSeriesDataPointDto[] = [];
     const currentDate = this.getCurrentDateInPKT();
     for (let i = 29; i >= 0; i--) {
       const date = new Date(currentDate);
       date.setDate(date.getDate() - i);
-      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-      const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+      const dayStart = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        0,
+        0,
+        0,
+        0,
+      );
+      const dayEnd = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        23,
+        59,
+        59,
+        999,
+      );
 
-      const dayRevenues = this.filterTransactionsByDate(revenueTransactions, dayStart, dayEnd);
-      const dayExpenses = this.filterTransactionsByDate(expenseTransactions, dayStart, dayEnd);
-      const dayLiabilities = this.filterTransactionsByDate(liabilityTransactions, dayStart, dayEnd);
+      const dayRevenues = this.filterTransactionsByDate(
+        revenueTransactions,
+        dayStart,
+        dayEnd,
+      );
+      const dayExpenses = this.filterTransactionsByDate(
+        expenseTransactions,
+        dayStart,
+        dayEnd,
+      );
+      const dayLiabilities = this.filterTransactionsByDate(
+        liabilityTransactions,
+        dayStart,
+        dayEnd,
+      );
 
       const revenue = dayRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
       const expense = dayExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
-      const liability = dayLiabilities.reduce((sum, t) => sum + Number(t.amount), 0);
+      const liability = dayLiabilities.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+      );
 
       daily.push({
         date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
@@ -954,7 +1233,7 @@ export class AnalyticsService {
         liability: Math.round(liability * 100) / 100,
         net: Math.round((revenue - expense) * 100) / 100,
         netProfit: Math.round((revenue - expense) * 100) / 100,
-        count: dayRevenues.length + dayExpenses.length + dayLiabilities.length
+        count: dayRevenues.length + dayExpenses.length + dayLiabilities.length,
       });
     }
 
@@ -962,19 +1241,40 @@ export class AnalyticsService {
     const weekly: TimeSeriesDataPointDto[] = [];
     for (let i = 11; i >= 0; i--) {
       const weekEnd = new Date(currentDate);
-      weekEnd.setDate(weekEnd.getDate() - (i * 7));
+      weekEnd.setDate(weekEnd.getDate() - i * 7);
       const weekStart = new Date(weekEnd);
       weekStart.setDate(weekStart.getDate() - 6);
       weekStart.setHours(0, 0, 0, 0);
       weekEnd.setHours(23, 59, 59, 999);
 
-      const weekRevenues = this.filterTransactionsByDate(revenueTransactions, weekStart, weekEnd);
-      const weekExpenses = this.filterTransactionsByDate(expenseTransactions, weekStart, weekEnd);
-      const weekLiabilities = this.filterTransactionsByDate(liabilityTransactions, weekStart, weekEnd);
+      const weekRevenues = this.filterTransactionsByDate(
+        revenueTransactions,
+        weekStart,
+        weekEnd,
+      );
+      const weekExpenses = this.filterTransactionsByDate(
+        expenseTransactions,
+        weekStart,
+        weekEnd,
+      );
+      const weekLiabilities = this.filterTransactionsByDate(
+        liabilityTransactions,
+        weekStart,
+        weekEnd,
+      );
 
-      const revenue = weekRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
-      const expense = weekExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
-      const liability = weekLiabilities.reduce((sum, t) => sum + Number(t.amount), 0);
+      const revenue = weekRevenues.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+      );
+      const expense = weekExpenses.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+      );
+      const liability = weekLiabilities.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+      );
 
       weekly.push({
         date: `Week ${52 - Math.floor((currentDate.getTime() - weekStart.getTime()) / (7 * 24 * 60 * 60 * 1000))}`,
@@ -983,7 +1283,8 @@ export class AnalyticsService {
         liability: Math.round(liability * 100) / 100,
         net: Math.round((revenue - expense) * 100) / 100,
         netProfit: Math.round((revenue - expense) * 100) / 100,
-        count: weekRevenues.length + weekExpenses.length + weekLiabilities.length
+        count:
+          weekRevenues.length + weekExpenses.length + weekLiabilities.length,
       });
     }
 
@@ -991,19 +1292,40 @@ export class AnalyticsService {
     const monthly: TimeSeriesDataPointDto[] = [];
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth(); // 0-11 (0 = January)
-    
+
     // Loop from January (0) to current month
     for (let month = 0; month <= currentMonth; month++) {
       const monthStart = new Date(currentYear, month, 1, 0, 0, 0, 0);
       const monthEnd = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
 
-      const monthRevenues = this.filterTransactionsByDate(revenueTransactions, monthStart, monthEnd);
-      const monthExpenses = this.filterTransactionsByDate(expenseTransactions, monthStart, monthEnd);
-      const monthLiabilities = this.filterTransactionsByDate(liabilityTransactions, monthStart, monthEnd);
+      const monthRevenues = this.filterTransactionsByDate(
+        revenueTransactions,
+        monthStart,
+        monthEnd,
+      );
+      const monthExpenses = this.filterTransactionsByDate(
+        expenseTransactions,
+        monthStart,
+        monthEnd,
+      );
+      const monthLiabilities = this.filterTransactionsByDate(
+        liabilityTransactions,
+        monthStart,
+        monthEnd,
+      );
 
-      const revenue = monthRevenues.reduce((sum, t) => sum + Number(t.amount), 0);
-      const expense = monthExpenses.reduce((sum, t) => sum + Number(t.amount), 0);
-      const liability = monthLiabilities.reduce((sum, t) => sum + Number(t.amount), 0);
+      const revenue = monthRevenues.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+      );
+      const expense = monthExpenses.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+      );
+      const liability = monthLiabilities.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0,
+      );
 
       monthly.push({
         date: `${currentYear}-${String(month + 1).padStart(2, '0')}`,
@@ -1012,7 +1334,8 @@ export class AnalyticsService {
         liability: Math.round(liability * 100) / 100,
         net: Math.round((revenue - expense) * 100) / 100,
         netProfit: Math.round((revenue - expense) * 100) / 100,
-        count: monthRevenues.length + monthExpenses.length + monthLiabilities.length
+        count:
+          monthRevenues.length + monthExpenses.length + monthLiabilities.length,
       });
     }
 
@@ -1027,35 +1350,50 @@ export class AnalyticsService {
     expenseTransactions: any[],
     revenues: RevenueMetricsDto,
     expenses: ExpenseMetricsDto,
-    summary: FinancialSummaryDto
+    summary: FinancialSummaryDto,
   ): DashboardWidgetsDto {
     const keyMetrics: WidgetMetricDto[] = [
       {
         title: 'Total Revenue',
         value: summary.totalRevenue,
-        previousValue: summary.totalRevenue - revenues.monthOverMonth.current.amount,
+        previousValue:
+          summary.totalRevenue - revenues.monthOverMonth.current.amount,
         changePercent: revenues.monthOverMonth.changePercent,
         trend: revenues.monthOverMonth.trend,
         icon: 'revenue',
-        color: 'green'
+        color: 'green',
       },
       {
         title: 'Total Expenses',
         value: summary.totalExpenses,
-        previousValue: summary.totalExpenses - expenses.monthOverMonth.current.amount,
+        previousValue:
+          summary.totalExpenses - expenses.monthOverMonth.current.amount,
         changePercent: expenses.monthOverMonth.changePercent,
-        trend: expenses.monthOverMonth.trend === 'up' ? 'down' : expenses.monthOverMonth.trend === 'down' ? 'up' : 'neutral',
+        trend:
+          expenses.monthOverMonth.trend === 'up'
+            ? 'down'
+            : expenses.monthOverMonth.trend === 'down'
+              ? 'up'
+              : 'neutral',
         icon: 'expense',
-        color: 'red'
+        color: 'red',
       },
       {
         title: 'Net Profit',
         value: summary.netProfit,
-        previousValue: summary.netProfit - (revenues.monthOverMonth.current.amount - expenses.monthOverMonth.current.amount),
-        changePercent: summary.totalRevenue > 0 ? ((revenues.monthOverMonth.changePercent - expenses.monthOverMonth.changePercent) / 2) : 0,
+        previousValue:
+          summary.netProfit -
+          (revenues.monthOverMonth.current.amount -
+            expenses.monthOverMonth.current.amount),
+        changePercent:
+          summary.totalRevenue > 0
+            ? (revenues.monthOverMonth.changePercent -
+                expenses.monthOverMonth.changePercent) /
+              2
+            : 0,
         trend: summary.netProfit > 0 ? 'up' : 'down',
         icon: 'profit',
-        color: summary.netProfit > 0 ? 'green' : 'red'
+        color: summary.netProfit > 0 ? 'green' : 'red',
       },
       {
         title: 'Profit Margin',
@@ -1064,24 +1402,32 @@ export class AnalyticsService {
         changePercent: 5,
         trend: summary.profitMargin > 0 ? 'up' : 'down',
         icon: 'margin',
-        color: summary.profitMargin > 20 ? 'green' : summary.profitMargin > 10 ? 'yellow' : 'red'
-      }
+        color:
+          summary.profitMargin > 20
+            ? 'green'
+            : summary.profitMargin > 10
+              ? 'yellow'
+              : 'red',
+      },
     ];
 
     // Revenue breakdown
-    const revenueBreakdown: CategoryBreakdownDto[] = revenues.topCategories.slice(0, 5);
+    const revenueBreakdown: CategoryBreakdownDto[] =
+      revenues.topCategories.slice(0, 5);
 
     // Expense breakdown
-    const expenseBreakdown: CategoryBreakdownDto[] = expenses.topCategories.slice(0, 5);
+    const expenseBreakdown: CategoryBreakdownDto[] =
+      expenses.topCategories.slice(0, 5);
 
     // Payment method distribution
-    const paymentMethodDistribution: CategoryBreakdownDto[] = expenses.topPaymentMethods;
+    const paymentMethodDistribution: CategoryBreakdownDto[] =
+      expenses.topPaymentMethods;
 
     return {
       keyMetrics,
       revenueBreakdown,
       expenseBreakdown,
-      paymentMethodDistribution
+      paymentMethodDistribution,
     };
   }
 }

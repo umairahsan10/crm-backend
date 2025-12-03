@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 
 @Injectable()
@@ -9,7 +14,7 @@ export class ArchivedLeadsAccessGuard implements CanActivate {
     console.log('🔍 ArchivedLeadsAccessGuard - canActivate called');
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    
+
     console.log('🔍 ArchivedLeadsAccessGuard - user:', user);
     console.log('🔍 ArchivedLeadsAccessGuard - user type:', typeof user);
 
@@ -29,9 +34,9 @@ export class ArchivedLeadsAccessGuard implements CanActivate {
       where: { id: user.id },
       include: {
         department: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     });
 
     if (!employee) {
@@ -42,16 +47,23 @@ export class ArchivedLeadsAccessGuard implements CanActivate {
 
     // Check if user can access archived leads (sales department required)
     if (departmentName !== 'Sales') {
-      throw new ForbiddenException('Access denied. Only sales department users can access archived leads.');
+      throw new ForbiddenException(
+        'Access denied. Only sales department users can access archived leads.',
+      );
     }
 
     // Check if user has the required role for archived leads access
     const allowedRoles = ['dep_manager', 'unit_head'];
     if (!allowedRoles.includes(user.role)) {
-      throw new ForbiddenException('Access denied. Only admin, department manager, and unit head can access archived leads.');
+      throw new ForbiddenException(
+        'Access denied. Only admin, department manager, and unit head can access archived leads.',
+      );
     }
 
-    console.log('🔍 ArchivedLeadsAccessGuard - Access granted for role:', user.role);
+    console.log(
+      '🔍 ArchivedLeadsAccessGuard - Access granted for role:',
+      user.role,
+    );
     return true;
   }
 }

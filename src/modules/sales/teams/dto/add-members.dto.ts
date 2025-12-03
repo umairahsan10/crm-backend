@@ -7,7 +7,7 @@ export class SalesAddMembersDto {
     example: [123, 456, 789],
     type: [Number],
     minItems: 1,
-    maxItems: 20
+    maxItems: 20,
   })
   @IsArray()
   @IsNumber({}, { each: true })

@@ -1,17 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../../prisma/prisma.service';
-import { Prisma, TransactionType, TransactionStatus, PaymentWays, PaymentMethod } from '@prisma/client';
+import {
+  Prisma,
+  TransactionType,
+  TransactionStatus,
+  PaymentWays,
+  PaymentMethod,
+} from '@prisma/client';
 import { CreateRevenueDto } from './dto/create-revenue.dto';
 import { UpdateRevenueDto } from './dto/update-revenue.dto';
-import { 
-  RevenueResponseDto, 
-  TransactionResponseDto, 
-  LeadResponseDto, 
+import {
+  RevenueResponseDto,
+  TransactionResponseDto,
+  LeadResponseDto,
   InvoiceResponseDto,
   RevenueListResponseDto,
   RevenueCreateResponseDto,
   RevenueUpdateResponseDto,
-  RevenueSingleResponseDto
+  RevenueSingleResponseDto,
 } from './dto/revenue-response.dto';
 
 export interface ErrorResponseDto {
@@ -26,7 +32,10 @@ export class RevenueService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async createRevenue(dto: CreateRevenueDto, currentUserId: number): Promise<RevenueCreateResponseDto | ErrorResponseDto> {
+  async createRevenue(
+    dto: CreateRevenueDto,
+    currentUserId: number,
+  ): Promise<RevenueCreateResponseDto | ErrorResponseDto> {
     try {
       // Validate inputs first
       const validationResult = await this.validateRevenueInputs(dto);
@@ -37,14 +46,14 @@ export class RevenueService {
       // Determine source and lead ID logic
       let finalSource = dto.source;
       let finalReceivedFrom = dto.receivedFrom;
-      let finalRelatedInvoiceId = dto.relatedInvoiceId;
+      const finalRelatedInvoiceId = dto.relatedInvoiceId;
 
       // Logic: If receivedFrom is provided, relatedInvoiceId is required
       if (dto.receivedFrom && !dto.relatedInvoiceId) {
         return {
           status: 'error',
           message: 'If lead ID is provided, invoice ID is required',
-          error_code: 'INVALID_INPUT'
+          error_code: 'INVALID_INPUT',
         };
       }
 
@@ -52,7 +61,7 @@ export class RevenueService {
       if (!dto.receivedFrom && dto.relatedInvoiceId) {
         const invoice = await this.prisma.invoice.findUnique({
           where: { id: dto.relatedInvoiceId },
-          include: { lead: true }
+          include: { lead: true },
         });
         if (invoice && invoice.lead) {
           finalReceivedFrom = invoice.lead.id;
@@ -68,7 +77,9 @@ export class RevenueService {
       // Use Prisma transaction to ensure data consistency
       const result = await this.prisma.$transaction(async (prisma) => {
         const currentDate = this.getCurrentDateInPKT();
-        const receivedOn = dto.receivedOn ? new Date(dto.receivedOn) : currentDate;
+        const receivedOn = dto.receivedOn
+          ? new Date(dto.receivedOn)
+          : currentDate;
 
         let transaction;
 
@@ -77,20 +88,22 @@ export class RevenueService {
           // Update existing transaction status to completed
           transaction = await prisma.transaction.update({
             where: { id: dto.transactionId },
-            data: { status: TransactionStatus.completed }
+            data: { status: TransactionStatus.completed },
           });
         } else {
           // 1. Create transaction record first
           // Get the next available ID (largest ID + 1)
           const maxTransactionId = await prisma.transaction.aggregate({
-            _max: { id: true }
+            _max: { id: true },
           });
           const nextTransactionId = (maxTransactionId._max.id || 0) + 1;
 
           // Determine transaction notes based on the scenario
           let transactionNotes = '';
           if (finalReceivedFrom && finalRelatedInvoiceId) {
-            const lead = await prisma.lead.findUnique({ where: { id: finalReceivedFrom } });
+            const lead = await prisma.lead.findUnique({
+              where: { id: finalReceivedFrom },
+            });
             transactionNotes = `Revenue from Lead: ${lead?.name || 'Unknown'} - ${dto.category}`;
           } else if (finalRelatedInvoiceId) {
             transactionNotes = `Revenue from Invoice: ${finalRelatedInvoiceId} - ${dto.category}`;
@@ -106,7 +119,9 @@ export class RevenueService {
               invoiceId: finalRelatedInvoiceId || null,
               amount: new Prisma.Decimal(dto.amount),
               transactionType: TransactionType.payment,
-              paymentMethod: dto.paymentMethod ? this.mapPaymentMethodToPaymentWays(dto.paymentMethod) : PaymentWays.bank,
+              paymentMethod: dto.paymentMethod
+                ? this.mapPaymentMethodToPaymentWays(dto.paymentMethod)
+                : PaymentWays.bank,
               transactionDate: currentDate,
               status: TransactionStatus.completed,
               notes: transactionNotes,
@@ -117,7 +132,7 @@ export class RevenueService {
         // 2. Create revenue record
         // Get the next available ID (largest ID + 1)
         const maxRevenueId = await prisma.revenue.aggregate({
-          _max: { id: true }
+          _max: { id: true },
         });
         const nextRevenueId = (maxRevenueId._max.id || 0) + 1;
 
@@ -129,7 +144,8 @@ export class RevenueService {
             amount: new Prisma.Decimal(dto.amount),
             receivedFrom: finalReceivedFrom,
             receivedOn: receivedOn,
-            paymentMethod: this.mapToPaymentMethod(dto.paymentMethod) || PaymentMethod.bank,
+            paymentMethod:
+              this.mapToPaymentMethod(dto.paymentMethod) || PaymentMethod.bank,
             relatedInvoiceId: finalRelatedInvoiceId,
             createdBy: currentUserId,
             transactionId: transaction.id,
@@ -171,29 +187,31 @@ export class RevenueService {
       };
     } catch (error) {
       this.logger.error(`Error creating revenue: ${error.message}`);
-      
+
       // Handle specific database errors
       if (error.code === 'P2002') {
         return {
           status: 'error',
           message: 'A revenue record with this ID already exists',
-          error_code: 'DUPLICATE_ID'
+          error_code: 'DUPLICATE_ID',
         };
       }
-      
+
       if (error.code === 'P2003') {
         return {
           status: 'error',
           message: 'Invalid reference: One of the provided IDs does not exist',
-          error_code: 'INVALID_REFERENCE'
+          error_code: 'INVALID_REFERENCE',
         };
       }
-      
+
       return this.getErrorMessage('creating revenue', error);
     }
   }
 
-  async getAllRevenues(query: any): Promise<RevenueListResponseDto | ErrorResponseDto> {
+  async getAllRevenues(
+    query: any,
+  ): Promise<RevenueListResponseDto | ErrorResponseDto> {
     try {
       const {
         category,
@@ -259,12 +277,21 @@ export class RevenueService {
         whereClause.OR = [
           { source: { contains: query.search, mode: 'insensitive' } },
           { category: { contains: query.search, mode: 'insensitive' } },
-          { transaction: { client: { companyName: { contains: query.search, mode: 'insensitive' } } } }
+          {
+            transaction: {
+              client: {
+                companyName: { contains: query.search, mode: 'insensitive' },
+              },
+            },
+          },
         ];
       }
 
       console.log('Revenue filters:', query);
-      console.log('Generated where clause:', JSON.stringify(whereClause, null, 2));
+      console.log(
+        'Generated where clause:',
+        JSON.stringify(whereClause, null, 2),
+      );
 
       const [revenues, total] = await Promise.all([
         this.prisma.revenue.findMany({
@@ -304,38 +331,40 @@ export class RevenueService {
       return {
         status: 'success',
         message: 'Revenues retrieved successfully',
-        data: revenues.map(revenue => this.mapRevenueToResponse(revenue)),
+        data: revenues.map((revenue) => this.mapRevenueToResponse(revenue)),
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
           total,
           totalPages: Math.ceil(total / parseInt(limit)),
-          retrieved: revenues.length
-        }
+          retrieved: revenues.length,
+        },
       };
     } catch (error) {
       this.logger.error(`Error retrieving revenues: ${error.message}`);
-      
+
       // Handle specific database errors
       if (error.code === 'P2003') {
         return {
           status: 'error',
           message: 'Invalid reference in filter criteria',
-          error_code: 'INVALID_FILTER'
+          error_code: 'INVALID_FILTER',
         };
       }
-      
+
       return this.getErrorMessage('retrieving revenues', error);
     }
   }
 
-  async getRevenueById(id: number): Promise<RevenueSingleResponseDto | ErrorResponseDto> {
+  async getRevenueById(
+    id: number,
+  ): Promise<RevenueSingleResponseDto | ErrorResponseDto> {
     try {
       if (!id) {
         return {
           status: 'error',
           message: 'Revenue ID is required',
-          error_code: 'MISSING_ID'
+          error_code: 'MISSING_ID',
         };
       }
 
@@ -370,7 +399,7 @@ export class RevenueService {
         return {
           status: 'error',
           message: 'Revenue not found',
-          error_code: 'NOT_FOUND'
+          error_code: 'NOT_FOUND',
         };
       }
 
@@ -381,41 +410,43 @@ export class RevenueService {
       };
     } catch (error) {
       this.logger.error(`Error retrieving revenue: ${error.message}`);
-      
+
       // Handle specific database errors
       if (error.code === 'P2003') {
         return {
           status: 'error',
           message: 'Invalid revenue ID provided',
-          error_code: 'INVALID_ID'
+          error_code: 'INVALID_ID',
         };
       }
-      
+
       return this.getErrorMessage('retrieving revenue', error);
     }
   }
 
-  async updateRevenue(dto: UpdateRevenueDto): Promise<RevenueUpdateResponseDto | ErrorResponseDto> {
+  async updateRevenue(
+    dto: UpdateRevenueDto,
+  ): Promise<RevenueUpdateResponseDto | ErrorResponseDto> {
     try {
       if (!dto.revenue_id) {
         return {
           status: 'error',
           message: 'Revenue ID is required',
-          error_code: 'MISSING_ID'
+          error_code: 'MISSING_ID',
         };
       }
 
       // Check if revenue exists
       const existingRevenue = await this.prisma.revenue.findUnique({
         where: { id: dto.revenue_id },
-        include: { transaction: true }
+        include: { transaction: true },
       });
 
       if (!existingRevenue) {
         return {
           status: 'error',
           message: 'Revenue not found',
-          error_code: 'NOT_FOUND'
+          error_code: 'NOT_FOUND',
         };
       }
 
@@ -441,11 +472,16 @@ export class RevenueService {
 
         if (dto.source !== undefined) updateData.source = dto.source;
         if (dto.category !== undefined) updateData.category = dto.category;
-        if (dto.amount !== undefined) updateData.amount = new Prisma.Decimal(dto.amount);
-        if (dto.receivedFrom !== undefined) updateData.receivedFrom = dto.receivedFrom;
-        if (dto.receivedOn !== undefined) updateData.receivedOn = new Date(dto.receivedOn);
-        if (dto.paymentMethod !== undefined) updateData.paymentMethod = this.mapToPaymentMethod(dto.paymentMethod);
-        if (dto.relatedInvoiceId !== undefined) updateData.relatedInvoiceId = dto.relatedInvoiceId;
+        if (dto.amount !== undefined)
+          updateData.amount = new Prisma.Decimal(dto.amount);
+        if (dto.receivedFrom !== undefined)
+          updateData.receivedFrom = dto.receivedFrom;
+        if (dto.receivedOn !== undefined)
+          updateData.receivedOn = new Date(dto.receivedOn);
+        if (dto.paymentMethod !== undefined)
+          updateData.paymentMethod = this.mapToPaymentMethod(dto.paymentMethod);
+        if (dto.relatedInvoiceId !== undefined)
+          updateData.relatedInvoiceId = dto.relatedInvoiceId;
 
         // Update revenue
         const updatedRevenue = await prisma.revenue.update({
@@ -478,7 +514,14 @@ export class RevenueService {
 
         // Update transaction if necessary
         let updatedTransaction: any = null;
-        if (dto.amount || dto.receivedFrom !== undefined || dto.relatedInvoiceId !== undefined || dto.paymentMethod || dto.source || dto.category) {
+        if (
+          dto.amount ||
+          dto.receivedFrom !== undefined ||
+          dto.relatedInvoiceId !== undefined ||
+          dto.paymentMethod ||
+          dto.source ||
+          dto.category
+        ) {
           const transactionUpdateData: any = {
             updatedAt: currentDate,
           };
@@ -495,24 +538,30 @@ export class RevenueService {
           }
 
           if (dto.paymentMethod) {
-            transactionUpdateData.paymentMethod = this.mapPaymentMethodToPaymentWays(dto.paymentMethod);
+            transactionUpdateData.paymentMethod =
+              this.mapPaymentMethodToPaymentWays(dto.paymentMethod);
           }
 
           if (dto.source || dto.category) {
             const newSource = dto.source || updatedRevenue.source;
             const newCategory = dto.category || updatedRevenue.category;
-            
+
             // Determine transaction notes based on the scenario
             let transactionNotes = '';
-            if (updatedRevenue.receivedFrom && updatedRevenue.relatedInvoiceId) {
-              const lead = await prisma.lead.findUnique({ where: { id: updatedRevenue.receivedFrom } });
+            if (
+              updatedRevenue.receivedFrom &&
+              updatedRevenue.relatedInvoiceId
+            ) {
+              const lead = await prisma.lead.findUnique({
+                where: { id: updatedRevenue.receivedFrom },
+              });
               transactionNotes = `Revenue from Lead: ${lead?.name || 'Unknown'} - ${newCategory}`;
             } else if (updatedRevenue.relatedInvoiceId) {
               transactionNotes = `Revenue from Invoice: ${updatedRevenue.relatedInvoiceId} - ${newCategory}`;
             } else {
               transactionNotes = `Admin Revenue Entry: ${newSource} - ${newCategory}`;
             }
-            
+
             transactionUpdateData.notes = transactionNotes;
           }
 
@@ -527,71 +576,75 @@ export class RevenueService {
         return { revenue: updatedRevenue, transaction: updatedTransaction };
       });
 
-              const responseData: any = {
-          revenue: this.mapRevenueToResponse(result.revenue),
-        };
-        
-        if (result.transaction) {
-          responseData.transaction = this.mapTransactionToResponse(result.transaction);
-        }
+      const responseData: any = {
+        revenue: this.mapRevenueToResponse(result.revenue),
+      };
 
-        return {
-          status: 'success',
-          message: 'Revenue updated successfully',
-          data: responseData,
-        };
+      if (result.transaction) {
+        responseData.transaction = this.mapTransactionToResponse(
+          result.transaction,
+        );
+      }
+
+      return {
+        status: 'success',
+        message: 'Revenue updated successfully',
+        data: responseData,
+      };
     } catch (error) {
       this.logger.error(`Error updating revenue: ${error.message}`);
-      
+
       // Handle specific database errors
       if (error.code === 'P2002') {
         return {
           status: 'error',
           message: 'A revenue record with this ID already exists',
-          error_code: 'DUPLICATE_ID'
+          error_code: 'DUPLICATE_ID',
         };
       }
-      
+
       if (error.code === 'P2003') {
         return {
           status: 'error',
           message: 'Invalid reference: One of the provided IDs does not exist',
-          error_code: 'INVALID_REFERENCE'
+          error_code: 'INVALID_REFERENCE',
         };
       }
-      
+
       if (error.code === 'P2025') {
         return {
           status: 'error',
           message: 'Revenue record not found for update',
-          error_code: 'NOT_FOUND'
+          error_code: 'NOT_FOUND',
         };
       }
-      
+
       return this.getErrorMessage('updating revenue', error);
     }
   }
 
-  private async validateRevenueInputs(dto: any): Promise<ErrorResponseDto | null> {
+  private async validateRevenueInputs(
+    dto: any,
+  ): Promise<ErrorResponseDto | null> {
     // Validate lead exists and is completed if provided
     if (dto.receivedFrom) {
       const lead = await this.prisma.lead.findUnique({
-        where: { id: dto.receivedFrom }
+        where: { id: dto.receivedFrom },
       });
       if (!lead) {
         return {
           status: 'error',
           message: 'Lead not found',
-          error_code: 'LEAD_NOT_FOUND'
+          error_code: 'LEAD_NOT_FOUND',
         };
       }
-      
+
       // Check if lead status is completed
       if (lead.status !== 'completed') {
         return {
           status: 'error',
           message: 'Revenue can only be recorded for completed leads',
-          error_code: 'LEAD_NOT_COMPLETED'
+          error_code: 'LEAD_NOT_COMPLETED',
         };
       }
     }
@@ -600,13 +653,13 @@ export class RevenueService {
     if (dto.relatedInvoiceId) {
       const invoice = await this.prisma.invoice.findUnique({
         where: { id: dto.relatedInvoiceId },
-        include: { lead: true }
+        include: { lead: true },
       });
       if (!invoice) {
         return {
           status: 'error',
           message: 'Invoice not found',
-          error_code: 'INVOICE_NOT_FOUND'
+          error_code: 'INVOICE_NOT_FOUND',
         };
       }
 
@@ -615,7 +668,7 @@ export class RevenueService {
         return {
           status: 'error',
           message: 'Lead ID does not match invoice lead ID',
-          error_code: 'LEAD_INVOICE_MISMATCH'
+          error_code: 'LEAD_INVOICE_MISMATCH',
         };
       }
     }
@@ -644,16 +697,18 @@ export class RevenueService {
    * Maps string or PaymentMethod enum to PaymentMethod enum
    * Handles both string values and enum values
    */
-  private mapToPaymentMethod(paymentMethod?: PaymentMethod | string): PaymentMethod {
+  private mapToPaymentMethod(
+    paymentMethod?: PaymentMethod | string,
+  ): PaymentMethod {
     if (!paymentMethod) {
       return PaymentMethod.bank;
     }
-    
+
     // If it's already a PaymentMethod enum value, return it
     if (Object.values(PaymentMethod).includes(paymentMethod as PaymentMethod)) {
       return paymentMethod as PaymentMethod;
     }
-    
+
     // Map string values to enum
     const method = String(paymentMethod).toLowerCase();
     switch (method) {
@@ -696,7 +751,9 @@ export class RevenueService {
       invoiceId: transaction.invoiceId,
       createdAt: transaction.createdAt.toISOString(),
       updatedAt: transaction.updatedAt.toISOString(),
-      client: transaction.client ? this.mapClientToResponse(transaction.client) : null,
+      client: transaction.client
+        ? this.mapClientToResponse(transaction.client)
+        : null,
     };
   }
 
@@ -740,7 +797,9 @@ export class RevenueService {
       transactionId: revenue.transactionId,
       createdAt: revenue.createdAt.toISOString(),
       updatedAt: revenue.updatedAt.toISOString(),
-      transaction: revenue.transaction ? this.mapTransactionToResponse(revenue.transaction) : null,
+      transaction: revenue.transaction
+        ? this.mapTransactionToResponse(revenue.transaction)
+        : null,
       lead: this.mapLeadToResponse(revenue.lead),
       invoice: this.mapInvoiceToResponse(revenue.invoice),
       employee: revenue.employee ? { id: revenue.employee.id } : null,
@@ -758,7 +817,11 @@ export class RevenueService {
   async getRevenueStats(): Promise<any> {
     try {
       const currentDate = this.getCurrentDateInPKT();
-      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const firstDayOfMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      );
 
       // Get all revenues
       const allRevenues = await this.prisma.revenue.findMany({
@@ -774,11 +837,17 @@ export class RevenueService {
 
       // Total count and sum
       const totalRevenue = allRevenues.length;
-      const totalAmount = allRevenues.reduce((sum, rev) => sum + Number(rev.amount), 0);
+      const totalAmount = allRevenues.reduce(
+        (sum, rev) => sum + Number(rev.amount),
+        0,
+      );
       const averageRevenue = totalRevenue > 0 ? totalAmount / totalRevenue : 0;
 
       // Breakdown by category
-      const categoryBreakdown: Record<string, { count: number; amount: number }> = {};
+      const categoryBreakdown: Record<
+        string,
+        { count: number; amount: number }
+      > = {};
       allRevenues.forEach((rev) => {
         const category = rev.category || 'Uncategorized';
         if (!categoryBreakdown[category]) {
@@ -789,7 +858,8 @@ export class RevenueService {
       });
 
       // Breakdown by source
-      const sourceBreakdown: Record<string, { count: number; amount: number }> = {};
+      const sourceBreakdown: Record<string, { count: number; amount: number }> =
+        {};
       allRevenues.forEach((rev) => {
         const source = rev.source || 'Unknown';
         if (!sourceBreakdown[source]) {
@@ -800,7 +870,10 @@ export class RevenueService {
       });
 
       // Breakdown by payment method
-      const paymentMethodBreakdown: Record<string, { count: number; amount: number }> = {};
+      const paymentMethodBreakdown: Record<
+        string,
+        { count: number; amount: number }
+      > = {};
       allRevenues.forEach((rev) => {
         const method = rev.paymentMethod || 'unknown';
         if (!paymentMethodBreakdown[method]) {
@@ -812,13 +885,19 @@ export class RevenueService {
 
       // This month's stats
       const thisMonthRevenues = allRevenues.filter(
-        (rev) => rev.createdAt >= firstDayOfMonth
+        (rev) => rev.createdAt >= firstDayOfMonth,
       );
       const thisMonthCount = thisMonthRevenues.length;
-      const thisMonthAmount = thisMonthRevenues.reduce((sum, rev) => sum + Number(rev.amount), 0);
+      const thisMonthAmount = thisMonthRevenues.reduce(
+        (sum, rev) => sum + Number(rev.amount),
+        0,
+      );
 
       // Top revenue generators
-      const leadRevenues: Record<number, { name: string; amount: number; count: number }> = {};
+      const leadRevenues: Record<
+        number,
+        { name: string; amount: number; count: number }
+      > = {};
       allRevenues.forEach((rev) => {
         if (rev.receivedFrom && rev.lead) {
           if (!leadRevenues[rev.receivedFrom]) {
@@ -861,7 +940,9 @@ export class RevenueService {
         },
       };
     } catch (error) {
-      this.logger.error(`Error retrieving revenue statistics: ${error.message}`);
+      this.logger.error(
+        `Error retrieving revenue statistics: ${error.message}`,
+      );
       return {
         status: 'error',
         message: 'An error occurred while retrieving revenue statistics',

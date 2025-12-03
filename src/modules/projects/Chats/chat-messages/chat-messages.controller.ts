@@ -1,4 +1,18 @@
-import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus, Request, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  ParseIntPipe,
+  Query,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ChatMessagesService } from './chat-messages.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
@@ -31,39 +45,66 @@ export class ChatMessagesController {
     @Param('chatId', ParseIntPipe) chatId: number,
     @Request() req,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string
+    @Query('offset') offset?: string,
   ) {
-    console.log('🎯 [CONTROLLER] GET /chat-messages/chat/:chatId - Getting messages by chat ID');
+    console.log(
+      '🎯 [CONTROLLER] GET /chat-messages/chat/:chatId - Getting messages by chat ID',
+    );
     console.log('💬 [CONTROLLER] Chat ID:', chatId);
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
-    console.log('📊 [CONTROLLER] Pagination - Limit:', limit || 'default(50)', 'Offset:', offset || '0');
-    
+    console.log(
+      '📊 [CONTROLLER] Pagination - Limit:',
+      limit || 'default(50)',
+      'Offset:',
+      offset || '0',
+    );
+
     const limitNum = limit ? parseInt(limit, 10) : undefined;
     const offsetNum = offset ? parseInt(offset, 10) : undefined;
-    
-    const result = await this.chatMessagesService.getChatMessagesByChatId(chatId, req.user.id, limitNum, offsetNum);
-    console.log('✅ [CONTROLLER] Successfully retrieved', result.messages.length, 'messages');
+
+    const result = await this.chatMessagesService.getChatMessagesByChatId(
+      chatId,
+      req.user.id,
+      limitNum,
+      offsetNum,
+    );
+    console.log(
+      '✅ [CONTROLLER] Successfully retrieved',
+      result.messages.length,
+      'messages',
+    );
     return result;
   }
 
   @Get('chat/:chatId/latest')
-  async getLatestMessageByChatId(@Param('chatId', ParseIntPipe) chatId: number) {
+  async getLatestMessageByChatId(
+    @Param('chatId', ParseIntPipe) chatId: number,
+  ) {
     return this.chatMessagesService.getLatestMessageByChatId(chatId);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createChatMessage(@Body() createChatMessageDto: CreateChatMessageDto, @Request() req) {
+  async createChatMessage(
+    @Body() createChatMessageDto: CreateChatMessageDto,
+    @Request() req,
+  ) {
     console.log('🎯 [CONTROLLER] POST /chat-messages - Creating new message');
     console.log('📥 [CONTROLLER] Request Body:', createChatMessageDto);
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
-    const result = await this.chatMessagesService.createChatMessage(createChatMessageDto, req.user.id);
-    console.log('✅ [CONTROLLER] Successfully created message ID:', result.data.id);
-    
+    const result = await this.chatMessagesService.createChatMessage(
+      createChatMessageDto,
+      req.user.id,
+    );
+    console.log(
+      '✅ [CONTROLLER] Successfully created message ID:',
+      result.data.id,
+    );
+
     // Emit socket event for real-time update
     this.chatGateway.emitNewMessage(createChatMessageDto.chatId, result.data);
     console.log('📡 [CONTROLLER] Emitted socket event for new message');
-    
+
     return result;
   }
 
@@ -71,19 +112,26 @@ export class ChatMessagesController {
   async updateChatMessage(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateChatMessageDto: UpdateChatMessageDto,
-    @Request() req
+    @Request() req,
   ) {
     console.log('🎯 [CONTROLLER] PUT /chat-messages/:id - Updating message');
     console.log('🆔 [CONTROLLER] Message ID:', id);
     console.log('📥 [CONTROLLER] Update Data:', updateChatMessageDto);
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
-    const result = await this.chatMessagesService.updateChatMessage(id, updateChatMessageDto, req.user.id);
-    console.log('✅ [CONTROLLER] Successfully updated message ID:', result.data.id);
-    
+    const result = await this.chatMessagesService.updateChatMessage(
+      id,
+      updateChatMessageDto,
+      req.user.id,
+    );
+    console.log(
+      '✅ [CONTROLLER] Successfully updated message ID:',
+      result.data.id,
+    );
+
     // Emit socket event for real-time update
     this.chatGateway.emitMessageUpdate(result.data.chatId, result.data);
     console.log('📡 [CONTROLLER] Emitted socket event for message update');
-    
+
     return result;
   }
 
@@ -91,23 +139,26 @@ export class ChatMessagesController {
   @HttpCode(HttpStatus.OK)
   async deleteChatMessage(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req
+    @Request() req,
   ) {
     console.log('🎯 [CONTROLLER] DELETE /chat-messages/:id - Deleting message');
     console.log('🆔 [CONTROLLER] Message ID:', id);
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
-    
+
     // Get message details before deletion to get chatId
     const message = await this.chatMessagesService.getChatMessageById(id);
     const chatId = message.chatId;
-    
-    const result = await this.chatMessagesService.deleteChatMessage(id, req.user.id);
+
+    const result = await this.chatMessagesService.deleteChatMessage(
+      id,
+      req.user.id,
+    );
     console.log('✅ [CONTROLLER] Successfully deleted message');
-    
+
     // Emit socket event for real-time update
     this.chatGateway.emitMessageDelete(chatId, id);
     console.log('📡 [CONTROLLER] Emitted socket event for message deletion');
-    
+
     return result;
   }
 }

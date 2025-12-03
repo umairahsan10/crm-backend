@@ -4,7 +4,10 @@ export class PnLResponseDto {
   @ApiProperty({ example: 'success', description: 'Response status' })
   status: 'success' | 'error';
 
-  @ApiProperty({ example: 'PnL calculated successfully', description: 'Response message' })
+  @ApiProperty({
+    example: 'PnL calculated successfully',
+    description: 'Response message',
+  })
   message: string;
 
   @ApiPropertyOptional({
@@ -16,8 +19,8 @@ export class PnLResponseDto {
       totalIncome: 50000,
       totalExpenses: 30000,
       netProfit: 20000,
-      calculationDate: '2025-10-14T12:00:00.000Z'
-    }
+      calculationDate: '2025-10-14T12:00:00.000Z',
+    },
   })
   data?: {
     month: string;
@@ -28,6 +31,9 @@ export class PnLResponseDto {
     calculationDate: string;
   };
 
-  @ApiPropertyOptional({ example: 'CALCULATION_ERROR', description: 'Error code if any' })
+  @ApiPropertyOptional({
+    example: 'CALCULATION_ERROR',
+    description: 'Error code if any',
+  })
   error_code?: string;
-} 
+}

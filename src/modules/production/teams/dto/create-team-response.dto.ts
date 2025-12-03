@@ -4,7 +4,10 @@ export class CreateTeamResponseDto {
   @ApiProperty({ description: 'Success status', example: true })
   success: boolean;
 
-  @ApiProperty({ description: 'Success message', example: 'Team "Development Team A" created successfully' })
+  @ApiProperty({
+    description: 'Success message',
+    example: 'Team "Development Team A" created successfully',
+  })
   message: string;
 
   @ApiProperty({ description: 'Created team data' })

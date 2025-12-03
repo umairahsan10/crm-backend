@@ -19,31 +19,53 @@ export class LateLogResponseDto {
   @ApiProperty({ description: 'Number of minutes the employee was late' })
   minutes_late: number;
 
-  @ApiProperty({ description: 'Reason provided by the employee for being late' })
+  @ApiProperty({
+    description: 'Reason provided by the employee for being late',
+  })
   reason: string;
 
-  @ApiProperty({ type: Boolean, nullable: true, description: 'Indicates whether the late entry was justified' })
+  @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description: 'Indicates whether the late entry was justified',
+  })
   justified: boolean | null;
 
-  @ApiProperty({ enum: ['paid', 'unpaid'], nullable: true, description: 'Type of late entry (paid or unpaid)' })
+  @ApiProperty({
+    enum: ['paid', 'unpaid'],
+    nullable: true,
+    description: 'Type of late entry (paid or unpaid)',
+  })
   late_type: 'paid' | 'unpaid' | null;
 
-  @ApiProperty({ enum: ['Created', 'Pending', 'Completed'], description: 'Current status of the late log process' })
+  @ApiProperty({
+    enum: ['Created', 'Pending', 'Completed'],
+    description: 'Current status of the late log process',
+  })
   action_taken: 'Created' | 'Pending' | 'Completed';
 
-  @ApiProperty({ type: Number, nullable: true, description: 'Reviewer ID who reviewed this late entry, if applicable' })
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Reviewer ID who reviewed this late entry, if applicable',
+  })
   reviewed_by: number | null;
 
-  @ApiProperty({ description: 'Timestamp when the record was created (ISO 8601)' })
+  @ApiProperty({
+    description: 'Timestamp when the record was created (ISO 8601)',
+  })
   created_at: string;
 
-  @ApiProperty({ description: 'Timestamp when the record was last updated (ISO 8601)' })
+  @ApiProperty({
+    description: 'Timestamp when the record was last updated (ISO 8601)',
+  })
   updated_at: string;
 
   @ApiProperty({
     type: () => Object,
     required: false,
-    description: 'Attendance table updates applied when the action is marked as Completed',
+    description:
+      'Attendance table updates applied when the action is marked as Completed',
     example: { late_days: 5, monthly_lates: 2 },
   })
   attendance_updates?: {

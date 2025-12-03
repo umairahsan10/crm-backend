@@ -8,6 +8,6 @@ import { DepartmentsGuard } from '../../common/guards/departments.guard';
 @Module({
   controllers: [CampaignController],
   providers: [CampaignService, JwtAuthGuard, DepartmentsGuard],
-  exports: [CampaignService]
+  exports: [CampaignService],
 })
 export class CampaignModule {}

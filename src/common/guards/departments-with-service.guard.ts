@@ -65,4 +65,4 @@ export class DepartmentsWithServiceGuard implements CanActivate {
 
     throw new ForbiddenException('Invalid department information');
   }
-} 
+}

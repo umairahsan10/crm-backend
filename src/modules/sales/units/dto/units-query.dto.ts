@@ -1,49 +1,81 @@
-import { IsOptional, IsNumber, IsBoolean, IsString, IsIn, Min, Max } from 'class-validator';
+import {
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsString,
+  IsIn,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SalesUnitsQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by specific unit ID', example: 1 })
+  @ApiPropertyOptional({
+    description: 'Filter by specific unit ID',
+    example: 1,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   unitId?: number;
 
-  @ApiPropertyOptional({ description: 'Filter units that have a head assigned', example: true })
+  @ApiPropertyOptional({
+    description: 'Filter units that have a head assigned',
+    example: true,
+  })
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
   hasHead?: boolean;
 
-  @ApiPropertyOptional({ description: 'Filter units that have teams assigned', example: true })
+  @ApiPropertyOptional({
+    description: 'Filter units that have teams assigned',
+    example: true,
+  })
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
   hasTeams?: boolean;
 
-  @ApiPropertyOptional({ description: 'Filter units that have leads assigned', example: true })
+  @ApiPropertyOptional({
+    description: 'Filter units that have leads assigned',
+    example: true,
+  })
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
   hasLeads?: boolean;
 
-  @ApiPropertyOptional({ description: 'Filter units that have employees assigned', example: true })
+  @ApiPropertyOptional({
+    description: 'Filter units that have employees assigned',
+    example: true,
+  })
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
   hasEmployees?: boolean;
 
-  @ApiPropertyOptional({ description: 'Filter by unit head email (partial match)', example: 'head@company.com' })
+  @ApiPropertyOptional({
+    description: 'Filter by unit head email (partial match)',
+    example: 'head@company.com',
+  })
   @IsOptional()
   @IsString()
   headEmail?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by unit head name (firstName or lastName, partial)', example: 'john' })
+  @ApiPropertyOptional({
+    description: 'Filter by unit head name (firstName or lastName, partial)',
+    example: 'john',
+  })
   @IsOptional()
   @IsString()
   headName?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by unit name (partial match)', example: 'north' })
+  @ApiPropertyOptional({
+    description: 'Filter by unit name (partial match)',
+    example: 'north',
+  })
   @IsOptional()
   @IsString()
   unitName?: string;
@@ -72,7 +104,10 @@ export class SalesUnitsQueryDto {
   @IsNumber()
   maxLeads?: number;
 
-  @ApiPropertyOptional({ description: 'Include related data (employees,teams,leads)', example: 'employees,teams' })
+  @ApiPropertyOptional({
+    description: 'Include related data (employees,teams,leads)',
+    example: 'employees,teams',
+  })
   @IsOptional()
   @IsString()
   include?: string;
@@ -83,20 +118,33 @@ export class SalesUnitsQueryDto {
   @IsIn(['name', 'email', 'createdAt', 'updatedAt', 'headId'])
   sortBy?: string;
 
-  @ApiPropertyOptional({ description: 'Sort order', example: 'asc', enum: ['asc', 'desc'] })
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    example: 'asc',
+    enum: ['asc', 'desc'],
+  })
   @IsOptional()
   @IsString()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc';
 
-  @ApiPropertyOptional({ description: 'Page number for pagination', example: 1, minimum: 1 })
+  @ApiPropertyOptional({
+    description: 'Page number for pagination',
+    example: 1,
+    minimum: 1,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Number of items per page', example: 10, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    example: 10,
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -104,7 +152,10 @@ export class SalesUnitsQueryDto {
   @Max(100)
   limit?: number;
 
-  @ApiPropertyOptional({ description: 'Search by unit name, email, or phone', example: 'sales' })
+  @ApiPropertyOptional({
+    description: 'Search by unit name, email, or phone',
+    example: 'sales',
+  })
   @IsOptional()
   @IsString()
   search?: string;

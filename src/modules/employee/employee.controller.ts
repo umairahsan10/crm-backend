@@ -9,7 +9,14 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionName } from '../../common/constants/permission.enum';
 import { EmployeeService } from './employee.service';
-import { ApiTags, ApiOperation, ApiResponse, getSchemaPath, ApiExtraModels, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  getSchemaPath,
+  ApiExtraModels,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -46,29 +53,29 @@ export class EmployeeController {
           status: 'active',
           address: '123 Main St, City, State',
           dateOfBirth: '1990-01-15T00:00:00.000Z',
-          department: { 
-            id: 2, 
-            name: 'Production' 
+          department: {
+            id: 2,
+            name: 'Production',
           },
-          role: { 
-            id: 3, 
-            name: 'dep_manager' 
+          role: {
+            id: 3,
+            name: 'dep_manager',
           },
-          manager: { 
-            id: 5, 
-            firstName: 'Jane', 
-            lastName: 'Smith', 
-            email: 'jane.smith@example.com' 
+          manager: {
+            id: 5,
+            firstName: 'Jane',
+            lastName: 'Smith',
+            email: 'jane.smith@example.com',
           },
-          teamLead: { 
-            id: 6, 
-            firstName: 'Mark', 
-            lastName: 'Taylor', 
-            email: 'mark.taylor@example.com' 
-          }
-        }
-      }
-    }
+          teamLead: {
+            id: 6,
+            firstName: 'Mark',
+            lastName: 'Taylor',
+            email: 'mark.taylor@example.com',
+          },
+        },
+      },
+    },
   })
   async getMyProfile(@Request() req: AuthenticatedRequest) {
     // All authenticated users can access their own profile
@@ -99,19 +106,31 @@ export class EmployeeController {
             email: 'alice.johnson@example.com',
             department: { id: 2, name: 'Engineering' },
             role: { id: 4, name: 'senior' },
-            manager: { id: 5, firstName: 'Jane', lastName: 'Smith', email: 'jane.smith@example.com' },
-            teamLead: { id: 6, firstName: 'Mark', lastName: 'Taylor', email: 'mark.taylor@example.com' }
-          }
-        ]
-      }
-    }
+            manager: {
+              id: 5,
+              firstName: 'Jane',
+              lastName: 'Smith',
+              email: 'jane.smith@example.com',
+            },
+            teamLead: {
+              id: 6,
+              firstName: 'Mark',
+              lastName: 'Taylor',
+              email: 'mark.taylor@example.com',
+            },
+          },
+        ],
+      },
+    },
   })
   async getDepartmentEmployees(@Request() req: AuthenticatedRequest) {
     // Only managers, team leads, and unit heads can see department employees
     if (!req.user.departmentId) {
       throw new Error('Department ID not found in user data');
     }
-    const employees = await this.employeeService.getDepartmentEmployees(req.user.departmentId);
+    const employees = await this.employeeService.getDepartmentEmployees(
+      req.user.departmentId,
+    );
     return {
       message: 'Department employees accessed',
       data: employees,
@@ -125,7 +144,7 @@ export class EmployeeController {
   @ApiResponse({
     status: 200,
     description: 'All employees accessed successfully',
-    schema: { example: { message: 'All employees accessed', data: [] } } // Simplified example
+    schema: { example: { message: 'All employees accessed', data: [] } }, // Simplified example
   })
   async getAllEmployees(@Request() req: AuthenticatedRequest) {
     // Only department managers and unit heads can see all employees
@@ -137,12 +156,12 @@ export class EmployeeController {
   }
 
   @Get('senior-employees')
-  @Roles( RoleName.dep_manager, RoleName.team_lead, RoleName.unit_head)
+  @Roles(RoleName.dep_manager, RoleName.team_lead, RoleName.unit_head)
   @ApiOperation({ summary: 'Get all senior employees' })
   @ApiResponse({
     status: 200,
     description: 'Senior employees accessed successfully',
-    schema: { example: { message: 'Senior employees accessed', data: [] } }
+    schema: { example: { message: 'Senior employees accessed', data: [] } },
   })
   async getSeniorEmployees(@Request() req: AuthenticatedRequest) {
     // Senior employees and above can see other senior employees
@@ -162,7 +181,9 @@ export class EmployeeController {
   @ApiResponse({
     status: 200,
     description: 'Access granted: You have salary permission.',
-    schema: { example: { message: 'Access granted: You have salary permission.' } }
+    schema: {
+      example: { message: 'Access granted: You have salary permission.' },
+    },
   })
   testSalaryPermission() {
     return { message: 'Access granted: You have salary permission.' };

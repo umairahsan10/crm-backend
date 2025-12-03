@@ -16,7 +16,9 @@ export class TaskQueryDto {
 
   @IsOptional()
   @IsString({ message: 'Sort by must be a string' })
-  @IsIn(['dueDate', 'priority', 'createdAt'], { message: 'Sort by must be one of: dueDate, priority, createdAt' })
+  @IsIn(['dueDate', 'priority', 'createdAt'], {
+    message: 'Sort by must be one of: dueDate, priority, createdAt',
+  })
   sortBy?: string;
 
   @IsOptional()

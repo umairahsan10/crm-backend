@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsEmail, IsNumber, IsEnum } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEmail,
+  IsNumber,
+  IsEnum,
+} from 'class-validator';
 import { TransactionType, PaymentWays } from '@prisma/client';
 
 export class UpdatePaymentLinkDto {

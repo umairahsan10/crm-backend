@@ -27,4 +27,4 @@ export class GetHalfDayLogsDto {
   @IsOptional()
   @IsDateString()
   end_date?: string;
-} 
+}

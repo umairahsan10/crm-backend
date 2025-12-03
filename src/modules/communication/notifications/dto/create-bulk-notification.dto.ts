@@ -20,14 +20,16 @@ export class CreateBulkNotificationDto {
   sentBy?: number;
 
   @ApiProperty({
-    description: 'Type of user the notification is targeted to (e.g., CLIENT, EMPLOYEE)',
+    description:
+      'Type of user the notification is targeted to (e.g., CLIENT, EMPLOYEE)',
     enum: UserType,
   })
   @IsEnum(UserType)
   userType: UserType;
 
   @ApiProperty({
-    description: 'Category of notification such as individual, bulk_all or bulk_department',
+    description:
+      'Category of notification such as individual, bulk_all or bulk_department',
     enum: NotificationType,
     example: NotificationType.bulk_all,
   })

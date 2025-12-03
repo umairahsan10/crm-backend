@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -8,12 +12,14 @@ import { CompanyResponseDto } from './dto/company-response.dto';
 export class CompanyService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createCompany(createCompanyDto: CreateCompanyDto): Promise<CompanyResponseDto> {
+  async createCompany(
+    createCompanyDto: CreateCompanyDto,
+  ): Promise<CompanyResponseDto> {
     // Set default values for time fields if not provided
     const companyData = {
       ...createCompanyDto,
-      lateTime: createCompanyDto.lateTime ?? 30,      // Default: 30 minutes
-      halfTime: createCompanyDto.halfTime ?? 90,      // Default: 90 minutes
+      lateTime: createCompanyDto.lateTime ?? 30, // Default: 30 minutes
+      halfTime: createCompanyDto.halfTime ?? 90, // Default: 90 minutes
       absentTime: createCompanyDto.absentTime ?? 180, // Default: 180 minutes
     };
 
@@ -32,7 +38,7 @@ export class CompanyService {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
         { country: { contains: query.search, mode: 'insensitive' } },
-        { status: { contains: query.search, mode: 'insensitive' } }
+        { status: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
@@ -70,18 +76,18 @@ export class CompanyService {
         skip,
         take: limit,
       }),
-      this.prisma.company.count({ where })
+      this.prisma.company.count({ where }),
     ]);
 
     // Return structured response with pagination metadata like leads
     return {
-      companies: companies.map(company => this.mapToResponseDto(company)),
+      companies: companies.map((company) => this.mapToResponseDto(company)),
       pagination: {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
@@ -105,19 +111,23 @@ export class CompanyService {
     const total = companies.length;
 
     // Calculate active and inactive counts
-    const active = companies.filter(company => (company as any).status === 'active').length;
-    const inactive = companies.filter(company => (company as any).status === 'inactive').length;
+    const active = companies.filter(
+      (company) => (company as any).status === 'active',
+    ).length;
+    const inactive = companies.filter(
+      (company) => (company as any).status === 'inactive',
+    ).length;
 
     // Calculate byCountry statistics
     const byCountry: { [key: string]: number } = {};
-    companies.forEach(company => {
+    companies.forEach((company) => {
       const country = company.country || 'Unknown';
       byCountry[country] = (byCountry[country] || 0) + 1;
     });
 
     // Calculate byStatus statistics
     const byStatus: { [key: string]: number } = {};
-    companies.forEach(company => {
+    companies.forEach((company) => {
       const status = (company as any).status || 'Unknown';
       byStatus[status] = (byStatus[status] || 0) + 1;
     });
@@ -131,7 +141,10 @@ export class CompanyService {
     };
   }
 
-  async updateCompany(id: number, updateCompanyDto: UpdateCompanyDto): Promise<CompanyResponseDto> {
+  async updateCompany(
+    id: number,
+    updateCompanyDto: UpdateCompanyDto,
+  ): Promise<CompanyResponseDto> {
     // Check if company exists
     const existingCompany = await this.prisma.company.findUnique({
       where: { id },
@@ -179,7 +192,7 @@ export class CompanyService {
     halfDeduction: number;
   }> {
     const company = await this.prisma.company.findFirst();
-    
+
     if (!company) {
       throw new NotFoundException('No company found');
     }

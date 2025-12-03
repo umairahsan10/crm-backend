@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { JwtConfigService } from '../../../config/jwt.config';
 
 interface JwtPayload {
   sub: number;
@@ -12,21 +13,24 @@ interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private jwtConfig: JwtConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'your-super-secret-jwt-key-for-crm-backend-2024',
+      secretOrKey: jwtConfig.getSecret(),
     });
   }
 
   validate(payload: JwtPayload) {
-    const isDebugMode = process.env.JWT_DEBUG === 'true';
-    
+    const isDebugMode = this.jwtConfig.isDebugMode();
+
     if (isDebugMode) {
-      console.log('🔍 JWT Strategy - validate called with payload:', JSON.stringify(payload, null, 2));
+      console.log(
+        '🔍 JWT Strategy - validate called with payload:',
+        JSON.stringify(payload, null, 2),
+      );
     }
-    
+
     const user = {
       id: payload.sub,
       role: payload.role,
@@ -34,11 +38,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...(payload.department && { department: payload.department }),
       ...(payload.permissions && { permissions: payload.permissions }),
     };
-    
+
     if (isDebugMode) {
-      console.log('🔍 JWT Strategy - returning user:', JSON.stringify(user, null, 2));
+      console.log(
+        '🔍 JWT Strategy - returning user:',
+        JSON.stringify(user, null, 2),
+      );
     }
-    
+
     return user;
   }
 }

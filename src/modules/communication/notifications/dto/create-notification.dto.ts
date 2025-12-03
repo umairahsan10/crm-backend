@@ -7,7 +7,9 @@ export class CreateNotificationDto {
   @IsString()
   heading: string;
 
-  @ApiProperty({ description: 'Main content or message body of the notification' })
+  @ApiProperty({
+    description: 'Main content or message body of the notification',
+  })
   @IsString()
   content: string;
 
@@ -28,7 +30,8 @@ export class CreateNotificationDto {
   sentBy?: number;
 
   @ApiProperty({
-    description: 'Type of user the notification is targeted to (e.g., admin, employee)',
+    description:
+      'Type of user the notification is targeted to (e.g., admin, employee)',
     enum: UserType,
     example: UserType.admin,
   })
@@ -36,7 +39,8 @@ export class CreateNotificationDto {
   userType: UserType;
 
   @ApiProperty({
-    description: 'Category of notification (e.g., individual, bulk_all, bulk_department)',
+    description:
+      'Category of notification (e.g., individual, bulk_all, bulk_department)',
     enum: NotificationType,
     example: NotificationType.bulk_all,
   })
@@ -44,7 +48,8 @@ export class CreateNotificationDto {
   notificationType: NotificationType;
 
   @ApiProperty({
-    description: 'Target department ID for department-specific bulk notifications',
+    description:
+      'Target department ID for department-specific bulk notifications',
     required: false,
   })
   @IsOptional()

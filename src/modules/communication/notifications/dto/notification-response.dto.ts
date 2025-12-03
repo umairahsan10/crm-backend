@@ -18,14 +18,16 @@ export class NotificationResponseDto {
   sentBy?: number;
 
   @ApiProperty({
-    description: 'Type of user the notification is targeted to (e.g., admin, EMPLOYEE)',
+    description:
+      'Type of user the notification is targeted to (e.g., admin, EMPLOYEE)',
     enum: UserType,
     example: UserType.admin,
   })
   userType: UserType;
 
   @ApiProperty({
-    description: 'Category of the notification (e.g., single, bulk_all, bulk_department)',
+    description:
+      'Category of the notification (e.g., single, bulk_all, bulk_department)',
     enum: NotificationType,
     example: NotificationType.bulk_all,
   })
@@ -45,10 +47,14 @@ export class NotificationResponseDto {
   })
   status: NotificationStatus;
 
-  @ApiProperty({ description: 'Date and time when the notification was created' })
+  @ApiProperty({
+    description: 'Date and time when the notification was created',
+  })
   createdAt: Date;
 
-  @ApiProperty({ description: 'Date and time when the notification was last updated' })
+  @ApiProperty({
+    description: 'Date and time when the notification was last updated',
+  })
   updatedAt: Date;
 
   // Additional fields for better UX
