@@ -949,13 +949,16 @@ export class FinanceSalaryService {
 
     for (const employee of employees) {
       try {
-        // Base salary is now joined with employee (accounts is an array, take first)
-        if (!employee.accounts?.[0]?.baseSalary) {
+        // OPTIMIZATION: More robust account handling - find first account with baseSalary
+        const account =
+          employee.accounts?.find((acc) => acc.baseSalary) ||
+          employee.accounts?.[0];
+        if (!account?.baseSalary) {
           throw new Error(`No base salary found for employee ${employee.id}`);
         }
 
         // Calculate salary (same logic as calculateSalaryInternal)
-        const baseSalary: Prisma.Decimal = employee.accounts[0].baseSalary;
+        const baseSalary: Prisma.Decimal = account.baseSalary;
         const salesDept = salesDeptMap.get(employee.id);
         const commission: Prisma.Decimal =
           salesDept?.commissionAmount ?? new Prisma.Decimal(0);
@@ -1069,17 +1072,21 @@ export class FinanceSalaryService {
       }
     }
 
-    // STEP 6: Batch update/create salary logs in transaction (2-3 queries total)
+    // STEP 6: Batch update/create salary logs in transaction (OPTIMIZED)
     this.logger.log(
       `Batch saving ${logUpdates.length} updates and ${logCreates.length} creates...`,
     );
     await this.prisma.$transaction(async (tx) => {
-      // Batch update existing logs
-      for (const update of logUpdates) {
-        await tx.netSalaryLog.update({
-          where: { id: update.id },
-          data: update.data,
-        });
+      // OPTIMIZATION: Parallel batch updates instead of sequential loop
+      if (logUpdates.length > 0) {
+        await Promise.all(
+          logUpdates.map((update) =>
+            tx.netSalaryLog.update({
+              where: { id: update.id },
+              data: update.data,
+            }),
+          ),
+        );
       }
 
       // Batch create new logs
@@ -1244,13 +1251,16 @@ export class FinanceSalaryService {
 
     for (const employee of employees) {
       try {
-        // Base salary is now joined with employee (accounts is an array, take first)
-        if (!employee.accounts?.[0]?.baseSalary) {
+        // OPTIMIZATION: More robust account handling - find first account with baseSalary
+        const account =
+          employee.accounts?.find((acc) => acc.baseSalary) ||
+          employee.accounts?.[0];
+        if (!account?.baseSalary) {
           throw new Error(`No base salary found for employee ${employee.id}`);
         }
 
         // Calculate salary
-        const baseSalary: Prisma.Decimal = employee.accounts[0].baseSalary;
+        const baseSalary: Prisma.Decimal = account.baseSalary;
         const salesDept = salesDeptMap.get(employee.id);
         const commission: Prisma.Decimal =
           salesDept?.commissionAmount ?? new Prisma.Decimal(0);
@@ -1384,17 +1394,21 @@ export class FinanceSalaryService {
       }
     }
 
-    // STEP 6: Batch update/create salary logs in transaction
+    // STEP 6: Batch update/create salary logs in transaction (OPTIMIZED)
     this.logger.log(
       `💾 Batch saving ${logUpdates.length} updates and ${logCreates.length} creates...`,
     );
     await this.prisma.$transaction(async (tx) => {
-      // Batch update existing logs
-      for (const update of logUpdates) {
-        await tx.netSalaryLog.update({
-          where: { id: update.id },
-          data: update.data,
-        });
+      // OPTIMIZATION: Parallel batch updates instead of sequential loop
+      if (logUpdates.length > 0) {
+        await Promise.all(
+          logUpdates.map((update) =>
+            tx.netSalaryLog.update({
+              where: { id: update.id },
+              data: update.data,
+            }),
+          ),
+        );
       }
 
       // Batch create new logs
