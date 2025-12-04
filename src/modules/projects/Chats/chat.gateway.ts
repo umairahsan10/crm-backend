@@ -38,15 +38,30 @@ interface AuthenticatedSocket extends Socket {
   namespace: '/chat',
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  /** Rate limiting config */
+  private readonly MESSAGE_LIMIT = 20; // messages
+  private readonly LIMIT_WINDOW = 60; // seconds
+
   @WebSocketServer()
-  server: Server;
+  public server: Server;
 
   private logger: Logger = new Logger('ChatGateway');
-  private activeUsers = new Map<number, string[]>(); // userId -> socketIds[]
-  private socketToUser = new Map<string, number>(); // socketId -> userId
+  private activeUsers: Map<number, string[]> = new Map(); // userId -> socketIds[]
+  private socketToUser: Map<string, number> = new Map(); // socketId -> userId
 
   constructor(private chatMessagesService: ChatMessagesService) {}
 
+  // Standardized error response helper
+  private standardError(message: string, code: string = 'ERROR') {
+    return {
+      success: false,
+      error: {
+        code,
+        message,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
   afterInit(server: Server) {
     this.logger.log('🚀 Chat WebSocket Gateway initialized');
   }
@@ -63,7 +78,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       // The WsJwtGuard will be applied to messages, but for connection we do basic validation
       this.logger.log(`✅ Client attempting to connect - Socket: ${client.id}`);
-      
     } catch (error) {
       this.logger.error(`❌ Connection error: ${error.message}`);
       client.disconnect();
@@ -72,7 +86,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   handleDisconnect(client: AuthenticatedSocket) {
     const userId = this.socketToUser.get(client.id);
-    
     if (userId) {
       // Remove socket from active users
       const userSockets = this.activeUsers.get(userId);
@@ -81,12 +94,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         if (index > -1) {
           userSockets.splice(index, 1);
         }
-        
         if (userSockets.length === 0) {
           this.activeUsers.delete(userId);
         }
       }
-      
       this.socketToUser.delete(client.id);
       this.logger.log(`❌ User ${userId} disconnected - Socket: ${client.id}`);
       this.logger.log(`👥 Active users: ${this.activeUsers.size}`);
@@ -99,7 +110,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   @SubscribeMessage('authenticate')
   async handleAuthenticate(@ConnectedSocket() client: AuthenticatedSocket) {
     const userId = client.data.user?.id;
-    
     if (!userId) {
       return { success: false, message: 'Authentication failed' };
     }
@@ -108,12 +118,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!this.activeUsers.has(userId)) {
       this.activeUsers.set(userId, []);
     }
-    
     const userSockets = this.activeUsers.get(userId);
     if (userSockets && !userSockets.includes(client.id)) {
       userSockets.push(client.id);
     }
-    
     this.socketToUser.set(client.id, userId);
 
     this.logger.log(`✅ User ${userId} authenticated - Socket: ${client.id}`);
@@ -127,11 +135,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       });
 
       const chatIds = userChats.map(chat => chat.chatId);
-      
       for (const chatId of chatIds) {
         await client.join(`chat_${chatId}`);
         this.logger.log(`🔄 Auto-joined user ${userId} to chat_${chatId}`);
-        
         // Notify other participants that user is now online in this chat
         client.to(`chat_${chatId}`).emit('userOnline', {
           chatId,
@@ -142,8 +148,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       this.logger.log(`✅ User ${userId} auto-joined ${chatIds.length} chats`);
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: 'Authenticated successfully',
         userId,
         socketId: client.id,
@@ -151,8 +157,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       };
     } catch (error) {
       this.logger.error(`❌ Error auto-joining chats: ${error.message}`);
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: 'Authenticated successfully, but failed to auto-join some chats',
         userId,
         socketId: client.id,
@@ -189,7 +195,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       await client.join(`chat_${chatId}`);
       this.logger.log(`📥 User ${userId} joined chat room: chat_${chatId}`);
-      
       // Notify other participants that user joined
       client.to(`chat_${chatId}`).emit('userJoined', {
         chatId,
@@ -216,7 +221,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       await client.leave(`chat_${chatId}`);
       this.logger.log(`📤 User ${userId} left chat room: chat_${chatId}`);
-      
       // Notify other participants that user left
       client.to(`chat_${chatId}`).emit('userLeft', {
         chatId,
@@ -234,9 +238,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
-    @MessageBody() data: { 
-      chatId: number; 
-      content?: string; 
+    @MessageBody() data: {
+      chatId: number;
+      content?: string;
       attachmentUrl?: string;
       attachmentType?: string;
       attachmentName?: string;
@@ -250,11 +254,11 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       const { chatId, content, attachmentUrl, attachmentType, attachmentName, attachmentSize, imageData } = data;
 
       if (!userId || !chatId) {
-        return { success: false, message: 'Invalid message data: chatId and userId are required' };
+        return this.standardError('Invalid message data: chatId and userId are required');
       }
 
       if (!content && !attachmentUrl && !imageData) {
-        return { success: false, message: 'Either message content, attachment URL, or image data is required' };
+        return this.standardError('Either message content, attachment URL, or image data is required');
       }
 
       this.logger.log(`📨 User ${userId} sending message to chat ${chatId}`);
@@ -289,18 +293,14 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       };
 
       // Emit to all users in the chat room INCLUDING sender
-      // Using .to() broadcasts to everyone in the room, including the sender if they're in the room
       this.server.to(chatRoom).emit('newMessage', messagePayload);
-
-      // Also emit directly to sender as backup to ensure they ALWAYS see their message
       client.emit('newMessage', messagePayload);
 
       this.logger.log(`✅ Message sent to chat_${chatId} - Message ID: ${result.data.id}`);
-      
       return { success: true, data: result.data };
     } catch (error) {
       this.logger.error(`❌ Error sending message: ${error.message}`);
-      return { success: false, message: error.message || 'Failed to send message' };
+      return this.standardError(error.message || 'Failed to send message', error.code || 'SEND_ERROR');
     }
   }
 

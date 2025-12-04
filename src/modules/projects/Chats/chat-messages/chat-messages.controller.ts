@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Param, ParseIntPipe, Query, Body, HttpCode, HttpStatus, Request, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
+import { diskStorage } from 'multer';
 import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ChatMessagesService } from './chat-messages.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
@@ -59,9 +59,15 @@ export class ChatMessagesController {
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(),
+      storage: diskStorage({
+        destination: './uploads/chat-files',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+          cb(null, uniqueSuffix + '-' + file.originalname);
+        },
+      }),
       limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB
+        fileSize: 10 * 1024 * 1024, // 10MB stricter limit
       },
     })
   )
@@ -92,6 +98,7 @@ export class ChatMessagesController {
     @Request() req,
   ) {
     console.log('🎯 [CONTROLLER] POST /chat-messages/upload - Uploading file');
+    console.log('[DEBUG] File object:', file);
     console.log('📁 [CONTROLLER] File:', file?.originalname, 'Size:', file?.size);
     console.log('💬 [CONTROLLER] Chat ID:', chatId);
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
@@ -115,6 +122,18 @@ export class ChatMessagesController {
     // Upload to Cloudinary
     const uploadResult = await uploadToCloudinary(file, chatIdNum);
 
+    // Delete file from disk after successful upload
+    if (file?.path) {
+      const fs = await import('fs');
+      fs.unlink(file.path, err => {
+        if (err) {
+          console.error('❌ [CONTROLLER] Failed to delete file from disk:', file.path, err);
+        } else {
+          console.log('🗑️ [CONTROLLER] Deleted file from disk:', file.path);
+        }
+      });
+    }
+
     console.log('✅ [CONTROLLER] File uploaded successfully to Cloudinary');
     console.log('🔗 [CONTROLLER] File URL:', uploadResult.url);
 
@@ -131,13 +150,17 @@ export class ChatMessagesController {
     console.log('🎯 [CONTROLLER] POST /chat-messages - Creating new message');
     console.log('📥 [CONTROLLER] Request Body:', createChatMessageDto);
     console.log('👤 [CONTROLLER] Requester ID:', req.user.id);
+    console.log('📎 [CONTROLLER] Attachment:', {
+      url: createChatMessageDto.attachmentUrl,
+      type: createChatMessageDto.attachmentType,
+      name: createChatMessageDto.attachmentName,
+      size: createChatMessageDto.attachmentSize,
+    });
     const result = await this.chatMessagesService.createChatMessage(createChatMessageDto, req.user.id);
     console.log('✅ [CONTROLLER] Successfully created message ID:', result.data.id);
-    
     // Emit socket event for real-time update
     this.chatGateway.emitNewMessage(createChatMessageDto.chatId, result.data);
     console.log('📡 [CONTROLLER] Emitted socket event for new message');
-    
     return result;
   }
 

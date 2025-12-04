@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import * as fs from 'fs';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
@@ -7,7 +8,20 @@ import { uploadBase64ImageToCloudinary } from './utils/file-upload.util';
 
 @Injectable()
 export class ChatMessagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+  ) { }
+
+  private auditLog(action: string, details: any) {
+    const logEntry = {
+      action,
+      details,
+      timestamp: new Date().toISOString(),
+    };
+    fs.appendFile('chat-message-audit.log', JSON.stringify(logEntry) + '\n', err => {
+      if (err) console.error('Failed to write audit log:', err);
+    });
+  }
 
   async getAllChatMessages() {
     try {
@@ -157,38 +171,20 @@ export class ChatMessagesService {
       console.log('💬 [SERVICE] Chat ID:', chatId);
       console.log('👤 [SERVICE] Requester ID:', requesterId);
       console.log('📊 [SERVICE] Pagination - Limit:', limit || 50, 'Offset:', offset || 0);
-      
+
       // Validate if chat exists
-      console.log('🔍 [SERVICE] Step 1: Checking if chat exists...');
-      const chat = await this.prisma.projectChat.findUnique({
-        where: { id: chatId },
-      });
+      const chat = await this.prisma.projectChat.findUnique({ where: { id: chatId } });
+      if (!chat) throw new NotFoundException(`Chat with ID ${chatId} not found.`);
 
-      if (!chat) {
-        console.log('❌ [SERVICE] Chat not found with ID:', chatId);
-        throw new NotFoundException(`Chat with ID ${chatId} not found. Please check the chat ID and try again.`);
-      }
-
-      console.log('✅ [SERVICE] Chat found - Project ID:', chat.projectId);
-
-      // Check if requester is a participant in this chat
-      console.log('🔐 [SERVICE] Step 2: Security Check - Verifying requester is participant...');
+      // Security check
       const requesterParticipant = await this.prisma.chatParticipant.findFirst({
-        where: {
-          chatId: chatId,
-          employeeId: requesterId,
-        },
+        where: { chatId, employeeId: requesterId },
       });
+      if (!requesterParticipant) throw new ForbiddenException(`Only chat participants can access messages.`);
 
-      if (!requesterParticipant) {
-        console.log('🚫 [SERVICE] Access Denied - Requester is NOT a participant in chat', chatId);
-        throw new ForbiddenException(`Only chat participants can access messages. You are not a participant in this chat.`);
-      }
 
-      console.log('✅ [SERVICE] Security Check Passed - Requester is', requesterParticipant.memberType, 'in chat', chatId);
-
-      console.log('🔍 [SERVICE] Step 3: Fetching messages with pagination (oldest first)...');
-      const messages = await this.prisma.chatMessage.findMany({
+      // Fallback: Fetch from DB
+      const dbMessages = await this.prisma.chatMessage.findMany({
         where: { chatId },
         include: {
           sender: {
@@ -219,12 +215,12 @@ export class ChatMessagesService {
         skip: offset || 0, // Default offset of 0
       });
 
-      if (messages.length === 0) {
+      if (dbMessages.length === 0) {
         console.log('⚠️ [SERVICE] No messages found for chat', chatId);
         throw new NotFoundException(`No chat messages found for chat ID ${chatId}. Please check the chat ID and try again.`);
       }
 
-      console.log('📊 [SERVICE] Found', messages.length, 'messages');
+      console.log('📊 [SERVICE] Found', dbMessages.length, 'messages');
 
       // Get total count for pagination info
       console.log('🔧 [SERVICE] Step 4: Getting total message count...');
@@ -236,12 +232,12 @@ export class ChatMessagesService {
       console.log('✅ [SERVICE] Successfully retrieved messages - Returning data');
 
       return {
-        messages,
+        messages: dbMessages,
         pagination: {
           total: totalCount,
           limit: limit || 50,
           offset: offset || 0,
-          hasMore: (offset || 0) + messages.length < totalCount,
+          hasMore: (offset || 0) + dbMessages.length < totalCount,
         },
         chat: {
           id: chat.id,
@@ -343,7 +339,18 @@ export class ChatMessagesService {
       console.log('🔧 [SERVICE] createChatMessage - Starting...');
       console.log('📥 [SERVICE] Message Data:', createChatMessageDto);
       console.log('👤 [SERVICE] Sender ID:', senderId);
-      
+
+      // Validate DTO schema
+      const { validateSync } = await import('class-validator');
+      const { plainToInstance } = await import('class-transformer');
+      const dto = plainToInstance(CreateChatMessageDto, createChatMessageDto);
+      const errors = validateSync(dto);
+      if (errors.length) {
+        console.error('Message validation failed:', errors);
+        throw new BadRequestException('Message schema validation failed');
+      }
+      this.auditLog('createMessage', { senderId, chatId: createChatMessageDto.chatId, content: createChatMessageDto.content, attachmentUrl: createChatMessageDto.attachmentUrl });
+
       const { chatId, content, messageType, attachmentUrl, attachmentType, attachmentName, attachmentSize, imageData } = createChatMessageDto;
 
       // Handle base64 image data (pasted screenshots)
@@ -367,11 +374,6 @@ export class ChatMessagesService {
             `Failed to upload pasted image: ${error instanceof Error ? error.message : 'Unknown error'}`
           );
         }
-      }
-
-      // Validate that either content, attachmentUrl, or imageData is provided
-      if (!content && !finalAttachmentUrl && !imageData) {
-        throw new BadRequestException('Either message content, attachment URL, or image data is required');
       }
 
       // Validate if chat exists
@@ -488,7 +490,7 @@ export class ChatMessagesService {
 
       console.log('✅ [SERVICE] Message created successfully with ID:', createdMessage.id);
       console.log('✅ [SERVICE] Returning message data');
-      
+
       return {
         message: 'Chat message created successfully',
         data: createdMessage,
@@ -513,7 +515,7 @@ export class ChatMessagesService {
       console.log('🆔 [SERVICE] Message ID:', id);
       console.log('📥 [SERVICE] Update Data:', updateChatMessageDto);
       console.log('👤 [SERVICE] Sender ID:', senderId);
-      
+
       // Validate if message exists
       console.log('🔍 [SERVICE] Step 1: Checking if message exists...');
       const existingMessage = await this.prisma.chatMessage.findUnique({
@@ -539,7 +541,7 @@ export class ChatMessagesService {
       // Check if sender is the original message sender
       const isOriginalSender = existingMessage.senderId === senderId;
       console.log('🔐 [SERVICE] Step 2: Security Check - Is original sender?', isOriginalSender);
-      
+
       // Get sender's participant info
       const senderParticipant = await this.prisma.chatParticipant.findFirst({
         where: {
@@ -660,7 +662,7 @@ export class ChatMessagesService {
 
       console.log('✅ [SERVICE] Message updated successfully');
       console.log('✅ [SERVICE] Returning updated message data');
-      
+
       return {
         message: 'Chat message updated successfully',
         data: updatedMessage,
@@ -684,7 +686,7 @@ export class ChatMessagesService {
       console.log('🔧 [SERVICE] deleteChatMessage - Starting...');
       console.log('🆔 [SERVICE] Message ID to delete:', id);
       console.log('👤 [SERVICE] Requester ID:', senderId);
-      
+
       // Validate if message exists
       console.log('🔍 [SERVICE] Step 1: Checking if message exists...');
       const existingMessage = await this.prisma.chatMessage.findUnique({
@@ -709,7 +711,7 @@ export class ChatMessagesService {
       // Check if sender is the original message sender or a chat owner
       const isOriginalSender = existingMessage.senderId === senderId;
       console.log('🔐 [SERVICE] Step 2: Security Check - Is original sender?', isOriginalSender);
-      
+
       const participant = await this.prisma.chatParticipant.findFirst({
         where: {
           chatId: existingMessage.chatId,
@@ -748,7 +750,7 @@ export class ChatMessagesService {
       // If owner is deleting someone else's message, update the message content instead of deleting
       if (isOwner && !isOriginalSender) {
         console.log('👑 [SERVICE] Owner deleting another user\'s message - will mark as deleted');
-        
+
         const owner = await this.prisma.employee.findUnique({
           where: { id: senderId },
           select: { firstName: true, lastName: true }
@@ -756,7 +758,7 @@ export class ChatMessagesService {
 
         const ownerName = `${owner?.firstName} ${owner?.lastName}`;
         console.log('👑 [SERVICE] Owner name:', ownerName);
-        
+
         const pktTime = TimeStorageUtil.getCurrentPKTTimeForStorage();
         await this.prisma.chatMessage.update({
           where: { id },

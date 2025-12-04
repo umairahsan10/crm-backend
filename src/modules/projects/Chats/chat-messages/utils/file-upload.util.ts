@@ -22,6 +22,7 @@ export interface FileUploadResult {
   type: 'image' | 'document';
   originalName: string;
   size: number;
+  signedUrl?: string;
 }
 
 /**
@@ -81,32 +82,55 @@ export async function uploadToCloudinary(
 ): Promise<FileUploadResult> {
   validateFile(file);
 
+  console.log('[DEBUG] uploadToCloudinary received file:', file);
+  let fileBuffer = file.buffer;
+  if (!fileBuffer && file.path) {
+    const fs = require('fs');
+    fileBuffer = fs.readFileSync(file.path);
+    console.log('[DEBUG] fileBuffer loaded from disk:', file.path);
+  }
+  console.log('[DEBUG] file.buffer:', fileBuffer);
+
   const fileType = getFileType(file.mimetype);
   const fileName = generateFileName(file.originalname);
   const folder = `chat/${chatId}`;
 
   try {
-    // Upload to Cloudinary
     const uploadOptions: UploadApiOptions = {
       folder,
-      public_id: `${folder}/${fileName.replace(path.extname(fileName), '')}`, // Include folder in public_id
-      resource_type: fileType === 'image' ? 'image' : 'raw', // Use 'raw' for documents
+      public_id: `${folder}/${fileName.replace(path.extname(fileName), '')}`,
+      resource_type: fileType === 'image' ? 'image' : 'raw',
     };
 
-    // Convert buffer to base64 for Cloudinary upload
-    const base64File = file.buffer.toString('base64');
+    const base64File = fileBuffer?.toString('base64');
     const dataUri = `data:${file.mimetype};base64,${base64File}`;
+
+    console.log('[DEBUG] Cloudinary upload dataUri:', dataUri.substring(0, 100) + '...');
+    console.log('[DEBUG] Cloudinary upload options:', uploadOptions);
 
     const result = await cloudinary.uploader.upload(dataUri, uploadOptions);
 
+    let signedUrl: string | undefined;
+    try {
+      signedUrl = cloudinary.url(result.public_id, {
+        secure: true,
+        type: fileType === 'image' ? 'image' : 'raw',
+        sign_url: true,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      });
+    } catch (err) {
+      signedUrl = undefined;
+    }
     return {
       url: result.secure_url,
       publicId: result.public_id,
       type: fileType,
       originalName: file.originalname,
       size: file.size,
+      signedUrl,
     };
   } catch (error) {
+    console.error('[ERROR] Cloudinary upload failed:', error);
     throw new BadRequestException(
       `Failed to upload file to Cloudinary: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
@@ -163,12 +187,25 @@ export async function uploadBase64ImageToCloudinary(
 
     const result = await cloudinary.uploader.upload(imageData, uploadOptions);
 
+    // Generate signed URL for private access (valid for 1 hour)
+    let signedUrl: string | undefined;
+    try {
+      signedUrl = cloudinary.url(result.public_id, {
+        secure: true,
+        type: 'image',
+        sign_url: true,
+        expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiry
+      });
+    } catch (err) {
+      signedUrl = undefined;
+    }
     return {
       url: result.secure_url,
       publicId: result.public_id,
       type: 'image',
       originalName: `pasted-image.${mimeType}`,
       size: fileSize,
+      signedUrl,
     };
   } catch (error) {
     throw new BadRequestException(

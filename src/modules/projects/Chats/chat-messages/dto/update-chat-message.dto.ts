@@ -15,6 +15,18 @@ export class UpdateChatMessageDto {
   attachmentUrl?: string;
 
   @IsOptional()
+  @IsString({ message: 'Attachment type must be a string' })
+  attachmentType?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Attachment name must be a string' })
+  attachmentName?: string;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'Attachment size must be a number' })
+  attachmentSize?: number;
+
+  @IsOptional()
   @IsNumber({}, { message: 'Chat ID must be a number' })
   chatId?: number;
 }
