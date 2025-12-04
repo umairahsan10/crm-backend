@@ -1,18 +1,27 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  InternalServerErrorException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import * as fs from 'fs';
 import { PrismaService } from '../../../../../prisma/prisma.service';
 import { CreateChatMessageDto } from './dto/create-chat-message.dto';
 import { UpdateChatMessageDto } from './dto/update-chat-message.dto';
 import { TimeStorageUtil } from '../../../../common/utils/time-storage.util';
+import { uploadBase64ImageToCloudinary } from './utils/file-upload.util';
 
 @Injectable()
 export class ChatMessagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+  ) { }
+
+  private auditLog(action: string, details: any) {
+    const logEntry = {
+      action,
+      details,
+      timestamp: new Date().toISOString(),
+    };
+    fs.appendFile('chat-message-audit.log', JSON.stringify(logEntry) + '\n', err => {
+      if (err) console.error('Failed to write audit log:', err);
+    });
+  }
 
   async getAllChatMessages() {
     try {
@@ -180,12 +189,7 @@ export class ChatMessagesService {
       console.log('🔧 [SERVICE] getChatMessagesByChatId - Starting...');
       console.log('💬 [SERVICE] Chat ID:', chatId);
       console.log('👤 [SERVICE] Requester ID:', requesterId);
-      console.log(
-        '📊 [SERVICE] Pagination - Limit:',
-        limit || 50,
-        'Offset:',
-        offset || 0,
-      );
+      console.log('📊 [SERVICE] Pagination - Limit:', limit || 50, 'Offset:', offset || 0);
 
       // Validate if chat exists
       console.log('🔍 [SERVICE] Step 1: Checking if chat exists...');
@@ -207,33 +211,13 @@ export class ChatMessagesService {
         '🔐 [SERVICE] Step 2: Security Check - Verifying requester is participant...',
       );
       const requesterParticipant = await this.prisma.chatParticipant.findFirst({
-        where: {
-          chatId: chatId,
-          employeeId: requesterId,
-        },
+        where: { chatId, employeeId: requesterId },
       });
+      if (!requesterParticipant) throw new ForbiddenException(`Only chat participants can access messages.`);
 
-      if (!requesterParticipant) {
-        console.log(
-          '🚫 [SERVICE] Access Denied - Requester is NOT a participant in chat',
-          chatId,
-        );
-        throw new ForbiddenException(
-          `Only chat participants can access messages. You are not a participant in this chat.`,
-        );
-      }
 
-      console.log(
-        '✅ [SERVICE] Security Check Passed - Requester is',
-        requesterParticipant.memberType,
-        'in chat',
-        chatId,
-      );
-
-      console.log(
-        '🔍 [SERVICE] Step 3: Fetching messages with pagination (oldest first)...',
-      );
-      const messages = await this.prisma.chatMessage.findMany({
+      // Fallback: Fetch from DB
+      const dbMessages = await this.prisma.chatMessage.findMany({
         where: { chatId },
         include: {
           sender: {
@@ -264,14 +248,14 @@ export class ChatMessagesService {
         skip: offset || 0, // Default offset of 0
       });
 
-      if (messages.length === 0) {
+      if (dbMessages.length === 0) {
         console.log('⚠️ [SERVICE] No messages found for chat', chatId);
         throw new NotFoundException(
           `No chat messages found for chat ID ${chatId}. Please check the chat ID and try again.`,
         );
       }
 
-      console.log('📊 [SERVICE] Found', messages.length, 'messages');
+      console.log('📊 [SERVICE] Found', dbMessages.length, 'messages');
 
       // Get total count for pagination info
       console.log('🔧 [SERVICE] Step 4: Getting total message count...');
@@ -285,12 +269,12 @@ export class ChatMessagesService {
       );
 
       return {
-        messages,
+        messages: dbMessages,
         pagination: {
           total: totalCount,
           limit: limit || 50,
           offset: offset || 0,
-          hasMore: (offset || 0) + messages.length < totalCount,
+          hasMore: (offset || 0) + dbMessages.length < totalCount,
         },
         chat: {
           id: chat.id,
@@ -387,6 +371,22 @@ export class ChatMessagesService {
     }
   }
 
+  /**
+   * Validates that a user has access to a chat
+   */
+  async validateChatAccess(chatId: number, userId: number): Promise<void> {
+    const participant = await this.prisma.chatParticipant.findFirst({
+      where: {
+        chatId,
+        employeeId: userId,
+      },
+    });
+
+    if (!participant) {
+      throw new ForbiddenException(`You do not have access to chat ${chatId}. Only chat participants can upload files.`);
+    }
+  }
+
   async createChatMessage(
     createChatMessageDto: CreateChatMessageDto,
     senderId: number,
@@ -396,8 +396,41 @@ export class ChatMessagesService {
       console.log('📥 [SERVICE] Message Data:', createChatMessageDto);
       console.log('👤 [SERVICE] Sender ID:', senderId);
 
-      const { chatId, content, messageType, attachmentUrl } =
-        createChatMessageDto;
+      // Validate DTO schema
+      const { validateSync } = await import('class-validator');
+      const { plainToInstance } = await import('class-transformer');
+      const dto = plainToInstance(CreateChatMessageDto, createChatMessageDto);
+      const errors = validateSync(dto);
+      if (errors.length) {
+        console.error('Message validation failed:', errors);
+        throw new BadRequestException('Message schema validation failed');
+      }
+      this.auditLog('createMessage', { senderId, chatId: createChatMessageDto.chatId, content: createChatMessageDto.content, attachmentUrl: createChatMessageDto.attachmentUrl });
+
+      const { chatId, content, messageType, attachmentUrl, attachmentType, attachmentName, attachmentSize, imageData } = createChatMessageDto;
+
+      // Handle base64 image data (pasted screenshots)
+      let finalAttachmentUrl = attachmentUrl;
+      let finalAttachmentType = attachmentType;
+      let finalAttachmentName = attachmentName;
+      let finalAttachmentSize = attachmentSize;
+
+      if (imageData) {
+        console.log('🖼️ [SERVICE] Processing pasted image data...');
+        try {
+          const uploadResult = await uploadBase64ImageToCloudinary(imageData, chatId);
+          finalAttachmentUrl = uploadResult.url;
+          finalAttachmentType = uploadResult.type;
+          finalAttachmentName = uploadResult.originalName;
+          finalAttachmentSize = uploadResult.size;
+          console.log('✅ [SERVICE] Image uploaded to Cloudinary:', uploadResult.url);
+        } catch (error) {
+          console.error('❌ [SERVICE] Failed to upload pasted image:', error);
+          throw new BadRequestException(
+            `Failed to upload pasted image: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      }
 
       // Validate if chat exists
       console.log('🔍 [SERVICE] Step 1: Validating chat exists...');
@@ -467,6 +500,10 @@ export class ChatMessagesService {
       // Create the message
       console.log('🔧 [SERVICE] Step 4: Creating chat message...');
       console.log('💬 [SERVICE] Message content:', content);
+      console.log('📎 [SERVICE] Attachment URL:', finalAttachmentUrl);
+      console.log('📎 [SERVICE] Attachment Type:', finalAttachmentType);
+      console.log('📎 [SERVICE] Attachment Name:', finalAttachmentName);
+      console.log('📎 [SERVICE] Attachment Size:', finalAttachmentSize);
       const pktTime = TimeStorageUtil.getCurrentPKTTimeForStorage();
       console.log(
         '🕐 [SERVICE] Message timestamp (PKT):',
@@ -476,7 +513,11 @@ export class ChatMessagesService {
         data: {
           chatId,
           senderId,
-          message: content,
+          message: content || null,
+          attachmentUrl: finalAttachmentUrl || null,
+          attachmentType: finalAttachmentType || null,
+          attachmentName: finalAttachmentName || null,
+          attachmentSize: finalAttachmentSize || null,
           createdAt: pktTime,
           updatedAt: pktTime,
         },
@@ -602,10 +643,7 @@ export class ChatMessagesService {
 
       // Check if sender is the original message sender
       const isOriginalSender = existingMessage.senderId === senderId;
-      console.log(
-        '🔐 [SERVICE] Step 2: Security Check - Is original sender?',
-        isOriginalSender,
-      );
+      console.log('🔐 [SERVICE] Step 2: Security Check - Is original sender?', isOriginalSender);
 
       // Get sender's participant info
       const senderParticipant = await this.prisma.chatParticipant.findFirst({
@@ -812,10 +850,7 @@ export class ChatMessagesService {
 
       // Check if sender is the original message sender or a chat owner
       const isOriginalSender = existingMessage.senderId === senderId;
-      console.log(
-        '🔐 [SERVICE] Step 2: Security Check - Is original sender?',
-        isOriginalSender,
-      );
+      console.log('🔐 [SERVICE] Step 2: Security Check - Is original sender?', isOriginalSender);
 
       const participant = await this.prisma.chatParticipant.findFirst({
         where: {
@@ -865,9 +900,7 @@ export class ChatMessagesService {
 
       // If owner is deleting someone else's message, update the message content instead of deleting
       if (isOwner && !isOriginalSender) {
-        console.log(
-          "👑 [SERVICE] Owner deleting another user's message - will mark as deleted",
-        );
+        console.log('👑 [SERVICE] Owner deleting another user\'s message - will mark as deleted');
 
         const owner = await this.prisma.employee.findUnique({
           where: { id: senderId },
@@ -876,6 +909,7 @@ export class ChatMessagesService {
 
         const ownerName = `${owner?.firstName} ${owner?.lastName}`;
         console.log('👑 [SERVICE] Owner name:', ownerName);
+
 
         const pktTime = TimeStorageUtil.getCurrentPKTTimeForStorage();
         await this.prisma.chatMessage.update({

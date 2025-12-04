@@ -5,6 +5,7 @@ import { ChatMessagesController } from './chat-messages.controller';
 import { ChatGateway } from '../chat.gateway';
 import { WsJwtGuard } from '../guards/ws-jwt.guard';
 import { JwtConfigService } from '../../../../config/jwt.config';
+import './config/cloudinary.config'; // Initialize Cloudinary
 
 @Module({
   imports: [
