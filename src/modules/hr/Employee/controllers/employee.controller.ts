@@ -65,7 +65,7 @@ interface AuthenticatedRequest extends Request {
 @ApiBearerAuth()
 @Controller('hr')
 export class EmployeeController {
-  constructor(private readonly hrService: EmployeeService) {}
+  constructor(private readonly hrService: EmployeeService) { }
 
   /**
    * Terminate an employee and process their final salary
@@ -227,7 +227,7 @@ export class EmployeeController {
   /**
    * Get department for employee by taking in the department id
    */
-  @Get('employees/:id/department')
+  @Get('employees/:id/depa  rtment')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
   @Departments('HR')
   @ApiOperation({ summary: 'Get department for employee by department ID' })

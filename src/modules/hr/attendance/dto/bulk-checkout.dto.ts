@@ -43,6 +43,11 @@ export class BulkCheckoutDto {
   @IsString()
   reason?: string; // Optional reason for bulk checkout
 
+  @ApiPropertyOptional({ description: 'Check-out time in ISO format. If not provided, uses current time.', example: '2023-01-15T17:30:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  checkout?: string;
+
   @ApiPropertyOptional({
     description: 'IANA timezone of the client (e.g., Asia/Karachi)',
     example: 'Asia/Karachi',
