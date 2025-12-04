@@ -500,12 +500,6 @@ export class FinanceService {
           absentDetails: filteredAbsentDetails,
           lateDetails: filteredLateDetails,
           halfDayDetails: filteredHalfDayDetails,
-          calculationPeriod: {
-            startDay,
-            endDay,
-            daysInPeriod,
-            daysInMonth,
-          },
         };
       }
 
@@ -1044,7 +1038,11 @@ export class FinanceService {
     });
 
     if (!employee) {
-      throw new Error('Employee does not exist');
+      return {
+        status: 'error',
+        message: 'Employee does not exist',
+        employee_id: employeeId,
+      };
     }
 
     // 2. Fetch sales department record for the employee
@@ -1053,12 +1051,21 @@ export class FinanceService {
     });
 
     if (!salesDepartment) {
-      throw new Error('Sales department record not found for employee');
+      return {
+        status: 'error',
+        message: 'Sales department record not found for employee',
+        employee_id: employeeId,
+      };
     }
 
     // 3. Check if flag change is needed
     if (salesDepartment.withholdFlag === flag) {
-      throw new Error('Withhold flag is already set to the requested value');
+      return {
+        status: 'error',
+        message: 'Withhold flag is already set to the requested value',
+        employee_id: employeeId,
+        current_flag: flag,
+      };
     }
 
     // 4. Update the withhold flag
@@ -1798,5 +1805,51 @@ export class FinanceService {
       day: log.date?.getDate() || 0,
       reason: 'Half Day',
     }));
+  }
+
+  /**
+   * Get commission details for all sales employees.
+   * This method retrieves commission details including withheld and available amounts.
+   * Results are sorted in ascending order by employee name.
+   */
+  public async getSalesCommissionDetails(): Promise<any[]> {
+    return await this.prisma.salesDepartment.findMany({
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: {
+        employee: {
+          id: 'asc',
+        },
+      },
+    }).then(records => records.map(record => ({
+      id: record.employee.id,
+      name: `${record.employee.firstName} ${record.employee.lastName}`,
+      commissionAmount: record.commissionAmount,
+      withholdCommission: record.withholdCommission,
+      withholdFlag: record.withholdFlag,
+    })));
+  }
+
+  /**
+   * Get projects suitable for assigning commissions.
+   * Returns project IDs and descriptions where the status is 'completed'.
+   */
+  public async getProjectsForCommission(): Promise<{ id: number; description: string | null }[]> {
+    return await this.prisma.project.findMany({
+      where: {
+        status: 'completed',
+      },
+      select: {
+        id: true,
+        description: true,
+      },
+    });
   }
 }

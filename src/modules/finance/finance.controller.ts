@@ -94,7 +94,7 @@ export class FinanceController {
 
   @Post('commission/withhold-flag')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
-  @Departments('Sales')
+  @Departments('Accounts')
   @Roles(RoleName.dep_manager)
   @ApiOperation({ summary: 'Update withhold flag for a sales employee' })
   @ApiBody({ schema: { example: { employee_id: 123, flag: true } } })
@@ -119,7 +119,7 @@ export class FinanceController {
 
   @Post('commission/transfer')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
-  @Departments('HR')
+  @Departments('Accounts')
   @Roles(RoleName.dep_manager)
   // @Permissions(PermissionName.commission_permission)
   @ApiOperation({
@@ -151,5 +151,49 @@ export class FinanceController {
       dto.amount,
       dto.direction,
     );
+  }
+
+  /**
+   * Get commission details for all sales employees.
+   * This endpoint retrieves commission details including withheld and available amounts.
+   */
+  @Get('commission/details')
+  @ApiOperation({ summary: 'Get commission details for all sales employees' })
+  @ApiResponse({
+    status: 200,
+    description: 'Commission details retrieved successfully',
+    schema: {
+      example: [
+        {
+          id: 1,
+          name: 'John Doe',
+          commissionAmount: 5000,
+          withholdCommission: 1000,
+        },
+      ],
+    },
+  })
+  async getSalesCommissionDetails() {
+    return await this.financeService.getSalesCommissionDetails();
+  }
+
+  /**
+   * Get projects suitable for assigning commissions.
+   * Returns project IDs and names where the status is 'completed'.
+   */
+  @Get('commission/projects')
+  @ApiOperation({ summary: 'Get projects suitable for assigning commissions' })
+  @ApiResponse({
+    status: 200,
+    description: 'Projects retrieved successfully',
+    schema: {
+      example: [
+        { id: 1, name: 'Project Alpha' },
+        { id: 2, name: 'Project Beta' },
+      ],
+    },
+  })
+  async getProjectsForCommission() {
+    return await this.financeService.getProjectsForCommission();
   }
 }

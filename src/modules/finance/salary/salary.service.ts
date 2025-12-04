@@ -17,6 +17,9 @@ type GetAllSalariesParams = {
   status?: string;
   minSalary?: string;
   maxSalary?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 @Injectable()
@@ -335,23 +338,36 @@ export class FinanceSalaryService {
     const maxSalaryNum = params.maxSalary
       ? parseFloat(params.maxSalary)
       : undefined;
-    const departmentIds = params.departments
-      ? params.departments
-          .split(',')
-          .map((id) => parseInt(id.trim(), 10))
-          .filter((id) => !isNaN(id))
-      : undefined;
+    const departmentRaw = params.departments;
+    let departmentIds: number[] | undefined;
+    let departmentNames: string[] | undefined;
+    if (departmentRaw) {
+      const parts = departmentRaw.split(',').map((s) => s.trim()).filter(Boolean);
+      const allNumeric = parts.every((p) => /^\d+$/.test(p));
+      if (allNumeric) {
+        departmentIds = parts.map((p) => parseInt(p, 10));
+      } else {
+        // treat as department names
+        departmentNames = parts;
+      }
+    }
+
+    const search = params.search;
+    const sortBy = params.sortBy;
+    const sortOrder = params.sortOrder;
 
     return await this.getAllSalariesDisplay(
       month,
       pageNum,
       limitNum,
       departmentIds,
+      departmentNames,
       params.status,
       minSalaryNum,
       maxSalaryNum,
-      undefined,
-      undefined,
+      search,
+      sortBy,
+      sortOrder,
     );
   }
 
@@ -369,8 +385,7 @@ export class FinanceSalaryService {
    * @param status - Optional employee status filter (active, inactive, terminated)
    * @param minSalary - Optional minimum final salary filter
    * @param maxSalary - Optional maximum final salary filter
-   * @param fromDate - Optional filter by salary log creation date from (YYYY-MM-DD)
-   * @param toDate - Optional filter by salary log creation date to (YYYY-MM-DD)
+   *
    * @returns Paginated salary display with summary and employee list
    */
   public async getAllSalariesDisplay(
@@ -378,11 +393,13 @@ export class FinanceSalaryService {
     page: number = 1,
     limit: number = 20,
     departmentIds?: number[],
+    departmentNames?: string[],
     status?: string,
     minSalary?: number,
     maxSalary?: number,
-    fromDate?: string,
-    toDate?: string,
+    search?: string,
+    sortBy?: string,
+    sortOrder?: string,
   ) {
     // Validate and get calculation month
     this.validateMonthFormat(month);
@@ -402,9 +419,21 @@ export class FinanceSalaryService {
       employeeWhere.status = 'active';
     }
 
-    // Department filter
+    // Department filter (support department IDs OR department names)
     if (departmentIds && departmentIds.length > 0) {
       employeeWhere.departmentId = { in: departmentIds };
+    } else if (departmentNames && departmentNames.length > 0) {
+      employeeWhere.department = { name: { in: departmentNames } };
+    }
+
+    // Search filter (by firstName, lastName, email) - case insensitive contains
+    if (search && search.trim().length > 0) {
+      const q = search.trim();
+      employeeWhere.OR = [
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ];
     }
 
     // STEP 1: Batch fetch employees with related data (1 query) - with filters
@@ -448,24 +477,11 @@ export class FinanceSalaryService {
       };
     }
 
-    // Build salary log where clause with date filters
+    // Build salary log where clause
     const salaryLogWhere: any = {
       employeeId: { in: employeeIds },
       month: requestedMonth,
     };
-
-    // Date range filter for salary log creation date
-    if (fromDate || toDate) {
-      salaryLogWhere.createdAt = {};
-      if (fromDate) {
-        salaryLogWhere.createdAt.gte = new Date(fromDate + 'T00:00:00.000Z');
-      }
-      if (toDate) {
-        // Include the entire end date (up to 23:59:59.999)
-        const endDateTime = new Date(toDate + 'T23:59:59.999Z');
-        salaryLogWhere.createdAt.lte = endDateTime;
-      }
-    }
 
     // STEP 2: Batch fetch all salary logs for the requested month (1 query instead of N queries)
     let salaryLogs = await this.prisma.netSalaryLog.findMany({
@@ -631,6 +647,40 @@ export class FinanceSalaryService {
       this.logger.log(
         `Applied salary range filter: ${salaryResults.length} -> ${filteredResults.length} results (min=${minSalary || 'none'}, max=${maxSalary || 'none'})`,
       );
+    }
+
+    // Apply sorting if requested (server-side on the filteredResults array)
+    if (sortBy && typeof sortBy === 'string') {
+      const order = sortOrder && sortOrder.toLowerCase() === 'desc' ? 'desc' : 'asc';
+      const key = sortBy;
+      filteredResults.sort((a, b) => {
+        const va = a[key];
+        const vb = b[key];
+
+        // Handle undefined
+        if (va === undefined && vb === undefined) return 0;
+        if (va === undefined) return order === 'asc' ? 1 : -1;
+        if (vb === undefined) return order === 'asc' ? -1 : 1;
+
+        // Numeric comparison
+        if (typeof va === 'number' && typeof vb === 'number') {
+          return order === 'asc' ? va - vb : vb - va;
+        }
+
+        // Date comparison
+        const dateA = new Date(va);
+        const dateB = new Date(vb);
+        if (!isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
+          return order === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+        }
+
+        // String comparison fallback
+        const sa = String(va).toLowerCase();
+        const sb = String(vb).toLowerCase();
+        if (sa < sb) return order === 'asc' ? -1 : 1;
+        if (sa > sb) return order === 'asc' ? 1 : -1;
+        return 0;
+      });
     }
 
     // Validate pagination parameters

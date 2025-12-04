@@ -46,6 +46,9 @@ type GetAllSalariesQuery = {
   status?: string;
   minSalary?: string;
   maxSalary?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
 };
 
 @ApiTags('Finance Salary')
@@ -132,7 +135,22 @@ export class FinanceSalaryController {
   })
   @ApiQuery({
     name: 'departments',
-    description: 'Comma-separated department IDs (e.g., "1,2,3")',
+    description: 'Comma-separated department names or IDs (e.g., "Production,Marketing" or "1,2")',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description: 'Search by employee first name, last name, or email (case-insensitive)',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    description: 'Sort by field (e.g., employeeName, finalSalary, createdAt, department)',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    description: 'Sort order: asc or desc',
     required: false,
   })
   @ApiQuery({
