@@ -58,19 +58,11 @@ export class AutoMarkAbsentTrigger {
 
   /**
    * Auto-mark absent cron job.
-   * Runs at 11 PM, 1 AM, 3 AM, and 5 AM PKT every day.
-   *
+   * Runs at 3 AM PKT every day.
    * Marks employees as absent if they haven't checked in and exceeded absentTime threshold.
-   * Half-day is only marked when employees actually check in late (through check-in process),
-   * not automatically in this cron job to avoid complexity of updating status later.
-   *
-   * Date determination:
-   * - At 11 PM: marks for current day
-   * - At 1 AM, 3 AM, 5 AM: marks for previous day
-   *
-   * Cron: '0 23,1,3,5 * * *' = At 23:00, 01:00, 03:00, and 05:00 every day
+   * Follows checkin/bulkMarkAllEmployeesPresent principles for date and log lookup.
    */
-  @Cron('0 23,1,3,5 * * *', {
+  @Cron('0 3 * * *', {
     name: 'auto-mark-absent',
     timeZone: 'Asia/Karachi', // PKT timezone
   })
@@ -94,24 +86,88 @@ export class AutoMarkAbsentTrigger {
       const currentMinute = pktTime.getMinutes();
       const timeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
 
-      // Automatically determine the attendance date
+      // Determine attendance date using checkin/checkout standards
       const attendanceDate = this.getAttendanceDate();
-      const dateExplanation =
-        currentHour < 9 || (currentHour === 9 && currentMinute === 0)
-          ? `previous day (triggered at ${timeStr} - before 09:01)`
-          : `current day (triggered at ${timeStr} - after 09:00)`;
-
       this.logger.log(
-        `Starting auto-mark-absent check at ${timeStr} PKT for date: ${attendanceDate} (${dateExplanation})`,
+        `Starting auto-mark-absent check at ${timeStr} PKT for date: ${attendanceDate}`,
       );
 
-      const absentResult =
-        await this.attendanceService.autoMarkAbsent(attendanceDate);
-      this.logger.log(
-        `Auto-mark-absent complete. Absent marked: ${absentResult.absent_marked}, Leave applied: ${absentResult.leave_applied}`,
-      );
+      // Get company absent time threshold
+      const company = await this.prisma.company.findFirst();
+      if (!company) {
+        throw new Error('Company settings not found');
+      }
+      const absentTimeMinutes = company.absentTime || 180;
 
-      return absentResult;
+      // Get all active employees
+      const employees = await this.prisma.employee.findMany({
+        where: { status: 'active' },
+        select: { id: true, shiftStart: true, shiftEnd: true },
+      });
+
+      let absentMarked = 0;
+      let errors = 0;
+
+      for (const employee of employees) {
+        try {
+          if (!employee.shiftStart) continue;
+          // Calculate deadline (shift start + absentTime)
+          const [shiftHours, shiftMins = 0] = employee.shiftStart.split(':').map(Number);
+          const shiftStartMinutes = shiftHours * 60 + shiftMins;
+          const currentMinutes = pktTime.getHours() * 60 + pktTime.getMinutes();
+          let timeSinceShiftStart = currentMinutes - shiftStartMinutes;
+          if (timeSinceShiftStart < 0) timeSinceShiftStart += 1440;
+
+          // Only mark absent if time since shift start >= absentTime
+          if (timeSinceShiftStart < absentTimeMinutes) continue;
+
+          // Per-employee log lookup (replicating checkin/bulkMarkAllEmployeesPresent)
+          let businessDate = new Date(attendanceDate + 'T00:00:00');
+          // Night shift adjustment
+          const [shiftEndHour, shiftEndMinute = 0] = (employee.shiftEnd || '17:00').split(':').map(Number);
+          if (shiftEndHour < shiftHours) {
+            const shiftEndMinutes = shiftEndHour * 60 + shiftEndMinute;
+            if (currentMinutes < shiftEndMinutes) {
+              businessDate.setDate(businessDate.getDate() - 1);
+            }
+          }
+
+          // Check if already marked absent or present for this business date
+          let existingLog = await this.prisma.attendanceLog.findFirst({
+            where: {
+              employeeId: employee.id,
+              date: businessDate,
+            },
+          });
+          if (existingLog && existingLog.status === 'absent') continue;
+          if (existingLog && existingLog.status !== 'absent') continue;
+
+          // Mark absent
+          await this.prisma.attendanceLog.create({
+            data: {
+              employeeId: employee.id,
+              date: businessDate,
+              checkin: null,
+              checkout: null,
+              mode: 'onsite',
+              status: 'absent',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+          absentMarked++;
+        } catch (error) {
+          this.logger.error(`Error marking absent for employee ${employee.id}: ${error.message}`);
+          errors++;
+        }
+      }
+
+      this.logger.log(`Auto-mark-absent complete. Absent marked: ${absentMarked}, Errors: ${errors}`);
+      return {
+        message: 'Auto-mark absent process completed successfully',
+        absent_marked: absentMarked,
+        leave_applied: 0,
+      };
     } catch (error) {
       if (
         error.message?.includes("Can't reach database server") ||

@@ -36,11 +36,11 @@ export class WeekendAutoPresentTrigger {
   }
 
   /**
-   * Trigger that runs once a day at 10:00 PM PKT (22:00)
-   * Automatically marks employees as present on weekends when their shift starts
-   * Cron: '0 22 * * *' = At 22:00 (10:00 PM) every day
+   * Trigger that runs once at 9:00 PM PKT (21:00) on Saturday and Sunday only
+   * Automatically marks employees as present on weekends, following checkin logic for date/time
+   * Cron: '0 21 * * 6,0' = At 21:00 (9:00 PM) only on Saturday (6) and Sunday (0)
    */
-  @Cron('0 22 * * *', {
+  @Cron('0 21 * * 6,0', {
     name: 'weekend-auto-present',
     timeZone: 'Asia/Karachi', // PKT timezone
   })
@@ -63,20 +63,17 @@ export class WeekendAutoPresentTrigger {
         now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }),
       );
 
-      // Check if it's weekend (Saturday = 6, Sunday = 7)
-      const dayOfWeek = this.getDayOfWeek(pktDate);
-
-      if (!this.isWeekend(dayOfWeek)) {
+      // Use checkin logic for business date
+      pktDate.setHours(0, 0, 0, 0);
+      const dayOfWeek = pktDate.getDay(); // 0 = Sunday, 6 = Saturday
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         this.logger.debug('Not a weekend, skipping auto-present check');
         return { marked_present: 0, errors: 0 };
       }
 
       this.logger.log(
-        `Weekend detected (Day ${dayOfWeek}), checking for shift start times...`,
+        `Weekend detected (Day ${dayOfWeek}), running auto-present for all active employees...`,
       );
-
-      // Get current time in HH:MM format for comparison
-      const currentTime = pktDate.toTimeString().slice(0, 5); // HH:MM format
 
       // Find all active employees with their shift start times
       const employees = await this.prisma.employee.findMany({
@@ -98,19 +95,9 @@ export class WeekendAutoPresentTrigger {
       let markedPresent = 0;
       let errors = 0;
 
-      // OPTIMIZATION: Filter employees whose shift is starting now
-      const employeesToMark = employees.filter((emp) =>
-        this.isShiftStartTime(currentTime, emp.shiftStart!),
-      );
+      const employeeIds = employees.map((emp) => emp.id);
 
-      if (employeesToMark.length === 0) {
-        this.logger.debug('No employees have shifts starting now');
-        return { marked_present: 0, errors: 0 };
-      }
-
-      const employeeIds = employeesToMark.map((emp) => emp.id);
-
-      // OPTIMIZATION: Pre-fetch all existing logs in ONE query
+      // Pre-fetch all existing logs for this business date
       const existingLogs = await this.prisma.attendanceLog.findMany({
         where: {
           employeeId: { in: employeeIds },
@@ -136,21 +123,13 @@ export class WeekendAutoPresentTrigger {
       const employeesToUpdateCounters: number[] = [];
 
       // Process all employees and group operations
-      for (const employee of employeesToMark) {
+      for (const employee of employees) {
         try {
           const existingLog = existingLogsMap.get(employee.id);
-
           if (!existingLog) {
-            // Create attendance log for weekend with shift times
-            const shiftStartDateTime = this.createShiftDateTime(
-              pktDate,
-              employee.shiftStart!,
-            );
-            const shiftEndDateTime = this.createShiftDateTime(
-              pktDate,
-              employee.shiftEnd!,
-            );
-
+            // Use checkin logic for shift start/end
+            const shiftStartDateTime = this.createShiftDateTime(pktDate, employee.shiftStart!);
+            const shiftEndDateTime = this.createShiftDateTime(pktDate, employee.shiftEnd!);
             logsToCreate.push({
               employeeId: employee.id,
               date: pktDate,
@@ -159,21 +138,12 @@ export class WeekendAutoPresentTrigger {
               mode: 'onsite',
               status: 'present',
             });
-
             employeesToUpdateCounters.push(employee.id);
             markedPresent++;
-
-            const totalHours = this.calculateShiftHours(
-              shiftStartDateTime,
-              shiftEndDateTime,
-            );
-            this.logger.log(
-              `Auto-marked present: ${employee.firstName} ${employee.lastName} (ID: ${employee.id}) on weekend - Shift: ${employee.shiftStart}-${employee.shiftEnd}, Hours: ${totalHours}`,
-            );
+            const totalHours = this.calculateShiftHours(shiftStartDateTime, shiftEndDateTime);
+            this.logger.log(`Auto-marked present: ${employee.firstName} ${employee.lastName} (ID: ${employee.id}) on weekend - Shift: ${employee.shiftStart}-${employee.shiftEnd}, Hours: ${totalHours}`);
           } else {
-            this.logger.debug(
-              `Attendance log already exists for ${employee.firstName} ${employee.lastName} on ${pktDate.toDateString()}`,
-            );
+            this.logger.debug(`Attendance log already exists for ${employee.firstName} ${employee.lastName} on ${pktDate.toDateString()}`);
           }
         } catch (error) {
           this.logger.error(`Error processing employee ${employee.id}:`, error);

@@ -28,18 +28,11 @@ export class AutoCheckoutTrigger {
 
   /**
    * Daily auto-checkout cron.
-   * Runs at 05:00 AM PKT and checks out all employees from yesterday's logs
+   * Runs at 05:30 AM PKT and checks out all employees from yesterday's logs
    * where status is not 'absent' and checkout is still null.
-   * Checkout time policy (in PKT):
-   *  - If employee.shiftEnd exists, use that as the checkout time for the business date
-   *    (handles cross-midnight by placing the time on the correct day).
-   *  - Else compute 9 hours from the employee's scheduled shiftStart (employee.shiftStart)
-   *    for the business date (handles cross-midnight).
-   *  - In all cases, cap the checkout time at 05:00 AM of the following day (cron run time),
-   *    so night shifts like 21:00 -> min(06:00, 05:00) = 05:00.
-   *  - Actual late check-in does not affect the computed checkout time.
+   * Follows bulkCheckout logic for log lookup and status update.
    */
-  @Cron('0 5 * * *', { timeZone: 'Asia/Karachi' })
+  @Cron('30 5 * * *', { timeZone: 'Asia/Karachi' })
   async autoCheckout(): Promise<{
     processed: number;
     updated: number;
@@ -62,73 +55,124 @@ export class AutoCheckoutTrigger {
       targetDate.setDate(targetDate.getDate() - 1);
       targetDate.setHours(0, 0, 0, 0);
 
-      // Fetch all attendance logs for targetDate with missing checkout and not absent
-      // Only include logs for active employees
-      const logs = await this.prisma.attendanceLog.findMany({
-        where: {
-          date: targetDate,
-          checkout: null,
-          NOT: { status: 'absent' },
-          employee: {
-            status: 'active',
-          },
-        },
-        select: {
-          id: true,
-          employeeId: true,
-          checkin: true,
-          status: true,
-          employee: {
-            select: { shiftStart: true, shiftEnd: true, status: true },
-          },
-        },
+      // Get all active employees
+      const employees = await this.prisma.employee.findMany({
+        where: { status: 'active' },
+        select: { id: true, shiftStart: true, shiftEnd: true },
       });
-
-      if (logs.length === 0) {
-        this.logger.log('Auto-checkout: No pending logs found for yesterday');
-        return { processed: 0, updated: 0, skipped: 0 };
-      }
 
       let updated = 0;
       let skipped = 0;
+      let processed = 0;
 
-      for (const log of logs) {
+      for (const employee of employees) {
         try {
+          // Per-employee log lookup (replicating bulkCheckout logic)
+          let existingAttendance = await this.prisma.attendanceLog.findFirst({
+            where: {
+              employeeId: employee.id,
+              date: targetDate,
+              checkin: { not: null },
+              checkout: null,
+            },
+          });
+          if (!existingAttendance) {
+            const prevDate = new Date(targetDate);
+            prevDate.setDate(prevDate.getDate() - 1);
+            existingAttendance = await this.prisma.attendanceLog.findFirst({
+              where: {
+                employeeId: employee.id,
+                date: prevDate,
+                checkin: { not: null },
+                checkout: null,
+              },
+            });
+          }
+          if (!existingAttendance) {
+            const nextDate = new Date(targetDate);
+            nextDate.setDate(nextDate.getDate() + 1);
+            existingAttendance = await this.prisma.attendanceLog.findFirst({
+              where: {
+                employeeId: employee.id,
+                date: nextDate,
+                checkin: { not: null },
+                checkout: null,
+              },
+            });
+          }
+          if (!existingAttendance) {
+            existingAttendance = await this.prisma.attendanceLog.findFirst({
+              where: {
+                employeeId: employee.id,
+                checkin: { not: null },
+                checkout: null,
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            });
+          }
+
+          if (!existingAttendance || !existingAttendance.checkin) {
+            skipped++;
+            continue;
+          }
+
           // Compute candidate checkout in PKT for the business date
           const candidateCheckout = this.computeCandidateCheckout(
             targetDate,
-            log.employee?.shiftStart || null,
-            log.employee?.shiftEnd || null,
+            employee.shiftStart || null,
+            employee.shiftEnd || null,
           );
 
-          // Cap at 05:00 AM PKT next day (cron run time)
+          // Cap at 05:30 AM PKT next day (cron run time)
           const capTime = new Date(targetDate);
           capTime.setDate(capTime.getDate() + 1);
-          capTime.setHours(5, 0, 0, 0);
+          capTime.setHours(5, 30, 0, 0);
 
           const finalCheckout =
             candidateCheckout > capTime ? capTime : candidateCheckout;
 
-          // Persist checkout as a PKT-local timestamp (Date object stored as UTC by DB)
+          // Calculate worked hours
+          const checkinTime = existingAttendance.checkin;
+          const workedMs = finalCheckout.getTime() - checkinTime.getTime();
+          const workedHours = workedMs / (1000 * 60 * 60);
+
+          // Determine new status based on worked hours
+          let newStatus = existingAttendance.status;
+          if (existingAttendance.status !== 'absent') {
+            if (workedHours >= 8) {
+              newStatus = 'present';
+            } else if (workedHours >= 4) {
+              newStatus = 'half_day';
+            } else {
+              newStatus = 'absent';
+            }
+          }
+
+          // Persist checkout and status
           await this.prisma.attendanceLog.update({
-            where: { id: log.id },
+            where: { id: existingAttendance.id },
             data: {
               checkout: finalCheckout,
+              status: newStatus,
+              updatedAt: new Date(),
             },
           });
           updated++;
         } catch (e) {
           this.logger.error(
-            `Failed auto-checkout for log ${log.id}: ${e.message}`,
+            `Failed auto-checkout for employee ${employee.id}: ${e.message}`,
           );
           skipped++;
         }
+        processed++;
       }
 
       this.logger.log(
-        `Auto-checkout complete. Processed=${logs.length}, Updated=${updated}, Skipped=${skipped}`,
+        `Auto-checkout complete. Processed=${processed}, Updated=${updated}, Skipped=${skipped}`,
       );
-      return { processed: logs.length, updated, skipped };
+      return { processed, updated, skipped };
     } catch (error) {
       if (
         error.message?.includes("Can't reach database server") ||
