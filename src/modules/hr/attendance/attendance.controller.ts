@@ -104,9 +104,17 @@ export class AttendanceController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   async getMyAttendanceLogs(
-    @Query() query: GetAttendanceLogsDto,
+      @Request() req: AuthenticatedRequest,
+      @Query() query: GetMyAttendanceLogsDto,
   ): Promise<AttendanceLogResponseDto[]> {
-    return this.attendanceService.getAttendanceLogs(query);
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new BadRequestException('Invalid authenticated user');
+      }
+
+      // Merge JWT user id into query to ensure the service returns only this user's logs
+      const mergedQuery: any = { ...(query as any), employee_id: String(userId) };
+      return this.attendanceService.getAttendanceLogs(mergedQuery);
   }
 
   @Post('checkin')

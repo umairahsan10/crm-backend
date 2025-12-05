@@ -70,6 +70,9 @@ export class FinanceController {
   }
 
   @Post('commission/assign')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR', 'Accounts')
+  @Roles(RoleName.dep_manager)
   // @Permissions(PermissionName.commission_permission)
   @ApiOperation({
     summary: 'Assign commission to employee for a completed project',
@@ -94,7 +97,7 @@ export class FinanceController {
 
   @Post('commission/withhold-flag')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
-  @Departments('Accounts')
+  @Departments('HR', 'Accounts')
   @Roles(RoleName.dep_manager)
   @ApiOperation({ summary: 'Update withhold flag for a sales employee' })
   @ApiBody({ schema: { example: { employee_id: 123, flag: true } } })
@@ -119,7 +122,7 @@ export class FinanceController {
 
   @Post('commission/transfer')
   @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
-  @Departments('Accounts')
+  @Departments('HR', 'Accounts')
   @Roles(RoleName.dep_manager)
   // @Permissions(PermissionName.commission_permission)
   @ApiOperation({
@@ -158,6 +161,9 @@ export class FinanceController {
    * This endpoint retrieves commission details including withheld and available amounts.
    */
   @Get('commission/details')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR', 'Accounts')
+  @Roles(RoleName.dep_manager)
   @ApiOperation({ summary: 'Get commission details for all sales employees' })
   @ApiResponse({
     status: 200,
@@ -182,6 +188,9 @@ export class FinanceController {
    * Returns project IDs and names where the status is 'completed'.
    */
   @Get('commission/projects')
+  @UseGuards(JwtAuthGuard, RolesGuard, DepartmentsGuard, PermissionsGuard)
+  @Departments('HR', 'Accounts')
+  @Roles(RoleName.dep_manager)
   @ApiOperation({ summary: 'Get projects suitable for assigning commissions' })
   @ApiResponse({
     status: 200,
