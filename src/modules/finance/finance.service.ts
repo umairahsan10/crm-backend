@@ -1820,6 +1820,11 @@ export class FinanceService {
             id: true,
             firstName: true,
             lastName: true,
+            role: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
       },
@@ -1831,6 +1836,7 @@ export class FinanceService {
     }).then(records => records.map(record => ({
       id: record.employee.id,
       name: `${record.employee.firstName} ${record.employee.lastName}`,
+      role: record.employee.role?.name || 'N/A',
       commissionAmount: record.commissionAmount,
       withholdCommission: record.withholdCommission,
       withholdFlag: record.withholdFlag,
