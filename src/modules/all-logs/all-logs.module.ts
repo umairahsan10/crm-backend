@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AllLogsController } from './all-logs.controller';
 import { AttendanceModule } from '../hr/attendance/attendance.module';
+import { LogsModule } from '../hr/view_logs/logs.module';
 import { AuthModule } from '../auth/auth.module';
 import { EmployeeModule } from '../hr/Employee/employee.module';
 import { ProjectLogsModule } from '../projects/Projects-Logs/project-logs.module';
@@ -9,6 +10,7 @@ import { FinanceModule } from '../finance/finance.module';
 @Module({
   imports: [
     AttendanceModule,
+    LogsModule,
     AuthModule,
     EmployeeModule,
     ProjectLogsModule,
