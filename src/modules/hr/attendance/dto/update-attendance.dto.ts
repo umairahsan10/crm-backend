@@ -64,7 +64,7 @@ export class UpdateAttendanceDto {
   remote_days?: number;
 
   @ApiPropertyOptional({
-    description: 'Number of quarterly leaves',
+    description: 'Number of available leaves',
     example: 2,
     minimum: 0,
   })
@@ -72,7 +72,7 @@ export class UpdateAttendanceDto {
   @IsInt()
   @Min(0)
   @Type(() => Number)
-  quarterly_leaves?: number;
+  available_leaves?: number;
 
   @ApiPropertyOptional({
     description: 'Number of monthly lates',

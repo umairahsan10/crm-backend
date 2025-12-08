@@ -185,7 +185,7 @@ export class CompanyService {
     lateTime: number;
     halfTime: number;
     absentTime: number;
-    quarterlyLeavesDays: number;
+    monthlyLeavesAccrual: number;
     monthlyLatesDays: number;
     absentDeduction: number;
     lateDeduction: number;
@@ -201,7 +201,7 @@ export class CompanyService {
       lateTime: company.lateTime,
       halfTime: company.halfTime,
       absentTime: company.absentTime,
-      quarterlyLeavesDays: company.quarterlyLeavesDays,
+      monthlyLeavesAccrual: company.monthlyLeavesAccrual,
       monthlyLatesDays: company.monthlyLatesDays,
       absentDeduction: company.absentDeduction,
       lateDeduction: company.lateDeduction,
@@ -223,7 +223,7 @@ export class CompanyService {
       website: company.website,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
-      quarterlyLeavesDays: company.quarterlyLeavesDays,
+      monthlyLeavesAccrual: company.monthlyLeavesAccrual,
       monthlyLatesDays: company.monthlyLatesDays,
       absentDeduction: company.absentDeduction,
       lateDeduction: company.lateDeduction,

@@ -692,7 +692,7 @@ export class LeaveLogsService {
           if (attendance) {
             const currentAbsentDays = attendance.absentDays || 0;
             const currentLeaveDays = attendance.leaveDays || 0;
-            const currentQuarterlyLeaves = attendance.quarterlyLeaves || 0;
+            const currentAvailableLeaves = attendance.availableLeaves || 0;
 
             // 1. Update attendance table
             await this.prisma.attendance.update({
@@ -700,7 +700,7 @@ export class LeaveLogsService {
               data: {
                 absentDays: Math.max(0, currentAbsentDays - totalLeaveDays),
                 leaveDays: currentLeaveDays + totalLeaveDays,
-                quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - totalLeaveDays)
+                availableLeaves: Math.max(0, currentAvailableLeaves - totalLeaveDays)
               }
             });
 

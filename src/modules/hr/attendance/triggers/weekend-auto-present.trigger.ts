@@ -196,6 +196,14 @@ export class WeekendAutoPresentTrigger {
                       },
                     });
                   } else {
+                    // Carry forward unused leaves and add monthly accrual
+                    const prevAttendance = await tx.attendance.findFirst({
+                      where: { employeeId: empId },
+                      orderBy: { id: 'desc' },
+                    });
+                    let prevLeaves = prevAttendance?.availableLeaves ?? 0;
+                    const company = await tx.company.findFirst();
+                    const monthlyAccrual = company?.monthlyLeavesAccrual ?? 2;
                     await tx.attendance.create({
                       data: {
                         employeeId: empId,
@@ -204,7 +212,7 @@ export class WeekendAutoPresentTrigger {
                         lateDays: 0,
                         leaveDays: 0,
                         remoteDays: 0,
-                        quarterlyLeaves: 0,
+                        availableLeaves: prevLeaves + monthlyAccrual,
                         monthlyLates: 0,
                         halfDays: 0,
                       },
@@ -403,7 +411,7 @@ export class WeekendAutoPresentTrigger {
             lateDays: 0,
             leaveDays: 0,
             remoteDays: 0,
-            quarterlyLeaves: 0,
+            availableLeaves: 0,
             monthlyLates: 3,
             halfDays: 0,
           },

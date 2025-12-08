@@ -231,7 +231,7 @@ export class CompanyController {
         lateTime: 15,
         halfTime: 4,
         absentTime: 8,
-        quarterlyLeavesDays: 10,
+        monthlyLeavesAccrual: 2,
         monthlyLatesDays: 3,
         absentDeduction: 500,
         lateDeduction: 50,
@@ -243,7 +243,6 @@ export class CompanyController {
     lateTime: number;
     halfTime: number;
     absentTime: number;
-    quarterlyLeavesDays: number;
     monthlyLatesDays: number;
     absentDeduction: number;
     lateDeduction: number;

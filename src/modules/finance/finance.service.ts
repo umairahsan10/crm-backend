@@ -891,8 +891,8 @@ export class FinanceService {
     absentDays: number,
     perDaySalary: number,
   ): number {
-    // For absent days: twice the per day salary for every day absent
-    return absentDays * perDaySalary * 2;
+    // For absent days: 1x per day salary for every day absent
+    return absentDays * perDaySalary;
   }
 
   private calculateLateDeduction(

@@ -5,7 +5,6 @@ import { AttendanceController } from './attendance.controller';
 import { HolidayService } from './holiday.service';
 import { HolidayController } from './holiday.controller';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
-import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
 import { FutureHolidayTrigger } from './triggers/future-holiday-trigger';
 import { AutoCheckoutTrigger } from './triggers/auto-checkout.trigger';
@@ -19,7 +18,6 @@ import { LogsModule } from '../view_logs/logs.module';
     AttendanceService,
     HolidayService,
     MonthlyLatesResetTrigger,
-    QuarterlyLeavesUpdateTrigger,
     WeekendAutoPresentTrigger,
     FutureHolidayTrigger,
     AutoCheckoutTrigger,

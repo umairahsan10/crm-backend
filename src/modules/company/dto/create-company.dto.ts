@@ -77,20 +77,20 @@ export class CreateCompanyDto {
   website?: string;
 
   @ApiPropertyOptional({
-    description: 'Number of quarterly leave days allowed',
-    example: 10,
-  })
-  @IsOptional()
-  @IsNumber()
-  quarterlyLeavesDays?: number;
-
-  @ApiPropertyOptional({
     description: 'Number of monthly late days allowed',
     example: 5,
   })
   @IsOptional()
   @IsNumber()
   monthlyLatesDays?: number;
+
+  @ApiPropertyOptional({
+    description: 'Number of leaves accrued per month',
+    example: 2,
+  })
+  @IsOptional()
+  @IsNumber()
+  monthlyLeavesAccrual?: number;
 
   @ApiPropertyOptional({
     description: 'Deduction for each absent day',

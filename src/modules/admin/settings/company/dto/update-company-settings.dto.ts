@@ -106,17 +106,20 @@ export class UpdateCompanySettingsDto {
 
   // Leave Policies
   @ApiPropertyOptional({
-    description: 'Quarterly leave days allowed',
-    example: 20,
+    description: 'Monthly late days allowed',
+    example: 3,
   })
   @IsOptional()
   @IsNumber()
-  quarterlyLeavesDays?: number;
+  monthlyLatesDays?: number;
 
-  @ApiPropertyOptional({ description: 'Monthly late days allowed', example: 3 })
+  @ApiPropertyOptional({
+    description: 'Leaves accrued per month',
+    example: 2,
+  })
   @IsOptional()
   @IsNumber()
-  monthlyLatesDays?: number;
+  monthlyLeavesAccrual?: number;
 
   // Deductions
   @ApiPropertyOptional({

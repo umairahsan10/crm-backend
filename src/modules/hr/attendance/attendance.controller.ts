@@ -40,7 +40,6 @@ import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
 import { BulkCheckoutDto } from './dto/bulk-checkout.dto';
 import { UpdateAttendanceLogStatusDto } from './dto/update-attendance-log-status.dto';
 import { MonthlyLatesResetTrigger } from './triggers/monthly-lates-reset.trigger';
-import { QuarterlyLeavesUpdateTrigger } from './triggers/quarterly-leaves-update.trigger';
 import { WeekendAutoPresentTrigger } from './triggers/weekend-auto-present.trigger';
 import { FutureHolidayTrigger } from './triggers/future-holiday-trigger';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -68,7 +67,6 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly monthlyLatesResetTrigger: MonthlyLatesResetTrigger,
-    private readonly quarterlyLeavesUpdateTrigger: QuarterlyLeavesUpdateTrigger,
     private readonly weekendAutoPresentTrigger: WeekendAutoPresentTrigger,
     private readonly futureHolidayTrigger: FutureHolidayTrigger,
   ) { }
