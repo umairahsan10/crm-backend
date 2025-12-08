@@ -294,38 +294,54 @@ export class AttendanceService {
       await this.updateMonthlyAttendanceSummary(employeeId, checkinDatePKT, status);
 
       // Create late log if needed
-      if (status === 'late') {
-        await this.prisma.lateLog.create({
-          data: {
-            empId: employeeId,
-            date: checkinDatePKT,
-            scheduledTimeIn: employee.shiftStart || '09:00',
-            actualTimeIn: formatTime(checkinLocal),
-            minutesLate,
-            reason: null,
-            actionTaken: 'Created',
-            lateType: null,
-            justified: null,
-          },
-        });
-      }
+        if (status === 'late') {
+          const existingLateLog = await this.prisma.lateLog.findFirst({
+            where: {
+              empId: employeeId,
+              date: checkinDatePKT,
+            },
+          });
+          if (!existingLateLog) {
+            await this.prisma.lateLog.create({
+              data: {
+                empId: employeeId,
+                date: checkinDatePKT,
+                scheduledTimeIn: employee.shiftStart || '09:00',
+                actualTimeIn: formatTime(checkinLocal),
+                minutesLate,
+                reason: null,
+                actionTaken: 'Created',
+                lateType: null,
+                justified: null,
+              },
+            });
+          }
+        }
 
       // Create half-day log if needed
-      if (status === 'half_day') {
-        await this.prisma.halfDayLog.create({
-          data: {
-            empId: employeeId,
-            date: checkinDatePKT,
-            scheduledTimeIn: employee.shiftStart || '09:00',
-            actualTimeIn: formatTime(checkinLocal),
-            minutesLate,
-            reason: null,
-            actionTaken: 'Created',
-            halfDayType: null,
-            justified: null,
-          },
-        });
-      }
+        if (status === 'half_day') {
+          const existingHalfDayLog = await this.prisma.halfDayLog.findFirst({
+            where: {
+              empId: employeeId,
+              date: checkinDatePKT,
+            },
+          });
+          if (!existingHalfDayLog) {
+            await this.prisma.halfDayLog.create({
+              data: {
+                empId: employeeId,
+                date: checkinDatePKT,
+                scheduledTimeIn: employee.shiftStart || '09:00',
+                actualTimeIn: formatTime(checkinLocal),
+                minutesLate,
+                reason: null,
+                actionTaken: 'Created',
+                halfDayType: null,
+                justified: null,
+              },
+            });
+          }
+        }
 
       return {
         id: attendanceLog.id,
