@@ -83,8 +83,8 @@ export class CompanySettingsService {
       if (dto.absentTime !== undefined) updateData.absentTime = dto.absentTime;
 
       // Leave Policies
-      if (dto.quarterlyLeavesDays !== undefined)
-        updateData.quarterlyLeavesDays = dto.quarterlyLeavesDays;
+      if (dto.monthlyLeavesAccrual !== undefined)
+        updateData.monthlyLeavesAccrual = dto.monthlyLeavesAccrual;
       if (dto.monthlyLatesDays !== undefined)
         updateData.monthlyLatesDays = dto.monthlyLatesDays;
 
@@ -135,11 +135,11 @@ export class CompanySettingsService {
       lateTime: company.lateTime,
       halfTime: company.halfTime,
       absentTime: company.absentTime,
-      quarterlyLeavesDays: company.quarterlyLeavesDays,
       monthlyLatesDays: company.monthlyLatesDays,
       absentDeduction: company.absentDeduction,
       lateDeduction: company.lateDeduction,
       halfDeduction: company.halfDeduction,
+      monthlyLeavesAccrual: company.monthlyLeavesAccrual,
       createdAt: company.createdAt,
       updatedAt: company.updatedAt,
     };

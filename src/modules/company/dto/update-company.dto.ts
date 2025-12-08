@@ -62,12 +62,7 @@ export class UpdateCompanyDto {
   @IsUrl()
   website?: string;
 
-  @ApiPropertyOptional({ description: 'Quarterly leave days', example: 10 })
-  @IsOptional()
-  @IsNumber()
-  quarterlyLeavesDays?: number;
-
-  @ApiPropertyOptional({ description: 'Monthly lates allowed', example: 3 })
+  @ApiPropertyOptional({ description: 'Monthly late days allowed', example: 3 })
   @IsOptional()
   @IsNumber()
   monthlyLatesDays?: number;
@@ -133,4 +128,9 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiPropertyOptional({ description: 'Leaves accrued per month', example: 2 })
+  @IsOptional()
+  @IsNumber()
+  monthlyLeavesAccrual?: number;
 }

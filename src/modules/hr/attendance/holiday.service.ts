@@ -656,7 +656,6 @@ export class HolidayService {
             lateDays: 0,
             leaveDays: 0,
             remoteDays: 0,
-            quarterlyLeaves: 0,
             monthlyLates: 0,
             halfDays: 0,
           },

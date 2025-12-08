@@ -68,12 +68,6 @@ export class CompanyResponseDto {
   updatedAt: Date;
 
   @ApiProperty({
-    description: 'Number of quarterly leave days allowed',
-    example: 10,
-  })
-  quarterlyLeavesDays: number;
-
-  @ApiProperty({
     description: 'Number of monthly late days allowed',
     example: 5,
   })
@@ -108,4 +102,10 @@ export class CompanyResponseDto {
 
   @ApiProperty({ description: 'Company status', example: 'active' })
   status: string;
+
+  @ApiProperty({
+    description: 'Number of leaves accrued per month',
+    example: 2,
+  })
+  monthlyLeavesAccrual: number;
 }

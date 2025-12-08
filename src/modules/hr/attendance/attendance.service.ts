@@ -3,8 +3,11 @@ import {
   BadRequestException,
   InternalServerErrorException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { LeaveLogsService } from '../view_logs/leave-logs.service';
 import { GetAttendanceLogsDto } from './dto/get-attendance-logs.dto';
 import { AttendanceLogResponseDto } from './dto/attendance-log-response.dto';
 import { CheckinDto } from './dto/checkin.dto';
@@ -17,43 +20,13 @@ import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { UpdateMonthlyAttendanceDto } from './dto/update-monthly-attendance.dto';
 import { BulkMarkPresentDto } from './dto/bulk-mark-present.dto';
 import { BulkCheckoutDto } from './dto/bulk-checkout.dto';
-import { ExportLeaveLogsDto } from './dto/export-leave-logs.dto';
-import {
-  LeaveLogsStatsDto,
-  LeaveLogsStatsResponseDto,
-  PeriodStatsDto,
-  EmployeeLeaveStatsDto,
-  LeaveTypeStatsDto,
-  StatsPeriod,
-} from './dto/leave-logs-stats.dto';
-import { ExportLateLogsDto } from './dto/export-late-logs.dto';
-import {
-  LateLogsStatsDto,
-  LateLogsStatsResponseDto,
-  EmployeeLateStatsDto,
-  ReasonStatsDto,
-  PeriodStatsDto as LatePeriodStatsDto,
-} from './dto/late-logs-stats.dto';
-import { ExportHalfDayLogsDto } from './dto/export-half-day-logs.dto';
-import {
-  HalfDayLogsStatsDto,
-  HalfDayLogsStatsResponseDto,
-  EmployeeHalfDayStatsDto,
-  ReasonStatsDto as HalfDayReasonStatsDto,
-  PeriodStatsDto as HalfDayPeriodStatsDto,
-} from './dto/half-day-logs-stats.dto';
-import { GetProjectLogsDto } from './dto/get-project-logs.dto';
-import { ProjectLogsListResponseDto } from './dto/project-logs-list-response.dto';
-import { ExportProjectLogsDto } from '../../projects/Projects-Logs/dto/export-project-logs.dto';
-import {
-  ProjectLogsStatsDto,
-  ProjectLogsStatsResponseDto,
-  StatsPeriod as ProjectLogsStatsPeriod,
-} from '../../projects/Projects-Logs/dto/project-logs-stats.dto';
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor( private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => LeaveLogsService))
+    private readonly leaveLogsService: LeaveLogsService,
+  ) {}
 
   async getAttendanceLogs(
     query: GetAttendanceLogsDto,
@@ -184,6 +157,17 @@ export class AttendanceService {
       const checkinDatePKT = new Date(checkinLocal);
       checkinDatePKT.setHours(5, 0, 0, 0);
 
+      // Check for approved leave logs for this employee and date
+      const leaveLogs = await this.leaveLogsService.getLeaveLogsByEmployee(employeeId);
+      const targetDateStr = checkinDatePKT.toISOString().split('T')[0];
+      const hasApprovedLeave = leaveLogs.some(log => {
+        if (log.status?.toLowerCase() === 'approved') {
+          // Check if target date falls within leave period
+          return targetDateStr >= log.start_date && targetDateStr <= log.end_date;
+        }
+        return false;
+      });
+
       // Parse shift start/end from varchar 24-hour format
       const [shiftStartHour, shiftStartMinute = 0] = (
         employee.shiftStart || '09:00'
@@ -244,14 +228,16 @@ export class AttendanceService {
       const halfTime = company.halfTime || 90;
       const absentTime = company.absentTime || 180;
 
-      // Determine status based on minutes late
+      // Determine status based on minutes late or approved leave
       let status: 'present' | 'late' | 'half_day' | 'absent' = 'present';
       let lateDetails: {
         minutes_late: number;
         requires_reason: boolean;
       } | null = null;
 
-      if (minutesLate > 0) {
+      if (hasApprovedLeave) {
+        status = 'present';
+      } else if (minutesLate > 0) {
         if (minutesLate <= lateTime) status = 'present';
         else if (minutesLate <= halfTime) {
           status = 'late';
@@ -308,38 +294,54 @@ export class AttendanceService {
       await this.updateMonthlyAttendanceSummary(employeeId, checkinDatePKT, status);
 
       // Create late log if needed
-      if (status === 'late') {
-        await this.prisma.lateLog.create({
-          data: {
-            empId: employeeId,
-            date: checkinDatePKT,
-            scheduledTimeIn: employee.shiftStart || '09:00',
-            actualTimeIn: formatTime(checkinLocal),
-            minutesLate,
-            reason: null,
-            actionTaken: 'Created',
-            lateType: null,
-            justified: null,
-          },
-        });
-      }
+        if (status === 'late') {
+          const existingLateLog = await this.prisma.lateLog.findFirst({
+            where: {
+              empId: employeeId,
+              date: checkinDatePKT,
+            },
+          });
+          if (!existingLateLog) {
+            await this.prisma.lateLog.create({
+              data: {
+                empId: employeeId,
+                date: checkinDatePKT,
+                scheduledTimeIn: employee.shiftStart || '09:00',
+                actualTimeIn: formatTime(checkinLocal),
+                minutesLate,
+                reason: null,
+                actionTaken: 'Created',
+                lateType: null,
+                justified: null,
+              },
+            });
+          }
+        }
 
       // Create half-day log if needed
-      if (status === 'half_day') {
-        await this.prisma.halfDayLog.create({
-          data: {
-            empId: employeeId,
-            date: checkinDatePKT,
-            scheduledTimeIn: employee.shiftStart || '09:00',
-            actualTimeIn: formatTime(checkinLocal),
-            minutesLate,
-            reason: null,
-            actionTaken: 'Created',
-            halfDayType: null,
-            justified: null,
-          },
-        });
-      }
+        if (status === 'half_day') {
+          const existingHalfDayLog = await this.prisma.halfDayLog.findFirst({
+            where: {
+              empId: employeeId,
+              date: checkinDatePKT,
+            },
+          });
+          if (!existingHalfDayLog) {
+            await this.prisma.halfDayLog.create({
+              data: {
+                empId: employeeId,
+                date: checkinDatePKT,
+                scheduledTimeIn: employee.shiftStart || '09:00',
+                actualTimeIn: formatTime(checkinLocal),
+                minutesLate,
+                reason: null,
+                actionTaken: 'Created',
+                halfDayType: null,
+                justified: null,
+              },
+            });
+          }
+        }
 
       return {
         id: attendanceLog.id,
@@ -605,7 +607,19 @@ export class AttendanceService {
   async getAttendanceList(): Promise<AttendanceListResponseDto[]> {
     try {
       const attendanceRecords = await this.prisma.attendance.findMany({
-        include: {
+        select: {
+          id: true,
+          employeeId: true,
+          presentDays: true,
+          absentDays: true,
+          lateDays: true,
+          leaveDays: true,
+          remoteDays: true,
+          availableLeaves: true,
+          monthlyLates: true,
+          halfDays: true,
+          createdAt: true,
+          updatedAt: true,
           employee: {
             select: {
               id: true,
@@ -627,7 +641,7 @@ export class AttendanceService {
         late_days: record.lateDays,
         leave_days: record.leaveDays,
         remote_days: record.remoteDays,
-        quarterly_leaves: record.quarterlyLeaves,
+        available_leaves: record.availableLeaves,
         monthly_lates: record.monthlyLates,
         half_days: record.halfDays,
         created_at: record.createdAt.toISOString(),
@@ -649,7 +663,19 @@ export class AttendanceService {
         where: {
           employeeId: employeeId,
         },
-        include: {
+        select: {
+          id: true,
+          employeeId: true,
+          presentDays: true,
+          absentDays: true,
+          lateDays: true,
+          leaveDays: true,
+          remoteDays: true,
+          availableLeaves: true,
+          monthlyLates: true,
+          halfDays: true,
+          createdAt: true,
+          updatedAt: true,
           employee: {
             select: {
               id: true,
@@ -672,7 +698,7 @@ export class AttendanceService {
         late_days: attendanceRecord.lateDays,
         leave_days: attendanceRecord.leaveDays,
         remote_days: attendanceRecord.remoteDays,
-        quarterly_leaves: attendanceRecord.quarterlyLeaves,
+        available_leaves: attendanceRecord.availableLeaves,
         monthly_lates: attendanceRecord.monthlyLates,
         half_days: attendanceRecord.halfDays,
         created_at: attendanceRecord.createdAt.toISOString(),
@@ -850,8 +876,8 @@ export class AttendanceService {
         dataToUpdate.leaveDays = updateFields.leave_days;
       if (updateFields.remote_days !== undefined)
         dataToUpdate.remoteDays = updateFields.remote_days;
-      if (updateFields.quarterly_leaves !== undefined)
-        dataToUpdate.quarterlyLeaves = updateFields.quarterly_leaves;
+      if (updateFields.available_leaves !== undefined)
+        dataToUpdate.availableLeaves = updateFields.available_leaves;
       if (updateFields.monthly_lates !== undefined)
         dataToUpdate.monthlyLates = updateFields.monthly_lates;
       if (updateFields.half_days !== undefined)
@@ -880,7 +906,7 @@ export class AttendanceService {
         late_days: updatedAttendance.lateDays,
         leave_days: updatedAttendance.leaveDays,
         remote_days: updatedAttendance.remoteDays,
-        quarterly_leaves: updatedAttendance.quarterlyLeaves,
+        available_leaves: updatedAttendance.availableLeaves,
         monthly_lates: updatedAttendance.monthlyLates,
         half_days: updatedAttendance.halfDays,
         created_at: updatedAttendance.createdAt.toISOString(),
@@ -1513,14 +1539,14 @@ export class AttendanceService {
                 const attendance = attendanceMap.get(update.employeeId);
                 if (attendance) {
                   const currentLeaveDays = attendance.leaveDays || 0;
-                  const currentQuarterlyLeaves =
-                    attendance.quarterlyLeaves || 0;
+                  const currentAvailableLeaves =
+                    attendance.availableLeaves || 0;
 
                   await tx.attendance.update({
                     where: { id: attendance.id },
                     data: {
                       leaveDays: currentLeaveDays + 1,
-                      quarterlyLeaves: Math.max(0, currentQuarterlyLeaves - 1),
+                      availableLeaves: Math.max(0, currentAvailableLeaves - 1),
                     },
                   });
 
@@ -1584,7 +1610,7 @@ export class AttendanceService {
                       lateDays: 0,
                       leaveDays: 0,
                       remoteDays: 0,
-                      quarterlyLeaves: 0,
+                      availableLeaves: 0,
                       monthlyLates: 0,
                       halfDays: 0,
                     },
@@ -1875,10 +1901,22 @@ export class AttendanceService {
         if (shiftEndHour < shiftStartHour && minutesLate < 0) minutesLate += 24 * 60;
         if (minutesLate < 0) minutesLate = 0;
 
+        // Check for approved leave logs for this employee and date
+        const leaveLogs = await this.leaveLogsService.getLeaveLogsByEmployee(employee.id);
+        const targetDateStr = checkinDatePKT.toISOString().split('T')[0];
+        const hasApprovedLeave = leaveLogs.some(log => {
+          if (log.status?.toLowerCase() === 'approved') {
+            return targetDateStr >= log.start_date && targetDateStr <= log.end_date;
+          }
+          return false;
+        });
+
         // Determine status
         let status: 'present' | 'late' | 'half_day' | 'absent' = 'present';
         let lateDetails: { minutes_late: number; requires_reason: boolean } | null = null;
-        if (minutesLate > 0) {
+        if (hasApprovedLeave) {
+          status = 'present';
+        } else if (minutesLate > 0) {
           if (minutesLate <= lateTime) status = 'present';
           else if (minutesLate <= halfTime) { status = 'late'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
           else if (minutesLate <= absentTime) { status = 'half_day'; lateDetails = { minutes_late: minutesLate, requires_reason: true }; }
@@ -2536,7 +2574,7 @@ export class AttendanceService {
         lateDays: 0,
         leaveDays: 0,
         remoteDays: 0,
-        quarterlyLeaves: 0,
+        availableLeaves: 0,
         monthlyLates: 0,
         halfDays: 0,
       },

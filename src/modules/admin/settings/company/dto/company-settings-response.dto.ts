@@ -82,16 +82,16 @@ export class CompanySettingsResponseDto {
 
   // Leave Policies
   @ApiProperty({
-    description: 'Number of quarterly leave days allowed',
-    example: 20,
-  })
-  quarterlyLeavesDays: number;
-
-  @ApiProperty({
     description: 'Number of monthly late days allowed',
     example: 3,
   })
   monthlyLatesDays: number;
+
+  @ApiProperty({
+    description: 'Number of leaves accrued per month',
+    example: 2,
+  })
+  monthlyLeavesAccrual: number;
 
   // Deductions
   @ApiProperty({ description: 'Deduction for each absent day', example: 1000 })

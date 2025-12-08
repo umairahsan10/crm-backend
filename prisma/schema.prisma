@@ -727,7 +727,7 @@ model Attendance {
   lateDays        Int?     @map("late_days")
   leaveDays       Int?     @map("leave_days")
   remoteDays      Int?     @map("remote_days")
-  quarterlyLeaves Int?     @map("quarterly_leaves")
+  availableLeaves Int?     @default(0) @map("available_leaves")
   monthlyLates    Int?     @map("monthly_lates")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -985,8 +985,9 @@ model Company {
   website             String?  @db.VarChar(255)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
-  quarterlyLeavesDays Int      @default(0) @map("quarterly_leaves_days")
+  // quarterlyLeavesDays removed; use availableLeaves logic
   monthlyLatesDays    Int      @default(0) @map("monthly_lates_days")
+  monthlyLeavesAccrual Int     @default(2) @map("monthly_leaves_accrual")
   absentDeduction     Int      @default(0) @map("absent_deduction")
   lateDeduction       Int      @default(0) @map("late_deduction")
   taxId               String?  @db.VarChar(100)

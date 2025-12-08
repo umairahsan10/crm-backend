@@ -49,9 +49,9 @@ export class AttendanceListResponseDto {
   @ApiProperty({
     type: Number,
     nullable: true,
-    description: 'Total number of quarterly leave days taken',
+    description: 'Total number of available leave days',
   })
-  quarterly_leaves: number | null;
+  available_leaves: number | null;
 
   @ApiProperty({
     type: Number,
