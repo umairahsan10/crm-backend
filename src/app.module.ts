@@ -22,6 +22,7 @@ import { DepartmentsModule } from './modules/Departments/departments.module';
 import { RolesModule } from './modules/Roles/roles.module';
 import { IndustryModule } from './modules/industry/industry.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { AllLogsModule } from './modules/all-logs/all-logs.module';
 import { DepartmentNamesModule } from './common/services/department-names.module';
 import { JwtConfigModule } from './config/jwt.module';
 
@@ -59,6 +60,7 @@ import { JwtConfigModule } from './config/jwt.module';
     RolesModule,
     IndustryModule,
     DashboardModule,
+    AllLogsModule,
   ],
   controllers: [AppController],
 })
